@@ -225,6 +225,27 @@ export class SqliteService implements Database {
       ['Papas Fritas 150g',       'Papas fritas sabor original',       2100,  1400,  25],
       ['Chocolate con Leche 100g','Chocolate con leche',                2200,  1500,  20],
       ['Caramelos Masticables 100g','Caramelos surtidos',               500,   300,  60],
+      // Productos 31-50: limpieza, higiene, y adicionales
+      ['Detergente 500ml',           'Detergente líquido para vajilla', 1800,  1200,  20],
+      ['Lavandina 1L',               'Lavandina concentrada',          1200,   800,  25],
+      ['Papel Higiénico x4',         'Papel higiénico x4 unidades',    2500,  1800,  30],
+      ['Pañuelos Descartables x10',  'Pañuelos de papel x10',          1200,   800,  40],
+      ['Jabón de Tocador 125g',      'Jabón de tocador',               1000,   650,  30],
+      ['Pasta Dental 90g',           'Pasta dental fluorada',          2200,  1500,  20],
+      ['Shampoo Sachet',             'Shampoo en sachet',               800,   500,  35],
+      ['Desodorante Aerosol',        'Desodorante aerosol x150ml',     3200,  2200,  15],
+      ['Galletitas Saladas 200g',    'Galletitas de agua',             1100,   700,  30],
+      ['Alfajores Triples x3',       'Alfajores triples de chocolate', 1800,  1200,  25],
+      ['Chicles Blister',            'Chicles sabor menta',             600,   350,  50],
+      ['Maní Salado 150g',           'Maní salado envasado',            900,   550,  30],
+      ['Pipas 100g',                 'Semillas de girasol',             700,   400,  35],
+      ['Té en Saquitos x25',         'Té negro en saquitos',           1500,  1000,  20],
+      ['Fósforos x10',               'Fósforos de cocina',              400,   200,  60],
+      ['Servilletas x100',           'Servilletas de papel x100',       800,   500,  25],
+      ['Film Adherente 30m',         'Film adherente para cocina',      900,   600,  20],
+      ['Papel Aluminio 5m',          'Papel de aluminio',              1200,   800,  15],
+      ['Agua Saborizada 1.5L',       'Agua saborizada pomelo',         1200,   800,  25],
+      ['Gaseosa Naranja 1.5L',       'Gaseosa sabor naranja',          1600,  1000,  20],
     ];
 
     const total = productos.length;
