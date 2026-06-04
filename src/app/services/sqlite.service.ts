@@ -72,6 +72,10 @@ export class SqliteService implements Database {
       await this._migrationV3(client);
     }
 
+    if (currentVersion < 4) {
+      await this._migrationV4(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -190,14 +194,64 @@ export class SqliteService implements Database {
   }
 
   private async _migrationV3(client: SQLocal): Promise<void> {
-    // Eliminar columna email de usuarios (ya no se usa para login)
-    try {
-      await client.sql('ALTER TABLE usuarios DROP COLUMN email');
-    } catch {
-      // La columna ya fue eliminada o nunca existió (install nuevo)
+    // Eliminar columna email de usuarios (ya no se usa para login).
+    // Usamos recreación de tabla (compatible con TODAS las versiones
+    // de SQLite, a diferencia de DROP COLUMN que requiere 3.35+).
+    const columns = await client.sql<{ name: string }>(
+      'PRAGMA table_info(usuarios)',
+    );
+    const hasEmail = columns.some((c) => c.name === 'email');
+    if (hasEmail) {
+      await client.sql('BEGIN TRANSACTION');
+      await client.sql(`CREATE TABLE usuarios_v3 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        rol TEXT NOT NULL DEFAULT 'trabajador' CHECK(rol IN ('admin', 'trabajador')),
+        activo INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`);
+      await client.sql(`INSERT INTO usuarios_v3
+        SELECT id, nombre, password_hash, salt, rol, activo, created_at, updated_at
+        FROM usuarios`);
+      await client.sql('DROP TABLE usuarios');
+      await client.sql('ALTER TABLE usuarios_v3 RENAME TO usuarios');
+      await client.sql('COMMIT');
     }
 
     await client.sql('INSERT INTO schema_version (version) VALUES (3)');
+  }
+
+  private async _migrationV4(client: SQLocal): Promise<void> {
+    // Reparación: si la columna email aún existe (v3 falló en algunos entornos),
+    // la eliminamos mediante recreación de tabla.
+    const columns = await client.sql<{ name: string }>(
+      'PRAGMA table_info(usuarios)',
+    );
+    const hasEmail = columns.some((c) => c.name === 'email');
+    if (hasEmail) {
+      await client.sql('BEGIN TRANSACTION');
+      await client.sql(`CREATE TABLE usuarios_v4 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        salt TEXT NOT NULL,
+        rol TEXT NOT NULL DEFAULT 'trabajador' CHECK(rol IN ('admin', 'trabajador')),
+        activo INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`);
+      await client.sql(`INSERT INTO usuarios_v4
+        SELECT id, nombre, password_hash, salt, rol, activo, created_at, updated_at
+        FROM usuarios`);
+      await client.sql('DROP TABLE usuarios');
+      await client.sql('ALTER TABLE usuarios_v4 RENAME TO usuarios');
+      await client.sql('COMMIT');
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (4)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {
