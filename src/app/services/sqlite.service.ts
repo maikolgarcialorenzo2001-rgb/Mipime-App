@@ -20,7 +20,23 @@ export class SqliteService implements Database {
       // Dynamic import: sqlocal se carga solo en el browser,
       // Vite nunca lo bundlea para SSR y no rompe el dev server.
       const { SQLocal: SQLocalClass } = await import('sqlocal');
-      this._client = new SQLocalClass('mipime-cuentas.db');
+
+      // Creamos el Worker desde nuestro código para que Vite/Angular
+      // lo procese correctamente (type: module). Si dejamos que SQLocal
+      // cree el Worker internamente, Vite no configura worker.format: 'es'
+      // y el worker falla con NS_ERROR_CORRUPTED_CONTENT.
+      const worker = new Worker(
+        new URL(
+          '../../../node_modules/sqlocal/dist/worker',
+          import.meta.url,
+        ),
+        { type: 'module' },
+      );
+
+      this._client = new SQLocalClass({
+        databasePath: 'mipime-cuentas.db',
+        processor: worker,
+      });
     }
     return this._client;
   }

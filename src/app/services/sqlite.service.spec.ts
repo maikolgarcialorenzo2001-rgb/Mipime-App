@@ -45,6 +45,15 @@ describe('SqliteService migration v2', () => {
     mockClientInstance = null;
     vi.clearAllMocks();
 
+    // Mock Worker para el processor custom (jsdom no tiene Worker)
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
     // Mock Web Crypto API para hashPassword (jsdom no tiene crypto.subtle.digest)
     const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
     Object.defineProperty(globalThis, 'crypto', {
