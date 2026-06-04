@@ -1,11 +1,37 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, type WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { JornadaPage } from './jornada.page';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
+
+interface MockJornadaService {
+  jornadaAbierta: WritableSignal<Jornada | null>;
+  jornadaCargando: WritableSignal<boolean>;
+  obtenerAbierta: () => import('rxjs').Observable<Jornada | null>;
+  cerrar: ReturnType<typeof vi.fn>;
+  obtenerReporte: ReturnType<typeof vi.fn>;
+}
+
+interface MockJornadaServiceInput {
+  jornadaAbierta?: Jornada | null;
+  jornadaCargando?: boolean;
+  obtenerAbierta?: () => import('rxjs').Observable<Jornada | null>;
+  cerrar?: ReturnType<typeof vi.fn>;
+  obtenerReporte?: ReturnType<typeof vi.fn>;
+}
+
+function createMockJornadaService(overrides: MockJornadaServiceInput = {}): MockJornadaService {
+  return {
+    jornadaAbierta: signal<Jornada | null>(overrides.jornadaAbierta ?? null),
+    jornadaCargando: signal<boolean>(overrides.jornadaCargando ?? false),
+    obtenerAbierta: overrides.obtenerAbierta ?? (() => of(null)),
+    cerrar: overrides.cerrar ?? vi.fn(),
+    obtenerReporte: overrides.obtenerReporte ?? vi.fn(),
+  };
+}
 
 const mockJornadaAbierta: Jornada = {
   id: 1,
@@ -68,11 +94,12 @@ describe('JornadaPage', () => {
         providers: [
           {
             provide: JornadaService,
-            useValue: {
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
               obtenerAbierta: () => of(mockJornadaAbierta),
               cerrar: vi.fn().mockReturnValue(of(mockJornadaCerrada)),
-              obtenerReporte: vi.fn().mockReturnValue(of(null)),
-            },
+            }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
         ],
@@ -120,9 +147,11 @@ describe('JornadaPage', () => {
         providers: [
           {
             provide: JornadaService,
-            useValue: {
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
               obtenerAbierta: () => of(mockJornadaAbierta),
-            },
+            }),
           },
           { provide: AuthService, useValue: createMockAuth(mockWorker) },
         ],
@@ -147,9 +176,11 @@ describe('JornadaPage', () => {
         providers: [
           {
             provide: JornadaService,
-            useValue: {
+            useValue: createMockJornadaService({
+              jornadaAbierta: null,
+              jornadaCargando: false,
               obtenerAbierta: () => of(null),
-            },
+            }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
         ],
@@ -174,9 +205,11 @@ describe('JornadaPage', () => {
         providers: [
           {
             provide: JornadaService,
-            useValue: {
+            useValue: createMockJornadaService({
+              jornadaAbierta: null,
+              jornadaCargando: false,
               obtenerAbierta: () => of(null),
-            },
+            }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
         ],
@@ -207,7 +240,9 @@ describe('JornadaPage', () => {
         providers: [
           {
             provide: JornadaService,
-            useValue: {
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
               obtenerAbierta: () => of(mockJornadaAbierta),
               cerrar: cerrarSpy,
               obtenerReporte: vi.fn().mockReturnValue(of({
@@ -218,7 +253,7 @@ describe('JornadaPage', () => {
                 filename: 'jornada_2026-06-04_1.xlsx',
                 created_at: '',
               })),
-            },
+            }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
         ],

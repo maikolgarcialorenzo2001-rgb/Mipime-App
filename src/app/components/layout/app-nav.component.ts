@@ -2,7 +2,6 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
-import type { Jornada } from '../../models';
 
 @Component({
   selector: 'app-nav',
@@ -13,12 +12,9 @@ import type { Jornada } from '../../models';
 export class AppNavComponent {
   private readonly _router = inject(Router);
   private readonly _auth = inject(AuthService);
-  private readonly _jornadaService = inject(JornadaService);
+  readonly jornadaService = inject(JornadaService);
 
   protected readonly auth = this._auth;
-
-  readonly jornada = signal<Jornada | null>(null);
-  readonly cargandoJornada = signal(true);
 
   /** Modal de apertura */
   readonly showOpenModal = signal(false);
@@ -32,19 +28,16 @@ export class AppNavComponent {
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
 
-  constructor() {
-    this._cargarJornada();
-  }
-
   get puedeAbrir(): boolean {
-    return !this.cargandoJornada() && this.jornada() === null;
+    return !this.jornadaService.jornadaCargando() && this.jornadaService.jornadaAbierta() === null;
   }
 
   get puedeCerrar(): boolean {
+    const j = this.jornadaService.jornadaAbierta();
     return (
-      !this.cargandoJornada() &&
-      this.jornada() !== null &&
-      this.jornada()!.estado === 'abierta' &&
+      !this.jornadaService.jornadaCargando() &&
+      j !== null &&
+      j.estado === 'abierta' &&
       this._auth.hasRole('admin')
     );
   }
@@ -73,9 +66,8 @@ export class AppNavComponent {
     this.abriendo.set(true);
     this.abrirError.set(null);
 
-    this._jornadaService.abrir(monto).subscribe({
-      next: (j) => {
-        this.jornada.set(j);
+    this.jornadaService.abrir(monto).subscribe({
+      next: () => {
         this.showOpenModal.set(false);
         this.abriendo.set(false);
       },
@@ -107,7 +99,7 @@ export class AppNavComponent {
   }
 
   confirmarCierre(): void {
-    const j = this.jornada();
+    const j = this.jornadaService.jornadaAbierta();
     const sr = this.saldoReal();
     const uid = this.auth.usuario()?.id;
 
@@ -116,9 +108,8 @@ export class AppNavComponent {
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this._jornadaService.cerrar(j.id, sr, uid).subscribe({
+    this.jornadaService.cerrar(j.id, sr, uid).subscribe({
       next: () => {
-        this.jornada.set(null);
         this.showCloseModal.set(false);
         this.cerrando.set(false);
 
@@ -153,7 +144,7 @@ export class AppNavComponent {
   // ── Internos ──────────────────────────────────────────
 
   private _descargarExcel(jornadaId: number): void {
-    this._jornadaService.obtenerReporte(jornadaId).subscribe({
+    this.jornadaService.obtenerReporte(jornadaId).subscribe({
       next: (reporte) => {
         if (!reporte) return;
 
@@ -173,21 +164,6 @@ export class AppNavComponent {
         a.download = reporte.filename;
         a.click();
         URL.revokeObjectURL(url);
-      },
-    });
-  }
-
-  private _cargarJornada(): void {
-    this.cargandoJornada.set(true);
-
-    this._jornadaService.obtenerAbierta().subscribe({
-      next: (j) => {
-        this.jornada.set(j);
-        this.cargandoJornada.set(false);
-      },
-      error: () => {
-        this.jornada.set(null);
-        this.cargandoJornada.set(false);
       },
     });
   }

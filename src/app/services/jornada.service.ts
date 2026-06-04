@@ -1,5 +1,5 @@
-import { Injectable, inject } from '@angular/core';
-import { from, map, Observable } from 'rxjs';
+import { Injectable, inject, signal } from '@angular/core';
+import { from, map, Observable, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService } from './excel.service';
 import type { Jornada, JornadaReporte } from '../models';
@@ -12,6 +12,31 @@ import type { Movimiento } from '../models/movimiento';
 export class JornadaService {
   private readonly _db = inject(DATABASE);
   private readonly _excelService = inject(ExcelService);
+
+  /** Señal compartida de la jornada abierta actual (null si no hay). */
+  readonly jornadaAbierta = signal<Jornada | null>(null);
+
+  /** `true` mientras se carga la jornada por primera vez o se refresca. */
+  readonly jornadaCargando = signal(true);
+
+  constructor() {
+    this.refreshJornadaAbierta();
+  }
+
+  /** Recarga la jornada abierta desde la DB y actualiza `jornadaAbierta`. */
+  refreshJornadaAbierta(): void {
+    this.jornadaCargando.set(true);
+    this.obtenerAbierta().subscribe({
+      next: (j) => {
+        this.jornadaAbierta.set(j);
+        this.jornadaCargando.set(false);
+      },
+      error: () => {
+        this.jornadaAbierta.set(null);
+        this.jornadaCargando.set(false);
+      },
+    });
+  }
 
   /** Abre una nueva jornada con el monto inicial del día. */
   abrir(montoInicial: number): Observable<Jornada> {
@@ -27,7 +52,10 @@ export class JornadaService {
          RETURNING *`,
         [fecha, hora, montoInicial, montoInicial, iso, iso],
       ),
-    ).pipe(map((rows) => rows[0]));
+    ).pipe(
+      map((rows) => rows[0]),
+      tap((j) => this.jornadaAbierta.set(j)),
+    );
   }
 
   /**
@@ -38,7 +66,9 @@ export class JornadaService {
    * 4. Actualiza la jornada (hora_cierre, saldo_real, user_cierre_id, estado)
    */
   cerrar(id: number, saldoReal: number, userId: number): Observable<Jornada> {
-    return from(this._cerrarAsync(id, saldoReal, userId));
+    return from(this._cerrarAsync(id, saldoReal, userId)).pipe(
+      tap(() => this.jornadaAbierta.set(null)),
+    );
   }
 
   private async _cerrarAsync(

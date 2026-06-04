@@ -4,7 +4,6 @@ import { AuthService } from '../../services/auth.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { JornadaSummaryCardComponent } from '../../components/jornada-summary-card/jornada-summary-card.component';
-import type { Jornada } from '../../models';
 
 @Component({
   selector: 'app-jornada-page',
@@ -13,11 +12,9 @@ import type { Jornada } from '../../models';
   styleUrl: './jornada.page.css',
 })
 export class JornadaPage {
-  private readonly _jornadaService = inject(JornadaService);
+  protected readonly jornadaService = inject(JornadaService);
   private readonly _authService = inject(AuthService);
 
-  readonly jornada = signal<Jornada | null>(null);
-  readonly cargando = signal(true);
   readonly error = signal<string | null>(null);
 
   /** Modal de cierre */
@@ -28,16 +25,13 @@ export class JornadaPage {
 
   readonly usuario = this._authService.usuario;
 
-  constructor() {
-    this._cargarJornada();
-  }
-
   get isAdmin(): boolean {
     return this._authService.hasRole('admin');
   }
 
   get puedeCerrar(): boolean {
-    return this.isAdmin && this.jornada() !== null && this.jornada()!.estado === 'abierta';
+    const j = this.jornadaService.jornadaAbierta();
+    return this.isAdmin && j !== null && j.estado === 'abierta';
   }
 
   abrirModalCierre(): void {
@@ -56,7 +50,7 @@ export class JornadaPage {
   }
 
   confirmarCierre(): void {
-    const j = this.jornada();
+    const j = this.jornadaService.jornadaAbierta();
     const sr = this.saldoReal();
     const uid = this.usuario()?.id;
 
@@ -65,10 +59,8 @@ export class JornadaPage {
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this._jornadaService.cerrar(j.id, sr, uid).subscribe({
+    this.jornadaService.cerrar(j.id, sr, uid).subscribe({
       next: () => {
-        // Recargar jornada (ahora cerrada)
-        this._cargarJornada();
         this.showCloseModal.set(false);
         this.cerrando.set(false);
 
@@ -96,24 +88,8 @@ export class JornadaPage {
     }
   }
 
-  private _cargarJornada(): void {
-    this.cargando.set(true);
-    this.error.set(null);
-
-    this._jornadaService.obtenerAbierta().subscribe({
-      next: (j) => {
-        this.jornada.set(j);
-        this.cargando.set(false);
-      },
-      error: (err: unknown) => {
-        this.error.set(err instanceof Error ? err.message : 'Error al cargar la jornada');
-        this.cargando.set(false);
-      },
-    });
-  }
-
   private _descargarExcel(jornadaId: number): void {
-    this._jornadaService.obtenerReporte(jornadaId).subscribe({
+    this.jornadaService.obtenerReporte(jornadaId).subscribe({
       next: (reporte) => {
         if (!reporte) return;
 

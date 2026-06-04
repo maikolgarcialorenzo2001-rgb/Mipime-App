@@ -75,7 +75,9 @@ describe('JornadaService', () => {
     });
 
     it('debería retornar la jornada abierta cuando existe', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([mockJornada]);
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([mockJornada]);
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerAbierta());
@@ -110,6 +112,8 @@ describe('JornadaService', () => {
   describe('cerrar', () => {
     it('debería cerrar la jornada generando Excel (admin)', async () => {
       vi.mocked(mockDb.sql)
+        // constructor: obtenerAbierta
+        .mockResolvedValueOnce([])
         // 1. admin check
         .mockResolvedValueOnce([{ rol: 'admin' }])
         // 2. ventas
@@ -132,7 +136,9 @@ describe('JornadaService', () => {
     });
 
     it('debería rechazar si el usuario no es admin', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValueOnce([{ rol: 'trabajador' }]);
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([{ rol: 'trabajador' }]);
 
       const service = TestBed.inject(JornadaService);
 
@@ -142,7 +148,9 @@ describe('JornadaService', () => {
     });
 
     it('debería rechazar si el usuario no existe', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValueOnce([]);
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]); // admin check -> usuario no encontrado
 
       const service = TestBed.inject(JornadaService);
 
@@ -163,6 +171,8 @@ describe('JornadaService', () => {
       ];
 
       vi.mocked(mockDb.sql)
+        // constructor: obtenerAbierta
+        .mockResolvedValueOnce([])
         // 1. admin check
         .mockResolvedValueOnce([{ rol: 'admin' }])
         // 2. ventas
@@ -198,6 +208,7 @@ describe('JornadaService', () => {
 
     it('debería lanzar error si la jornada no existe', async () => {
       vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([{ rol: 'admin' }])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])

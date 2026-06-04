@@ -34,8 +34,6 @@ export class PosPage {
   readonly showModal = signal(false);
   readonly pendingProduct = signal<Producto | null>(null);
 
-  readonly jornadaCargando = signal(true);
-  readonly jornadaId = signal<number | null>(null);
   readonly ventaError = signal<string | null>(null);
 
   /** Cantidad de columnas del grid según el viewport, matcheando Tailwind breakpoints. */
@@ -51,7 +49,6 @@ export class PosPage {
 
   constructor() {
     this._buscar('');
-    this._cargarJornada();
 
     afterNextRender(() => {
       this.searchInput()?.nativeElement.focus();
@@ -59,7 +56,7 @@ export class PosPage {
   }
 
   get sinJornada(): boolean {
-    return !this.jornadaCargando() && this.jornadaId() === null;
+    return !this._jornadaService.jornadaCargando() && this._jornadaService.jornadaAbierta() === null;
   }
 
   onQueryChange(value: string): void {
@@ -156,8 +153,8 @@ export class PosPage {
   }
 
   confirmarVenta(): void {
-    const jId = this.jornadaId();
-    if (jId === null) return;
+    const jId = this._jornadaService.jornadaAbierta()?.id;
+    if (jId === undefined) return;
 
     this.ventaError.set(null);
     const items = this.cart.items();
@@ -172,21 +169,6 @@ export class PosPage {
         this.ventaError.set(
           err instanceof Error ? err.message : 'Error al registrar la venta',
         );
-      },
-    });
-  }
-
-  private _cargarJornada(): void {
-    this.jornadaCargando.set(true);
-
-    this._jornadaService.obtenerAbierta().subscribe({
-      next: (jornada) => {
-        this.jornadaId.set(jornada?.id ?? null);
-        this.jornadaCargando.set(false);
-      },
-      error: () => {
-        this.jornadaId.set(null);
-        this.jornadaCargando.set(false);
       },
     });
   }

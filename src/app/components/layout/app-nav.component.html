@@ -70,7 +70,7 @@
 
       <div class="flex items-center gap-3 text-sm">
         <!-- Botones de jornada -->
-        @if (!cargandoJornada()) {
+        @if (!jornadaService.jornadaCargando()) {
           @if (puedeAbrir) {
             <button
               type="button"
