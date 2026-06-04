@@ -191,9 +191,9 @@ describe('HistorialPage — vacío', () => {
     expect(empty).toBeTruthy();
   });
 
-  it('no debería mostrar el calendario si no hay jornadas', () => {
-    const calendar = fixture.nativeElement.querySelector('.grid.grid-cols-7');
-    expect(calendar).toBeFalsy();
+  it('debería mostrar el calendario aunque no haya jornadas', () => {
+    const calendar = fixture.nativeElement.querySelector('.grid-cols-7');
+    expect(calendar).toBeTruthy();
   });
 });
 

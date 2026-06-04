@@ -7,10 +7,8 @@
 
   @if (loading()) {
     <app-loading-spinner />
-  } @else if (jornadas().length === 0) {
-    <app-empty-state message="No hay jornadas registradas" />
   } @else {
-    <!-- Navegación de mes -->
+    <!-- Navegación de mes — siempre visible -->
     <div class="mb-4 flex items-center justify-between">
       <button
         type="button"
@@ -37,7 +35,7 @@
       </button>
     </div>
 
-    <!-- Grid del calendario -->
+    <!-- Grid del calendario — siempre visible -->
     <div class="rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
       <!-- Cabecera de días de la semana -->
       <div class="grid grid-cols-7 border-b border-gray-100">
@@ -94,6 +92,13 @@
         }
       </div>
     </div>
+
+    <!-- Indicador si no hay jornadas en ningún mes -->
+    @if (jornadas().length === 0) {
+      <div class="mt-6">
+        <app-empty-state message="No hay jornadas registradas aún. Abrí una jornada desde la página de Jornada." />
+      </div>
+    }
 
     <!-- Panel de detalle del día seleccionado -->
     @if (diaSeleccionado(); as sel) {
