@@ -1,0 +1,172 @@
+import { Injectable, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import type { SQLocal } from 'sqlocal';
+import type { Database } from './database';
+
+@Injectable()
+export class SqliteService implements Database {
+  private _client: SQLocal | null = null;
+  private readonly _isBrowser: boolean;
+
+  constructor() {
+    this._isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  }
+
+  private async _getClient(): Promise<SQLocal> {
+    if (!this._client) {
+      if (!this._isBrowser) {
+        throw new Error('SqliteService solo está disponible en el navegador');
+      }
+      // Dynamic import: sqlocal se carga solo en el browser,
+      // Vite nunca lo bundlea para SSR y no rompe el dev server.
+      const { SQLocal: SQLocalClass } = await import('sqlocal');
+      this._client = new SQLocalClass('mipime-cuentas.db');
+    }
+    return this._client;
+  }
+
+  async sql<T>(query: string, params?: unknown[]): Promise<T[]> {
+    const client = await this._getClient();
+    const result = await client.sql(query, ...(params ?? []));
+    return result as unknown as T[];
+  }
+
+  async initialize(): Promise<void> {
+    if (!this._isBrowser) return;
+    const client = await this._getClient();
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY
+    )`);
+
+    const rows = await client.sql<{ version: number }>(
+      'SELECT COALESCE(MAX(version), 0) AS version FROM schema_version',
+    );
+    const currentVersion = rows[0]?.version ?? 0;
+
+    if (currentVersion < 1) {
+      await this._migrationV1(client);
+    }
+
+    await this._seedIfEmpty(client);
+  }
+
+  private async _migrationV1(client: SQLocal): Promise<void> {
+    await client.sql(`CREATE TABLE IF NOT EXISTS jornadas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fecha TEXT NOT NULL,
+      hora_apertura TEXT NOT NULL,
+      monto_inicial REAL NOT NULL DEFAULT 0,
+      hora_cierre TEXT,
+      total_ventas REAL NOT NULL DEFAULT 0,
+      total_gastos REAL NOT NULL DEFAULT 0,
+      saldo_esperado REAL NOT NULL DEFAULT 0,
+      saldo_real REAL,
+      estado TEXT NOT NULL DEFAULT 'abierta' CHECK(estado IN ('abierta', 'cerrada')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS productos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      descripcion TEXT,
+      precio_venta REAL NOT NULL,
+      precio_costo REAL,
+      stock_actual REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS ventas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      fecha_hora TEXT NOT NULL,
+      total REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS detalle_ventas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      venta_id INTEGER NOT NULL REFERENCES ventas(id),
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      precio_unitario REAL NOT NULL,
+      subtotal REAL NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS movimientos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      tipo TEXT NOT NULL CHECK(tipo IN ('gasto', 'ingreso_extra')),
+      descripcion TEXT NOT NULL,
+      monto REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (1)');
+  }
+
+  private async _seedIfEmpty(client: SQLocal): Promise<void> {
+    const [{ count }] = await client.sql<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM productos',
+    );
+
+    if (count > 0) return;
+
+    const ahora = new Date().toISOString();
+    const productos: [string, string | null, number, number | null, number][] = [
+      ['Harina 0000 1kg',        'Harina de trigo tradicional',         850,   550,  50],
+      ['Azúcar 1kg',              'Azúcar blanca refinada',             900,   600,  40],
+      ['Leche Entera 1L',         'Leche fluida entera',               1100,   750,  30],
+      ['Pan Lactal 500g',         'Pan de molde blanco',               1500,  1000,  20],
+      ['Huevos x12',              'Huevos de campo',                   1800,  1200,  25],
+      ['Aceite Girasol 1.5L',     'Aceite puro de girasol',            2500,  1700,  15],
+      ['Arroz 1kg',               'Arroz blanco largo fino',           1200,   800,  35],
+      ['Fideos Tallarines 500g',  'Fideos secos de sémola',             800,   500,  45],
+      ['Yerba Mate 1kg',          'Yerba mate con palo',               3500,  2500,  20],
+      ['Café Molido 500g',        'Café torrado molido',               4000,  2800,  15],
+      ['Galletitas Dulces 200g',  'Galletitas de vainilla',             950,   600,  40],
+      ['Manteca 200g',            'Manteca pasteurizada',              1200,   800,  25],
+      ['Queso Cremoso 200g',      'Queso cremoso entero',              1800,  1200,  20],
+      ['Yogur Firme x4',          'Yogur firme sabor frutilla',        1400,   950,  30],
+      ['Sal Fina 500g',           'Sal fina de mesa',                   500,   300,  50],
+      ['Dulce de Leche 400g',     'Dulce de leche tradicional',        2200,  1500,  20],
+      ['Atún al Natural x2',      'Lata de atún desmenuzado',          2100,  1400,  25],
+      ['Tomate Perita Lata 400g', 'Tomate perita pelado entero',       1200,   750,  30],
+      ['Lentejas 500g',           'Lentejas secas',                     950,   600,  30],
+      ['Puré de Tomates 500g',    'Puré de tomates tradicional',        800,   500,  35],
+      ['Mayonesa 500g',           'Mayonesa clásica',                  1600,  1100,  20],
+      ['Mostaza 250g',            'Mostaza amarilla',                   900,   550,  25],
+      ['Vinagre Alcohol 500ml',   'Vinagre de alcohol',                 600,   350,  30],
+      ['Agua Mineral 2L',         'Agua mineral sin gas',               800,   500,  40],
+      ['Gaseosa Cola 1.5L',       'Gaseosa sabor cola',                1800,  1200,  30],
+      ['Cerveza Lata 473ml',      'Cerveza rubia',                     1500,   950,  35],
+      ['Vino Tinto Botella',      'Vino tinto varietal',               3500,  2200,  15],
+      ['Papas Fritas 150g',       'Papas fritas sabor original',       2100,  1400,  25],
+      ['Chocolate con Leche 100g','Chocolate con leche',                2200,  1500,  20],
+      ['Caramelos Masticables 100g','Caramelos surtidos',               500,   300,  60],
+    ];
+
+    const total = productos.length;
+    const batchSize = 10;
+
+    for (let i = 0; i < total; i += batchSize) {
+      const batch = productos.slice(i, i + batchSize);
+      const placeholders = batch
+        .map(() => '(?, ?, ?, ?, ?, ?, ?)')
+        .join(', ');
+
+      const flatParams: unknown[] = [];
+      for (const [nombre, descripcion, precioVenta, precioCosto, stock] of batch) {
+        flatParams.push(nombre, descripcion, precioVenta, precioCosto ?? null, stock, ahora, ahora);
+      }
+
+      await client.sql(
+        `INSERT INTO productos (nombre, descripcion, precio_venta, precio_costo, stock_actual, created_at, updated_at)
+         VALUES ${placeholders}`,
+        ...flatParams,
+      );
+    }
+  }
+}

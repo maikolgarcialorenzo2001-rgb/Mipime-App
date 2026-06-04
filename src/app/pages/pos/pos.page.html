@@ -1,0 +1,176 @@
+<div class="flex h-[calc(100vh-53px)]">
+  <!-- Columna izquierda: buscador + productos -->
+  <div class="flex flex-1 flex-col overflow-hidden">
+    <!-- Buscador -->
+    <div class="border-b border-gray-200 bg-white px-6 py-3">
+      <input
+        #searchInput
+        type="text"
+        placeholder="Buscá productos por nombre… (Escape para limpiar, ↑↓ para navegar)"
+        class="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-lg shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors"
+        [value]="query()"
+        (input)="onQueryChange($any($event.target).value)"
+        (keydown)="onKeydown($event)"
+      />
+    </div>
+
+    <!-- Resultados -->
+    <div class="flex-1 overflow-y-auto p-6">
+      @if (buscando()) {
+        <div class="flex items-center justify-center py-20 text-gray-400">
+          <svg class="h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+      } @else if (resultados().length === 0) {
+        <div class="flex items-center justify-center py-20 text-gray-400">
+          <p class="text-lg">Escribí para buscar productos</p>
+        </div>
+      } @else {
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          @for (p of resultados(); track p.id; let i = $index) {
+            <button
+              type="button"
+              class="flex flex-col rounded-xl border-2 p-4 text-left transition-all hover:shadow-md active:scale-[0.97]"
+              [class]="i === selectedIndex()
+                ? 'border-blue-500 bg-blue-50 shadow-sm'
+                : 'border-gray-200 bg-white hover:border-gray-300'"
+              (click)="agregarAlCarrito(p)"
+            >
+              <span class="text-sm font-medium text-gray-900 leading-tight line-clamp-2">{{ p.nombre }}</span>
+              <span class="mt-1 text-lg font-bold text-blue-600">
+                {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              </span>
+              @if (p.stock_actual <= 5) {
+                <span class="mt-1 text-xs text-red-500">Stock: {{ p.stock_actual }}</span>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Columna derecha: carrito -->
+  <div class="flex w-96 flex-col border-l border-gray-200 bg-white">
+    <div class="border-b border-gray-200 px-5 py-4">
+      <h2 class="text-base font-semibold text-gray-900">
+        Carrito ({{ cart.cantidadItems() }} item{{ cart.cantidadItems() !== 1 ? 's' : '' }})
+      </h2>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-5 py-2">
+      @if (cart.items().length === 0) {
+        <p class="mt-10 text-center text-sm text-gray-400">
+          El carrito está vacío
+        </p>
+      } @else {
+        <ul class="divide-y divide-gray-100">
+          @for (item of cart.items(); track item.producto.id) {
+            <li class="flex items-center gap-3 py-3">
+              <div class="flex-1 min-w-0">
+                <p class="truncate text-sm font-medium text-gray-900">{{ item.producto.nombre }}</p>
+                <p class="text-xs text-gray-400">{{ item.producto.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  class="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                  (click)="cart.actualizarCantidad(item.producto.id, item.cantidad - 1)"
+                  aria-label="Reducir cantidad"
+                >−</button>
+
+                <span class="w-8 text-center text-sm font-semibold tabular-nums">{{ item.cantidad }}</span>
+
+                <button
+                  type="button"
+                  class="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                  (click)="cart.actualizarCantidad(item.producto.id, item.cantidad + 1)"
+                  aria-label="Aumentar cantidad"
+                >+</button>
+              </div>
+
+              <span class="w-20 text-right text-sm font-semibold tabular-nums text-gray-900">
+                {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              </span>
+
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                (click)="cart.quitar(item.producto.id)"
+                aria-label="Quitar del carrito"
+              >✕</button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <!-- Total + Cobrar -->
+    @if (cart.items().length > 0) {
+      <div class="border-t border-gray-200 px-5 py-4">
+        <div class="mb-4 flex items-baseline justify-between">
+          <span class="text-sm text-gray-500">Total</span>
+          <span class="text-2xl font-bold text-gray-900">
+            {{ cart.total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
+          </span>
+        </div>
+        <button
+          type="button"
+          class="w-full rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors"
+          (click)="abrirModal()"
+        >Cobrar</button>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Modal de cobro -->
+@if (showModal()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    role="dialog"
+    tabindex="-1"
+    (click)="onBackdropClick($event)"
+    (keydown)="onModalKeydown($event)"
+  >
+    <div
+      class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+    >
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Confirmar venta</h3>
+
+      <ul class="mb-4 divide-y divide-gray-100 text-sm">
+        @for (item of cart.items(); track item.producto.id) {
+          <li class="flex justify-between py-2">
+            <span class="text-gray-600 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
+            <span class="font-medium text-gray-900 tabular-nums">
+              {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
+            </span>
+          </li>
+        }
+      </ul>
+
+      <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 pt-3">
+        <span class="text-base font-semibold text-gray-900">Total</span>
+        <span class="text-xl font-bold text-gray-900">
+          {{ cart.total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
+        </span>
+      </div>
+
+      <div class="flex gap-3">
+        <button
+          type="button"
+          class="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          (click)="cerrarModal()"
+        >Cancelar</button>
+        <button
+          type="button"
+          class="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors"
+          (click)="confirmarVenta()"
+        >Confirmar venta</button>
+      </div>
+    </div>
+  </div>
+}
