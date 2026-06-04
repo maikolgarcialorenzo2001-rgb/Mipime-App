@@ -1,0 +1,8 @@
+<span
+  class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium"
+  [ngClass]="estado() === 'abierta'
+    ? 'bg-green-100 text-green-700'
+    : 'bg-gray-100 text-gray-600'"
+>
+  {{ estado() === 'abierta' ? 'Abierta' : 'Cerrada' }}
+</span>

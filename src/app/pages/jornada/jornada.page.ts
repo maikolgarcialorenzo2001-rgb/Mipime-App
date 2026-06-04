@@ -1,11 +1,13 @@
 import { Component, inject, OnInit } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { JornadaService } from '../../services/jornada.service';
+import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
+import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
+import { JornadaSummaryCardComponent } from '../../components/jornada-summary-card/jornada-summary-card.component';
 import type { Jornada } from '../../models';
 
 @Component({
   selector: 'app-jornada-page',
-  imports: [DatePipe],
+  imports: [ErrorAlertComponent, EmptyStateComponent, JornadaSummaryCardComponent],
   templateUrl: './jornada.page.html',
   styleUrl: './jornada.page.css',
 })

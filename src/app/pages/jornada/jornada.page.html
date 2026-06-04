@@ -2,49 +2,12 @@
   <h1 class="text-2xl font-bold text-gray-900 mb-6">Jornada del día</h1>
 
   @if (error) {
-    <div class="rounded-lg bg-red-50 p-4 text-red-700">
-      {{ error }}
-    </div>
+    <app-error-alert [message]="error" />
   }
 
   @if (jornada; as j) {
-    <div class="rounded-xl bg-white p-6 shadow-sm">
-      <div class="flex items-center gap-3 mb-4">
-        <span
-          class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium"
-          [class]="j.estado === 'abierta'
-            ? 'bg-green-100 text-green-700'
-            : 'bg-gray-100 text-gray-600'"
-        >
-          {{ j.estado === 'abierta' ? 'Abierta' : 'Cerrada' }}
-        </span>
-        <span class="text-sm text-gray-500">
-          {{ j.fecha | date }}
-        </span>
-      </div>
-
-      <dl class="grid grid-cols-2 gap-4">
-        <div>
-          <dt class="text-sm text-gray-500">Monto inicial</dt>
-          <dd class="text-lg font-semibold">${{ j.monto_inicial }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-gray-500">Total ventas</dt>
-          <dd class="text-lg font-semibold">${{ j.total_ventas }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-gray-500">Total gastos</dt>
-          <dd class="text-lg font-semibold">${{ j.total_gastos }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm text-gray-500">Saldo esperado</dt>
-          <dd class="text-lg font-semibold">${{ j.saldo_esperado }}</dd>
-        </div>
-      </dl>
-    </div>
+    <app-jornada-summary-card [jornada]="j" />
   } @else if (!error) {
-    <div class="rounded-xl bg-white p-6 shadow-sm text-center text-gray-500">
-      No hay jornada abierta. Iniciá el día para comenzar.
-    </div>
+    <app-empty-state message="No hay jornada abierta. Iniciá el día para comenzar." />
   }
 </div>
