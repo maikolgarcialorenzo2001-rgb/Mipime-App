@@ -85,7 +85,7 @@ describe('App component nav', () => {
     fixture.detectChanges();
 
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
-    const linkTexts = Array.from(navLinks).map((a: HTMLAnchorElement) => a.textContent?.trim());
+    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
 
     expect(linkTexts).toContain('POS');
     expect(linkTexts).toContain('Productos');
@@ -141,7 +141,7 @@ describe('App component nav', () => {
     fixture.detectChanges();
 
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
-    const linkTexts = Array.from(navLinks).map((a: HTMLAnchorElement) => a.textContent?.trim());
+    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
 
     expect(linkTexts).not.toContain('Admin');
     expect(linkTexts).toContain('POS');

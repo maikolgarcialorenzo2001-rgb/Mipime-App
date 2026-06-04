@@ -5,6 +5,7 @@ import { routes } from './app.routes';
 describe('app.routes', () => {
   type RouteWithGuard = {
     path: string;
+    pathMatch?: string;
     canActivate?: unknown[];
     loadComponent?: unknown;
     redirectTo?: string;
