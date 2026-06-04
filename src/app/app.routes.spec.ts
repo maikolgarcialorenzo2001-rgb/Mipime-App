@@ -14,10 +14,10 @@ describe('app.routes', () => {
     return routes.find((r) => r.path === path) as RouteWithGuard | undefined;
   }
 
-  it('debería redirigir / a /jornada', () => {
+  it('debería redirigir / a /pos', () => {
     const route = findRoute('');
     expect(route).toBeDefined();
-    expect(route!.redirectTo).toBe('/jornada');
+    expect(route!.redirectTo).toBe('/pos');
     expect(route!.pathMatch).toBe('full');
   });
 
