@@ -69,8 +69,7 @@ describe('App component nav', () => {
     const hash = await hashPassword('admin123', salt);
     (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
       id: 1,
-      nombre: 'Admin',
-      email: 'admin@mipime.com',
+      nombre: 'admin',
       password_hash: hash,
       salt,
       rol: 'admin',
@@ -80,7 +79,7 @@ describe('App component nav', () => {
     }]);
 
     const auth = TestBed.inject(AuthService);
-    await firstValueFrom(auth.login('admin@mipime.com', 'admin123'));
+    await firstValueFrom(auth.login('admin', 'admin123'));
 
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -101,8 +100,7 @@ describe('App component nav', () => {
     const hash = await hashPassword('admin123', salt);
     (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
       id: 1,
-      nombre: 'Admin',
-      email: 'admin@mipime.com',
+      nombre: 'admin',
       password_hash: hash,
       salt,
       rol: 'admin',
@@ -112,13 +110,13 @@ describe('App component nav', () => {
     }]);
 
     const auth = TestBed.inject(AuthService);
-    await firstValueFrom(auth.login('admin@mipime.com', 'admin123'));
+    await firstValueFrom(auth.login('admin', 'admin123'));
 
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('Admin');
+    expect(text).toContain('admin');
     expect(text).toContain('Cerrar sesión');
   });
 
@@ -127,8 +125,7 @@ describe('App component nav', () => {
     const hash = await hashPassword('pass123', salt);
     (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
       id: 2,
-      nombre: 'Worker',
-      email: 'worker@test.com',
+      nombre: 'worker',
       password_hash: hash,
       salt,
       rol: 'trabajador',
@@ -138,7 +135,7 @@ describe('App component nav', () => {
     }]);
 
     const auth = TestBed.inject(AuthService);
-    await firstValueFrom(auth.login('worker@test.com', 'pass123'));
+    await firstValueFrom(auth.login('worker', 'pass123'));
 
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -165,8 +162,7 @@ describe('App component nav', () => {
     const hash = await hashPassword('admin123', salt);
     (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
       id: 1,
-      nombre: 'Admin',
-      email: 'admin@mipime.com',
+      nombre: 'admin',
       password_hash: hash,
       salt,
       rol: 'admin',
@@ -176,7 +172,7 @@ describe('App component nav', () => {
     }]);
 
     const auth = TestBed.inject(AuthService);
-    await firstValueFrom(auth.login('admin@mipime.com', 'admin123'));
+    await firstValueFrom(auth.login('admin', 'admin123'));
 
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

@@ -43,8 +43,7 @@ function createMockDb(): Database {
 function createMockUsuario(salt: string, hash: string): Usuario {
   return {
     id: 1,
-    nombre: 'Admin',
-    email: 'admin@mipime.com',
+    nombre: 'admin',
     password_hash: hash,
     salt,
     rol: 'admin',
@@ -60,7 +59,7 @@ async function setupLoggedInUser(): Promise<AuthService> {
   const mockDb = TestBed.inject(DATABASE) as unknown as { sql: ReturnType<typeof vi.fn> };
   mockDb.sql.mockResolvedValue([createMockUsuario(salt, hash)]);
   const auth = TestBed.inject(AuthService);
-  await firstValueFrom(auth.login('admin@mipime.com', 'admin123'));
+  await firstValueFrom(auth.login('admin', 'admin123'));
   return auth;
 }
 
@@ -137,7 +136,7 @@ describe('adminGuard', () => {
       rol: 'trabajador',
     }]);
     const auth = TestBed.inject(AuthService);
-    await firstValueFrom(auth.login('worker@test.com', 'pass123'));
+    await firstValueFrom(auth.login('worker', 'pass123'));
 
     const result = TestBed.runInInjectionContext(() =>
       adminGuard({} as any, {} as any),

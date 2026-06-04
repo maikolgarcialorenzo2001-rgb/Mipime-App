@@ -39,8 +39,7 @@ function mockCrypto(): void {
 function createMockUsuario(overrides: Partial<Usuario> = {}): Usuario {
   return {
     id: 1,
-    nombre: 'Admin',
-    email: 'admin@mipime.com',
+    nombre: 'admin',
     password_hash: '',
     salt: '',
     rol: 'admin',
@@ -89,22 +88,22 @@ describe('AuthService', () => {
 
       const service = TestBed.inject(AuthService);
       const usuario = await firstValueFrom(
-        service.login('admin@mipime.com', 'admin123'),
+        service.login('admin', 'admin123'),
       );
 
-      expect(usuario.email).toBe('admin@mipime.com');
+      expect(usuario.nombre).toBe('admin');
       expect(usuario.rol).toBe('admin');
       expect(usuario).not.toHaveProperty('password_hash');
       expect(usuario).not.toHaveProperty('salt');
       expect(service.isLoggedIn()).toBe(true);
     });
 
-    it('debería rechazar email inexistente', async () => {
+    it('debería rechazar usuario inexistente', async () => {
       vi.mocked(mockDb.sql).mockResolvedValue([]);
 
       const service = TestBed.inject(AuthService);
       await expect(
-        firstValueFrom(service.login('noexiste@test.com', 'pass')),
+        firstValueFrom(service.login('noexiste', 'pass')),
       ).rejects.toThrow('Credenciales inválidas');
 
       expect(service.isLoggedIn()).toBe(false);
@@ -112,8 +111,6 @@ describe('AuthService', () => {
 
     it('debería rechazar contraseña incorrecta', async () => {
       const salt = 'test-salt-123';
-      // Pre-computamos el hash que va a generar el mock de crypto
-      // El mock usa un hash simple: cada string da un resultado diferente
       const hash = await hashPassword('correcta', salt);
       const mockUser = createMockUsuario({ salt, password_hash: hash });
 
@@ -121,7 +118,7 @@ describe('AuthService', () => {
 
       const service = TestBed.inject(AuthService);
       await expect(
-        firstValueFrom(service.login('admin@mipime.com', 'incorrecta')),
+        firstValueFrom(service.login('admin', 'incorrecta')),
       ).rejects.toThrow('Credenciales inválidas');
 
       expect(service.isLoggedIn()).toBe(false);
@@ -140,7 +137,7 @@ describe('AuthService', () => {
 
       const service = TestBed.inject(AuthService);
       await expect(
-        firstValueFrom(service.login('admin@mipime.com', 'admin123')),
+        firstValueFrom(service.login('admin', 'admin123')),
       ).rejects.toThrow('Usuario desactivado');
 
       expect(service.isLoggedIn()).toBe(false);
@@ -156,7 +153,7 @@ describe('AuthService', () => {
       vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
 
       const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin@mipime.com', 'admin123'));
+      await firstValueFrom(service.login('admin', 'admin123'));
       expect(service.isLoggedIn()).toBe(true);
 
       service.logout();
@@ -181,7 +178,7 @@ describe('AuthService', () => {
       vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
 
       const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin@mipime.com', 'admin123'));
+      await firstValueFrom(service.login('admin', 'admin123'));
 
       expect(service.isLoggedIn()).toBe(true);
     });
@@ -198,7 +195,7 @@ describe('AuthService', () => {
       vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
 
       const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin@mipime.com', 'admin123'));
+      await firstValueFrom(service.login('admin', 'admin123'));
 
       expect(service.hasRole('admin')).toBe(true);
       expect(service.hasRole('trabajador')).toBe(false);
@@ -219,8 +216,7 @@ describe('AuthService - localStorage', () => {
   it('debería restaurar sesión desde localStorage', () => {
     const session = {
       id: 1,
-      nombre: 'Admin',
-      email: 'admin@mipime.com',
+      nombre: 'admin',
       rol: 'admin' as const,
       activo: 1,
       created_at: '2026-06-04T00:00:00Z',
@@ -237,7 +233,7 @@ describe('AuthService - localStorage', () => {
     const service = TestBed.inject(AuthService);
 
     expect(service.isLoggedIn()).toBe(true);
-    expect(service.usuario()?.email).toBe('admin@mipime.com');
+    expect(service.usuario()?.nombre).toBe('admin');
   });
 
   it('debería ignorar localStorage corrupto', () => {

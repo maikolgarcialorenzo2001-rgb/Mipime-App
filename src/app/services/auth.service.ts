@@ -32,11 +32,11 @@ export class AuthService {
   }
 
   /**
-   * Inicia sesión con email y contraseña.
-   * Busca el usuario, verifica el hash y persiste la sesión.
+   * Inicia sesión con nombre de usuario y contraseña.
+   * Busca por nombre (case-insensitive), verifica el hash y persiste la sesión.
    */
-  login(email: string, password: string): Observable<UsuarioPublico> {
-    return from(this._loginAsync(email, password));
+  login(username: string, password: string): Observable<UsuarioPublico> {
+    return from(this._loginAsync(username, password));
   }
 
   /**
@@ -48,12 +48,12 @@ export class AuthService {
   }
 
   private async _loginAsync(
-    email: string,
+    username: string,
     password: string,
   ): Promise<UsuarioPublico> {
     const rows = await this._db.sql<Usuario>(
-      'SELECT * FROM usuarios WHERE email = ?',
-      [email],
+      'SELECT * FROM usuarios WHERE LOWER(nombre) = LOWER(?)',
+      [username],
     );
 
     const user = rows[0];
@@ -73,7 +73,6 @@ export class AuthService {
     const session: UsuarioPublico = {
       id: user.id,
       nombre: user.nombre,
-      email: user.email,
       rol: user.rol,
       activo: user.activo,
       created_at: user.created_at,
@@ -98,7 +97,7 @@ export class AuthService {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const session = JSON.parse(raw) as UsuarioPublico;
-        if (session && session.id && session.email) {
+        if (session && session.id && session.nombre) {
           this._currentUser.set(session);
         }
       }

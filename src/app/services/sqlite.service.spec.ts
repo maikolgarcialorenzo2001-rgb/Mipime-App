@@ -13,7 +13,7 @@ class MockSQLocalClient {
       return [{ version: 1 }];
     }
     // Check if admin user exists: return count 0 so seed runs
-    if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE email = 'admin@mipime.com'")) {
+    if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE nombre = 'admin'")) {
       return [{ count: 0 }];
     }
     // Seed check for productos (after migration)
@@ -88,7 +88,6 @@ describe('SqliteService migration v2', () => {
     expect(usuariosSql).toContain('usuarios');
     expect(usuariosSql).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
     expect(usuariosSql).toContain('nombre TEXT NOT NULL');
-    expect(usuariosSql).toContain('email TEXT NOT NULL UNIQUE');
     expect(usuariosSql).toContain('password_hash TEXT NOT NULL');
     expect(usuariosSql).toContain('salt TEXT NOT NULL');
     expect(usuariosSql).toContain('rol TEXT NOT NULL DEFAULT');
@@ -193,10 +192,11 @@ describe('SqliteService migration v2', () => {
     const adminInsert = sqlCalls.find(
       (c) =>
         c.query.includes('INSERT INTO usuarios') &&
-        c.params.some((p) => p === 'Admin'),
+        c.params.some((p) => p === 'admin'),
     );
     expect(adminInsert).toBeDefined();
-    expect(adminInsert!.params).toContain('admin@mipime.com');
+    // El seed ya no incluye email, solo nombre ('admin') + hash + salt + rol + timestamps
+    expect(adminInsert!.params).toContain('admin');
   });
 
   it('debería saltar migration v1 y ejecutar v2 directo si version >= 1', async () => {

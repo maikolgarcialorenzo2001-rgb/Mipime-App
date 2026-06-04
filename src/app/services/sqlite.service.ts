@@ -68,6 +68,10 @@ export class SqliteService implements Database {
       await this._migrationV2(client);
     }
 
+    if (currentVersion < 3) {
+      await this._migrationV3(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -130,8 +134,7 @@ export class SqliteService implements Database {
   private async _migrationV2(client: SQLocal): Promise<void> {
     await client.sql(`CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
+      nombre TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
       rol TEXT NOT NULL DEFAULT 'trabajador' CHECK(rol IN ('admin', 'trabajador')),
@@ -169,7 +172,7 @@ export class SqliteService implements Database {
 
     // Seed admin: solo si no existe
     const [{ count }] = await client.sql<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM usuarios WHERE email = 'admin@mipime.com'",
+      "SELECT COUNT(*) AS count FROM usuarios WHERE nombre = 'admin'",
     );
     if (count === 0) {
       const ahora = new Date().toISOString();
@@ -177,13 +180,24 @@ export class SqliteService implements Database {
       const salt = generateSalt();
       const hash = await hashPassword('admin123', salt);
       await client.sql(
-        `INSERT INTO usuarios (nombre, email, password_hash, salt, rol, activo, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'admin', 1, ?, ?)`,
-        'Admin', 'admin@mipime.com', hash, salt, ahora, ahora,
+        `INSERT INTO usuarios (nombre, password_hash, salt, rol, activo, created_at, updated_at)
+         VALUES (?, ?, ?, 'admin', 1, ?, ?)`,
+        'admin', hash, salt, ahora, ahora,
       );
     }
 
     await client.sql('INSERT INTO schema_version (version) VALUES (2)');
+  }
+
+  private async _migrationV3(client: SQLocal): Promise<void> {
+    // Eliminar columna email de usuarios (ya no se usa para login)
+    try {
+      await client.sql('ALTER TABLE usuarios DROP COLUMN email');
+    } catch {
+      // La columna ya fue eliminada o nunca existió (install nuevo)
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (3)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

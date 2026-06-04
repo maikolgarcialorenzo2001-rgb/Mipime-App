@@ -5,7 +5,6 @@ describe('Usuario model', () => {
     const usuario: Usuario = {
       id: 1,
       nombre: 'Admin',
-      email: 'admin@mipime.com',
       password_hash: 'a1b2c3d4e5f6',
       salt: 'saltejemplo',
       rol: 'admin',
@@ -23,7 +22,6 @@ describe('Usuario model', () => {
     const usuario: Usuario = {
       id: 2,
       nombre: 'Trabajador',
-      email: 'trabajador@mipime.com',
       password_hash: 'hash123',
       salt: 'otrasalt',
       rol: 'trabajador',
