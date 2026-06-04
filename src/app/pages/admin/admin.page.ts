@@ -1,7 +1,6 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, NgClass } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
 import type { UsuarioPublico } from '../../models';
@@ -13,10 +12,8 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
   selector: 'app-admin',
   standalone: true,
   imports: [
-    RouterLink,
     FormsModule,
     DatePipe,
-    NgClass,
     ErrorAlertComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
