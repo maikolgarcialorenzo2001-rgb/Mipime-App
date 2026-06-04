@@ -91,6 +91,15 @@
   </div>
 </div>
 
+<!-- Selector de cantidad -->
+@if (pendingProduct(); as product) {
+  <app-quantity-input
+    [producto]="product"
+    (confirmar)="onCantidadConfirmada($event)"
+    (cancelar)="onCantidadCancelada()"
+  />
+}
+
 <!-- Modal de cobro -->
 @if (showModal()) {
   <div class="fixed inset-0 z-50 flex items-start justify-center pt-20">

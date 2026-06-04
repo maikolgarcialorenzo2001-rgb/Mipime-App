@@ -7,6 +7,7 @@ import { VentaService } from '../../services/venta.service';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
+import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
@@ -14,7 +15,7 @@ import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, LoadingSpinnerComponent, EmptyStateComponent, ErrorAlertComponent],
+  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent, ErrorAlertComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -32,6 +33,7 @@ export class PosPage {
   readonly buscando = signal(false);
   readonly selectedIndex = signal(0);
   readonly showModal = signal(false);
+  readonly pendingProduct = signal<Producto | null>(null);
 
   readonly jornadaCargando = signal(true);
   readonly jornadaId = signal<number | null>(null);
@@ -72,12 +74,33 @@ export class PosPage {
   }
 
   onKeydown(event: KeyboardEvent): void {
+    // Si el modal de cantidad está abierto, no procesamos atajos
+    if (this.pendingProduct()) return;
+
     if (event.key === 'Escape') {
       if (this.query()) {
         this.query.set('');
         this._buscar('');
       }
       this.searchInput()?.nativeElement.focus();
+      return;
+    }
+
+    if (event.key === 'Backspace') {
+      // Si hay resultados y todo el texto de búsqueda ya se borró,
+      // reducir cantidad del producto seleccionado en el carrito
+      if (!this.query()) {
+        const resultados = this.resultados();
+        const idx = this.selectedIndex();
+        const producto = resultados[idx];
+        if (producto) {
+          const item = this.cart.items().find(i => i.producto.id === producto.id);
+          if (item) {
+            event.preventDefault();
+            this.cart.actualizarCantidad(producto.id, item.cantidad - 1);
+          }
+        }
+      }
       return;
     }
 
@@ -108,7 +131,19 @@ export class PosPage {
   }
 
   agregarAlCarrito(producto: Producto): void {
-    this._agregarAlCarrito(producto);
+    this.pendingProduct.set(producto);
+  }
+
+  onCantidadConfirmada(cantidad: number): void {
+    const producto = this.pendingProduct();
+    if (!producto) return;
+    this.pendingProduct.set(null);
+    this._agregarAlCarrito(producto, cantidad);
+  }
+
+  onCantidadCancelada(): void {
+    this.pendingProduct.set(null);
+    this.searchInput()?.nativeElement.focus();
   }
 
   abrirModal(): void {
@@ -178,8 +213,8 @@ export class PosPage {
     });
   }
 
-  private _agregarAlCarrito(producto: Producto): void {
-    this.cart.agregar(producto);
+  private _agregarAlCarrito(producto: Producto, cantidad = 1): void {
+    this.cart.agregar(producto, cantidad);
     this.query.set('');
     this._buscar('');
     this.searchInput()?.nativeElement.focus();

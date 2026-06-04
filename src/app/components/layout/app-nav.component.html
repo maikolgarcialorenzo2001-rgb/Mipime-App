@@ -8,7 +8,7 @@
           routerLinkActive #pos="routerLinkActive"
           [class.text-blue-600]="pos.isActive"
           [class.font-semibold]="pos.isActive"
-          class="text-gray-600 hover:text-blue-800 transition-colors"
+           class="text-gray-600 hover:text-blue-800 transition-colors cursor-pointer"
         >
           POS
         </a>
@@ -17,7 +17,7 @@
           routerLinkActive #productos="routerLinkActive"
           [class.text-blue-600]="productos.isActive"
           [class.font-semibold]="productos.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
         >
           Productos
         </a>
@@ -26,7 +26,7 @@
           routerLinkActive #jornada="routerLinkActive"
           [class.text-blue-600]="jornada.isActive"
           [class.font-semibold]="jornada.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
         >
           Jornada
         </a>
@@ -35,7 +35,7 @@
           routerLinkActive #inventario="routerLinkActive"
           [class.text-blue-600]="inventario.isActive"
           [class.font-semibold]="inventario.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
         >
           Inventario
         </a>
@@ -44,7 +44,7 @@
           routerLinkActive #historial="routerLinkActive"
           [class.text-blue-600]="historial.isActive"
           [class.font-semibold]="historial.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
         >
           Historial
         </a>
@@ -54,7 +54,7 @@
             routerLinkActive #admin="routerLinkActive"
             [class.text-blue-600]="admin.isActive"
             [class.font-semibold]="admin.isActive"
-            class="text-gray-600 hover:text-blue-600 transition-colors"
+            class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
           >
             Admin
           </a>
@@ -62,7 +62,7 @@
         <span class="ml-4 text-gray-500">{{ auth.usuario()?.nombre }}</span>
         <button
           (click)="logout()"
-          class="text-red-600 hover:text-red-800 transition-colors"
+          class="text-red-600 hover:text-red-800 transition-colors cursor-pointer"
         >
           Cerrar sesión
         </button>
