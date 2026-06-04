@@ -41,7 +41,7 @@ Phase 4: 4.1 → 4.2 → 4.3 → 4.4
 
 ## Phase 1: Foundation (Migration + Auth)
 
-- [ ] **1.1 [P1][M]** Migration v2 in SqliteService — add usuarios, stock_movimientos, jornada_pdfs tables, ALTER jornadas/ventas, seed admin
+- [ ] **1.1 [P1][M]** Migration v2 in SqliteService — add usuarios, stock_movimientos, jornada_reportes tables, ALTER jornadas/ventas, seed admin
 - [ ] **1.2 [P1][S]** Create `models/usuario.ts` — Usuario interface
 - [ ] **1.3 [P1][L]** AuthService — login (SHA-256+salt), logout, Signal session, localStorage restore
 - [ ] **1.4 [P2][S]** Guards: `auth.guard.ts` + `admin.guard.ts`
@@ -73,12 +73,12 @@ Phase 4: 4.1 → 4.2 → 4.3 → 4.4
 
 ---
 
-## Phase 4: Jornada Close + PDF + History
+## Phase 4: Jornada Close + Excel + History
 
-- [ ] **4.1 [P1][S]** Install jsPDF + jspdf-autotable
-- [ ] **4.2 [P1][M]** PdfService — generarPdfJornada() base64 PDF
-- [ ] **4.3 [P2][M]** JornadaService — cerrar() with PDF generation + storage, admin check
-- [ ] **4.4 [P2][M]** JornadaPage — close modal, admin-only button, auto-download PDF
-- [ ] **4.5 [P1][M]** HistorialPage — list closed jornadas, download PDF, empty state
+- [ ] **4.1 [P1][S]** Install `xlsx` (SheetJS, bun add xlsx)
+- [ ] **4.2 [P1][M]** ExcelService — generarExcelJornada() base64 xlsx with ventas + movimientos
+- [ ] **4.3 [P2][M]** JornadaService — cerrar() with Excel generation + storage (jornada_reportes), admin check
+- [ ] **4.4 [P2][M]** JornadaPage — close modal, admin-only button, auto-download Excel, in-app preview
+- [ ] **4.5 [P1][M]** HistorialPage — list closed jornadas, download Excel, in-app view, empty state
 
-**Tests**: PdfService valid PDF, JornadaService admin/worker, HistorialPage list/download
+**Tests**: ExcelService valid xlsx, JornadaService admin/worker, HistorialPage list/download/preview

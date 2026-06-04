@@ -1,6 +1,6 @@
 # Delta Specs: auth-y-pages-restantes
 
-> Change that completes the POS app: auth, admin, full payment flow, inventory, jornada close with PDF, and history.
+> Change that completes the POS app: auth, admin, full payment flow, inventory, jornada close with Excel, and history.
 
 ## Migration v2 (Data Model Changes)
 
@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS stock_movimientos (
 );
 ```
 
-### New table: `jornada_pdfs`
+### New table: `jornada_reportes`
 ```sql
-CREATE TABLE IF NOT EXISTS jornada_pdfs (
+CREATE TABLE IF NOT EXISTS jornada_reportes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
-  pdf_base64 TEXT NOT NULL,
+  content_type TEXT NOT NULL DEFAULT 'excel',
+  content_base64 TEXT NOT NULL,
+  filename TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 ```
@@ -96,15 +98,17 @@ WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'admin@mipime.com');
 - **INV-2**: Register stock entry → stock_movimientos + stock_actual update.
 - **INV-3**: Display products with stock info.
 
-### Jornada-PDF (Modified)
+### Jornada-Excel (Modified)
 
-- **JOR-1**: Close jornada generates PDF via jsPDF, stores base64 in jornada_pdfs. Auto-download.
+- **JOR-1**: Close jornada generates Excel via SheetJS, stores base64 in jornada_reportes. Auto-download.
 - **JOR-2**: Close requires admin role.
+- **JOR-3**: Closed jornada shows in-app Excel preview (read-only table).
 
 ### History
 
 - **HIST-1**: List closed jornadas descending.
-- **HIST-2**: Download PDF per jornada. Handle missing PDF.
+- **HIST-2**: Download Excel per jornada. Handle missing report.
+- **HIST-3**: Button to view Excel content in-app (read-only table).
 
 ## Test Expectations
 
@@ -114,6 +118,6 @@ WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'admin@mipime.com');
 | UsuarioService | listar, crear (success + duplicate), toggleActivo (self-guard) |
 | VentaService | confirmarVenta success, no jornada, insufficient stock, rollback, cart cleared |
 | InventarioService | crearProducto (success + validation), registrarEntrada, listarConStock |
-| PdfService | generarPdfJornada returns valid base64 PDF |
-| JornadaService | cerrar with admin (pdf stored), cerrar with worker (rejected), obtenerCerradas |
+| ExcelService | generarExcelJornada returns valid base64 xlsx |
+| JornadaService | cerrar with admin (excel stored), cerrar with worker (rejected), obtenerCerradas |
 | Guards | authGuard (session yes/no), adminGuard (admin/worker) |
