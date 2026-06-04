@@ -60,7 +60,7 @@
           "builder": "@angular/build:dev-server",
           "options": {
             "prebundle": {
-              "exclude": ["sqlocal"]
+              "exclude": ["sqlocal", "@sqlite.org/sqlite-wasm"]
             }
           },
           "configurations": {
