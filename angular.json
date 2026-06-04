@@ -61,6 +61,10 @@
           "options": {
             "prebundle": {
               "exclude": ["sqlocal", "@sqlite.org/sqlite-wasm"]
+            },
+            "headers": {
+              "Cross-Origin-Embedder-Policy": "require-corp",
+              "Cross-Origin-Opener-Policy": "same-origin"
             }
           },
           "configurations": {
