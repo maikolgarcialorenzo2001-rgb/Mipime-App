@@ -156,23 +156,23 @@ chore:     tooling, dependencias, config
 ### Ramas
 
 ```
-main              → estable, siempre anda
-feature/<nombre>  → cada funcionalidad nueva en su rama
-fix/<nombre>      → hotfixes
+main                    → estable, siempre anda
+feature/auth-y-pages    → feature branch activa (PRs incrementales)
+fix/<nombre>            → hotfixes
 ```
 
-**Flujo:**
+**Flujo actual (feature branch):**
 ```bash
-git checkout main && git pull
-git checkout -b feature/login
-# ... codeás ...
-git add . && git commit -m "feat: agrega login con roles"
-git checkout main && git pull
-git merge feature/login
-git push
+# Todos los PRs apuntan a feature/auth-y-pages
+# Solo cuando está completo se mergea a main
+
+git checkout feature/auth-y-pages
+git checkout -b pr/auth-service    # rama para el PR
+# ... codeás, commiteás, pusheás ...
+# Creás PR apuntando a feature/auth-y-pages
 ```
 
-Nunca se commitea directo a `main`.
+Nunca se commitea directo a `main` ni a `feature/auth-y-pages`.
 
 ## Desarrollo local
 
@@ -194,15 +194,51 @@ bun vitest
 bun run build
 ```
 
+## Tareas — auth-y-pages-restantes
+
+Distribución para 2 personas (~2000 líneas, feature branch `feature/auth-y-pages`).
+
+| # | Tarea | Quién | Archivos | Dep. | Esf. |
+|---|-------|-------|----------|------|------|
+| **FASE 1 — Fundación** (hace falta antes de todo) |
+| 1.1 | Migration v2 en SqliteService | **Tú** | sqlite.service.ts | — | M |
+| 1.2 | AuthService (login, logout, session signal) | **Tú** | auth.service.ts, usuario.ts | 1.1 | M |
+| 1.3 | AuthService tests + hash helper | **Tú** | auth.service.spec.ts | 1.2 | M |
+| 1.4 | authGuard + roleGuard | **Compañero** | guards/auth.guard.ts, guards/role.guard.ts | 1.2 | S |
+| 1.5 | Routes actualizadas con guards | **Compañero** | app.routes.ts | 1.4 | S |
+| 1.6 | Nav condicional + logout | **Compañero** | app.ts, app.html | 1.5 | S |
+| **FASE 2 — Login + Admin** (paralelo con Fase 3) |
+| 2.1 | Login page | **Tú** | pages/login/ | 1.3, 1.6 | M |
+| 2.2 | UsuarioService (CRUD workers) | **Compañero** | usuario.service.ts | 1.1 | M |
+| 2.3 | Admin page (list + create workers) | **Compañero** | pages/admin/ | 2.2, 1.6 | M |
+| **FASE 3 — POS + Inventario** (paralelo con Fase 2) |
+| 3.1 | VentaService (transacción SQL) | **Tú** | venta.service.ts | 1.1 | M |
+| 3.2 | Wire up confirmarVenta() en POS | **Tú** | pos.page.ts | 3.1 | S |
+| 3.3 | InventarioService (crear + entrada stock) | **Compañero** | inventario.service.ts | 1.1 | M |
+| 3.4 | Inventario page | **Compañero** | pages/inventario/ | 3.3, 1.6 | M |
+| **FASE 4 — Cierre + PDF + Historial** |
+| 4.1 | PdfService (jsPDF) | **Tú** | pdf.service.ts | — | M |
+| 4.2 | Cerrar jornada con PDF | **Tú** | jornada.service.ts, sqlite.service.ts (mig) | 4.1, 1.1 | M |
+| 4.3 | Extender JornadaPage para cierre | **Compañero** | pages/jornada/ | 1.6 | M |
+| 4.4 | History page | **Compañero** | pages/historial/ | 4.2, 4.3, 1.6 | S |
+| 4.5 | Tests de integración | **Tú** | varios | 4.2, 4.3, 4.4 | M |
+
+**Total**: 9 tareas por persona.
+
+### Dependencias a instalar
+
+```bash
+bun add jspdf jspdf-autotable
+```
+
 ## Roadmap
 
 - [x] Setup Angular 21 + Tailwind 4 + Vitest + SQLocal
 - [x] Modelos de datos y migración
 - [x] ABM de productos
 - [x] POS con carrito y modal de cobro
-- [ ] Login con roles (admin / trabajador)
-- [ ] Admin panel — crear trabajadores
-- [ ] Inventario — entradas de stock
-- [ ] Persistir ventas al cobrar
-- [ ] Cierre de jornada con PDF
-- [ ] Historial de jornadas
+- [x] SSR desactivado
+- [ ] **Fase 1** — Migration v2, AuthService, guards, nav
+- [ ] **Fase 2** — Login + Admin
+- [ ] **Fase 3** — POS persistente + Inventario
+- [ ] **Fase 4** — Cierre de jornada con PDF + Historial
