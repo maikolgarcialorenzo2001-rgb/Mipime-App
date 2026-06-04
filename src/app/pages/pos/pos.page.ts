@@ -157,7 +157,9 @@ export class PosPage {
   }
 
   private _buscar(query: string): void {
-    this.buscando.set(true);
+    // Si la query se resuelve rápido (< 150ms), no mostramos el spinner
+    // para evitar el pantallazo al agregar productos al carrito.
+    const loadingTimer = setTimeout(() => this.buscando.set(true), 150);
 
     const obs = query
       ? this._productoService.buscar(query)
@@ -165,10 +167,12 @@ export class PosPage {
 
     obs.subscribe({
       next: (productos) => {
+        clearTimeout(loadingTimer);
         this.resultados.set(productos);
         this.buscando.set(false);
       },
       error: () => {
+        clearTimeout(loadingTimer);
         this.buscando.set(false);
       },
     });
