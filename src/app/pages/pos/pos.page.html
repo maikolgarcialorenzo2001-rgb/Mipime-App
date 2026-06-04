@@ -102,14 +102,10 @@
 
 <!-- Modal de cobro -->
 @if (showModal()) {
-  <div class="fixed inset-0 z-50 flex items-start justify-center pt-20">
-    @if (ventaError(); as err) {
-      <app-error-alert [message]="err" />
-    }
-  </div>
   <app-checkout-modal
     [items]="cart.items()"
     [total]="cart.total()"
+    [errorMessage]="ventaError()"
     (confirmar)="confirmarVenta()"
     (cancelar)="cerrarModal()"
   />

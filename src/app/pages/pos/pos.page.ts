@@ -10,12 +10,11 @@ import { CheckoutModalComponent } from '../../components/checkout-modal/checkout
 import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
-import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent, ErrorAlertComponent],
+  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -153,6 +152,7 @@ export class PosPage {
 
   cerrarModal(): void {
     this.showModal.set(false);
+    this.ventaError.set(null);
   }
 
   confirmarVenta(): void {

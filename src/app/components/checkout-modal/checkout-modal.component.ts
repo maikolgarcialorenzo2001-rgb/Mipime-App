@@ -11,6 +11,7 @@ import type { CartItem } from '../../services/cart.service';
 export class CheckoutModalComponent {
   readonly items = input.required<CartItem[]>();
   readonly total = input.required<number>();
+  readonly errorMessage = input<string | null>(null);
   readonly confirmar = output();
   readonly cancelar = output();
 
