@@ -8,8 +8,10 @@ import type { Producto, StockMovimiento } from '../../models';
 describe('InventarioPage', () => {
   let fixture: ComponentFixture<InventarioPage>;
   let component: InventarioPage;
-  let mockProductoService: Record<string, ReturnType<typeof vi.fn>>;
-  let mockStockService: Record<string, ReturnType<typeof vi.fn>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockProductoService: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockStockService: any;
 
   const productos: Producto[] = [
     {
