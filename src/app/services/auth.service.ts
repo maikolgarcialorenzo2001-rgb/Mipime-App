@@ -65,15 +65,13 @@ export class AuthService {
       throw new Error('Usuario desactivado');
     }
 
-    // ⚠️ Pueden existir varios usuarios con el mismo nombre en DBs que
-    // migraron desde antes de agregar UNIQUE en la columna `nombre`.
-    // NO usamos rows[0] porque agarraría al primero nomás, ignorando
-    // password y rol del resto.
+    // ⚠️ `nombre` NO tiene UNIQUE constraint — pueden existir múltiples
+    // usuarios con el mismo nombre. NO usamos rows[0] porque agarraría
+    // al primer coincidente, ignorando password y rol del resto.
     //
-    // En vez de eso: iteramos TODOS los usuarios con ese nombre, y el
-    // que tenga la contraseña correcta → ese loguea con SU rol (sea
-    // admin o trabajador). Así cada uno entra con su identidad real
-    // aunque compartan nombre.
+    // En vez de eso: iteramos TODOS los que se llamen igual, y el que
+    // tenga la contraseña correcta → ese loguea con SU rol (sea admin
+    // o trabajador). Así cada uno entra con su identidad real.
     for (const user of rows) {
       if (!user.activo) continue;
 

@@ -134,7 +134,7 @@ export class SqliteService implements Database {
   private async _migrationV2(client: SQLocal): Promise<void> {
     await client.sql(`CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL UNIQUE,
+      nombre TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
       rol TEXT NOT NULL DEFAULT 'trabajador' CHECK(rol IN ('admin', 'trabajador')),
