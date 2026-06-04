@@ -65,6 +65,7 @@ Phase 4: 4.1 → 4.2 → 4.3 → 4.4
 ## Phase 3: POS + Inventory
 
 - [ ] **3.1 [P1][L]** VentaService — confirmarVenta() SQL transaction (INSERT venta+detalle, UPDATE stock, UPDATE jornada)
+  - [x] Block 1: Model + StockMovimientoService + VentaService integration
 - [ ] **3.2 [P1][M]** PosPage — wire confirmarVenta(), forma_pago selector, error handling
 - [ ] **3.3 [P2][M]** InventarioService — crearProducto(), registrarEntrada(), listarConStock()
 - [ ] **3.4 [P2][L]** InventarioPage — product form, stock entry form, inventory table

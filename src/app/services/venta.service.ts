@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { from, map, Observable } from 'rxjs';
 import { DATABASE } from './database';
+import { StockMovimientoService } from './stock-movimiento.service';
 import type { Venta } from '../models';
 import type { CartItem } from './cart.service';
 
@@ -9,6 +10,7 @@ import type { CartItem } from './cart.service';
 })
 export class VentaService {
   private readonly _db = inject(DATABASE);
+  private readonly _stockMovimiento = inject(StockMovimientoService);
 
   /**
    * Registra una venta en la DB:
@@ -16,6 +18,7 @@ export class VentaService {
    * 2. INSERT en detalle_ventas por cada item
    * 3. UPDATE stock en productos
    * 4. UPDATE total_ventas / saldo_esperado en la jornada
+   * 5. Registrar salida de stock vía StockMovimientoService por cada item
    */
   registrar(jornadaId: number, items: CartItem[]): Observable<Venta> {
     const ahora = new Date().toISOString();
@@ -97,6 +100,14 @@ export class VentaService {
        WHERE id = ?`,
       [total, total, ahora, jornadaId],
     );
+
+    // 4. Registrar salida de stock para cada item
+    for (const item of items) {
+      await this._stockMovimiento.registrarSalida(
+        item.producto.id,
+        item.cantidad,
+      );
+    }
 
     return [venta];
   }
