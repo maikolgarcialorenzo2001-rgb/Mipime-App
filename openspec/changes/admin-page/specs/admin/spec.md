@@ -16,6 +16,7 @@ The system MUST allow an authenticated admin user to create a new user with `nom
 
 - The `nombre` does NOT need to be unique — múltiples usuarios pueden compartir nombre. Cada uno se autentica con su contraseña (el auth loop en `AuthService._loginAsync` itera todos los que coincidan y loguea al que tenga la contraseña correcta).
 - La tabla `usuarios` NO tiene constraint UNIQUE en `nombre`.
+- **Pero**: si ya existe un usuario con el mismo `nombre` **y** la misma `contraseña` (hash coincide), el sistema DEBE rechazar la creación con el error "Ya existe un usuario con ese nombre y contraseña". Esto previene duplicados accidentales donde dos cuentas serían indistinguibles al loguear.
 - The password MUST be hashed with `generateSalt()` + `hashPassword()` before INSERT.
 - The `created_at` and `updated_at` MUST be set to the current ISO timestamp.
 - The campo `email` is REMOVED — login is nombre-only (migration v3).
@@ -28,13 +29,21 @@ The system MUST allow an authenticated admin user to create a new user with `nom
 - AND the new user appears in the table immediately
 - AND the form resets
 
-#### Scenario: Crear usuario con mismo nombre que otro existente
+#### Scenario: Crear usuario con mismo nombre pero diferente pass
 
-- GIVEN a user with nombre "juan" already exists
-- WHEN the admin submits the form with nombre "juan" and a different password
-- THEN the system INSERTs a new row with nombre "juan" (no error)
+- GIVEN a user "juan" with password "abc" already exists
+- WHEN the admin submits the form with nombre "juan" and password "xyz"
+- THEN the system INSERTs a new row (password differs, no conflict)
 - AND both "juan" users appear in the table
 - AND cada uno loguea con su propia contraseña y obtiene su rol
+
+#### Scenario: Crear usuario con mismo nombre y misma pass (rechazado)
+
+- GIVEN a user "juan" with password "abc" already exists
+- WHEN the admin submits the form with nombre "juan" and password "abc"
+- THEN the system detects that password hash matches an existing user
+- AND shows error "Ya existe un usuario con ese nombre y contraseña"
+- AND the table is NOT modified
 
 ---
 
@@ -162,7 +171,7 @@ The `UserService` MUST expose these async methods returning `Promise<>`:
 | Method | Signature | Description |
 |--------|-----------|-------------|
 | `list()` | `() => Promise<UsuarioPublico[]>` | SELECT all users, ordered by `created_at DESC`, return public type (no hash/salt) |
-| `create(nombre, password, rol)` | `(nombre: string, password: string, rol: 'admin' \| 'trabajador') => Promise<UsuarioPublico>` | INSERT with hashed password. No uniqueness check on nombre — múltiples usuarios pueden compartir nombre |
+| `create(nombre, password, rol)` | `(nombre: string, password: string, rol: 'admin' \| 'trabajador') => Promise<UsuarioPublico>` | INSERT with hashed password. Si ya existe un usuario con mismo nombre y misma pass → rechazar. Si mismo nombre pero distinta pass → permitir |
 | `toggleActivo(id)` | `(id: number) => Promise<void>` | Flip `activo` 0↔1. MUST NOT be called for seed admin or self |
 | `updateRol(id, rol)` | `(id: number, rol: 'admin' \| 'trabajador') => Promise<void>` | UPDATE rol. MUST NOT be called for seed admin |
 | `updatePassword(id, password)` | `(id: number, password: string) => Promise<void>` | UPDATE password_hash + salt. Reject empty password |
@@ -233,6 +242,10 @@ AdminPage (component)
   │                  FROM usuarios ORDER BY created_at DESC
   │
   ├─ create user → UserService.create(nombre, password, rol)
+  │                   ├─ SELECT * FROM usuarios WHERE LOWER(nombre)=LOWER(?)
+  │                   ├─ for each existing user with same nombre:
+  │                   │    └─ hashPassword(password, existing.salt) === existing.password_hash?
+  │                   │       → throw "Ya existe un usuario con ese nombre y contraseña"
   │                   ├─ salt = generateSalt()
   │                   ├─ hash = hashPassword(password, salt)
   │                   ├─ INSERT INTO usuarios (...)
