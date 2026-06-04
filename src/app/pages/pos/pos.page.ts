@@ -3,11 +3,15 @@ import { CurrencyPipe } from '@angular/common';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
+import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
+import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
+import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
+import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ProductCardComponent],
+  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -89,18 +93,6 @@ export class PosPage {
 
   cerrarModal(): void {
     this.showModal.set(false);
-  }
-
-  onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.cerrarModal();
-    }
-  }
-
-  onModalKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      this.cerrarModal();
-    }
   }
 
   confirmarVenta(): void {

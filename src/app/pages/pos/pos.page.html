@@ -17,16 +17,9 @@
     <!-- Resultados -->
     <div class="flex-1 overflow-y-auto p-6">
       @if (buscando()) {
-        <div class="flex items-center justify-center py-20 text-gray-400">
-          <svg class="h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-        </div>
+        <app-loading-spinner />
       } @else if (resultados().length === 0) {
-        <div class="flex items-center justify-center py-20 text-gray-400">
-          <p class="text-lg">Escribí para buscar productos</p>
-        </div>
+        <app-empty-state message="Escribí para buscar productos" />
       } @else {
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           @for (p of resultados(); track p.id; let i = $index) {
@@ -55,45 +48,16 @@
           El carrito está vacío
         </p>
       } @else {
-        <ul class="divide-y divide-gray-100">
+        <div class="divide-y divide-gray-100">
           @for (item of cart.items(); track item.producto.id) {
-            <li class="flex items-center gap-3 py-3">
-              <div class="flex-1 min-w-0">
-                <p class="truncate text-sm font-medium text-gray-900">{{ item.producto.nombre }}</p>
-                <p class="text-xs text-gray-400">{{ item.producto.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
-              </div>
-
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  class="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                  (click)="cart.actualizarCantidad(item.producto.id, item.cantidad - 1)"
-                  aria-label="Reducir cantidad"
-                >−</button>
-
-                <span class="w-8 text-center text-sm font-semibold tabular-nums">{{ item.cantidad }}</span>
-
-                <button
-                  type="button"
-                  class="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                  (click)="cart.actualizarCantidad(item.producto.id, item.cantidad + 1)"
-                  aria-label="Aumentar cantidad"
-                >+</button>
-              </div>
-
-              <span class="w-20 text-right text-sm font-semibold tabular-nums text-gray-900">
-                {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </span>
-
-              <button
-                type="button"
-                class="flex h-6 w-6 items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-                (click)="cart.quitar(item.producto.id)"
-                aria-label="Quitar del carrito"
-              >✕</button>
-            </li>
+            <app-cart-item-row
+              [item]="item"
+              (cantidadReducir)="cart.actualizarCantidad(item.producto.id, item.cantidad - 1)"
+              (cantidadAumentar)="cart.actualizarCantidad(item.producto.id, item.cantidad + 1)"
+              (quitar)="cart.quitar(item.producto.id)"
+            />
           }
-        </ul>
+        </div>
       }
     </div>
 
@@ -118,48 +82,10 @@
 
 <!-- Modal de cobro -->
 @if (showModal()) {
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-    role="dialog"
-    tabindex="-1"
-    (click)="onBackdropClick($event)"
-    (keydown)="onModalKeydown($event)"
-  >
-    <div
-      class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-    >
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">Confirmar venta</h3>
-
-      <ul class="mb-4 divide-y divide-gray-100 text-sm">
-        @for (item of cart.items(); track item.producto.id) {
-          <li class="flex justify-between py-2">
-            <span class="text-gray-600 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
-            <span class="font-medium text-gray-900 tabular-nums">
-              {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
-            </span>
-          </li>
-        }
-      </ul>
-
-      <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 pt-3">
-        <span class="text-base font-semibold text-gray-900">Total</span>
-        <span class="text-xl font-bold text-gray-900">
-          {{ cart.total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
-        </span>
-      </div>
-
-      <div class="flex gap-3">
-        <button
-          type="button"
-          class="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          (click)="cerrarModal()"
-        >Cancelar</button>
-        <button
-          type="button"
-          class="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors"
-          (click)="confirmarVenta()"
-        >Confirmar venta</button>
-      </div>
-    </div>
-  </div>
+  <app-checkout-modal
+    [items]="cart.items()"
+    [total]="cart.total()"
+    (confirmar)="confirmarVenta()"
+    (cancelar)="cerrarModal()"
+  />
 }
