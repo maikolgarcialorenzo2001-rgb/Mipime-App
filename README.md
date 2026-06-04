@@ -1,59 +1,208 @@
-# MipimeCuentas
+# Mipime-Cuentas
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.7.
+Sistema de punto de venta (POS) para pequeños comercios. Corré 100% en el navegador con SQLite (vía SQLocal) — no necesita backend ni instalación de base de datos.
 
-## Development server
+## Stack
 
-To start a local development server, run:
+| Capa | Tecnología |
+|------|-----------|
+| Framework | Angular 21 |
+| Estilos | Tailwind CSS 4 |
+| Base de datos | SQLocal (SQLite via WASM en el browser) |
+| Tests | Vitest + jsdom |
+| Package manager | Bun |
+| Build | Angular CLI + Vite |
 
-```bash
-ng serve
+## Estructura del proyecto
+
+```
+src/
+└── app/
+    ├── app.ts                    # Root component + nav
+    ├── app.config.ts             # Providers (router, DB, auth)
+    ├── app.routes.ts             # Definición de rutas
+    │
+    ├── models/                   # Interfaces de datos
+    │   ├── index.ts
+    │   ├── jornada.ts
+    │   ├── producto.ts
+    │   ├── venta.ts
+    │   ├── movimiento.ts
+    │   └── usuario.ts            # 👤 NUEVO
+    │
+    ├── services/                 # Lógica de negocio + DB
+    │   ├── database.ts           # Abstracción DB (InjectionToken)
+    │   ├── sqlite.service.ts     # Implementación SQLocal + migraciones
+    │   ├── producto.service.ts   # CRUD productos
+    │   ├── jornada.service.ts    # ABM jornadas
+    │   ├── cart.service.ts       # Carrito (signal)
+    │   ├── auth.service.ts       # 👤 NUEVO: login, roles, sesión
+    │   ├── venta.service.ts      # 🆕 NUEVO: persistir ventas
+    │   ├── inventario.service.ts # 🆕 NUEVO: entradas de stock
+    │   └── reporte.service.ts    # 🆕 NUEVO: generar PDFs de cierre
+    │
+    ├── guards/                   # Protección de rutas
+    │   └── auth.guard.ts         # 🆕 NUEVO: redirige si no hay sesión
+    │   └── role.guard.ts         # 🆕 NUEVO: solo admin
+    │
+    ├── components/               # Componentes compartidos
+    │   └── layout/               # 🆕 NUEVO: sidebar / header según rol
+    │
+    └── pages/
+        ├── login/                # 👤 NUEVO: pantalla de inicio de sesión
+        ├── admin/                # 👤 NUEVO: crear cuentas de trabajadores
+        ├── inventario/           # 🆕 NUEVO: control de mercancías
+        ├── pos/                  # ✅ Existente: punto de venta
+        ├── jornada/              # ✅ Existente: cierre del día
+        └── historial/            # 🆕 NUEVO: PDFs de días anteriores
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Mapa de páginas
 
-## Code scaffolding
+| Ruta | Página | Rol | Descripción |
+|------|--------|-----|-------------|
+| `/login` | Login | Todos | Inicio de sesión |
+| `/admin` | Admin | Admin | Crear cuentas de trabajadores |
+| `/inventario` | Inventario | Admin + Trabajador | Agregar productos, registrar entradas de stock |
+| `/pos` | POS | Trabajador | Registrar ventas del día |
+| `/jornada` | Jornada | Trabajador | Ver estado del día, cerrar jornada |
+| `/historial` | Historial | Trabajador | Ver PDFs de jornadas cerradas |
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Flujo de uso diario
 
-```bash
-ng generate component component-name
+```
+1. Login → trabajador o admin
+2. Admin (opcional) → crear/modificar trabajadores
+3. Inventario → cargar productos o registrar entrada de mercadería
+4. POS → vender durante el día (productos se descuentan del stock)
+5. Jornada → cerrar el día → genera PDF no editable
+6. Historial → consultar cierres anteriores
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Modelo de datos
 
-```bash
-ng generate --help
+```mermaid
+erDiagram
+    USUARIO ||--o{ JORNADA : "abre/cierra"
+    USUARIO {
+        int id PK
+        string nombre
+        string email
+        string password_hash
+        string rol "admin | trabajador"
+    }
+    JORNADA ||--o{ VENTA : "contiene"
+    JORNADA ||--o{ MOVIMIENTO : "registra"
+    JORNADA {
+        int id PK
+        date fecha
+        string hora_apertura
+        string hora_cierre
+        float monto_inicial
+        float total_ventas
+        float total_gastos
+        float saldo_esperado
+        float saldo_real
+        string estado "abierta | cerrada"
+    }
+    VENTA ||--|{ DETALLE_VENTA : "detalla"
+    VENTA {
+        int id PK
+        int jornada_id FK
+        datetime fecha_hora
+        float total
+    }
+    DETALLE_VENTA {
+        int id PK
+        int venta_id FK
+        int producto_id FK
+        float cantidad
+        float precio_unitario
+        float subtotal
+        string tipo "venta | anulacion"
+    }
+    PRODUCTO {
+        int id PK
+        string nombre
+        string descripcion
+        float precio_venta
+        float precio_costo
+        float stock_actual
+    }
+    MOVIMIENTO {
+        int id PK
+        int jornada_id FK
+        string tipo "gasto | ingreso_extra"
+        string descripcion
+        float monto
+    }
 ```
 
-## Building
+## Convenciones del equipo
 
-To build the project run:
+### Commits
 
-```bash
-ng build
+Usamos [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat:      nueva funcionalidad
+fix:       corrección de bug
+refactor:  cambio que no agrega funcionalidad
+test:      tests
+docs:      documentación
+chore:     tooling, dependencias, config
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+### Ramas
 
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
+```
+main              → estable, siempre anda
+feature/<nombre>  → cada funcionalidad nueva en su rama
+fix/<nombre>      → hotfixes
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
+**Flujo:**
 ```bash
-ng e2e
+git checkout main && git pull
+git checkout -b feature/login
+# ... codeás ...
+git add . && git commit -m "feat: agrega login con roles"
+git checkout main && git pull
+git merge feature/login
+git push
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Nunca se commitea directo a `main`.
 
-## Additional Resources
+## Desarrollo local
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+```bash
+# Clonar
+git clone https://github.com/maikolgarcialorenzo2001-rgb/Mipime-App.git
+cd Mipime-App
+
+# Instalar dependencias
+bun install
+
+# Servidor de desarrollo
+bun run start
+
+# Tests
+bun vitest
+
+# Build producción
+bun run build
+```
+
+## Roadmap
+
+- [x] Setup Angular 21 + Tailwind 4 + Vitest + SQLocal
+- [x] Modelos de datos y migración
+- [x] ABM de productos
+- [x] POS con carrito y modal de cobro
+- [ ] Login con roles (admin / trabajador)
+- [ ] Admin panel — crear trabajadores
+- [ ] Inventario — entradas de stock
+- [ ] Persistir ventas al cobrar
+- [ ] Cierre de jornada con PDF
+- [ ] Historial de jornadas
