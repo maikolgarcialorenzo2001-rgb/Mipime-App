@@ -10,77 +10,169 @@
   } @else if (jornadas().length === 0) {
     <app-empty-state message="No hay jornadas registradas" />
   } @else {
-    <div class="overflow-x-auto rounded-lg shadow-sm">
-      <table class="w-full border-collapse bg-white">
-        <thead>
-          <tr class="bg-gray-100 text-left text-sm font-semibold text-gray-600">
-            <th class="px-4 py-3">Fecha</th>
-            <th class="px-4 py-3">Apertura</th>
-            <th class="px-4 py-3">Cierre</th>
-            <th class="px-4 py-3 text-right">Ventas</th>
-            <th class="px-4 py-3 text-right">Gastos</th>
-            <th class="px-4 py-3 text-right">Saldo esperado</th>
-            <th class="px-4 py-3 text-right">Saldo real</th>
-            <th class="px-4 py-3">Estado</th>
-            <th class="px-4 py-3">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (j of jornadas(); track j.id) {
-            <tr class="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                {{ j.fecha }}
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                {{ j.hora_apertura }}
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                {{ j.hora_cierre ?? '—' }}
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums whitespace-nowrap">
-                {{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums whitespace-nowrap">
-                {{ j.total_gastos | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </td>
-              <td class="px-4 py-3 text-sm font-semibold text-gray-900 text-right tabular-nums whitespace-nowrap">
-                {{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </td>
-              <td class="px-4 py-3 text-sm text-right tabular-nums whitespace-nowrap"
+    <!-- Navegación de mes -->
+    <div class="mb-4 flex items-center justify-between">
+      <button
+        type="button"
+        class="cursor-pointer rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-200 transition-colors"
+        (click)="mesAnterior()"
+        title="Mes anterior"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <h2 class="text-lg font-semibold text-gray-900 capitalize">{{ mesTitulo() }}</h2>
+
+      <button
+        type="button"
+        class="cursor-pointer rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-200 transition-colors"
+        (click)="mesSiguiente()"
+        title="Mes siguiente"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Grid del calendario -->
+    <div class="rounded-xl bg-white shadow-sm ring-1 ring-gray-200">
+      <!-- Cabecera de días de la semana -->
+      <div class="grid grid-cols-7 border-b border-gray-100">
+        @for (dia of diasSemana(); track $index) {
+          <div class="py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {{ dia }}
+          </div>
+        }
+      </div>
+
+      <!-- Días del mes -->
+      <div class="grid grid-cols-7">
+        @for (cell of grid(); track $index) {
+          @if (cell.day !== null && cell.jornada) {
+            <!-- Día con jornada -->
+            <button
+              type="button"
+              class="flex cursor-pointer flex-col items-center border-b border-r border-gray-100 p-2 transition-colors hover:bg-blue-50 min-h-[90px]"
+              [class.bg-blue-50]="selectedDateStr() === cell.dateStr"
+              [class.ring-2]="selectedDateStr() === cell.dateStr"
+              [class.ring-inset]="selectedDateStr() === cell.dateStr"
+              [class.ring-blue-500]="selectedDateStr() === cell.dateStr"
+              (click)="seleccionarDia(cell.dateStr)"
+            >
+              <span
+                class="mb-1 text-sm font-semibold"
+                [class.text-blue-600]="cell.isToday"
+                [class.text-gray-900]="!cell.isToday"
+              >{{ cell.day }}</span>
+
+              <app-estado-badge [estado]="cell.jornada.estado" />
+
+              <span class="mt-1 text-[10px] font-medium text-gray-700 tabular-nums leading-tight">
+                ${{ cell.jornada.total_ventas | number:'1.0-0' }}
+              </span>
+
+              @if (cell.jornada.saldo_real !== null) {
+                <span class="text-[10px] text-green-600 tabular-nums leading-tight">
+                  ${{ cell.jornada.saldo_real | number:'1.0-0' }}
+                </span>
+              }
+            </button>
+          } @else if (cell.day !== null) {
+            <!-- Día sin jornada -->
+            <div
+              class="flex flex-col items-center border-b border-r border-gray-100 p-2 min-h-[90px]"
+            >
+              <span class="text-sm text-gray-300">{{ cell.day }}</span>
+            </div>
+          } @else {
+            <!-- Celda vacía (padding) -->
+            <div class="min-h-[90px] border-b border-r border-gray-50 bg-gray-50/50"></div>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Panel de detalle del día seleccionado -->
+    @if (diaSeleccionado(); as sel) {
+      <div class="mt-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+        <div class="mb-3 flex items-center justify-between">
+          <h3 class="text-base font-semibold text-gray-900">
+            {{ sel.fecha | date:'fullDate':'':'es-AR' }}
+          </h3>
+          @if (sel.jornada) {
+            <app-estado-badge [estado]="sel.jornada.estado" />
+          }
+        </div>
+
+        @if (sel.jornada; as j) {
+          <div class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+            <div>
+              <span class="block text-xs text-gray-500">Apertura</span>
+              <span class="font-medium text-gray-900">{{ j.hora_apertura }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Cierre</span>
+              <span class="font-medium text-gray-900">{{ j.hora_cierre ?? '—' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Ventas</span>
+              <span class="font-medium text-gray-900">{{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Gastos</span>
+              <span class="font-medium text-gray-900">{{ j.total_gastos | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Saldo esperado</span>
+              <span class="font-semibold text-gray-900">{{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Saldo real</span>
+              <span
+                class="font-semibold"
                 [class.text-gray-900]="j.saldo_real !== null"
                 [class.text-gray-400]="j.saldo_real === null"
-              >
-                @if (j.saldo_real !== null) {
-                  {{ j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}
-                } @else {
-                  —
-                }
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <app-estado-badge [estado]="j.estado" />
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <div class="flex items-center gap-2">
-                  <button
-                    type="button"
-                    class="text-sm text-blue-600 hover:text-blue-800 underline transition-colors disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed"
-                    [disabled]="j.estado === 'abierta'"
-                    (click)="descargarExcel(j)"
-                    title="Descargar Excel"
-                  >Excel</button>
-                  <button
-                    type="button"
-                    class="text-sm text-blue-600 hover:text-blue-800 underline transition-colors disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed"
-                    [disabled]="j.estado === 'abierta'"
-                    (click)="verPreview(j)"
-                    title="Vista previa"
-                  >Ver</button>
-                </div>
-              </td>
-            </tr>
+              >{{ j.saldo_real !== null ? (j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Monto inicial</span>
+              <span class="font-medium text-gray-900">{{ j.monto_inicial | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+            </div>
+            <div>
+              <span class="block text-xs text-gray-500">Diferencia</span>
+              @if (j.saldo_real !== null) {
+                <span
+                  class="font-semibold tabular-nums"
+                  [class.text-green-600]="j.saldo_esperado - j.saldo_real >= 0"
+                  [class.text-red-600]="j.saldo_esperado - j.saldo_real < 0"
+                >{{ j.saldo_esperado - j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+              } @else {
+                <span class="text-gray-400">—</span>
+              }
+            </div>
+          </div>
+
+          @if (j.estado === 'cerrada') {
+            <div class="mt-4 flex gap-3">
+              <button
+                type="button"
+                class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors"
+                (click)="descargarExcel(j)"
+              >Descargar Excel</button>
+              <button
+                type="button"
+                class="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                (click)="verPreview(j)"
+              >Vista previa</button>
+            </div>
           }
-        </tbody>
-      </table>
-    </div>
+        } @else {
+          <p class="text-sm text-gray-500">No hay jornada registrada para este día.</p>
+        }
+      </div>
+    }
   }
 </div>

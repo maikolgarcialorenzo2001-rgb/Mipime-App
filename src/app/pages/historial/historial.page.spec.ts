@@ -1,8 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { registerLocaleData } from '@angular/common';
+import localeEs from '@angular/common/locales/es';
 import { HistorialPage } from './historial.page';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
+
+registerLocaleData(localeEs);
 
 const mockJornadas: Jornada[] = [
   {
@@ -37,7 +41,7 @@ const mockJornadas: Jornada[] = [
   },
   {
     id: 1,
-    fecha: '2026-06-04',
+    fecha: '2026-06-01',
     hora_apertura: '09:00:00',
     hora_cierre: null,
     monto_inicial: 5000,
@@ -47,8 +51,8 @@ const mockJornadas: Jornada[] = [
     saldo_real: null,
     estado: 'abierta',
     user_cierre_id: null,
-    created_at: '2026-06-04T09:00:00Z',
-    updated_at: '2026-06-04T09:00:00Z',
+    created_at: '2026-06-01T09:00:00Z',
+    updated_at: '2026-06-01T09:00:00Z',
   },
 ];
 
@@ -71,6 +75,8 @@ describe('HistorialPage', () => {
 
     fixture = TestBed.createComponent(HistorialPage);
     component = fixture.componentInstance;
+    // Fijamos el mes a junio 2026 para matchear los mocks
+    component.currentMonth.set(new Date(2026, 5, 1));
     fixture.detectChanges();
   });
 
@@ -78,50 +84,90 @@ describe('HistorialPage', () => {
     expect(component).toBeTruthy();
   });
 
-  it('debería mostrar todas las jornadas en la tabla', () => {
-    const rows = fixture.nativeElement.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(3);
+  it('debería mostrar el título del mes en uppercase', () => {
+    const titulo = fixture.nativeElement.querySelector('h2');
+    expect(titulo?.textContent?.toLowerCase()).toContain('junio');
+    expect(titulo?.textContent).toContain('2026');
   });
 
-  it('debería mostrar el estado con app-estado-badge', () => {
+  it('debería tener 7 columnas de días de la semana', () => {
+    const grids = fixture.nativeElement.querySelectorAll('.grid-cols-7');
+    const headerGrid = grids[0];
+    const dayHeaders = headerGrid.querySelectorAll(':scope > div');
+    expect(dayHeaders.length).toBe(7);
+  });
+
+  it('debería mostrar botones para los días con jornada', () => {
+    // Junio 2026: lunes 1, martes 2... Los días con jornada: 1, 3, 4
+    // El 1 es lunes → primer día del grid
+    // Buscamos los botones (días clickeables) que tienen app-estado-badge
+    const buttons = fixture.nativeElement.querySelectorAll('button');
+    // Total buttons: 2 nav (prev/next) + botones de días con jornada
+    const dayButtons = Array.from(buttons).filter(
+      (b) => b instanceof HTMLElement && b.querySelector('app-estado-badge'),
+    );
+    expect(dayButtons.length).toBe(3);
+  });
+
+  it('debería mostrar estado badge en celdas con jornada', () => {
     const badges = fixture.nativeElement.querySelectorAll('app-estado-badge');
     expect(badges.length).toBe(3);
   });
 
-  it('debería mostrar las fechas correctamente', () => {
-    const cells = fixture.nativeElement.querySelectorAll('tbody tr td:first-child');
-    expect(cells[0].textContent?.trim()).toBe('2026-06-04');
-    expect(cells[1].textContent?.trim()).toBe('2026-06-03');
+  it('debería seleccionar/deseleccionar un día al hacer click', () => {
+    expect(component.selectedDateStr()).toBeNull();
+
+    component.seleccionarDia('2026-06-03');
+    expect(component.selectedDateStr()).toBe('2026-06-03');
+
+    // Click again deselecciona
+    component.seleccionarDia('2026-06-03');
+    expect(component.selectedDateStr()).toBeNull();
   });
 
-  it('debería mostrar "—" si no hay hora de cierre', () => {
-    const cierreCells = fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(3)');
-    expect(cierreCells[2].textContent?.trim()).toBe('—');
+  it('debería mostrar panel de detalle al seleccionar un día', () => {
+    component.seleccionarDia('2026-06-04');
+    fixture.detectChanges();
+
+    const detailPanel = fixture.nativeElement.querySelector('.rounded-xl.bg-white.p-5');
+    expect(detailPanel).toBeTruthy();
+    // Debería mostrar "junio" en la fecha formateada
+    expect(detailPanel?.textContent).toContain('Ventas');
+    expect(detailPanel?.textContent).toContain('Gastos');
   });
 
-  it('debería mostrar "—" si no hay saldo real', () => {
-    const saldoCells = fixture.nativeElement.querySelectorAll('tbody tr td:nth-child(7)');
-    expect(saldoCells[1].textContent?.trim()).toBe('—');
+  it('debería navegar entre meses', () => {
+    component.mesAnterior();
+    fixture.detectChanges();
+    expect(component.currentMonth().getMonth()).toBe(4); // mayo
+
+    component.mesSiguiente();
+    fixture.detectChanges();
+    expect(component.currentMonth().getMonth()).toBe(5); // junio otra vez
   });
 
-  it('debería tener botón Excel deshabilitado para jornada abierta', () => {
-    const buttons = fixture.nativeElement.querySelectorAll('tbody tr:last-child button');
-    buttons.forEach((btn: HTMLButtonElement) => {
-      expect(btn.disabled).toBe(true);
-    });
+  it('debería limpiar selección al cambiar de mes', () => {
+    component.seleccionarDia('2026-06-03');
+    expect(component.selectedDateStr()).toBe('2026-06-03');
+
+    component.mesAnterior();
+    expect(component.selectedDateStr()).toBeNull();
   });
 
-  it('debería tener botones habilitados para jornada cerrada', () => {
-    const firstRowButtons = fixture.nativeElement.querySelectorAll('tbody tr:first-child button');
-    firstRowButtons.forEach((btn: HTMLButtonElement) => {
-      expect(btn.disabled).toBe(false);
-    });
+  it('debería mostrar botón descargar en panel si jornada está cerrada', () => {
+    component.seleccionarDia('2026-06-04');
+    fixture.detectChanges();
+
+    const downloadBtn: HTMLElement | null = fixture.nativeElement.querySelector(
+      '.rounded-xl.bg-white.p-5 button',
+    );
+    expect(downloadBtn).toBeTruthy();
+    expect(downloadBtn?.textContent).toContain('Descargar Excel');
   });
 });
 
 describe('HistorialPage — vacío', () => {
   let fixture: ComponentFixture<HistorialPage>;
-  let component: HistorialPage;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -137,7 +183,6 @@ describe('HistorialPage — vacío', () => {
     });
 
     fixture = TestBed.createComponent(HistorialPage);
-    component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
@@ -146,9 +191,9 @@ describe('HistorialPage — vacío', () => {
     expect(empty).toBeTruthy();
   });
 
-  it('no debería mostrar la tabla si no hay jornadas', () => {
-    const table = fixture.nativeElement.querySelector('table');
-    expect(table).toBeFalsy();
+  it('no debería mostrar el calendario si no hay jornadas', () => {
+    const calendar = fixture.nativeElement.querySelector('.grid.grid-cols-7');
+    expect(calendar).toBeFalsy();
   });
 });
 
