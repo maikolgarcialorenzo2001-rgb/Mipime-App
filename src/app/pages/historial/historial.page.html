@@ -1,0 +1,86 @@
+<div class="mx-auto max-w-5xl min-h-screen bg-gray-50 p-6">
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">Historial de Jornadas</h1>
+
+  @if (error(); as err) {
+    <app-error-alert [message]="err" />
+  }
+
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else if (jornadas().length === 0) {
+    <app-empty-state message="No hay jornadas registradas" />
+  } @else {
+    <div class="overflow-x-auto rounded-lg shadow-sm">
+      <table class="w-full border-collapse bg-white">
+        <thead>
+          <tr class="bg-gray-100 text-left text-sm font-semibold text-gray-600">
+            <th class="px-4 py-3">Fecha</th>
+            <th class="px-4 py-3">Apertura</th>
+            <th class="px-4 py-3">Cierre</th>
+            <th class="px-4 py-3 text-right">Ventas</th>
+            <th class="px-4 py-3 text-right">Gastos</th>
+            <th class="px-4 py-3 text-right">Saldo esperado</th>
+            <th class="px-4 py-3 text-right">Saldo real</th>
+            <th class="px-4 py-3">Estado</th>
+            <th class="px-4 py-3">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (j of jornadas(); track j.id) {
+            <tr class="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
+                {{ j.fecha }}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                {{ j.hora_apertura }}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                {{ j.hora_cierre ?? '—' }}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums whitespace-nowrap">
+                {{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-900 text-right tabular-nums whitespace-nowrap">
+                {{ j.total_gastos | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              </td>
+              <td class="px-4 py-3 text-sm font-semibold text-gray-900 text-right tabular-nums whitespace-nowrap">
+                {{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              </td>
+              <td class="px-4 py-3 text-sm text-right tabular-nums whitespace-nowrap"
+                [class.text-gray-900]="j.saldo_real !== null"
+                [class.text-gray-400]="j.saldo_real === null"
+              >
+                @if (j.saldo_real !== null) {
+                  {{ j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}
+                } @else {
+                  —
+                }
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <app-estado-badge [estado]="j.estado" />
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="text-sm text-blue-600 hover:text-blue-800 underline transition-colors disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed"
+                    [disabled]="j.estado === 'abierta'"
+                    (click)="descargarExcel(j)"
+                    title="Descargar Excel"
+                  >Excel</button>
+                  <button
+                    type="button"
+                    class="text-sm text-blue-600 hover:text-blue-800 underline transition-colors disabled:text-gray-300 disabled:no-underline disabled:cursor-not-allowed"
+                    [disabled]="j.estado === 'abierta'"
+                    (click)="verPreview(j)"
+                    title="Vista previa"
+                  >Ver</button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
