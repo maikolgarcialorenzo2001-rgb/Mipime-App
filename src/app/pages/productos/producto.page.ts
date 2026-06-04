@@ -47,6 +47,12 @@ export class ProductosPage implements OnInit {
     }, 300);
   }
 
+  /** Vuelve a cargar productos, limpiando el error previo. */
+  recargar(): void {
+    this.error.set(undefined);
+    this._cargar();
+  }
+
   private _cargar(): void {
     this.buscando.set(true);
     this._productoService.listar().subscribe({
@@ -57,6 +63,7 @@ export class ProductosPage implements OnInit {
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Error al cargar productos');
         this.buscando.set(false);
+        console.error('[ProductosPage] Error al cargar:', err);
       },
     });
   }

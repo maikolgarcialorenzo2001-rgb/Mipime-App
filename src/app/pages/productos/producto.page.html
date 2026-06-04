@@ -2,8 +2,13 @@
   <h1 class="text-2xl font-bold text-gray-900 mb-6">Productos</h1>
 
   @if (error()) {
-    <div class="rounded-lg bg-red-50 p-4 text-red-700 mb-4">
-      {{ error() }}
+    <div class="rounded-lg bg-red-50 p-4 text-red-700 mb-4 flex items-center justify-between gap-4">
+      <span>{{ error() }}</span>
+      <button
+        type="button"
+        class="shrink-0 rounded bg-red-200 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-300 transition-colors"
+        (click)="recargar()"
+      >Reintentar</button>
     </div>
   }
 

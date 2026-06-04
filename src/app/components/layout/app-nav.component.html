@@ -5,30 +5,45 @@
       <div class="flex items-center gap-4 text-sm font-medium">
         <a
           routerLink="/pos"
-          class="font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+          routerLinkActive #pos="routerLinkActive"
+          [class.text-blue-600]="pos.isActive"
+          [class.font-semibold]="pos.isActive"
+          class="text-gray-600 hover:text-blue-800 transition-colors"
         >
           POS
         </a>
         <a
           routerLink="/productos"
+          routerLinkActive #productos="routerLinkActive"
+          [class.text-blue-600]="productos.isActive"
+          [class.font-semibold]="productos.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors"
         >
           Productos
         </a>
         <a
           routerLink="/jornada"
+          routerLinkActive #jornada="routerLinkActive"
+          [class.text-blue-600]="jornada.isActive"
+          [class.font-semibold]="jornada.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors"
         >
           Jornada
         </a>
         <a
           routerLink="/inventario"
+          routerLinkActive #inventario="routerLinkActive"
+          [class.text-blue-600]="inventario.isActive"
+          [class.font-semibold]="inventario.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors"
         >
           Inventario
         </a>
         <a
           routerLink="/historial"
+          routerLinkActive #historial="routerLinkActive"
+          [class.text-blue-600]="historial.isActive"
+          [class.font-semibold]="historial.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors"
         >
           Historial
@@ -36,6 +51,9 @@
         @if (auth.hasRole('admin')) {
           <a
             routerLink="/admin"
+            routerLinkActive #admin="routerLinkActive"
+            [class.text-blue-600]="admin.isActive"
+            [class.font-semibold]="admin.isActive"
             class="text-gray-600 hover:text-blue-600 transition-colors"
           >
             Admin
