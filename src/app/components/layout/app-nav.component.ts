@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
@@ -11,6 +11,7 @@ import type { Jornada } from '../../models';
   styleUrl: './app-nav.component.css',
 })
 export class AppNavComponent {
+  private readonly _router = inject(Router);
   private readonly _auth = inject(AuthService);
   private readonly _jornadaService = inject(JornadaService);
 
@@ -193,5 +194,6 @@ export class AppNavComponent {
 
   logout(): void {
     this._auth.logout();
+    this._router.navigateByUrl('/login');
   }
 }
