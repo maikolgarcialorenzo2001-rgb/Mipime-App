@@ -58,6 +58,11 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "prebundle": {
+              "exclude": ["sqlocal"]
+            }
+          },
           "configurations": {
             "production": {
               "buildTarget": "Mipime-Cuentas:build:production"

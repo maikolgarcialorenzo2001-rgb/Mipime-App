@@ -133,10 +133,12 @@ export class SqliteService implements Database {
       created_at TEXT NOT NULL
     )`);
 
-    await client.sql(`CREATE TABLE IF NOT EXISTS jornada_pdfs (
+    await client.sql(`CREATE TABLE IF NOT EXISTS jornada_reportes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
-      pdf_base64 TEXT NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'excel',
+      content_base64 TEXT NOT NULL,
+      filename TEXT NOT NULL,
       created_at TEXT NOT NULL
     )`);
 

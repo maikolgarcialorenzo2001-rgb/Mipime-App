@@ -1,14 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  Router,
-  type UrlTree,
-  provideLocationMocks,
-} from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
+import { Router, type UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { DATABASE, type Database } from '../services/database';
 import { hashPassword, generateSalt } from '../services/hash-password';
 import { authGuard } from './auth.guard';
+import { adminGuard } from './admin.guard';
+import { firstValueFrom } from 'rxjs';
 import type { Usuario } from '../models';
 
 function mockCrypto(): void {
@@ -43,26 +40,42 @@ function createMockDb(): Database {
   };
 }
 
-describe('authGuard', () => {
-  let mockDb: Database;
-  let router: Router;
+function createMockUsuario(salt: string, hash: string): Usuario {
+  return {
+    id: 1,
+    nombre: 'Admin',
+    email: 'admin@mipime.com',
+    password_hash: hash,
+    salt,
+    rol: 'admin',
+    activo: 1,
+    created_at: '2026-06-04T00:00:00Z',
+    updated_at: '2026-06-04T00:00:00Z',
+  };
+}
 
-  beforeEach(async () => {
+async function setupLoggedInUser(): Promise<AuthService> {
+  const salt = generateSalt();
+  const hash = await hashPassword('admin123', salt);
+  const mockDb = TestBed.inject(DATABASE) as unknown as { sql: ReturnType<typeof vi.fn> };
+  mockDb.sql.mockResolvedValue([createMockUsuario(salt, hash)]);
+  const auth = TestBed.inject(AuthService);
+  await firstValueFrom(auth.login('admin@mipime.com', 'admin123'));
+  return auth;
+}
+
+describe('authGuard', () => {
+  beforeEach(() => {
     mockCrypto();
-    mockDb = createMockDb();
     localStorage.clear();
+    vi.clearAllMocks();
 
     TestBed.configureTestingModule({
-      imports: [RouterTestingModule],
       providers: [
         AuthService,
-        { provide: DATABASE, useValue: mockDb },
+        { provide: DATABASE, useValue: createMockDb() },
       ],
     });
-
-    router = TestBed.inject(Router);
-    // Navigate to root so router has a usable state
-    await router.navigate(['/']);
   });
 
   afterEach(() => {
@@ -71,34 +84,65 @@ describe('authGuard', () => {
   });
 
   it('debería retornar true si el usuario está logueado', async () => {
-    // Login first
-    const salt = generateSalt();
-    const hash = await hashPassword('admin123', salt);
-    vi.mocked(mockDb.sql).mockResolvedValue([{
-      id: 1,
-      nombre: 'Admin',
-      email: 'admin@mipime.com',
-      password_hash: hash,
-      salt,
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    } satisfies Usuario]);
-
-    const auth = TestBed.inject(AuthService);
-    await auth.login('admin@mipime.com', 'admin123').toPromise();
-
-    const result = authGuard(undefined as any, undefined as any);
+    await setupLoggedInUser();
+    const result = TestBed.runInInjectionContext(() =>
+      authGuard({} as any, {} as any),
+    );
     expect(result).toBe(true);
   });
 
   it('debería redirigir a /login si no hay sesión', () => {
     const result = TestBed.runInInjectionContext(() =>
-      authGuard(undefined as any, undefined as any),
+      authGuard({} as any, {} as any),
     ) as UrlTree;
 
-    expect(router.isUrlTree(result)).toBe(true);
     expect(result.toString()).toBe('/login');
+  });
+});
+
+describe('adminGuard', () => {
+  beforeEach(() => {
+    mockCrypto();
+    localStorage.clear();
+    vi.clearAllMocks();
+
+    TestBed.configureTestingModule({
+      providers: [
+        AuthService,
+        { provide: DATABASE, useValue: createMockDb() },
+      ],
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it('debería retornar true si el usuario es admin', async () => {
+    await setupLoggedInUser();
+    const result = TestBed.runInInjectionContext(() =>
+      adminGuard({} as any, {} as any),
+    );
+    expect(result).toBe(true);
+  });
+
+  it('debería redirigir a / si el usuario no es admin', async () => {
+    // Login as trabajador
+    const mockDb = TestBed.inject(DATABASE) as unknown as { sql: ReturnType<typeof vi.fn> };
+    const salt = generateSalt();
+    const hash = await hashPassword('pass123', salt);
+    mockDb.sql.mockResolvedValue([{
+      ...createMockUsuario(salt, hash),
+      rol: 'trabajador',
+    }]);
+    const auth = TestBed.inject(AuthService);
+    await firstValueFrom(auth.login('worker@test.com', 'pass123'));
+
+    const result = TestBed.runInInjectionContext(() =>
+      adminGuard({} as any, {} as any),
+    ) as UrlTree;
+
+    expect(result.toString()).toBe('/');
   });
 });

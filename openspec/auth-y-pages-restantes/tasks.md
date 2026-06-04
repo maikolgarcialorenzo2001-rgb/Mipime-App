@@ -41,12 +41,12 @@ Phase 4: 4.1 → 4.2 → 4.3 → 4.4
 
 ## Phase 1: Foundation (Migration + Auth)
 
-- [ ] **1.1 [P1][M]** Migration v2 in SqliteService — add usuarios, stock_movimientos, jornada_reportes tables, ALTER jornadas/ventas, seed admin
-- [ ] **1.2 [P1][S]** Create `models/usuario.ts` — Usuario interface
-- [ ] **1.3 [P1][L]** AuthService — login (SHA-256+salt), logout, Signal session, localStorage restore
-- [ ] **1.4 [P2][S]** Guards: `auth.guard.ts` + `admin.guard.ts`
-- [ ] **1.5 [P2][S]** Update `app.routes.ts` — add all routes with guards
-- [ ] **1.6 [P2][M]** Update `app.html` + `app.ts` — conditional nav, logout button
+- [x] **1.1 [P1][M]** Migration v2 in SqliteService — add usuarios, stock_movimientos, jornada_pdfs tables, ALTER jornadas/ventas, seed admin
+- [x] **1.2 [P1][S]** Create `models/usuario.ts` — Usuario interface
+- [x] **1.3 [P1][L]** AuthService — login (SHA-256+salt), logout, Signal session, localStorage restore
+- [x] **1.4 [P2][S]** Guards: `auth.guard.ts` + `admin.guard.ts`
+- [x] **1.5 [P2][S]** Update `app.routes.ts` — add all routes with guards
+- [x] **1.6 [P2][M]** Update `app.ts` — conditional nav, logout button
 
 **Tests**: AuthService login/logout/session/guard redirects
 

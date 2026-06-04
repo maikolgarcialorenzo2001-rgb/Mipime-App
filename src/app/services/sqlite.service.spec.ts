@@ -106,18 +106,20 @@ describe('SqliteService migration v2', () => {
     expect(sql).toContain('motivo TEXT');
   });
 
-  it('debería crear tabla jornada_pdfs en migration v2', async () => {
+  it('debería crear tabla jornada_reportes en migration v2', async () => {
     await service.initialize();
 
     const createTableCalls = sqlCalls.filter(
       (c) =>
-        c.query.includes('CREATE TABLE') && c.query.includes('jornada_pdfs'),
+        c.query.includes('CREATE TABLE') && c.query.includes('jornada_reportes'),
     );
 
     expect(createTableCalls.length).toBeGreaterThanOrEqual(1);
     const sql = createTableCalls[0].query;
     expect(sql).toContain('jornada_id INTEGER NOT NULL REFERENCES jornadas(id)');
-    expect(sql).toContain('pdf_base64 TEXT NOT NULL');
+    expect(sql).toContain('content_type TEXT NOT NULL DEFAULT');
+    expect(sql).toContain('content_base64 TEXT NOT NULL');
+    expect(sql).toContain('filename TEXT NOT NULL');
   });
 
   it('debería ejectuar ALTER TABLE para user_cierre_id en jornadas', async () => {
