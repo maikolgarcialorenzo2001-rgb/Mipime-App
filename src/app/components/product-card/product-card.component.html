@@ -8,7 +8,7 @@
 >
   <span class="text-sm font-medium text-gray-900 leading-tight line-clamp-2">{{ producto().nombre }}</span>
   <div class="mt-2">
-    <span class="text-lg font-bold text-blue-600">
+    <span class="text-lg font-semibold text-blue-600">
       {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
     </span>
     @if (producto().stock_actual <= stockWarningThreshold()) {
