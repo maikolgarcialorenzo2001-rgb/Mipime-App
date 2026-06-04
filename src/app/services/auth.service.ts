@@ -56,32 +56,45 @@ export class AuthService {
       [username],
     );
 
-    const user = rows[0];
-    if (!user) {
+    if (rows.length === 0) {
       throw new Error('Credenciales inválidas');
     }
 
-    if (!user.activo) {
+    // Si todos los usuarios con ese nombre están desactivados, rechazar
+    if (rows.every((u) => !u.activo)) {
       throw new Error('Usuario desactivado');
     }
 
-    const hash = await hashPassword(password, user.salt);
-    if (hash !== user.password_hash) {
-      throw new Error('Credenciales inválidas');
+    // ⚠️ Pueden existir varios usuarios con el mismo nombre en DBs que
+    // migraron desde antes de agregar UNIQUE en la columna `nombre`.
+    // NO usamos rows[0] porque agarraría al primero nomás, ignorando
+    // password y rol del resto.
+    //
+    // En vez de eso: iteramos TODOS los usuarios con ese nombre, y el
+    // que tenga la contraseña correcta → ese loguea con SU rol (sea
+    // admin o trabajador). Así cada uno entra con su identidad real
+    // aunque compartan nombre.
+    for (const user of rows) {
+      if (!user.activo) continue;
+
+      const hash = await hashPassword(password, user.salt);
+      if (hash !== user.password_hash) continue;
+
+      const session: UsuarioPublico = {
+        id: user.id,
+        nombre: user.nombre,
+        rol: user.rol,
+        activo: user.activo,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      };
+
+      this._currentUser.set(session);
+      this._persistSession(session);
+      return session;
     }
 
-    const session: UsuarioPublico = {
-      id: user.id,
-      nombre: user.nombre,
-      rol: user.rol,
-      activo: user.activo,
-      created_at: user.created_at,
-      updated_at: user.updated_at,
-    };
-
-    this._currentUser.set(session);
-    this._persistSession(session);
-    return session;
+    throw new Error('Credenciales inválidas');
   }
 
   private _persistSession(session: UsuarioPublico): void {
