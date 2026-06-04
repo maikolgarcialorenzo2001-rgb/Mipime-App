@@ -48,6 +48,10 @@ export class SqliteService implements Database {
       await this._migrationV1(client);
     }
 
+    if (currentVersion < 2) {
+      await this._migrationV2(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -105,6 +109,63 @@ export class SqliteService implements Database {
     )`);
 
     await client.sql('INSERT INTO schema_version (version) VALUES (1)');
+  }
+
+  private async _migrationV2(client: SQLocal): Promise<void> {
+    await client.sql(`CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      rol TEXT NOT NULL DEFAULT 'trabajador' CHECK(rol IN ('admin', 'trabajador')),
+      activo INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS stock_movimientos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida', 'ajuste')),
+      motivo TEXT,
+      created_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS jornada_pdfs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      pdf_base64 TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+
+    // ALTER TABLEs con try/catch por si la columna ya existe
+    for (const q of [
+      'ALTER TABLE jornadas ADD COLUMN user_cierre_id INTEGER REFERENCES usuarios(id)',
+      'ALTER TABLE ventas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id)',
+      `ALTER TABLE ventas ADD COLUMN forma_pago TEXT NOT NULL DEFAULT 'efectivo' CHECK(forma_pago IN ('efectivo', 'transferencia', 'tarjeta', 'mercadopago'))`,
+    ]) {
+      try { await client.sql(q); } catch { /* columna ya existe */ }
+    }
+
+    // Seed admin: solo si no existe
+    const [{ count }] = await client.sql<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM usuarios WHERE email = 'admin@mipime.com'",
+    );
+    if (count === 0) {
+      const ahora = new Date().toISOString();
+      const { generateSalt, hashPassword } = await import('./hash-password');
+      const salt = generateSalt();
+      const hash = await hashPassword('admin123', salt);
+      await client.sql(
+        `INSERT INTO usuarios (nombre, email, password_hash, salt, rol, activo, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'admin', 1, ?, ?)`,
+        'Admin', 'admin@mipime.com', hash, salt, ahora, ahora,
+      );
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (2)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {
