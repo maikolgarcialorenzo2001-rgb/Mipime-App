@@ -35,7 +35,6 @@
           <tr class="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Precio venta</th>
-            <th class="px-6 py-3">Costo</th>
             <th class="px-6 py-3">Stock</th>
             <th class="px-6 py-3">Existencias</th>
           </tr>
@@ -51,11 +50,6 @@
               </td>
               <td class="px-6 py-4 font-medium text-gray-900">
                 {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </td>
-              <td class="px-6 py-4 text-gray-600">
-                @if (p.precio_costo) {
-                  {{ p.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0' }}
-                }
               </td>
               <td class="px-6 py-4">
                 <app-stock-badge [stock]="p.stock_actual" />
