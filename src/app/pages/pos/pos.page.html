@@ -6,7 +6,7 @@
       <input
         #searchInput
         type="text"
-        placeholder="Buscar productos por nombre… (Escape para limpiar, ↑↓ para navegar)"
+        placeholder="Buscar productos por nombre… (Escape para limpiar, ←↑↓→ para navegar)"
         class="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-lg shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors"
         [value]="query()"
         (input)="onQueryChange($any($event.target).value)"

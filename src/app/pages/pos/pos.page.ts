@@ -37,6 +37,15 @@ export class PosPage {
   readonly jornadaId = signal<number | null>(null);
   readonly ventaError = signal<string | null>(null);
 
+  /** Cantidad de columnas del grid según el viewport, matcheando Tailwind breakpoints. */
+  private get _columnCount(): number {
+    const w = window.innerWidth;
+    if (w >= 1280) return 5; // xl: grid-cols-5
+    if (w >= 1024) return 4; // lg: grid-cols-4
+    if (w >= 640) return 3;  // sm: grid-cols-3
+    return 2;                // default: grid-cols-2
+  }
+
   private _debounceId?: ReturnType<typeof setTimeout>;
 
   constructor() {
@@ -72,17 +81,20 @@ export class PosPage {
       return;
     }
 
-    if (event.key === 'ArrowUp') {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault();
-      this.selectedIndex.update((i) => Math.max(0, i - 1));
-      return;
-    }
+      const len = this.resultados().length;
+      const cols = this._columnCount;
 
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      this.selectedIndex.update((i) =>
-        Math.min(this.resultados().length - 1, i + 1),
-      );
+      this.selectedIndex.update((i) => {
+        switch (event.key) {
+          case 'ArrowLeft':  return Math.max(0, i - 1);
+          case 'ArrowRight': return Math.min(len - 1, i + 1);
+          case 'ArrowUp':    return Math.max(0, i - cols);
+          case 'ArrowDown':  return Math.min(len - 1, i + cols);
+          default:           return i;
+        }
+      });
       return;
     }
 
