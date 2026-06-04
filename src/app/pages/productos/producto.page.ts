@@ -1,11 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
 import { ProductoService } from '../../services/producto.service';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-productos-page',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [CurrencyPipe, DecimalPipe, StockBadgeComponent],
   templateUrl: './producto.page.html',
   styleUrl: './producto.page.css',
 })

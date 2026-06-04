@@ -8,4 +8,5 @@ import {
 getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting(),
+  { errorOnUnknownElements: true, errorOnUnknownProperties: true },
 );
