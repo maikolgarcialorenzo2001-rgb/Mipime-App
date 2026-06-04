@@ -2,11 +2,12 @@ import { Component, inject, viewChild, ElementRef, afterNextRender, signal } fro
 import { CurrencyPipe } from '@angular/common';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
+import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe],
+  imports: [CurrencyPipe, ProductCardComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })

@@ -30,22 +30,11 @@
       } @else {
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           @for (p of resultados(); track p.id; let i = $index) {
-            <button
-              type="button"
-              class="flex flex-col rounded-xl border-2 p-4 text-left transition-all hover:shadow-md active:scale-[0.97]"
-              [class]="i === selectedIndex()
-                ? 'border-blue-500 bg-blue-50 shadow-sm'
-                : 'border-gray-200 bg-white hover:border-gray-300'"
-              (click)="agregarAlCarrito(p)"
-            >
-              <span class="text-sm font-medium text-gray-900 leading-tight line-clamp-2">{{ p.nombre }}</span>
-              <span class="mt-1 text-lg font-bold text-blue-600">
-                {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </span>
-              @if (p.stock_actual <= 5) {
-                <span class="mt-1 text-xs text-red-500">Stock: {{ p.stock_actual }}</span>
-              }
-            </button>
+            <app-product-card
+              [producto]="p"
+              [selected]="i === selectedIndex()"
+              (clicked)="agregarAlCarrito(p)"
+            />
           }
         </div>
       }
