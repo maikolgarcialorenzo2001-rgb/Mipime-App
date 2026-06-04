@@ -90,7 +90,7 @@ describe('App component nav', () => {
     expect(linkTexts).toContain('POS');
     expect(linkTexts).toContain('Productos');
     expect(linkTexts).toContain('Jornada');
-    expect(linkTexts).toContain('Inventario');
+    expect(linkTexts).toContain('Inventario Producto');
     expect(linkTexts).toContain('Historial');
     expect(linkTexts).toContain('Admin');
   });

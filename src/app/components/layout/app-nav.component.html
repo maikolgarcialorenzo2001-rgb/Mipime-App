@@ -8,7 +8,8 @@
           routerLinkActive #pos="routerLinkActive"
           [class.text-blue-600]="pos.isActive"
           [class.font-semibold]="pos.isActive"
-           class="text-gray-600 hover:text-blue-800 transition-colors cursor-pointer"
+          [class.underline]="pos.isActive"
+          class="text-gray-600 hover:text-blue-800 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
         >
           POS
         </a>
@@ -17,7 +18,8 @@
           routerLinkActive #productos="routerLinkActive"
           [class.text-blue-600]="productos.isActive"
           [class.font-semibold]="productos.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+          [class.underline]="productos.isActive"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
         >
           Productos
         </a>
@@ -26,7 +28,8 @@
           routerLinkActive #jornada="routerLinkActive"
           [class.text-blue-600]="jornada.isActive"
           [class.font-semibold]="jornada.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+          [class.underline]="jornada.isActive"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
         >
           Jornada
         </a>
@@ -35,16 +38,18 @@
           routerLinkActive #inventario="routerLinkActive"
           [class.text-blue-600]="inventario.isActive"
           [class.font-semibold]="inventario.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+          [class.underline]="inventario.isActive"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
         >
-          Inventario
+          Inventario Producto
         </a>
         <a
           routerLink="/historial"
           routerLinkActive #historial="routerLinkActive"
           [class.text-blue-600]="historial.isActive"
           [class.font-semibold]="historial.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+          [class.underline]="historial.isActive"
+          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
         >
           Historial
         </a>
@@ -54,7 +59,8 @@
             routerLinkActive #admin="routerLinkActive"
             [class.text-blue-600]="admin.isActive"
             [class.font-semibold]="admin.isActive"
-            class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+            [class.underline]="admin.isActive"
+            class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-blue-600 decoration-2"
           >
             Admin
           </a>
