@@ -37,7 +37,7 @@
             <th class="px-6 py-3">Precio venta</th>
             <th class="px-6 py-3">Costo</th>
             <th class="px-6 py-3">Stock</th>
-            <th class="px-6 py-3">Margen</th>
+            <th class="px-6 py-3">Existencias</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -60,10 +60,8 @@
               <td class="px-6 py-4">
                 <app-stock-badge [stock]="p.stock_actual" />
               </td>
-              <td class="px-6 py-4 text-gray-600">
-                @if (p.precio_costo && p.precio_costo > 0) {
-                  {{ ((p.precio_venta - p.precio_costo) / p.precio_costo * 100) | number:'1.0-0' }}%
-                }
+              <td class="px-6 py-4 font-medium text-gray-900 tabular-nums">
+                {{ p.stock_actual }}
               </td>
             </tr>
           }
