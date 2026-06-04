@@ -19,6 +19,7 @@ describe('ExcelService', () => {
     saldo_esperado: 18000,
     saldo_real: 17800,
     estado: 'cerrada',
+    user_cierre_id: 1,
     created_at: '2026-06-04T09:00:00Z',
     updated_at: '2026-06-04T18:30:00Z',
   };

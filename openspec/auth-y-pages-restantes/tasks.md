@@ -77,8 +77,8 @@ Phase 4: 4.1 → 4.2 → 4.3 → 4.4
 
 - [ ] **4.1 [P1][S]** Install `xlsx` (SheetJS, bun add xlsx)
 - [ ] **4.2 [P1][M]** ExcelService — generarExcelJornada() base64 xlsx with ventas + movimientos
-- [ ] **4.3 [P2][M]** JornadaService — cerrar() with Excel generation + storage (jornada_reportes), admin check
-- [ ] **4.4 [P2][M]** JornadaPage — close modal, admin-only button, auto-download Excel, in-app preview
+- [x] **4.3 [P1][M]** JornadaService — cerrar() with Excel generation + storage (jornada_reportes), admin check
+- [x] **4.4 [P1][M]** JornadaPage — close modal, admin-only button, auto-download Excel, in-app preview
 - [ ] **4.5 [P1][M]** HistorialPage — list closed jornadas, download Excel, in-app view, empty state
 
 **Tests**: ExcelService valid xlsx, JornadaService admin/worker, HistorialPage list/download/preview
