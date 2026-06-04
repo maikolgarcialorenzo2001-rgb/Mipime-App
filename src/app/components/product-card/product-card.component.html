@@ -1,16 +1,18 @@
 <button
   type="button"
-  class="flex flex-col rounded-xl border-2 p-4 text-left transition-all hover:shadow-md active:scale-[0.97]"
+  class="flex h-full flex-col justify-between rounded-xl border-2 p-4 text-left transition-all hover:shadow-md active:scale-[0.97]"
   [ngClass]="selected()
     ? 'border-blue-500 bg-blue-50 shadow-sm'
     : 'border-gray-200 bg-white hover:border-gray-300'"
   (click)="clicked.emit()"
 >
   <span class="text-sm font-medium text-gray-900 leading-tight line-clamp-2">{{ producto().nombre }}</span>
-  <span class="mt-1 text-lg font-bold text-blue-600">
-    {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
-  </span>
-  @if (producto().stock_actual <= stockWarningThreshold()) {
-    <span class="mt-1 text-xs text-red-500">Stock: {{ producto().stock_actual }}</span>
-  }
+  <div class="mt-2">
+    <span class="text-lg font-bold text-blue-600">
+      {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
+    </span>
+    @if (producto().stock_actual <= stockWarningThreshold()) {
+      <span class="mt-1 block text-xs text-red-500">Stock: {{ producto().stock_actual }}</span>
+    }
+  </div>
 </button>
