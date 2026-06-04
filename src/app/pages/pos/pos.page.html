@@ -6,7 +6,7 @@
       <input
         #searchInput
         type="text"
-        placeholder="Buscá productos por nombre… (Escape para limpiar, ↑↓ para navegar)"
+        placeholder="Buscar productos por nombre… (Escape para limpiar, ↑↓ para navegar)"
         class="w-full rounded-lg border-2 border-gray-300 px-4 py-3 text-lg shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-colors"
         [value]="query()"
         (input)="onQueryChange($any($event.target).value)"
@@ -19,7 +19,7 @@
       @if (buscando()) {
         <app-loading-spinner />
       } @else if (resultados().length === 0) {
-        <app-empty-state message="Escribí para buscar productos" />
+        <app-empty-state message="Escribe para buscar productos" />
       } @else {
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           @for (p of resultados(); track p.id; let i = $index) {
@@ -38,7 +38,7 @@
   <div class="flex w-96 flex-col border-l border-gray-200 bg-white">
     <div class="border-b border-gray-200 px-5 py-4">
       <h2 class="text-base font-semibold text-gray-900">
-        Carrito ({{ cart.cantidadItems() }} item{{ cart.cantidadItems() !== 1 ? 's' : '' }})
+        Carrito ({{ cart.cantidadItems() }} producto{{ cart.cantidadItems() !== 1 ? 's' : '' }})
       </h2>
     </div>
 
