@@ -2,22 +2,27 @@ import { Component, inject, viewChild, ElementRef, afterNextRender, signal } fro
 import { CurrencyPipe } from '@angular/common';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
+import { JornadaService } from '../../services/jornada.service';
+import { VentaService } from '../../services/venta.service';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
+import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, LoadingSpinnerComponent, EmptyStateComponent, ErrorAlertComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
 export class PosPage {
   private readonly _productoService = inject(ProductoService);
   private readonly _cartService = inject(CartService);
+  private readonly _jornadaService = inject(JornadaService);
+  private readonly _ventaService = inject(VentaService);
 
   readonly cart = this._cartService;
   readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
@@ -28,16 +33,23 @@ export class PosPage {
   readonly selectedIndex = signal(0);
   readonly showModal = signal(false);
 
+  readonly jornadaCargando = signal(true);
+  readonly jornadaId = signal<number | null>(null);
+  readonly ventaError = signal<string | null>(null);
+
   private _debounceId?: ReturnType<typeof setTimeout>;
 
   constructor() {
-    // En un POS, al cargar la página mostrar todos los productos
     this._buscar('');
+    this._cargarJornada();
 
     afterNextRender(() => {
-      // Foco automático en el buscador
       this.searchInput()?.nativeElement.focus();
     });
+  }
+
+  get sinJornada(): boolean {
+    return !this.jornadaCargando() && this.jornadaId() === null;
   }
 
   onQueryChange(value: string): void {
@@ -88,6 +100,7 @@ export class PosPage {
   }
 
   abrirModal(): void {
+    this.ventaError.set(null);
     this.showModal.set(true);
   }
 
@@ -96,10 +109,39 @@ export class PosPage {
   }
 
   confirmarVenta(): void {
-    // TODO: persistir la venta en la DB
-    this.showModal.set(false);
-    this.cart.limpiar();
-    this.searchInput()?.nativeElement.focus();
+    const jId = this.jornadaId();
+    if (jId === null) return;
+
+    this.ventaError.set(null);
+    const items = this.cart.items();
+
+    this._ventaService.registrar(jId, items).subscribe({
+      next: () => {
+        this.showModal.set(false);
+        this.cart.limpiar();
+        this.searchInput()?.nativeElement.focus();
+      },
+      error: (err: unknown) => {
+        this.ventaError.set(
+          err instanceof Error ? err.message : 'Error al registrar la venta',
+        );
+      },
+    });
+  }
+
+  private _cargarJornada(): void {
+    this.jornadaCargando.set(true);
+
+    this._jornadaService.obtenerAbierta().subscribe({
+      next: (jornada) => {
+        this.jornadaId.set(jornada?.id ?? null);
+        this.jornadaCargando.set(false);
+      },
+      error: () => {
+        this.jornadaId.set(null);
+        this.jornadaCargando.set(false);
+      },
+    });
   }
 
   private _buscar(query: string): void {

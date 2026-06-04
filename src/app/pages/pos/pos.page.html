@@ -36,6 +36,13 @@
 
   <!-- Columna derecha: carrito -->
   <div class="flex w-96 flex-col border-l border-gray-200 bg-white">
+    <!-- Alerta si no hay jornada -->
+    @if (sinJornada) {
+      <div class="border-b border-yellow-200 bg-yellow-50 px-5 py-3 text-sm text-yellow-800">
+        No hay una jornada abierta. Inicia el día en Jornada para poder cobrar.
+      </div>
+    }
+
     <div class="border-b border-gray-200 px-5 py-4">
       <h2 class="text-base font-semibold text-gray-900">
         Carrito ({{ cart.cantidadItems() }} producto{{ cart.cantidadItems() !== 1 ? 's' : '' }})
@@ -72,7 +79,11 @@
         </div>
         <button
           type="button"
-          class="w-full rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors"
+          [disabled]="sinJornada"
+          class="w-full rounded-lg px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors"
+          [class]="sinJornada
+            ? 'bg-gray-300 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 cursor-pointer'"
           (click)="abrirModal()"
         >Cobrar</button>
       </div>
@@ -82,6 +93,11 @@
 
 <!-- Modal de cobro -->
 @if (showModal()) {
+  <div class="fixed inset-0 z-50 flex items-start justify-center pt-20">
+    @if (ventaError(); as err) {
+      <app-error-alert [message]="err" />
+    }
+  </div>
   <app-checkout-modal
     [items]="cart.items()"
     [total]="cart.total()"
