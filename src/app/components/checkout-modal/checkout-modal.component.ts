@@ -1,10 +1,10 @@
 import { Component, input, output, signal } from '@angular/core';
-import { CurrencyPipe, NgClass } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import type { CartItem } from '../../services/cart.service';
 
 @Component({
   selector: 'app-checkout-modal',
-  imports: [CurrencyPipe, NgClass],
+  imports: [CurrencyPipe],
   templateUrl: './checkout-modal.component.html',
   styleUrl: './checkout-modal.component.css',
 })
