@@ -48,19 +48,12 @@
       }
 
       <div class="mb-4">
-        <label for="saldo-real" class="mb-1 block text-sm font-medium text-gray-700">
-          Saldo real ($)
+        <label class="mb-1 block text-sm font-medium text-gray-700">
+          Saldo esperado ($)
         </label>
-        <input
-          id="saldo-real"
-          type="text"
-          inputmode="numeric"
-          class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-lg font-medium text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-          [class.border-red-400]="cerrarError()"
-          placeholder="0"
-          (input)="onSaldoRealChange($any($event.target).value)"
-          (keydown)="onModalKeydown($event)"
-        />
+        <div class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-lg font-semibold text-gray-900">
+          {{ jornadaService.jornadaAbierta()?.saldo_esperado?.toLocaleString() ?? '—' }}
+        </div>
       </div>
 
       <div class="flex gap-3">
@@ -73,7 +66,7 @@
         <button
           type="button"
           class="flex-1 cursor-pointer rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="cerrando() || saldoReal() === null"
+          [disabled]="cerrando()"
           (click)="confirmarCierre()"
         >
           @if (cerrando()) {

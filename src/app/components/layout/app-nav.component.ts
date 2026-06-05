@@ -24,7 +24,6 @@ export class AppNavComponent {
 
   /** Modal de cierre */
   readonly showCloseModal = signal(false);
-  readonly saldoReal = signal<number | null>(null);
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
 
@@ -84,7 +83,6 @@ export class AppNavComponent {
 
   abrirModalCierre(): void {
     this.cerrarError.set(null);
-    this.saldoReal.set(null);
     this.showCloseModal.set(true);
   }
 
@@ -93,17 +91,12 @@ export class AppNavComponent {
     this.cerrarError.set(null);
   }
 
-  onSaldoRealChange(value: string): void {
-    const num = value === '' ? null : Number(value);
-    this.saldoReal.set(Number.isNaN(num) ? null : num);
-  }
-
   confirmarCierre(): void {
     const j = this.jornadaService.jornadaAbierta();
-    const sr = this.saldoReal();
     const uid = this.auth.usuario()?.id;
 
-    if (!j || sr === null || uid === undefined) return;
+    if (!j || uid === undefined) return;
+    const sr = j.saldo_esperado;
 
     this.cerrando.set(true);
     this.cerrarError.set(null);

@@ -264,19 +264,22 @@ describe('JornadaPage', () => {
       fixture.detectChanges();
     });
 
-    it('debería llamar a cerrar() con jornadaId, saldoReal y userId', () => {
+    it('5.3 RED: modal de cierre debería pasar saldo_esperado como saldoReal sin input manual', () => {
       component.abrirModalCierre();
-      component.onSaldoRealChange('17800');
+      fixture.detectChanges();
+
+      // NO debe haber input de saldoReal
+      const input = fixture.nativeElement.querySelector('#saldo-real');
+      expect(input).toBeNull();
+
+      // Debe mostrar el saldo_esperado como read-only
+      const modalText = fixture.nativeElement.querySelector('[role="dialog"]')?.textContent ?? '';
+      expect(modalText).toContain('Saldo esperado');
+      expect(modalText).toContain('18,000');
+
+      // confirmarCierre debe usar saldo_esperado automáticamente
       component.confirmarCierre();
-
-      expect(cerrarSpy).toHaveBeenCalledWith(1, 17800, 1);
-    });
-
-    it('no debería llamar a cerrar() si saldoReal es null', () => {
-      component.abrirModalCierre();
-      component.confirmarCierre();
-
-      expect(cerrarSpy).not.toHaveBeenCalled();
+      expect(cerrarSpy).toHaveBeenCalledWith(1, 18000, 1);
     });
 
     it('debería mostrar error si confirmarCierre falla', () => {

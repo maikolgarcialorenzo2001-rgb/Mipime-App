@@ -19,7 +19,6 @@ export class JornadaPage {
 
   /** Modal de cierre */
   readonly showCloseModal = signal(false);
-  readonly saldoReal = signal<number | null>(null);
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
 
@@ -36,7 +35,6 @@ export class JornadaPage {
 
   abrirModalCierre(): void {
     this.cerrarError.set(null);
-    this.saldoReal.set(null);
     this.showCloseModal.set(true);
   }
 
@@ -44,17 +42,12 @@ export class JornadaPage {
     this.showCloseModal.set(false);
   }
 
-  onSaldoRealChange(value: string): void {
-    const num = value === '' ? null : Number(value);
-    this.saldoReal.set(Number.isNaN(num) ? null : num);
-  }
-
   confirmarCierre(): void {
     const j = this.jornadaService.jornadaAbierta();
-    const sr = this.saldoReal();
     const uid = this.usuario()?.id;
 
-    if (!j || sr === null || uid === undefined) return;
+    if (!j || uid === undefined) return;
+    const sr = j.saldo_esperado;
 
     this.cerrando.set(true);
     this.cerrarError.set(null);

@@ -89,6 +89,52 @@ describe('ExcelService', () => {
       expect(workbook.SheetNames).toContain('Movimientos');
     });
 
+    it('2.1 RED: debería mostrar nombre de producto vía productosMap, no producto_id', () => {
+      const productosMap = new Map<number, string>([
+        [1, 'Coca-Cola 500ml'],
+        [2, 'Agua 1L'],
+        [3, 'Chocolate'],
+      ]);
+      const dataConMap: JornadaReportData = {
+        ...data,
+        productosMap,
+      };
+
+      const result = service.generarExcelJornada(dataConMap);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // Debe mostrar nombres, no IDs
+      const filas = json as unknown[][];
+      expect(filas.some((f) => f.includes('Coca-Cola 500ml'))).toBe(true);
+      expect(filas.some((f) => f.includes('Agua 1L'))).toBe(true);
+      expect(filas.some((f) => f.includes('Chocolate'))).toBe(true);
+      // No debe mostrar IDs numéricos en la columna de producto
+      expect(filas.some((f) => f[2] === 1)).toBe(false);
+      expect(filas.some((f) => f[2] === 2)).toBe(false);
+      expect(filas.some((f) => f[2] === 3)).toBe(false);
+    });
+
+    it('2.2 RED: debería omitir fila "Total gastos" cuando total_gastos = 0', () => {
+      const jornadaSinGastos: Jornada = {
+        ...jornada,
+        total_gastos: 0,
+      };
+      const dataSinGastos: JornadaReportData = {
+        jornada: jornadaSinGastos,
+        ventas: [],
+        movimientos: [],
+      };
+
+      const result = service.generarExcelJornada(dataSinGastos);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).not.toContainEqual(['Total gastos', 0]);
+    });
+
     it('debería tener la data correcta en la hoja Resumen', () => {
       const result = service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });

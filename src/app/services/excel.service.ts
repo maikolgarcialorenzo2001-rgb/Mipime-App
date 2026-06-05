@@ -12,6 +12,7 @@ export interface JornadaReportData {
   jornada: Jornada;
   ventas: VentaConDetalles[];
   movimientos: Movimiento[];
+  productosMap?: Map<number, string>;
 }
 
 @Injectable({
@@ -48,7 +49,7 @@ export class ExcelService {
       [],
       ['Monto inicial', j.monto_inicial],
       ['Total ventas', j.total_ventas],
-      ['Total gastos', j.total_gastos],
+      ...(j.total_gastos > 0 ? [['Total gastos' as const, j.total_gastos]] : []),
       ['Saldo esperado', j.saldo_esperado],
     ];
 
@@ -70,14 +71,17 @@ export class ExcelService {
       ['#', 'Fecha/Hora', 'Producto', 'Cantidad', 'Precio unitario', 'Subtotal', 'Total venta'],
     ];
 
+    const pmap = data.productosMap;
+
     let nro = 1;
     for (const venta of data.ventas) {
       let primerDetalle = true;
       for (const detalle of venta.detalles) {
+        const nombreProducto = pmap?.get(detalle.producto_id) ?? detalle.producto_id;
         filas.push([
           primerDetalle ? nro : '',
           primerDetalle ? venta.fecha_hora : '',
-          detalle.producto_id,
+          nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
           detalle.subtotal,

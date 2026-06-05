@@ -4,6 +4,7 @@ import { JornadaService } from './jornada.service';
 import { ExcelService } from './excel.service';
 import { DATABASE, type Database } from './database';
 import type { Jornada } from '../models';
+import type { Producto } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 
@@ -114,18 +115,18 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta
         .mockResolvedValueOnce([])
-        // 1. admin check
+        // admin check
         .mockResolvedValueOnce([{ rol: 'admin' }])
-        // 2. ventas
+        // ventas
         .mockResolvedValueOnce([])
-        // 3. movimientos
+        // movimientos
         .mockResolvedValueOnce([])
-        // 4. get jornada
-        .mockResolvedValueOnce([mockJornada])
-        // 5. insert reporte
+        // UPDATE jornada (antes que Excel)
+        .mockResolvedValueOnce([mockJornadaCerrada])
+        // SELECT productos
         .mockResolvedValueOnce([])
-        // 6. update jornada
-        .mockResolvedValueOnce([mockJornadaCerrada]);
+        // INSERT reporte
+        .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.cerrar(1, 7200, 1));
@@ -173,31 +174,33 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta
         .mockResolvedValueOnce([])
-        // 1. admin check
+        // admin check
         .mockResolvedValueOnce([{ rol: 'admin' }])
-        // 2. ventas
+        // ventas
         .mockResolvedValueOnce(mockVentas)
-        // 3. detalles (ventaIds = [10])
+        // detalles (ventaIds = [10])
         .mockResolvedValueOnce(mockDetalles)
-        // 4. movimientos
+        // movimientos
         .mockResolvedValueOnce(mockMovimientos)
-        // 5. get jornada
-        .mockResolvedValueOnce([mockJornada])
-        // 6. insert reporte
+        // UPDATE jornada (antes que Excel)
+        .mockResolvedValueOnce([mockJornadaCerrada])
+        // SELECT productos
         .mockResolvedValueOnce([])
-        // 7. update jornada
-        .mockResolvedValueOnce([mockJornadaCerrada]);
+        // INSERT reporte
+        .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
       await firstValueFrom(service.cerrar(1, 7200, 1));
 
       // Verificar que se llamó a ExcelService con los datos correctos
       const excelService = TestBed.inject(ExcelService);
-      expect(excelService.generarExcelJornada).toHaveBeenCalledWith({
-        jornada: mockJornada,
-        ventas: [expect.objectContaining({ id: 10, detalles: mockDetalles })],
-        movimientos: mockMovimientos,
-      });
+      expect(excelService.generarExcelJornada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jornada: mockJornadaCerrada,
+          ventas: [expect.objectContaining({ id: 10, detalles: mockDetalles })],
+          movimientos: mockMovimientos,
+        }),
+      );
 
       // Verificar que se insertó el reporte
       const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
@@ -257,6 +260,129 @@ describe('JornadaService', () => {
       const resultado = await firstValueFrom(service.historial(10));
 
       expect(resultado).toHaveLength(2);
+    });
+  });
+
+  describe('cerrarSinAuth', () => {
+    it('3.1 RED: debería cerrar sin verificar rol admin', async () => {
+      vi.mocked(mockDb.sql)
+        // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([])
+        // _cerrarSinAuthAsync: SELECT jornada para saldo_esperado
+        .mockResolvedValueOnce([mockJornada])
+        // _ejecutarCierre: ventas
+        .mockResolvedValueOnce([])
+        // movimientos
+        .mockResolvedValueOnce([])
+        // UPDATE jornada RETURNING *
+        .mockResolvedValueOnce([mockJornadaCerrada])
+        // SELECT productos
+        .mockResolvedValueOnce([])
+        // INSERT reporte
+        .mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.cerrarSinAuth(1, 2));
+
+      expect(resultado.estado).toBe('cerrada');
+
+      // Verificar que NO se llamó a SELECT rol (admin check)
+      const adminCheckCalls = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('SELECT rol FROM usuarios'),
+      );
+      expect(adminCheckCalls).toHaveLength(0);
+    });
+  });
+
+  describe('cierre refactor orden', () => {
+    it('3.2 RED: UPDATE debería ejecutarse antes que la generación de Excel (estado "cerrada")', async () => {
+      const mockVentas: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, created_at: '' },
+      ];
+      const mockDetalles: DetalleVenta[] = [
+        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
+      ];
+      const mockProductos: Producto[] = [
+        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_actual: 10, created_at: '', updated_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([])
+        // admin check
+        .mockResolvedValueOnce([{ rol: 'admin' }])
+        // ventas
+        .mockResolvedValueOnce(mockVentas)
+        // detalles
+        .mockResolvedValueOnce(mockDetalles)
+        // movimientos
+        .mockResolvedValueOnce([])
+        // UPDATE jornada (cerrada) — ANTES de la generación de Excel
+        .mockResolvedValueOnce([mockJornadaCerrada])
+        // SELECT productos
+        .mockResolvedValueOnce(mockProductos)
+        // INSERT reporte
+        .mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      expect(resultado.estado).toBe('cerrada');
+
+      // Verificar que el Excel recibió la jornada con estado 'cerrada'
+      const excelService = TestBed.inject(ExcelService);
+      expect(excelService.generarExcelJornada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jornada: expect.objectContaining({ estado: 'cerrada' }),
+        }),
+      );
+    });
+
+    it('3.3 RED: debería construir productosMap y pasarlo a ExcelService', async () => {
+      const mockVentas: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, created_at: '' },
+      ];
+      const mockDetalles: DetalleVenta[] = [
+        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
+      ];
+      const mockProductos: Producto[] = [
+        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_actual: 10, created_at: '', updated_at: '' },
+        { id: 2, nombre: 'Agua 1L', descripcion: null, precio_venta: 1500, precio_costo: null, stock_actual: 20, created_at: '', updated_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([])
+        // admin check
+        .mockResolvedValueOnce([{ rol: 'admin' }])
+        // ventas
+        .mockResolvedValueOnce(mockVentas)
+        // detalles
+        .mockResolvedValueOnce(mockDetalles)
+        // movimientos
+        .mockResolvedValueOnce([])
+        // UPDATE jornada
+        .mockResolvedValueOnce([mockJornadaCerrada])
+        // SELECT productos
+        .mockResolvedValueOnce(mockProductos)
+        // INSERT reporte
+        .mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      // Verificar que productosMap fue pasado a ExcelService
+      const excelService = TestBed.inject(ExcelService);
+      expect(excelService.generarExcelJornada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productosMap: expect.any(Map),
+        }),
+      );
+
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      const productosMap = callArg.productosMap as Map<number, string>;
+      expect(productosMap.get(1)).toBe('Coca-Cola');
+      expect(productosMap.get(2)).toBe('Agua 1L');
     });
   });
 });

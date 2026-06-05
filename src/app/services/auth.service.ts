@@ -5,6 +5,8 @@ import { hashPassword } from './hash-password';
 import type { Usuario, UsuarioPublico } from '../models';
 
 const SESSION_KEY = 'mipime_session';
+const HEARTBEAT_KEY = 'session_heartbeat';
+const PENDING_CLOSE_KEY = 'mipime_pending_close';
 
 @Injectable({
   providedIn: 'root',
@@ -22,6 +24,19 @@ export class AuthService {
 
   constructor() {
     this._restoreSession();
+    this._setHeartbeat();
+  }
+
+  /**
+   * Escribe session_heartbeat en sessionStorage.
+   * sessionStorage sobrevive a F5 pero muere al cerrar tab.
+   */
+  private _setHeartbeat(): void {
+    try {
+      sessionStorage.setItem(HEARTBEAT_KEY, '1');
+    } catch {
+      // sessionStorage puede fallar (cuota excedida, etc.)
+    }
   }
 
   /**
@@ -106,11 +121,23 @@ export class AuthService {
   private _restoreSession(): void {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
-      if (raw) {
-        const session = JSON.parse(raw) as UsuarioPublico;
-        if (session && session.id && session.nombre) {
-          this._currentUser.set(session);
+      if (!raw) return;
+
+      // Si no hay heartbeat en sessionStorage, es una tab nueva tras cerrar la app.
+      // Pero si hay pending_close, la sesión se conserva temporalmente para que
+      // App.ngOnInit procese el cierre pendiente y luego haga logout.
+      const heartbeat = sessionStorage.getItem(HEARTBEAT_KEY);
+      if (!heartbeat) {
+        const pendingClose = localStorage.getItem(PENDING_CLOSE_KEY);
+        if (!pendingClose) {
+          localStorage.removeItem(SESSION_KEY);
+          return;
         }
+      }
+
+      const session = JSON.parse(raw) as UsuarioPublico;
+      if (session && session.id && session.nombre) {
+        this._currentUser.set(session);
       }
     } catch {
       // JSON corrupto → no hay sesión
