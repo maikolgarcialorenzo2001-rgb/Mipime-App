@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { SqliteService } from './sqlite.service';
 import { PLATFORM_ID } from '@angular/core';
+import { environment } from '../environments/environment';
 
 // Track all SQL calls made through the mock client
 const sqlCalls: { query: string; params: unknown[] }[] = [];
@@ -25,9 +26,16 @@ class MockSQLocalClient {
 }
 
 let mockClientInstance: MockSQLocalClient | null = null;
+let mockDbName: string | null = null;
+
+interface SQLocalConfig {
+  databasePath: string;
+  processor: Worker;
+}
 
 class MockSQLocal {
-  constructor(_dbName: string) {
+  constructor(config: SQLocalConfig) {
+    mockDbName = config.databasePath;
     mockClientInstance = new MockSQLocalClient();
     return mockClientInstance;
   }
@@ -207,5 +215,10 @@ describe('SqliteService migration v2', () => {
       (c) => c.query.includes('CREATE TABLE IF NOT EXISTS jornadas'),
     );
     expect(v1TableCreates.length).toBe(0);
+  });
+
+  it('debería usar dbName del environment en lugar de hardcode', async () => {
+    await service.initialize();
+    expect(mockDbName).toBe(environment.dbName);
   });
 });

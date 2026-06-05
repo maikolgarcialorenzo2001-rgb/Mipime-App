@@ -2,6 +2,7 @@ import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import type { SQLocal } from 'sqlocal';
 import type { Database } from './database';
+import { environment } from '../environments/environment';
 
 @Injectable()
 export class SqliteService implements Database {
@@ -34,7 +35,7 @@ export class SqliteService implements Database {
       );
 
       this._client = new SQLocalClass({
-        databasePath: 'mipime-cuentas.db',
+        databasePath: environment.dbName,
         processor: worker,
       });
     }
