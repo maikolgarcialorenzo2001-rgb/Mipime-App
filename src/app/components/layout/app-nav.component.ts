@@ -36,8 +36,7 @@ export class AppNavComponent {
     return (
       !this.jornadaService.jornadaCargando() &&
       j !== null &&
-      j.estado === 'abierta' &&
-      this._auth.hasRole('admin')
+      j.estado === 'abierta'
     );
   }
 

@@ -140,14 +140,6 @@ export class JornadaService {
     saldoReal: number,
     userId: number,
   ): Promise<Jornada> {
-    // Verificar que el usuario sea admin
-    const usuarios = await this._db.sql<{ rol: string }>(
-      'SELECT rol FROM usuarios WHERE id = ?',
-      [userId],
-    );
-    if (usuarios.length === 0) throw new Error('Usuario no encontrado');
-    if (usuarios[0].rol !== 'admin') throw new Error('Solo administradores pueden cerrar la jornada');
-
     return this._ejecutarCierre(id, saldoReal, userId);
   }
 

@@ -115,8 +115,6 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta
         .mockResolvedValueOnce([])
-        // admin check
-        .mockResolvedValueOnce([{ rol: 'admin' }])
         // ventas
         .mockResolvedValueOnce([])
         // movimientos
@@ -136,28 +134,19 @@ describe('JornadaService', () => {
       expect(resultado.user_cierre_id).toBe(1);
     });
 
-    it('debería rechazar si el usuario no es admin', async () => {
+    it('debería cerrar la jornada incluso para worker', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([{ rol: 'trabajador' }]);
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.cerrar(1, 7200, 2));
 
-      await expect(
-        firstValueFrom(service.cerrar(1, 7200, 2)),
-      ).rejects.toThrow('Solo administradores pueden cerrar la jornada');
-    });
-
-    it('debería rechazar si el usuario no existe', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([]); // admin check -> usuario no encontrado
-
-      const service = TestBed.inject(JornadaService);
-
-      await expect(
-        firstValueFrom(service.cerrar(1, 7200, 999)),
-      ).rejects.toThrow('Usuario no encontrado');
+      expect(resultado.estado).toBe('cerrada');
     });
 
     it('debería generar y almacenar Excel en jornada_reportes', async () => {
@@ -174,8 +163,6 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta
         .mockResolvedValueOnce([])
-        // admin check
-        .mockResolvedValueOnce([{ rol: 'admin' }])
         // ventas
         .mockResolvedValueOnce(mockVentas)
         // detalles (ventaIds = [10])
@@ -212,10 +199,9 @@ describe('JornadaService', () => {
     it('debería lanzar error si la jornada no existe', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([{ rol: 'admin' }])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]); // UPDATE -> empty -> throw
 
       const service = TestBed.inject(JornadaService);
 
@@ -310,7 +296,6 @@ describe('JornadaService', () => {
 
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
         .mockResolvedValueOnce(mockVentasConDetalles) // ventas
         .mockResolvedValueOnce(mockDetalles) // detalles
         .mockResolvedValueOnce([]) // movimientos
@@ -344,7 +329,6 @@ describe('JornadaService', () => {
 
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
         .mockResolvedValueOnce(mockVentasConDetalles) // ventas
         .mockResolvedValueOnce(mockDetalles) // detalles
         .mockResolvedValueOnce([]) // movimientos
@@ -365,7 +349,6 @@ describe('JornadaService', () => {
     it('2.1 RED: userCierreNombre debería ser null si usuario no encontrado', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
         .mockResolvedValueOnce([]) // ventas (empty)
         .mockResolvedValueOnce([]) // movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
@@ -501,8 +484,6 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([])
-        // admin check
-        .mockResolvedValueOnce([{ rol: 'admin' }])
         // ventas
         .mockResolvedValueOnce(mockVentas)
         // detalles
@@ -545,8 +526,6 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([])
-        // admin check
-        .mockResolvedValueOnce([{ rol: 'admin' }])
         // ventas
         .mockResolvedValueOnce(mockVentas)
         // detalles

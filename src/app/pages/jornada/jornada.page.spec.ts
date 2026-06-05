@@ -167,9 +167,9 @@ describe('JornadaPage', () => {
       fixture.detectChanges();
     });
 
-    it('NO debería mostrar botón de cerrar para worker', () => {
+    it('SÍ debería mostrar botón de cerrar para worker', () => {
       const btn = fixture.nativeElement.querySelector('button');
-      expect(btn).toBeFalsy();
+      expect(btn).toBeTruthy();
     });
   });
 

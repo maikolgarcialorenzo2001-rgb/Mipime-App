@@ -37,7 +37,7 @@ export class JornadaPage {
 
   get puedeCerrar(): boolean {
     const j = this.jornadaService.jornadaAbierta();
-    return this.isAdmin && j !== null && j.estado === 'abierta';
+    return j !== null && j.estado === 'abierta';
   }
 
   registrarMovimiento(): void {
