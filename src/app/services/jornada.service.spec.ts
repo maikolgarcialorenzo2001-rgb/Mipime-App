@@ -294,6 +294,198 @@ describe('JornadaService', () => {
     });
   });
 
+  describe('total_costo y userCierreNombre en _ejecutarCierre', () => {
+    it('2.1 RED: debería calcular total_costo mediante JOIN y pasarlo a ExcelService', async () => {
+      const mockVentasConDetalles: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, created_at: '' },
+      ];
+      const mockDetalles: DetalleVenta[] = [
+        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
+        { id: 2, venta_id: 10, producto_id: 2, cantidad: 3, precio_unitario: 1000, subtotal: 3000 },
+      ];
+      const mockProductos: Producto[] = [
+        { id: 1, nombre: 'Prod A', descripcion: null, precio_venta: 2500, precio_costo: 10, stock_actual: 10, created_at: '', updated_at: '' },
+        { id: 2, nombre: 'Prod B', descripcion: null, precio_venta: 1000, precio_costo: 5, stock_actual: 20, created_at: '', updated_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
+        .mockResolvedValueOnce(mockVentasConDetalles) // ventas
+        .mockResolvedValueOnce(mockDetalles) // detalles
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce(mockProductos) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 35 }]) // total_costo = 10*2 + 5*3 = 35
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // user nombre
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+
+      // Should have passed totalCosto to ExcelService
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.totalCosto).toBe(35);
+      expect(callArg.userCierreNombre).toBe('Admin');
+    });
+
+    it('2.1 RED: debería tratar NULL precio_costo como 0', async () => {
+      const mockVentasConDetalles: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 3000, created_at: '' },
+      ];
+      const mockDetalles: DetalleVenta[] = [
+        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 1500, subtotal: 3000 },
+      ];
+      const mockProductos: Producto[] = [
+        { id: 1, nombre: 'Prod Sin Costo', descripcion: null, precio_venta: 1500, precio_costo: null, stock_actual: 10, created_at: '', updated_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
+        .mockResolvedValueOnce(mockVentasConDetalles) // ventas
+        .mockResolvedValueOnce(mockDetalles) // detalles
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce(mockProductos) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 0 }]) // total_costo = NULL * 2 = 0
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // user nombre
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.totalCosto).toBe(0);
+    });
+
+    it('2.1 RED: userCierreNombre debería ser null si usuario no encontrado', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([{ rol: 'admin' }]) // admin check
+        .mockResolvedValueOnce([]) // ventas (empty)
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]) // user nombre -> empty
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 999));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.userCierreNombre).toBeNull();
+    });
+  });
+
+  describe('registrarMovimiento', () => {
+    it('1.1 RED: debería validar que tipo sea gasto o ingreso_extra', async () => {
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'invalido' as any, 'test', 100)),
+      ).rejects.toThrow('Tipo inválido');
+    });
+
+    it('1.1 RED: debería validar que descripcion no esté vacía', async () => {
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', '', 100)),
+      ).rejects.toThrow('Descripción requerida');
+    });
+
+    it('1.1 RED: debería validar que descripcion no sea solo espacios', async () => {
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', '   ', 100)),
+      ).rejects.toThrow('Descripción requerida');
+    });
+
+    it('1.1 RED: debería validar que monto sea mayor a 0', async () => {
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', 'test', 0)),
+      ).rejects.toThrow('Monto debe ser mayor a 0');
+    });
+
+    it('1.1 RED: debería validar que monto no sea negativo', async () => {
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', 'test', -100)),
+      ).rejects.toThrow('Monto debe ser mayor a 0');
+    });
+
+    it('1.1 RED: debería insertar movimiento y actualizar jornada para gasto', async () => {
+      const mockMovimiento: Movimiento = {
+        id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'Luz', monto: 500, created_at: '2026-06-05T12:00:00Z',
+      };
+      const mockJornadaActualizada: Jornada = {
+        ...mockJornada, total_gastos: 500, saldo_esperado: 4500,
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos
+        .mockResolvedValueOnce([mockJornadaActualizada]); // UPDATE jornadas
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Luz', 500));
+
+      expect(resultado.tipo).toBe('gasto');
+      expect(resultado.descripcion).toBe('Luz');
+      expect(resultado.monto).toBe(500);
+
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO movimientos'),
+      );
+      expect(insertCall).toBeTruthy();
+      expect(insertCall![1]).toEqual([1, 'gasto', 'Luz', 500, expect.any(String)]);
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
+      );
+      expect(updateCall).toBeTruthy();
+      // total_gastos += 500, saldo_esperado += -500 (ajuste = -monto para gasto)
+      expect(updateCall![1]).toEqual([500, -500, expect.any(String), 1]);
+    });
+
+    it('1.1 RED: debería insertar movimiento y actualizar jornada para ingreso_extra', async () => {
+      const mockMovimiento: Movimiento = {
+        id: 2, jornada_id: 1, tipo: 'ingreso_extra', descripcion: 'Venta envases', monto: 300, created_at: '2026-06-05T12:00:00Z',
+      };
+      const mockJornadaActualizada: Jornada = {
+        ...mockJornada, total_gastos: 300, saldo_esperado: 5300,
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos
+        .mockResolvedValueOnce([mockJornadaActualizada]); // UPDATE jornadas
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'ingreso_extra', 'Venta envases', 300));
+
+      expect(resultado.tipo).toBe('ingreso_extra');
+      expect(resultado.descripcion).toBe('Venta envases');
+      expect(resultado.monto).toBe(300);
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
+      );
+      expect(updateCall).toBeTruthy();
+      // total_gastos += 300, saldo_esperado += 300 (ajuste = +monto para ingreso_extra)
+      expect(updateCall![1]).toEqual([300, 300, expect.any(String), 1]);
+    });
+  });
+
   describe('cierre refactor orden', () => {
     it('3.2 RED: UPDATE debería ejecutarse antes que la generación de Excel (estado "cerrada")', async () => {
       const mockVentas: Venta[] = [

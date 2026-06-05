@@ -13,6 +13,8 @@ export interface JornadaReportData {
   ventas: VentaConDetalles[];
   movimientos: Movimiento[];
   productosMap?: Map<number, string>;
+  totalCosto: number;
+  userCierreNombre: string | null;
 }
 
 @Injectable({
@@ -40,6 +42,7 @@ export class ExcelService {
   private _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const j = data.jornada;
     const ventas = data.ventas;
+    const gananciaBruta = j.total_ventas - data.totalCosto;
 
     // Calcular desglose por forma de pago
     const totalEfectivo = ventas
@@ -62,12 +65,17 @@ export class ExcelService {
       ['Total efectivo', totalEfectivo],
       ['Total transferencia', totalTransferencia],
       ...(j.total_gastos > 0 ? [['Total gastos' as const, j.total_gastos]] : []),
+      ['Ganancia bruta', gananciaBruta],
       ['Saldo esperado', j.saldo_esperado],
     ];
 
     if (j.saldo_real !== null) {
       filas.push(['Saldo real', j.saldo_real]);
       filas.push(['Diferencia', j.saldo_esperado - j.saldo_real]);
+    }
+
+    if (data.userCierreNombre) {
+      filas.push(['Firmado por', data.userCierreNombre]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -80,39 +88,33 @@ export class ExcelService {
 
   private _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const filas: unknown[][] = [
-      ['#', 'Fecha/Hora', 'Producto', 'Cantidad', 'Precio unitario', 'Subtotal', 'Total venta', 'Forma de pago'],
+      ['Producto', 'Cantidad', 'Precio unitario', 'Total', 'Forma de pago'],
     ];
 
     const pmap = data.productosMap;
 
-    let nro = 1;
+    let granTotal = 0;
     for (const venta of data.ventas) {
-      let primerDetalle = true;
       for (const detalle of venta.detalles) {
         const nombreProducto = pmap?.get(detalle.producto_id) ?? detalle.producto_id;
         filas.push([
-          primerDetalle ? nro : '',
-          primerDetalle ? venta.fecha_hora : '',
           nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
           detalle.subtotal,
-          primerDetalle ? venta.total : '',
-          primerDetalle ? venta.forma_pago ?? '' : '',
+          (venta as any).forma_pago ?? 'efectivo',
         ]);
-        primerDetalle = false;
+        granTotal += detalle.subtotal;
       }
-      nro++;
     }
+
+    filas.push([], ['Total ingresos', '', '', granTotal, '']);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
-      { wch: 6 },
-      { wch: 22 },
-      { wch: 10 },
+      { wch: 20 },
       { wch: 10 },
       { wch: 16 },
-      { wch: 12 },
       { wch: 14 },
       { wch: 16 },
     ];

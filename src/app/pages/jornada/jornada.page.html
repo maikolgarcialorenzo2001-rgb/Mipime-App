@@ -23,6 +23,32 @@
     </div>
   } @else if (jornadaService.jornadaAbierta(); as j) {
     <app-jornada-summary-card [jornada]="j" />
+
+    @if (isAdmin) {
+      <div class="mt-6 rounded-xl border border-gray-200 bg-white p-6">
+        <h3 class="mb-4 text-lg font-semibold text-gray-900">Registrar movimiento</h3>
+
+        @if (formError(); as err) {
+          <app-error-alert [message]="err" />
+        }
+
+        <div class="mb-3">
+          <select (change)="tipo.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5">
+            <option value="gasto">Gasto</option>
+            <option value="ingreso_extra">Ingreso extra</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <input type="text" placeholder="Descripción" (input)="descripcion.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5" />
+        </div>
+        <div class="mb-4">
+          <input type="text" inputmode="numeric" placeholder="Monto" (input)="monto.set(+$any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5" />
+        </div>
+        <button (click)="registrarMovimiento()" [disabled]="registrando()" class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+          Registrar
+        </button>
+      </div>
+    }
   } @else if (!error()) {
     <app-empty-state message="No hay jornada abierta. Inicia el día para comenzar." />
   }

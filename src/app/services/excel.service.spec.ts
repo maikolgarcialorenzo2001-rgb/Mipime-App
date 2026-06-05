@@ -58,6 +58,8 @@ describe('ExcelService', () => {
     jornada,
     ventas: ventaConDetalles,
     movimientos,
+    totalCosto: 0,
+    userCierreNombre: null,
   };
 
   beforeEach(() => {
@@ -98,6 +100,8 @@ describe('ExcelService', () => {
       const dataConMap: JornadaReportData = {
         ...data,
         productosMap,
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataConMap);
@@ -110,10 +114,10 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f.includes('Coca-Cola 500ml'))).toBe(true);
       expect(filas.some((f) => f.includes('Agua 1L'))).toBe(true);
       expect(filas.some((f) => f.includes('Chocolate'))).toBe(true);
-      // No debe mostrar IDs numéricos en la columna de producto
-      expect(filas.some((f) => f[2] === 1)).toBe(false);
-      expect(filas.some((f) => f[2] === 2)).toBe(false);
-      expect(filas.some((f) => f[2] === 3)).toBe(false);
+      // No debe mostrar IDs numéricos en la columna de producto (index 0)
+      expect(filas.some((f) => f[0] === 1)).toBe(false);
+      expect(filas.some((f) => f[0] === 2)).toBe(false);
+      expect(filas.some((f) => f[0] === 3)).toBe(false);
     });
 
     it('2.2 RED: debería omitir fila "Total gastos" cuando total_gastos = 0', () => {
@@ -125,6 +129,8 @@ describe('ExcelService', () => {
         jornada: jornadaSinGastos,
         ventas: [],
         movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataSinGastos);
@@ -160,15 +166,20 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Header row + 4 detail rows
-      expect(json.length).toBe(5);
+      // Header row + 4 detail rows + empty row + footer row
+      expect(json.length).toBe(7);
 
-      // Primera fila de detalle
+      // Primera fila de detalle: [producto_id, cantidad, precio_unitario, subtotal, forma_pago]
       expect(json[1]).toContainEqual(850);
       // Segunda venta, primer detalle
       expect(json[2]).toContainEqual(1700);
       expect(json[3]).toContainEqual(1100);
       expect(json[4]).toContainEqual(150);
+
+      // Footer row
+      const footerRow = json[6] as unknown[];
+      expect(footerRow[0]).toBe('Total ingresos');
+      expect(footerRow[3]).toBe(3800);
     });
 
     it('debería listar los movimientos', () => {
@@ -189,6 +200,8 @@ describe('ExcelService', () => {
         jornada,
         ventas: [],
         movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataVacia);
@@ -199,7 +212,156 @@ describe('ExcelService', () => {
 
       const ventasSheet = workbook.Sheets['Ventas'];
       const ventasJson = XLSX.utils.sheet_to_json(ventasSheet, { header: 1 }) as unknown[][];
-      expect(ventasJson.length).toBe(1); // solo header
+      expect(ventasJson.length).toBe(3); // header + empty row + footer row
+    });
+  });
+
+  describe('Ventas restructuring', () => {
+    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Total, Forma de pago', () => {
+      const result = service.generarExcelJornada(data);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const header = json[0] as string[];
+      expect(header[0]).toBe('Producto');
+      expect(header[1]).toBe('Cantidad');
+      expect(header[2]).toBe('Precio unitario');
+      expect(header[3]).toBe('Total');
+      expect(header[4]).toBe('Forma de pago');
+      expect(header).toHaveLength(5);
+    });
+
+    it('3.1 RED: una fila por detalle con nombre de producto resuelto', () => {
+      const productosMap = new Map<number, string>([
+        [1, 'Coca-Cola 500ml'],
+        [2, 'Agua 1L'],
+        [3, 'Chocolate'],
+      ]);
+      const dataConMap: JornadaReportData = {
+        ...data,
+        productosMap,
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataConMap);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // 1 header + 4 detalle rows + 1 footer + 1 empty = 7
+      expect(json.length).toBeGreaterThanOrEqual(5);
+
+      // Product names resolved
+      const filas = json as unknown[][];
+      expect(filas.some((f) => f[0] === 'Coca-Cola 500ml')).toBe(true);
+      expect(filas.some((f) => f[0] === 'Agua 1L')).toBe(true);
+      expect(filas.some((f) => f[0] === 'Chocolate')).toBe(true);
+
+      // No numeric IDs in product column
+      expect(filas.some((f) => f[0] === 1)).toBe(false);
+    });
+
+    it('3.1 RED: fila footer debe tener suma total de todos los subtotales', () => {
+      const result = service.generarExcelJornada(data);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      // Find footer row - should contain 'Total ingresos' and the grand total
+      const footerRow = filas.find((f) => f[0] === 'Total ingresos');
+      expect(footerRow).toBeTruthy();
+      // Total = 850 + 1700 + 1100 + 150 = 3800
+      expect(footerRow![3]).toBe(3800);
+    });
+
+    it('3.1 RED: footer suma debe ser 0 cuando no hay ventas', () => {
+      const dataSinVentas: JornadaReportData = {
+        jornada,
+        ventas: [],
+        movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataSinVentas);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      const footerRow = filas.find((f) => f[0] === 'Total ingresos');
+      expect(footerRow).toBeTruthy();
+      expect(footerRow![3]).toBe(0);
+    });
+  });
+
+  describe('Ganancia bruta y Firmado por en Resumen', () => {
+    it('3.3 RED: Resumen debe incluir Ganancia bruta = total_ventas - total_costo', () => {
+      const dataConGanancia: JornadaReportData = {
+        jornada,
+        ventas: ventaConDetalles,
+        movimientos,
+        totalCosto: 40,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataConGanancia);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Ganancia bruta', 14960]); // 15000 - 40
+    });
+
+    it('3.3 RED: Ganancia bruta debe ser total_ventas cuando total_costo = 0', () => {
+      const dataSinCosto: JornadaReportData = {
+        ...data,
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataSinCosto);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Ganancia bruta', 15000]);
+    });
+
+    it('3.3 RED: Resumen debe incluir Firmado por cuando userCierreNombre no es null', () => {
+      const dataConFirma: JornadaReportData = {
+        jornada,
+        ventas: ventaConDetalles,
+        movimientos,
+        totalCosto: 0,
+        userCierreNombre: 'Admin',
+      };
+
+      const result = service.generarExcelJornada(dataConFirma);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Firmado por', 'Admin']);
+    });
+
+    it('3.3 RED: NO debe incluir Firmado por cuando userCierreNombre es null', () => {
+      const dataSinFirma: JornadaReportData = {
+        ...data,
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataSinFirma);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).not.toContainEqual(['Firmado por', 'Admin']);
+      expect(json.some((f: unknown) => (f as unknown[])[0] === 'Firmado por')).toBe(false);
     });
   });
 
@@ -236,6 +398,8 @@ describe('ExcelService', () => {
         jornada,
         ventas: ventasConFormaPago,
         movimientos,
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataConForma);
@@ -252,6 +416,8 @@ describe('ExcelService', () => {
         jornada,
         ventas: ventasConFormaPago,
         movimientos,
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataConForma);
@@ -270,6 +436,8 @@ describe('ExcelService', () => {
         jornada,
         ventas: ventasConFormaPago,
         movimientos,
+        totalCosto: 0,
+        userCierreNombre: null,
       };
 
       const result = service.generarExcelJornada(dataConForma);

@@ -13,6 +13,8 @@ interface MockJornadaService {
   obtenerAbierta: () => import('rxjs').Observable<Jornada | null>;
   cerrar: ReturnType<typeof vi.fn>;
   obtenerReporte: ReturnType<typeof vi.fn>;
+  registrarMovimiento: ReturnType<typeof vi.fn>;
+  refreshJornadaAbierta: ReturnType<typeof vi.fn>;
 }
 
 interface MockJornadaServiceInput {
@@ -21,6 +23,8 @@ interface MockJornadaServiceInput {
   obtenerAbierta?: () => import('rxjs').Observable<Jornada | null>;
   cerrar?: ReturnType<typeof vi.fn>;
   obtenerReporte?: ReturnType<typeof vi.fn>;
+  registrarMovimiento?: ReturnType<typeof vi.fn>;
+  refreshJornadaAbierta?: ReturnType<typeof vi.fn>;
 }
 
 function createMockJornadaService(overrides: MockJornadaServiceInput = {}): MockJornadaService {
@@ -30,6 +34,8 @@ function createMockJornadaService(overrides: MockJornadaServiceInput = {}): Mock
     obtenerAbierta: overrides.obtenerAbierta ?? (() => of(null)),
     cerrar: overrides.cerrar ?? vi.fn(),
     obtenerReporte: overrides.obtenerReporte ?? vi.fn(),
+    registrarMovimiento: overrides.registrarMovimiento ?? vi.fn(),
+    refreshJornadaAbierta: overrides.refreshJornadaAbierta ?? vi.fn(),
   };
 }
 
@@ -224,6 +230,178 @@ describe('JornadaPage', () => {
     it('debería mostrar error si hay error', () => {
       const error = fixture.nativeElement.querySelector('app-error-alert');
       expect(error).toBeTruthy();
+    });
+  });
+
+  describe('movimiento form - admin con jornada abierta', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+    let component: JornadaPage;
+    let registrarSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      registrarSpy = vi.fn().mockReturnValue(of({ id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'test', monto: 100, created_at: '' }));
+
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(mockJornadaAbierta),
+              registrarMovimiento: registrarSpy,
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('4.1 RED: debería mostrar formulario de movimiento para admin con jornada abierta', () => {
+      const select = fixture.nativeElement.querySelector('select');
+      expect(select).toBeTruthy();
+      const descInput = fixture.nativeElement.querySelector('input[placeholder="Descripción"]');
+      expect(descInput).toBeTruthy();
+      const montoInput = fixture.nativeElement.querySelector('input[placeholder="Monto"]');
+      expect(montoInput).toBeTruthy();
+    });
+
+    it('4.1 RED: debería llamar registrarMovimiento al submit con datos válidos', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Luz');
+      component.monto.set(500);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      expect(registrarSpy).toHaveBeenCalledWith(1, 'gasto', 'Luz', 500);
+    });
+
+    it('4.1 RED: debería limpiar form y refrescar jornada tras registro exitoso', () => {
+      const refreshSpy = vi.fn();
+      (TestBed.inject(JornadaService) as any).refreshJornadaAbierta = refreshSpy;
+
+      component.tipo.set('gasto');
+      component.descripcion.set('Luz');
+      component.monto.set(500);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      expect(component.tipo()).toBe('gasto');
+      expect(component.descripcion()).toBe('');
+      expect(component.monto()).toBe(0);
+      expect(component.registrando()).toBe(false);
+      expect(refreshSpy).toHaveBeenCalled();
+    });
+
+    it('4.1 RED: debería mostrar error si descripcion está vacía', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('');
+      component.monto.set(500);
+
+      component.registrarMovimiento();
+
+      expect(component.formError()).toBe('La descripción es requerida');
+      expect(registrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('4.1 RED: debería mostrar error si monto es 0', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(0);
+
+      component.registrarMovimiento();
+
+      expect(component.formError()).toBe('El monto debe ser mayor a 0');
+      expect(registrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('4.1 RED: debería mostrar error si monto es negativo', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(-100);
+
+      component.registrarMovimiento();
+
+      expect(component.formError()).toBe('El monto debe ser mayor a 0');
+      expect(registrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('4.1 RED: debería llamar registrarMovimiento con ingreso_extra', () => {
+      component.tipo.set('ingreso_extra');
+      component.descripcion.set('Venta de envases');
+      component.monto.set(300);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      expect(registrarSpy).toHaveBeenCalledWith(1, 'ingreso_extra', 'Venta de envases', 300);
+    });
+  });
+
+  describe('movimiento form - worker', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(mockJornadaAbierta),
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockWorker) },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      fixture.detectChanges();
+    });
+
+    it('4.1 RED: NO debería mostrar formulario de movimiento para worker', () => {
+      const select = fixture.nativeElement.querySelector('select');
+      expect(select).toBeFalsy();
+      const descInput = fixture.nativeElement.querySelector('input[placeholder="Descripción"]');
+      expect(descInput).toBeFalsy();
+    });
+  });
+
+  describe('movimiento form - sin jornada abierta', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+
+    beforeEach(() => {
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: null,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(null),
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      fixture.detectChanges();
+    });
+
+    it('4.1 RED: NO debería mostrar formulario cuando no hay jornada abierta', () => {
+      const select = fixture.nativeElement.querySelector('select');
+      expect(select).toBeFalsy();
     });
   });
 

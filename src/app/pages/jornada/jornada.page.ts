@@ -17,6 +17,13 @@ export class JornadaPage {
 
   readonly error = signal<string | null>(null);
 
+  /** Movimiento form */
+  readonly tipo = signal<'gasto' | 'ingreso_extra'>('gasto');
+  readonly descripcion = signal('');
+  readonly monto = signal(0);
+  readonly registrando = signal(false);
+  readonly formError = signal<string | null>(null);
+
   /** Modal de cierre */
   readonly showCloseModal = signal(false);
   readonly cerrando = signal(false);
@@ -31,6 +38,41 @@ export class JornadaPage {
   get puedeCerrar(): boolean {
     const j = this.jornadaService.jornadaAbierta();
     return this.isAdmin && j !== null && j.estado === 'abierta';
+  }
+
+  registrarMovimiento(): void {
+    const desc = this.descripcion().trim();
+    const monto = this.monto();
+
+    if (!desc) {
+      this.formError.set('La descripción es requerida');
+      return;
+    }
+
+    if (monto <= 0) {
+      this.formError.set('El monto debe ser mayor a 0');
+      return;
+    }
+
+    const j = this.jornadaService.jornadaAbierta();
+    if (!j) return;
+
+    this.formError.set(null);
+    this.registrando.set(true);
+
+    this.jornadaService.registrarMovimiento(j.id, this.tipo(), desc, monto).subscribe({
+      next: () => {
+        this.registrando.set(false);
+        this.descripcion.set('');
+        this.monto.set(0);
+        this.tipo.set('gasto');
+        this.jornadaService.refreshJornadaAbierta();
+      },
+      error: (err: unknown) => {
+        this.registrando.set(false);
+        this.formError.set(err instanceof Error ? err.message : 'Error al registrar movimiento');
+      },
+    });
   }
 
   abrirModalCierre(): void {

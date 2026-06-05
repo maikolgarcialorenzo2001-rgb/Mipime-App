@@ -23,6 +23,50 @@ export class JornadaService {
     this.refreshJornadaAbierta();
   }
 
+  /**
+   * Registra un movimiento (gasto o ingreso_extra) en la jornada abierta.
+   * Inserta en `movimientos` y actualiza `total_gastos` + `saldo_esperado`.
+   */
+  registrarMovimiento(
+    jornadaId: number,
+    tipo: 'gasto' | 'ingreso_extra',
+    descripcion: string,
+    monto: number,
+  ): Observable<Movimiento> {
+    return from(this._registrarMovimientoAsync(jornadaId, tipo, descripcion, monto));
+  }
+
+  private async _registrarMovimientoAsync(
+    jornadaId: number,
+    tipo: 'gasto' | 'ingreso_extra',
+    descripcion: string,
+    monto: number,
+  ): Promise<Movimiento> {
+    if (!['gasto', 'ingreso_extra'].includes(tipo)) throw new Error('Tipo inválido');
+    if (!descripcion || descripcion.trim().length === 0) throw new Error('Descripción requerida');
+    if (!monto || monto <= 0) throw new Error('Monto debe ser mayor a 0');
+
+    const ahora = new Date().toISOString();
+
+    const movs = await this._db.sql<Movimiento>(
+      `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
+       VALUES (?, ?, ?, ?, ?) RETURNING *`,
+      [jornadaId, tipo, descripcion, monto, ahora],
+    );
+
+    const ajuste = tipo === 'gasto' ? -monto : monto;
+    await this._db.sql(
+      `UPDATE jornadas
+       SET total_gastos = total_gastos + ?,
+           saldo_esperado = saldo_esperado + ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [monto, ajuste, ahora, jornadaId],
+    );
+
+    return movs[0];
+  }
+
   /** Recarga la jornada abierta desde la DB y actualiza `jornadaAbierta`. */
   refreshJornadaAbierta(): void {
     this.jornadaCargando.set(true);
@@ -166,18 +210,41 @@ export class JornadaService {
       productosMap.set(p.id, p.nombre);
     }
 
-    // 5. Agrupar detalles por venta
+    // 5. Calcular costo total de productos vendidos
+    let totalCosto = 0;
+    if (ventaIds.length > 0) {
+      const costoPlaceholders = ventaIds.map(() => '?').join(', ');
+      const costoResult = await this._db.sql<{ total_costo: number }>(
+        `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
+         FROM detalle_ventas dv
+         JOIN productos p ON p.id = dv.producto_id
+         WHERE dv.venta_id IN (${costoPlaceholders})`,
+        ventaIds,
+      );
+      totalCosto = costoResult[0]?.total_costo ?? 0;
+    }
+
+    // 6. Obtener nombre del usuario que cerró
+    const users = await this._db.sql<{ nombre: string }>(
+      'SELECT nombre FROM usuarios WHERE id = ?',
+      [userId],
+    );
+    const userCierreNombre = users[0]?.nombre ?? null;
+
+    // 7. Agrupar detalles por venta
     const ventasConDetalles = ventas.map((v) => ({
       ...v,
       detalles: detalles.filter((d) => d.venta_id === v.id),
     }));
 
-    // 6. Generar Excel con estado fresco y nombres de producto
+    // 8. Generar Excel con estado fresco y nombres de producto
     const base64 = this._excelService.generarExcelJornada({
       jornada,
       ventas: ventasConDetalles,
       movimientos,
       productosMap,
+      totalCosto,
+      userCierreNombre,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
