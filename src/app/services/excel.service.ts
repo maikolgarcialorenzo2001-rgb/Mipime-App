@@ -87,6 +87,7 @@ export class ExcelService {
 
     // Ajustar ancho de columnas
     ws['!cols'] = [{ wch: 20 }, { wch: 20 }];
+    ws['!protect'] = true;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
   }
@@ -127,6 +128,7 @@ export class ExcelService {
       { wch: 14 },
       { wch: 16 },
     ];
+    ws['!protect'] = true;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
   }
@@ -150,6 +152,7 @@ export class ExcelService {
       { wch: 40 },
       { wch: 14 },
     ];
+    ws['!protect'] = true;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
   }
