@@ -1,4 +1,4 @@
-import { Component, inject, viewChild, ElementRef, afterNextRender, signal } from '@angular/core';
+import { Component, inject, viewChild, ElementRef, afterNextRender, signal, DestroyRef } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
@@ -25,6 +25,7 @@ export class PosPage {
   private readonly _jornadaService = inject(JornadaService);
   private readonly _ventaService = inject(VentaService);
   private readonly _auth = inject(AuthService);
+  private readonly _destroyRef = inject(DestroyRef);
 
   readonly cart = this._cartService;
   readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
@@ -40,23 +41,30 @@ export class PosPage {
 
   readonly successMessage = signal<string | null>(null);
 
-  /** Cantidad de columnas del grid según el viewport, matcheando Tailwind breakpoints. */
-  private get _columnCount(): number {
+  /** Cantidad de columnas del grid, calculada una vez al inicio. */
+  private _columnCount = 2;
+
+  private _debounceId?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    this._columnCount = this._calcularColumnas();
+    this._buscar('');
+
+    this._destroyRef.onDestroy(() => {
+      clearTimeout(this._debounceId);
+    });
+
+    afterNextRender(() => {
+      this.searchInput()?.nativeElement.focus();
+    });
+  }
+
+  private _calcularColumnas(): number {
     const w = window.innerWidth;
     if (w >= 1280) return 5; // xl: grid-cols-5
     if (w >= 1024) return 4; // lg: grid-cols-4
     if (w >= 640) return 3;  // sm: grid-cols-3
     return 2;                // default: grid-cols-2
-  }
-
-  private _debounceId?: ReturnType<typeof setTimeout>;
-
-  constructor() {
-    this._buscar('');
-
-    afterNextRender(() => {
-      this.searchInput()?.nativeElement.focus();
-    });
   }
 
   get sinJornada(): boolean {

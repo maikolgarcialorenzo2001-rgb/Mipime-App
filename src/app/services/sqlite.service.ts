@@ -45,7 +45,16 @@ export class SqliteService implements Database {
   async sql<T>(query: string, params?: unknown[]): Promise<T[]> {
     const client = await this._getClient();
     const result = await client.sql(query, ...(params ?? []));
-    return result as unknown as T[];
+    return this._mapRows<T>(result);
+  }
+
+  /**
+   * Convierte el resultado crudo de SQLocal (Record<string, unknown>[])
+   * al tipo esperado T. Es un cast necesario porque SQLocal no conoce
+   * nuestras tablas. Nosotros controlamos el schema, así que es seguro.
+   */
+  private _mapRows<T>(rows: Record<string, unknown>[]): T[] {
+    return rows as unknown as T[];
   }
 
   async initialize(): Promise<void> {
