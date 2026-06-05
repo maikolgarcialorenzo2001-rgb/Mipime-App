@@ -11,8 +11,13 @@
     <span class="text-lg font-semibold text-blue-600">
       {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
     </span>
-    @if (producto().stock_actual <= stockWarningThreshold()) {
-      <span class="mt-1 block text-xs text-red-500">Stock: {{ producto().stock_actual }}</span>
-    }
+    <span
+      class="mt-1 block text-xs"
+      [class.text-green-400]="producto().stock_actual > 10"
+      [class.text-orange-400]="producto().stock_actual >= 1 && producto().stock_actual <= 10"
+      [class.text-red-500]="producto().stock_actual === 0"
+    >
+      Stock: {{ producto().stock_actual }}
+    </span>
   </div>
 </button>

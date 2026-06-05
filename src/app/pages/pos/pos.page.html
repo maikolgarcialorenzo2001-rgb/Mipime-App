@@ -110,3 +110,10 @@
     (cancelar)="cerrarModal()"
   />
 }
+
+<!-- Toast de éxito -->
+@if (successMessage(); as msg) {
+  <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in">
+    {{ msg }}
+  </div>
+}

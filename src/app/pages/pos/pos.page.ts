@@ -36,6 +36,8 @@ export class PosPage {
 
   readonly ventaError = signal<string | null>(null);
 
+  readonly successMessage = signal<string | null>(null);
+
   /** Cantidad de columnas del grid según el viewport, matcheando Tailwind breakpoints. */
   private get _columnCount(): number {
     const w = window.innerWidth;
@@ -163,6 +165,8 @@ export class PosPage {
       next: () => {
         this.showModal.set(false);
         this.cart.limpiar();
+        this.successMessage.set('¡Venta registrada con éxito!');
+        setTimeout(() => this.successMessage.set(null), 3000);
         this.searchInput()?.nativeElement.focus();
       },
       error: (err: unknown) => {
