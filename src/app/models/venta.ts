@@ -3,6 +3,8 @@ export interface Venta {
   jornada_id: number;
   fecha_hora: string;
   total: number;
+  usuario_id: number | null;
+  forma_pago: string;
   created_at: string;
 }
 

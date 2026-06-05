@@ -5,6 +5,7 @@ import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
+import { AuthService } from '../../services/auth.service';
 import { CurrencyPipe } from '@angular/common';
 import type { Jornada, Producto } from '../../models';
 
@@ -66,6 +67,12 @@ describe('PosPage — toast de éxito', () => {
         {
           provide: VentaService,
           useValue: mockVentaService,
+        },
+        {
+          provide: AuthService,
+          useValue: {
+            usuario: vi.fn().mockReturnValue({ id: 1 }),
+          },
         },
       ],
     });

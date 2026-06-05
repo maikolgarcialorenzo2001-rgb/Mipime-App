@@ -27,6 +27,35 @@
       }
     </ul>
 
+    <!-- Selector de forma de pago -->
+    <div class="mb-4">
+      <p class="text-sm font-medium text-gray-700 mb-2">Forma de pago</p>
+      <div class="flex gap-2">
+        <button
+          type="button"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+          [class.bg-blue-600]="formaPago() === 'efectivo'"
+          [class.text-white]="formaPago() === 'efectivo'"
+          [class.border-blue-600]="formaPago() === 'efectivo'"
+          [class.border-gray-300]="formaPago() !== 'efectivo'"
+          [class.text-gray-700]="formaPago() !== 'efectivo'"
+          [class.hover:bg-gray-50]="formaPago() !== 'efectivo'"
+          (click)="seleccionarFormaPago('efectivo')"
+        >Efectivo</button>
+        <button
+          type="button"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+          [class.bg-blue-600]="formaPago() === 'transferencia'"
+          [class.text-white]="formaPago() === 'transferencia'"
+          [class.border-blue-600]="formaPago() === 'transferencia'"
+          [class.border-gray-300]="formaPago() !== 'transferencia'"
+          [class.text-gray-700]="formaPago() !== 'transferencia'"
+          [class.hover:bg-gray-50]="formaPago() !== 'transferencia'"
+          (click)="seleccionarFormaPago('transferencia')"
+        >Transferencia</button>
+      </div>
+    </div>
+
     <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 pt-3">
       <span class="text-base font-semibold text-gray-900">Total</span>
       <span class="text-xl font-semibold text-gray-900">
@@ -43,7 +72,7 @@
       <button
         type="button"
         class="flex-1 cursor-pointer rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors"
-        (click)="confirmar.emit()"
+        (click)="onConfirmar()"
       >Confirmar venta</button>
     </div>
   </div>

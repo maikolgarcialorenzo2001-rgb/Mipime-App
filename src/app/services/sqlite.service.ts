@@ -77,6 +77,10 @@ export class SqliteService implements Database {
       await this._migrationV4(client);
     }
 
+    if (currentVersion < 5) {
+      await this._migrationV5(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -253,6 +257,27 @@ export class SqliteService implements Database {
     }
 
     await client.sql('INSERT INTO schema_version (version) VALUES (4)');
+  }
+
+  private async _migrationV5(client: SQLocal): Promise<void> {
+    // Recrear ventas con CHECK(forma_pago) actualizado a solo efectivo/transferencia
+    await client.sql('BEGIN TRANSACTION');
+    await client.sql(`CREATE TABLE ventas_v5 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      fecha_hora TEXT NOT NULL,
+      total REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      usuario_id INTEGER REFERENCES usuarios(id),
+      forma_pago TEXT NOT NULL DEFAULT 'efectivo' CHECK(forma_pago IN ('efectivo', 'transferencia'))
+    )`);
+    await client.sql(`INSERT INTO ventas_v5
+      SELECT id, jornada_id, fecha_hora, total, created_at, usuario_id, forma_pago
+      FROM ventas`);
+    await client.sql('DROP TABLE ventas');
+    await client.sql('ALTER TABLE ventas_v5 RENAME TO ventas');
+    await client.sql('INSERT INTO schema_version (version) VALUES (5)');
+    await client.sql('COMMIT');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

@@ -4,6 +4,7 @@ import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
+import { AuthService } from '../../services/auth.service';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
@@ -23,6 +24,7 @@ export class PosPage {
   private readonly _cartService = inject(CartService);
   private readonly _jornadaService = inject(JornadaService);
   private readonly _ventaService = inject(VentaService);
+  private readonly _auth = inject(AuthService);
 
   readonly cart = this._cartService;
   readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
@@ -154,14 +156,15 @@ export class PosPage {
     this.ventaError.set(null);
   }
 
-  confirmarVenta(): void {
+  confirmarVenta(formaPago: string): void {
     const jId = this._jornadaService.jornadaAbierta()?.id;
-    if (jId === undefined) return;
+    const usuarioId = this._auth.usuario()?.id;
+    if (jId === undefined || !usuarioId) return;
 
     this.ventaError.set(null);
     const items = this.cart.items();
 
-    this._ventaService.registrar(jId, items).subscribe({
+    this._ventaService.registrar(jId, items, usuarioId, formaPago).subscribe({
       next: () => {
         this.showModal.set(false);
         this.cart.limpiar();

@@ -6,12 +6,15 @@ import { environment } from '../environments/environment';
 // Track all SQL calls made through the mock client
 const sqlCalls: { query: string; params: unknown[] }[] = [];
 
+/** Override para controlar qué versión devuelve el mock de schema_version. */
+let mockSchemaVersion: number | null = null;
+
 class MockSQLocalClient {
   sql = vi.fn().mockImplementation((query: string, ...params: unknown[]) => {
     sqlCalls.push({ query, params });
     // Check schema_version: return version 1 so v1 is skipped, then v2 runs
     if (query.includes('COALESCE(MAX(version), 0)')) {
-      return [{ version: 1 }];
+      return [{ version: mockSchemaVersion ?? 1 }];
     }
     // Check if admin user exists: return count 0 so seed runs
     if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE nombre = 'admin'")) {
@@ -220,5 +223,94 @@ describe('SqliteService migration v2', () => {
   it('debería usar dbName del environment en lugar de hardcode', async () => {
     await service.initialize();
     expect(mockDbName).toBe(environment.dbName);
+  });
+});
+
+describe('SqliteService migration v5', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('1.1 RED: migration v5 debería recrear ventas con CHECK(forma_pago IN)', async () => {
+    mockSchemaVersion = 4;
+    await service.initialize();
+
+    // Debería crear ventas_v5 con CHECK(forma_pago IN ('efectivo', 'transferencia'))
+    const createV5 = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('ventas_v5'),
+    );
+    expect(createV5).toBeDefined();
+    expect(createV5!.query).toContain(
+      "CHECK(forma_pago IN ('efectivo', 'transferencia')",
+    );
+
+    // Debería migrar datos existentes
+    const insertV5 = sqlCalls.find(
+      (c) =>
+        c.query.includes('INSERT INTO ventas_v5') &&
+        c.query.includes('SELECT'),
+    );
+    expect(insertV5).toBeDefined();
+
+    // Debería dropear tabla vieja y renombrar
+    expect(
+      sqlCalls.some((c) => c.query.includes('DROP TABLE ventas')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('ALTER TABLE ventas_v5 RENAME TO ventas'),
+      ),
+    ).toBe(true);
+
+    // Debería insertar version 5
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (5)'),
+      ),
+    ).toBe(true);
+
+    // Debería estar envuelto en transacción
+    expect(
+      sqlCalls.some((c) => c.query.includes('BEGIN TRANSACTION')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) => c.query.includes('COMMIT')),
+    ).toBe(true);
   });
 });

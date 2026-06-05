@@ -202,4 +202,83 @@ describe('ExcelService', () => {
       expect(ventasJson.length).toBe(1); // solo header
     });
   });
+
+  describe('Forma de pago en Excel', () => {
+    const ventasConFormaPago: VentaConDetalles[] = [
+      {
+        id: 1,
+        jornada_id: 1,
+        fecha_hora: '2026-06-04T10:00:00',
+        total: 1000,
+        usuario_id: 1,
+        forma_pago: 'efectivo',
+        created_at: '2026-06-04T10:00:00Z',
+        detalles: [
+          { id: 1, venta_id: 1, producto_id: 1, cantidad: 1, precio_unitario: 1000, subtotal: 1000 },
+        ],
+      },
+      {
+        id: 2,
+        jornada_id: 1,
+        fecha_hora: '2026-06-04T11:00:00',
+        total: 2500,
+        usuario_id: 1,
+        forma_pago: 'transferencia',
+        created_at: '2026-06-04T11:00:00Z',
+        detalles: [
+          { id: 2, venta_id: 2, producto_id: 2, cantidad: 1, precio_unitario: 2500, subtotal: 2500 },
+        ],
+      },
+    ];
+
+    it('4.1 RED: Ventas sheet debería tener columna "Forma de pago"', () => {
+      const dataConForma: JornadaReportData = {
+        jornada,
+        ventas: ventasConFormaPago,
+        movimientos,
+      };
+
+      const result = service.generarExcelJornada(dataConForma);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const header = json[0];
+      expect(header).toContain('Forma de pago');
+    });
+
+    it('4.1 RED: Ventas sheet debería mostrar forma_pago de cada venta', () => {
+      const dataConForma: JornadaReportData = {
+        jornada,
+        ventas: ventasConFormaPago,
+        movimientos,
+      };
+
+      const result = service.generarExcelJornada(dataConForma);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // Debería mostrar 'efectivo' y 'transferencia' en alguna fila
+      const filas = json as unknown[][];
+      expect(filas.some((f) => f.includes('efectivo'))).toBe(true);
+      expect(filas.some((f) => f.includes('transferencia'))).toBe(true);
+    });
+
+    it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia', () => {
+      const dataConForma: JornadaReportData = {
+        jornada,
+        ventas: ventasConFormaPago,
+        movimientos,
+      };
+
+      const result = service.generarExcelJornada(dataConForma);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Total efectivo', 1000]);
+      expect(json).toContainEqual(['Total transferencia', 2500]);
+    });
+  });
 });

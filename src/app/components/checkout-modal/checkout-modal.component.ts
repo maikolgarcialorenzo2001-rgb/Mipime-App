@@ -1,10 +1,10 @@
-import { Component, input, output } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { Component, input, output, signal } from '@angular/core';
+import { CurrencyPipe, NgClass } from '@angular/common';
 import type { CartItem } from '../../services/cart.service';
 
 @Component({
   selector: 'app-checkout-modal',
-  imports: [CurrencyPipe],
+  imports: [CurrencyPipe, NgClass],
   templateUrl: './checkout-modal.component.html',
   styleUrl: './checkout-modal.component.css',
 })
@@ -12,8 +12,10 @@ export class CheckoutModalComponent {
   readonly items = input.required<CartItem[]>();
   readonly total = input.required<number>();
   readonly errorMessage = input<string | null>(null);
-  readonly confirmar = output();
+  readonly confirmar = output<{ formaPago: string }>();
   readonly cancelar = output();
+
+  readonly formaPago = signal<'efectivo' | 'transferencia'>('efectivo');
 
   onBackdropClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
@@ -25,5 +27,13 @@ export class CheckoutModalComponent {
     if (event.key === 'Escape') {
       this.cancelar.emit();
     }
+  }
+
+  onConfirmar(): void {
+    this.confirmar.emit({ formaPago: this.formaPago() });
+  }
+
+  seleccionarFormaPago(valor: 'efectivo' | 'transferencia'): void {
+    this.formaPago.set(valor);
   }
 }

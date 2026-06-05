@@ -39,6 +39,16 @@ export class ExcelService {
 
   private _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const j = data.jornada;
+    const ventas = data.ventas;
+
+    // Calcular desglose por forma de pago
+    const totalEfectivo = ventas
+      .filter((v) => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalTransferencia = ventas
+      .filter((v) => v.forma_pago === 'transferencia')
+      .reduce((sum, v) => sum + v.total, 0);
+
     const filas: unknown[][] = [
       ['Mipime-Cuentas — Resumen de Jornada'],
       [],
@@ -49,6 +59,8 @@ export class ExcelService {
       [],
       ['Monto inicial', j.monto_inicial],
       ['Total ventas', j.total_ventas],
+      ['Total efectivo', totalEfectivo],
+      ['Total transferencia', totalTransferencia],
       ...(j.total_gastos > 0 ? [['Total gastos' as const, j.total_gastos]] : []),
       ['Saldo esperado', j.saldo_esperado],
     ];
@@ -68,7 +80,7 @@ export class ExcelService {
 
   private _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const filas: unknown[][] = [
-      ['#', 'Fecha/Hora', 'Producto', 'Cantidad', 'Precio unitario', 'Subtotal', 'Total venta'],
+      ['#', 'Fecha/Hora', 'Producto', 'Cantidad', 'Precio unitario', 'Subtotal', 'Total venta', 'Forma de pago'],
     ];
 
     const pmap = data.productosMap;
@@ -86,6 +98,7 @@ export class ExcelService {
           detalle.precio_unitario,
           detalle.subtotal,
           primerDetalle ? venta.total : '',
+          primerDetalle ? venta.forma_pago ?? '' : '',
         ]);
         primerDetalle = false;
       }
@@ -101,6 +114,7 @@ export class ExcelService {
       { wch: 16 },
       { wch: 12 },
       { wch: 14 },
+      { wch: 16 },
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, 'Ventas');

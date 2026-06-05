@@ -106,7 +106,7 @@
     [items]="cart.items()"
     [total]="cart.total()"
     [errorMessage]="ventaError()"
-    (confirmar)="confirmarVenta()"
+    (confirmar)="confirmarVenta($event.formaPago)"
     (cancelar)="cerrarModal()"
   />
 }
