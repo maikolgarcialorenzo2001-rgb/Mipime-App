@@ -4,6 +4,11 @@ import type { Jornada } from '../models/jornada';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 
+export interface ProductoInfo {
+  nombre: string;
+  precio_costo: number | null;
+}
+
 export interface VentaConDetalles extends Venta {
   detalles: DetalleVenta[];
 }
@@ -12,7 +17,7 @@ export interface JornadaReportData {
   jornada: Jornada;
   ventas: VentaConDetalles[];
   movimientos: Movimiento[];
-  productosMap?: Map<number, string>;
+  productosMap?: Map<number, ProductoInfo>;
   totalCosto: number;
   userCierreNombre: string | null;
 }
@@ -64,7 +69,7 @@ export class ExcelService {
       ['Total ventas', j.total_ventas],
       ['Total efectivo', totalEfectivo],
       ['Total transferencia', totalTransferencia],
-      ...(j.total_gastos > 0 ? [['Total gastos' as const, j.total_gastos]] : []),
+      ['Total gastos', j.total_gastos],
       ['Ganancia bruta', gananciaBruta],
       ['Saldo esperado', j.saldo_esperado],
     ];
@@ -88,7 +93,7 @@ export class ExcelService {
 
   private _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const filas: unknown[][] = [
-      ['Producto', 'Cantidad', 'Precio unitario', 'Total', 'Forma de pago'],
+      ['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago'],
     ];
 
     const pmap = data.productosMap;
@@ -96,11 +101,14 @@ export class ExcelService {
     let granTotal = 0;
     for (const venta of data.ventas) {
       for (const detalle of venta.detalles) {
-        const nombreProducto = pmap?.get(detalle.producto_id) ?? detalle.producto_id;
+        const info = pmap?.get(detalle.producto_id);
+        const nombreProducto = info?.nombre ?? detalle.producto_id;
+        const precioBase = info?.precio_costo ?? null;
         filas.push([
           nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
+          precioBase,
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
         ]);
@@ -108,13 +116,14 @@ export class ExcelService {
       }
     }
 
-    filas.push([], ['Total ingresos', '', '', granTotal, '']);
+    filas.push([], ['Total ingresos', '', '', '', granTotal, '']);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
       { wch: 20 },
       { wch: 10 },
       { wch: 16 },
+      { wch: 10 },
       { wch: 14 },
       { wch: 16 },
     ];

@@ -201,13 +201,13 @@ export class JornadaService {
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];
 
-    // 4. Obtener productos para el mapa de nombres
-    const productos = await this._db.sql<{ id: number; nombre: string }>(
-      'SELECT id, nombre FROM productos',
+    // 4. Obtener productos para el mapa de nombres + precio_costo
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
+      'SELECT id, nombre, precio_costo FROM productos',
     );
-    const productosMap = new Map<number, string>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
     for (const p of productos) {
-      productosMap.set(p.id, p.nombre);
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
     }
 
     // 5. Calcular costo total de productos vendidos

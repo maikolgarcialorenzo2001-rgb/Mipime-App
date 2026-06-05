@@ -572,9 +572,9 @@ describe('JornadaService', () => {
       );
 
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
-      const productosMap = callArg.productosMap as Map<number, string>;
-      expect(productosMap.get(1)).toBe('Coca-Cola');
-      expect(productosMap.get(2)).toBe('Agua 1L');
+      const productosMap = callArg.productosMap as Map<number, { nombre: string; precio_costo: number | null }>;
+      expect(productosMap.get(1)?.nombre).toBe('Coca-Cola');
+      expect(productosMap.get(2)?.nombre).toBe('Agua 1L');
     });
   });
 });

@@ -92,10 +92,10 @@ describe('ExcelService', () => {
     });
 
     it('2.1 RED: debería mostrar nombre de producto vía productosMap, no producto_id', () => {
-      const productosMap = new Map<number, string>([
-        [1, 'Coca-Cola 500ml'],
-        [2, 'Agua 1L'],
-        [3, 'Chocolate'],
+      const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>([
+        [1, { nombre: 'Coca-Cola 500ml', precio_costo: null }],
+        [2, { nombre: 'Agua 1L', precio_costo: null }],
+        [3, { nombre: 'Chocolate', precio_costo: null }],
       ]);
       const dataConMap: JornadaReportData = {
         ...data,
@@ -120,7 +120,7 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f[0] === 3)).toBe(false);
     });
 
-    it('2.2 RED: debería omitir fila "Total gastos" cuando total_gastos = 0', () => {
+    it('2.2 RED: debería mostrar fila "Total gastos" incluso cuando es 0', () => {
       const jornadaSinGastos: Jornada = {
         ...jornada,
         total_gastos: 0,
@@ -138,7 +138,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).not.toContainEqual(['Total gastos', 0]);
+      expect(json).toContainEqual(['Total gastos', 0]);
     });
 
     it('debería tener la data correcta en la hoja Resumen', () => {
@@ -176,10 +176,10 @@ describe('ExcelService', () => {
       expect(json[3]).toContainEqual(1100);
       expect(json[4]).toContainEqual(150);
 
-      // Footer row
+      // Footer row (index 4 = columna Total por Precio base agregado)
       const footerRow = json[6] as unknown[];
       expect(footerRow[0]).toBe('Total ingresos');
-      expect(footerRow[3]).toBe(3800);
+      expect(footerRow[4]).toBe(3800);
     });
 
     it('debería listar los movimientos', () => {
@@ -217,7 +217,7 @@ describe('ExcelService', () => {
   });
 
   describe('Ventas restructuring', () => {
-    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Total, Forma de pago', () => {
+    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Precio base, Total, Forma de pago', () => {
       const result = service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
@@ -227,16 +227,17 @@ describe('ExcelService', () => {
       expect(header[0]).toBe('Producto');
       expect(header[1]).toBe('Cantidad');
       expect(header[2]).toBe('Precio unitario');
-      expect(header[3]).toBe('Total');
-      expect(header[4]).toBe('Forma de pago');
-      expect(header).toHaveLength(5);
+      expect(header[3]).toBe('Precio base');
+      expect(header[4]).toBe('Total');
+      expect(header[5]).toBe('Forma de pago');
+      expect(header).toHaveLength(6);
     });
 
     it('3.1 RED: una fila por detalle con nombre de producto resuelto', () => {
-      const productosMap = new Map<number, string>([
-        [1, 'Coca-Cola 500ml'],
-        [2, 'Agua 1L'],
-        [3, 'Chocolate'],
+      const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>([
+        [1, { nombre: 'Coca-Cola 500ml', precio_costo: 400 }],
+        [2, { nombre: 'Agua 1L', precio_costo: 600 }],
+        [3, { nombre: 'Chocolate', precio_costo: 80 }],
       ]);
       const dataConMap: JornadaReportData = {
         ...data,
@@ -250,7 +251,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // 1 header + 4 detalle rows + 1 footer + 1 empty = 7
+      // 1 header + 4 detalle rows + 1 empty + 1 footer = 7
       expect(json.length).toBeGreaterThanOrEqual(5);
 
       // Product names resolved
@@ -273,8 +274,8 @@ describe('ExcelService', () => {
       // Find footer row - should contain 'Total ingresos' and the grand total
       const footerRow = filas.find((f) => f[0] === 'Total ingresos');
       expect(footerRow).toBeTruthy();
-      // Total = 850 + 1700 + 1100 + 150 = 3800
-      expect(footerRow![3]).toBe(3800);
+      // Total = 850 + 1700 + 1100 + 150 = 3800 (index 4 = columna Total)
+      expect(footerRow![4]).toBe(3800);
     });
 
     it('3.1 RED: footer suma debe ser 0 cuando no hay ventas', () => {
@@ -294,7 +295,7 @@ describe('ExcelService', () => {
       const filas = json as unknown[][];
       const footerRow = filas.find((f) => f[0] === 'Total ingresos');
       expect(footerRow).toBeTruthy();
-      expect(footerRow![3]).toBe(0);
+      expect(footerRow![4]).toBe(0);
     });
   });
 
