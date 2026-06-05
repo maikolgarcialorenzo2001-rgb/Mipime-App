@@ -106,8 +106,8 @@ describe('PosPage — toast de éxito', () => {
     );
     expect(toastEl).toBeTruthy();
 
-    // Avanzar 3 segundos
-    vi.advanceTimersByTime(3000);
+    // Avanzar 2 segundos
+    vi.advanceTimersByTime(2000);
     fixture.detectChanges();
 
     const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(

@@ -166,7 +166,7 @@ export class PosPage {
         this.showModal.set(false);
         this.cart.limpiar();
         this.successMessage.set('¡Venta registrada con éxito!');
-        setTimeout(() => this.successMessage.set(null), 3000);
+        setTimeout(() => this.successMessage.set(null), 2000);
         this.searchInput()?.nativeElement.focus();
       },
       error: (err: unknown) => {
