@@ -5,6 +5,7 @@ import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
 import { AuthService } from '../../services/auth.service';
+import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
@@ -15,7 +16,7 @@ import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CurrencyPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -38,6 +39,7 @@ export class PosPage {
   readonly pendingProduct = signal<Producto | null>(null);
 
   readonly ventaError = signal<string | null>(null);
+  readonly searchError = signal<string | null>(null);
 
   readonly successMessage = signal<string | null>(null);
 
@@ -192,6 +194,7 @@ export class PosPage {
     // Si la query se resuelve rápido (< 150ms), no mostramos el spinner
     // para evitar el pantallazo al agregar productos al carrito.
     const loadingTimer = setTimeout(() => this.buscando.set(true), 150);
+    this.searchError.set(null);
 
     const obs = query
       ? this._productoService.buscar(query)
@@ -203,9 +206,12 @@ export class PosPage {
         this.resultados.set(productos);
         this.buscando.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
         clearTimeout(loadingTimer);
         this.buscando.set(false);
+        this.searchError.set(
+          err instanceof Error ? err.message : 'Error al buscar productos',
+        );
       },
     });
   }

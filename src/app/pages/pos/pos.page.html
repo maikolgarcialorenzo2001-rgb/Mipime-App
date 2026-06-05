@@ -14,6 +14,13 @@
       />
     </div>
 
+    <!-- Error de búsqueda -->
+    @if (searchError(); as err) {
+      <div class="px-6 pt-3">
+        <app-error-alert [message]="err" />
+      </div>
+    }
+
     <!-- Resultados -->
     <div class="flex-1 overflow-y-auto p-6">
       @if (buscando()) {
