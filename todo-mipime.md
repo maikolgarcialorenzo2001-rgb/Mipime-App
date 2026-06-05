@@ -48,47 +48,82 @@ Selector efectivo/transferencia en checkout, desglose en Excel, migración v5.
 
 ---
 
-## 🔴 Pendiente — Prioridad Alta
+## 🔴 Prioridad Alta — Funcionalidades rotas / incompletas
 
-### A2. Editar / eliminar movimientos
-**Contexto:** Hoy los movimientos (gastos/ingresos_extra) solo se pueden registrar, no modificar ni eliminar. Si el admin se equivoca, no hay forma de corregirlo.
-**Posible approach:** Agregar botones editar/eliminar en la lista de movimientos del Excel o en una nueva sección en JornadaPage.
+### A2. HistorialPage — handlers vacíos
+**Archivo:** `src/app/pages/historial/historial.page.ts` (líneas 145-152)
+**Problema:** Al clickear un día con jornada cerrada, los botones **"Descargar Excel"** y **"Vista previa"** no hacen nada:
+```typescript
+descargarExcel(_jornada: Jornada): void {
+  // TODO: 4.3 — JornadaService.cerrar() guarda el Excel,
+  // acá lo recuperamos de jornada_reportes y lo descargamos
+}
+verPreview(_jornada: Jornada): void {
+  // TODO: 4.3 — Mostrar el Excel in-app (tabla readonly)
+}
+```
+**Fix Descargar:** Usar `JornadaService.obtenerReporte(j.id)` → `_descargarExcel(base64)` (el mismo patrón que ya funciona en `app-nav.component.ts` y `jornada.page.ts`).
+**Fix Vista previa:** Mostrar un modal con tabla readonly con los datos de la jornada (reusar lógica de ExcelService).
 
-### A3. Gestión de productos desde Admin
-**Contexto:** `ProductosPage` solo lista y busca. No hay alta, baja ni modificación de productos desde la UI. Los productos se seedean desde `sqlite.service.ts` únicamente.
-**Posible approach:** CRUD completo en AdminPage (o una página separada) con formulario de creación/edición + confirmación de eliminación.
+### A3. Editar / eliminar movimientos
+**Contexto:** Hoy los movimientos (gastos/ingresos_extra) solo se pueden registrar, no modificar ni eliminar.
+**Posible approach:** Botones editar/eliminar en cada fila del formulario de movimientos en JornadaPage.
+
+### A4. CRUD completo de productos desde la UI
+**Contexto:** `ProductosPage` solo lista y busca. `AdminPage` solo maneja usuarios. No hay forma de crear, editar o eliminar productos desde la app; solo existen los 50 productos del seed en `sqlite.service.ts`.
+**Posible approach:** Formulario de alta/edición en AdminPage o ProductosPage. Confirmación para baja.
 
 ---
 
-## 🟡 Pendiente — Prioridad Media
+## 🟡 Prioridad Media — Features a medio implementar
 
 ### B4. Reabrir jornada
-**Contexto:** Si una jornada se cierra por error (o el pending_close la cierra sin querer), no hay forma de reabrirla. El admin debería poder reabrir una jornada cerrada del día actual.
-**Posible approach:** Botón "Reabrir" en HistorialPage para jornadas del día, solo admin. Vale `estado = 'abierta'`, limpia `hora_cierre` y `saldo_real`.
+**Contexto:** Si una jornada se cierra por error (o el `pending_close` la cierra sin querer), no hay forma de reabrirla.
+**Posible approach:** Botón "Reabrir" en HistorialPage para jornadas del día actual, solo admin. `UPDATE estado = 'abierta'`, limpia `hora_cierre`, `saldo_real`, `user_cierre_id`.
 
-### B5. Stock mínimo / alertas
-**Contexto:** No hay notificación cuando un producto tiene stock bajo. El admin tiene que ir a Inventario a mirar.
-**Posible approach:** Señal de `stock_bajo` en Nav o badge rojo en inventario cuando `stock_actual < umbral` (ej: 5 unidades).
+### B5. LoginPage sin tests
+**Archivo:** `src/app/pages/login/login.page.ts` — **no tiene spec**
+**Contexto:** La página de login es crítica (auth) y no tiene cobertura de tests.
+**Posible approach:** Testear flujo login exitoso, error de credenciales, redirect a POS.
+
+### B6. ProductosPage sin tests
+**Archivo:** `src/app/pages/productos/producto.page.ts` — **no tiene spec**
+**Contexto:** Página de listado/búsqueda de productos sin cobertura.
 
 ---
 
-## 🟢 Pendiente — Prioridad Baja
+## 🟢 Prioridad Baja — Features nuevas / deuda técnica
 
-### C5. Dashboard / página de inicio
-**Contexto:** `/` redirige a `/pos`. No hay un dashboard con KPIs del día (ventas del día, jornada abierta/cerrada, productos más vendidos, ganancia del día, etc.).
-**Posible approach:** Página separada o sección en POS con tarjetas de resumen.
+### C5. Componentes sin tests (8)
+**Archivos:**
+- `src/app/components/cart-item-row/cart-item-row.component` — sin spec
+- `src/app/components/empty-state/empty-state.component` — sin spec
+- `src/app/components/error-alert/error-alert.component` — sin spec
+- `src/app/components/estado-badge/estado-badge.component` — sin spec
+- `src/app/components/jornada-summary-card/jornada-summary-card.component` — sin spec
+- `src/app/components/loading-spinner/loading-spinner.component` — sin spec
+- `src/app/components/quantity-input/quantity-input.component` — sin spec
+- `src/app/components/stock-badge/stock-badge.component` — sin spec
 
-### C6. Imprimir ticket / comprobante
-**Contexto:** Después de cobrar, no se genera ningún comprobante para el cliente. Solo queda el registro en DB.
-**Posible approach:** Ventana de impresión con detalle de la venta (productos, cantidades, total, forma de pago).
+### C6. Dashboard / página de inicio
+**Contexto:** `/` redirige a `/pos`. No hay dashboard con KPIs del día.
+**Posible approach:** Página con tarjetas de resumen (ventas hoy, jornada, productos top, ganancia del día).
 
-### C7. Exportación de datos histórica
-**Contexto:** Solo se puede exportar el Excel de la jornada actual al cerrarla. No hay exportación de históricos (ej: todas las ventas del mes).
-**Posible approach:** Botón "Exportar mes" en HistorialPage que genera un Excel con todas las jornadas del mes seleccionado.
+### C7. Imprimir ticket / comprobante
+**Contexto:** Después de cobrar, no se genera ningún comprobante.
+**Posible approach:** Ventana de impresión con detalle de la venta.
 
-### C8. Modo oscuro
-**Contexto:** Toda la UI es modo claro. No hay toggle para modo oscuro.
-**Posible approach:** Clase `.dark` en `document.documentElement` + persistencia en localStorage. Tailwind 4 tiene soporte nativo.
+### C8. Stock mínimo / alertas
+**Contexto:** No hay notificación de stock bajo.
+**Posible approach:** Badge rojo en Nav o en Inventario cuando `stock_actual < umbral` (ej: 5).
+
+### C9. Exportación de datos histórica
+**Contexto:** Solo se exporta Excel al cerrar jornada. No hay exportación de históricos.
+**Posible approach:** Botón "Exportar mes" en HistorialPage.
+
+### C10. Modo oscuro
+**Contexto:** Toda la UI es modo claro.
+**Posible approach:** Clase `.dark` + persistencia en localStorage. Tailwind 4 tiene soporte nativo.
 
 ---
 
