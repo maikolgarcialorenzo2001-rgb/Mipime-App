@@ -3,7 +3,7 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `feature/auth-y-pages`
-> Tests: **209 / 22 test files** (↑ desde 205)
+> Tests: **235 / 22 test files** (↑ desde 209)
 > Última actualización: 2026-06-08
 
 ---
@@ -45,6 +45,14 @@ Selector efectivo/transferencia en checkout, desglose en Excel, migración v5.
 ### ~~BUG: Transacción no atómica en ventas~~ ✅
 **Commit:** `db2fc91`
 `_validarStock()` upfront + BEGIN/COMMIT/ROLLBACK en todas las escrituras.
+
+### ~~A2. HistorialPage — handlers vacíos~~ ✅
+**Commit:** `3bf7bb3`
+Implementados `descargarExcel()`, `verPreview()` con modal completo (productos + movimientos), `cerrarPreview()` por botón/Escape/backdrop, fix sheet name collision.
+
+### ~~C9. Exportación de datos histórica~~ ✅
+**Commit:** `3bf7bb3`
+Botón "Exportar mes" en HistorialPage con `generarExcelMensual()` multi-hoja, `jornadasDelMes()` en JornadaService, resumen del mes + hoja por jornada.
 
 ---
 
@@ -92,6 +100,18 @@ verPreview(_jornada: Jornada): void {
 
 ---
 
+## ⏳ Por aprobar — Pendiente de decisión del cliente/empresa
+
+### C6. Dashboard / página de inicio
+**Contexto:** `/` redirige a `/pos`. No hay dashboard con KPIs del día.
+**Posible approach:** Página con tarjetas de resumen (ventas hoy, jornada, productos top, ganancia del día).
+
+### C7. Imprimir ticket / comprobante
+**Contexto:** Después de cobrar, no se genera ningún comprobante.
+**Posible approach:** Ventana de impresión con detalle de la venta.
+
+---
+
 ## 🟢 Prioridad Baja — Features nuevas / deuda técnica
 
 ### C5. Componentes sin tests (8)
@@ -105,21 +125,9 @@ verPreview(_jornada: Jornada): void {
 - `src/app/components/quantity-input/quantity-input.component` — sin spec
 - `src/app/components/stock-badge/stock-badge.component` — sin spec
 
-### C6. Dashboard / página de inicio
-**Contexto:** `/` redirige a `/pos`. No hay dashboard con KPIs del día.
-**Posible approach:** Página con tarjetas de resumen (ventas hoy, jornada, productos top, ganancia del día).
-
-### C7. Imprimir ticket / comprobante
-**Contexto:** Después de cobrar, no se genera ningún comprobante.
-**Posible approach:** Ventana de impresión con detalle de la venta.
-
 ### ~~C8. Stock mínimo / alertas~~ ✅
 **Commit:** `30d6931`
 **Hecho:** Thresholds unificados entre StockBadgeComponent y ProductCardComponent. StockBadge usa computed signal (`>10` green, `>=1` yellow, `≤0` red). ProductCard ahora reusa `<app-stock-badge>`. Tests: 8 tests (5 nuevos + 3 migrados).
-
-### C9. Exportación de datos histórica
-**Contexto:** Solo se exporta Excel al cerrar jornada. No hay exportación de históricos.
-**Posible approach:** Botón "Exportar mes" en HistorialPage.
 
 ### C10. Modo oscuro
 **Contexto:** Toda la UI es modo claro.
@@ -131,6 +139,7 @@ verPreview(_jornada: Jornada): void {
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-06-08 | A2+C9: HistorialPage handlers + Exportación mensual | `3bf7bb3` |
 | 2026-06-08 | C8: Stock thresholds unificados — StockBadge computed signal + ProductCard reuse | `30d6931` |
 | 2026-06-05 | A1: ErrorAlert en POS `_buscar()` | `f8e72e8` |
 | 2026-06-05 | B1-B3: cleanup debounce, cache columnCount, sql cast | `0f1e3f5` |
