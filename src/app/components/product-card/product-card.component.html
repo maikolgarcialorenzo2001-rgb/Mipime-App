@@ -11,13 +11,9 @@
     <span class="text-lg font-semibold text-blue-600">
       {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
     </span>
-    <span
-      class="mt-1 block text-xs"
-      [class.text-green-400]="producto().stock_actual > 10"
-      [class.text-orange-400]="producto().stock_actual >= 1 && producto().stock_actual <= 10"
-      [class.text-red-500]="producto().stock_actual === 0"
-    >
-      Stock: {{ producto().stock_actual }}
-    </span>
+    <div class="mt-1 flex items-center gap-1">
+      <span class="text-xs text-gray-500">Stock: </span>
+      <app-stock-badge [stock]="producto().stock_actual" />
+    </div>
   </div>
 </button>
