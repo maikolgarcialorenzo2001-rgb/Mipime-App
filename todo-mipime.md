@@ -3,8 +3,8 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `feature/auth-y-pages`
-> Tests: **205 / 21 test files** (↑ desde 178)
-> Última actualización: 2026-06-05
+> Tests: **209 / 22 test files** (↑ desde 205)
+> Última actualización: 2026-06-08
 
 ---
 
@@ -113,9 +113,9 @@ verPreview(_jornada: Jornada): void {
 **Contexto:** Después de cobrar, no se genera ningún comprobante.
 **Posible approach:** Ventana de impresión con detalle de la venta.
 
-### C8. Stock mínimo / alertas
-**Contexto:** No hay notificación de stock bajo.
-**Posible approach:** Badge rojo en Nav o en Inventario cuando `stock_actual < umbral` (ej: 5).
+### ~~C8. Stock mínimo / alertas~~ ✅
+**Commit:** `30d6931`
+**Hecho:** Thresholds unificados entre StockBadgeComponent y ProductCardComponent. StockBadge usa computed signal (`>10` green, `>=1` yellow, `≤0` red). ProductCard ahora reusa `<app-stock-badge>`. Tests: 8 tests (5 nuevos + 3 migrados).
 
 ### C9. Exportación de datos histórica
 **Contexto:** Solo se exporta Excel al cerrar jornada. No hay exportación de históricos.
@@ -131,6 +131,7 @@ verPreview(_jornada: Jornada): void {
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-06-08 | C8: Stock thresholds unificados — StockBadge computed signal + ProductCard reuse | `30d6931` |
 | 2026-06-05 | A1: ErrorAlert en POS `_buscar()` | `f8e72e8` |
 | 2026-06-05 | B1-B3: cleanup debounce, cache columnCount, sql cast | `0f1e3f5` |
 | 2026-06-05 | Excel: protección hojas + Precio base columna + Total gastos siempre visible | `a87a0a5`, `8447b1f` |
