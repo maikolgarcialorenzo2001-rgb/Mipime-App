@@ -6,6 +6,7 @@ import { EmptyStateComponent } from '../../components/empty-state/empty-state.co
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EstadoBadgeComponent } from '../../components/estado-badge/estado-badge.component';
 import type { Jornada } from '../../models';
+import type { JornadaReportData } from '../../services/excel.service';
 
 export interface DiaCalendario {
   day: number | null;
@@ -36,6 +37,63 @@ export class HistorialPage {
   readonly error = signal<string | null>(null);
   readonly currentMonth = signal(new Date());
   readonly selectedDateStr = signal<string | null>(null);
+
+  /** Señal de carga para la exportación mensual. */
+  readonly exportando = signal(false);
+
+  /** Error de la exportación mensual. */
+  readonly errorExport = signal<string | null>(null);
+
+  /** Controla la visibilidad del modal de vista previa. */
+  readonly showPreview = signal(false);
+
+  /** Jornada activa en el modal de vista previa. */
+  readonly previewJornada = signal<Jornada | null>(null);
+
+  /** Datos completos cargados para la vista previa. */
+  readonly previewData = signal<JornadaReportData | null>(null);
+
+  /** Indicador de carga de datos de preview. */
+  readonly previewLoading = signal(false);
+
+  /** Detalles aplanados de productos vendidos para la tabla de preview. */
+  readonly previewDetalles = computed(() => {
+    const data = this.previewData();
+    if (!data) return [];
+    const items: {
+      producto: string;
+      cantidad: number;
+      precioUnitario: number;
+      precioBase: number | null;
+      total: number;
+      formaPago: string;
+    }[] = [];
+    for (const venta of data.ventas) {
+      for (const detalle of venta.detalles) {
+        const info = data.productosMap?.get(detalle.producto_id);
+        items.push({
+          producto: info?.nombre ?? `Producto #${detalle.producto_id}`,
+          cantidad: detalle.cantidad,
+          precioUnitario: detalle.precio_unitario,
+          precioBase: info?.precio_costo ?? null,
+          total: detalle.subtotal,
+          formaPago: venta.forma_pago ?? 'efectivo',
+        });
+      }
+    }
+    return items;
+  });
+
+  /** Movimientos de la jornada para la tabla de preview. */
+  readonly previewMovimientos = computed(() => this.previewData()?.movimientos ?? []);
+
+  /** `true` cuando el mes visible tiene al menos una jornada cerrada. */
+  readonly tieneJornadasCerradas = computed(() => {
+    const m = this.currentMonth();
+    const lo = new Date(m.getFullYear(), m.getMonth(), 1).toISOString().split('T')[0];
+    const hi = new Date(m.getFullYear(), m.getMonth() + 1, 0).toISOString().split('T')[0];
+    return this.jornadas().some((j) => j.estado === 'cerrada' && j.fecha >= lo && j.fecha <= hi);
+  });
 
   /** Mapa fecha → jornada para lookup O(1). */
   private readonly _jornadasPorFecha = computed(() => {
@@ -142,13 +200,88 @@ export class HistorialPage {
     this.selectedDateStr.update((prev) => (prev === dateStr ? null : dateStr));
   }
 
-  descargarExcel(_jornada: Jornada): void {
-    // TODO: 4.3 — JornadaService.cerrar() guarda el Excel,
-    // acá lo recuperamos de jornada_reportes y lo descargamos
+  descargarExcel(j: Jornada): void {
+    this._jornadaService.obtenerReporte(j.id).subscribe({
+      next: (reporte) => {
+        if (!reporte) return;
+
+        const byteCharacters = atob(reporte.content_base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = reporte.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+    });
   }
 
-  verPreview(_jornada: Jornada): void {
-    // TODO: 4.3 — Mostrar el Excel in-app (tabla readonly)
+  verPreview(j: Jornada): void {
+    this.previewJornada.set(j);
+    this.showPreview.set(true);
+    this.previewLoading.set(true);
+    this._jornadaService.obtenerDatosJornada(j.id, j.user_cierre_id).subscribe({
+      next: (data) => {
+        this.previewData.set(data);
+        this.previewLoading.set(false);
+      },
+      error: () => {
+        this.previewLoading.set(false);
+      },
+    });
+  }
+
+  cerrarPreview(): void {
+    this.showPreview.set(false);
+    this.previewJornada.set(null);
+    this.previewData.set(null);
+  }
+
+  /** Exporta todas las jornadas cerradas del mes visible como Excel multi-hoja. */
+  exportarMes(): void {
+    this.exportando.set(true);
+    this.errorExport.set(null);
+    const m = this.currentMonth();
+
+    this._jornadaService.generarExportacionMensual(m.getFullYear(), m.getMonth()).subscribe({
+      next: (base64) => {
+        this._descargarBase64(base64, m);
+        this.exportando.set(false);
+      },
+      error: (err: unknown) => {
+        this.errorExport.set(
+          err instanceof Error ? err.message : 'Error al exportar',
+        );
+        this.exportando.set(false);
+      },
+    });
+  }
+
+  private _descargarBase64(base64: string, month: Date): void {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jornadas_${month.getFullYear()}_${String(month.getMonth() + 1).padStart(2, '0')}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   private _cargarJornadas(): void {

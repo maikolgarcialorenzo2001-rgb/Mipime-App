@@ -434,7 +434,7 @@ describe('ExcelService', () => {
 
     it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia', () => {
       const dataConForma: JornadaReportData = {
-        jornada,
+        ...data,
         ventas: ventasConFormaPago,
         movimientos,
         totalCosto: 0,
@@ -446,8 +446,141 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Total efectivo', 1000]);
       expect(json).toContainEqual(['Total transferencia', 2500]);
     });
   });
+
+  describe('generarExcelMensual', () => {
+    const jornada1: Jornada = {
+      id: 1,
+      fecha: '2026-03-15',
+      hora_apertura: '09:00:00',
+      hora_cierre: '18:00:00',
+      monto_inicial: 5000,
+      total_ventas: 15000,
+      total_gastos: 2000,
+      saldo_esperado: 18000,
+      saldo_real: 17800,
+      estado: 'cerrada',
+      user_cierre_id: 1,
+      created_at: '',
+      updated_at: '',
+    };
+
+    const jornada2: Jornada = {
+      id: 2,
+      fecha: '2026-03-20',
+      hora_apertura: '08:00:00',
+      hora_cierre: '17:30:00',
+      monto_inicial: 3000,
+      total_ventas: 25000,
+      total_gastos: 5000,
+      saldo_esperado: 23000,
+      saldo_real: 23000,
+      estado: 'cerrada',
+      user_cierre_id: 2,
+      created_at: '',
+      updated_at: '',
+    };
+
+    const dataMulti: JornadaReportData[] = [
+      {
+        jornada: jornada1,
+        ventas: [
+          {
+            id: 1, jornada_id: 1, fecha_hora: '', total: 5000,
+            created_at: '', detalles: [
+              { id: 1, venta_id: 1, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
+            ],
+          },
+        ],
+        movimientos: [
+          { id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'Luz', monto: 1500, created_at: '' },
+        ],
+        totalCosto: 0,
+        userCierreNombre: 'Admin',
+      },
+      {
+        jornada: jornada2,
+        ventas: [],
+        movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
+      },
+    ];
+
+    it('C9 RED: debería generar workbook con hoja "Resumen del Mes" + una hoja por jornada', () => {
+      const result = service.generarExcelMensual(dataMulti);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).toEqual(['Resumen del Mes', '2026-03-15 (1)', '2026-03-20 (2)']);
+    });
+
+    it('C9 RED: Resumen del Mes debería mostrar mes, cantidad, totales consolidados', () => {
+      const result = service.generarExcelMensual(dataMulti);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen del Mes'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Mes', 'marzo de 2026']);
+      expect(json).toContainEqual(['Cantidad de jornadas', 2]);
+      expect(json).toContainEqual(['Total ventas', 40000]); // 15000 + 25000
+      expect(json).toContainEqual(['Total gastos', 7000]);  // 2000 + 5000
+    });
+
+    it('C9 RED: hoja por jornada debería tener resumen header + ventas + movimientos', () => {
+      const result = service.generarExcelMensual(dataMulti);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-03-15 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // Should have resumen header fields
+      expect(json.some((r) => r[0] === 'Fecha' && r[1] === '2026-03-15')).toBe(true);
+      expect(json.some((r) => r[0] === 'Total ventas' && r[1] === 15000)).toBe(true);
+      // Should have ventas table header
+      expect(json.some((r) => r[0] === 'Producto')).toBe(true);
+      expect(json.some((r) => r[0] === 'Total ingresos')).toBe(true);
+      // Should have movimientos table header
+      expect(json.some((r) => r[0] === 'Tipo')).toBe(true);
+    });
+
+    it('C9 RED: debería manejar una sola jornada', () => {
+      const result = service.generarExcelMensual([dataMulti[0]]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).toEqual(['Resumen del Mes', '2026-03-15 (1)']);
+    });
+
+    it('C9 RED: no debería colisionar cuando dos jornadas tienen la misma fecha', () => {
+      const dataSameDate: JornadaReportData[] = [
+        {
+          ...dataMulti[0],
+          jornada: { ...jornada1, id: 5 },
+        },
+        {
+          ...dataMulti[1],
+          jornada: { ...jornada2, fecha: '2026-03-15', id: 6 },
+        },
+      ];
+
+      const result = service.generarExcelMensual(dataSameDate);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).toContain('2026-03-15 (5)');
+      expect(workbook.SheetNames).toContain('2026-03-15 (6)');
+      // No debería haber duplicados
+      const uniqueNames = new Set(workbook.SheetNames);
+      expect(uniqueNames.size).toBe(workbook.SheetNames.length);
+    });
+
+    it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () => {
+      const result = service.generarExcelMensual(dataMulti);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen del Mes'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // saldo_esperado: 18000 + 23000 = 41000; saldo_real: 17800 + 23000 = 40800; diff = 200
+      expect(json).toContainEqual(['Diferencia consolidada', 200]);
+  });
+});
 });

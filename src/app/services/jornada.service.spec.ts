@@ -53,7 +53,10 @@ describe('JornadaService', () => {
         { provide: DATABASE, useValue: mockDb },
         {
           provide: ExcelService,
-          useValue: { generarExcelJornada: vi.fn().mockReturnValue(mockExcelBase64) },
+          useValue: {
+            generarExcelJornada: vi.fn().mockReturnValue(mockExcelBase64),
+            generarExcelMensual: vi.fn().mockReturnValue(mockExcelBase64),
+          },
         },
       ],
     });
@@ -554,6 +557,145 @@ describe('JornadaService', () => {
       const productosMap = callArg.productosMap as Map<number, { nombre: string; precio_costo: number | null }>;
       expect(productosMap.get(1)?.nombre).toBe('Coca-Cola');
       expect(productosMap.get(2)?.nombre).toBe('Agua 1L');
+    });
+  });
+
+  describe('generarExportacionMensual', () => {
+    const junJornada1: Jornada = {
+      ...mockJornadaCerrada,
+      id: 10,
+      fecha: '2026-06-05',
+    };
+    const junJornada2: Jornada = {
+      ...mockJornadaCerrada,
+      id: 11,
+      fecha: '2026-06-15',
+    };
+
+    it('C9 RED: debería generar Excel multi-hoja con todas las jornadas del mes', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada1, junJornada2]) // jornadasDelMes SQL
+        .mockResolvedValueOnce([]) // _recolectarDatosJornada: ventas jornada 1
+        .mockResolvedValueOnce([]) // movimientos jornada 1
+        .mockResolvedValueOnce([]) // productos jornada 1
+        .mockResolvedValueOnce([]); // _recolectarDatosJornada: ventas jornada 2
+        // movimientos, productos — fallback mockResolvedValue([])
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.generarExportacionMensual(2026, 5));
+
+      // Should call generarExcelMensual on ExcelService with 2 entries
+      const excelService = TestBed.inject(ExcelService);
+      expect(excelService.generarExcelMensual).toHaveBeenCalledTimes(1);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg).toHaveLength(2);
+      expect(callArg[0].jornada.id).toBe(10);
+      expect(callArg[1].jornada.id).toBe(11);
+      expect(typeof resultado).toBe('string');
+      expect(resultado.length).toBeGreaterThan(0);
+    });
+
+    it('C9 RED: debería lanzar error si no hay jornadas cerradas en el mes', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]); // jornadasDelMes SQL -> empty
+
+      const service = TestBed.inject(JornadaService);
+
+      await expect(
+        firstValueFrom(service.generarExportacionMensual(2026, 1)),
+      ).rejects.toThrow('No hay jornadas cerradas en este mes.');
+    });
+
+    it('C9 RED: debería pasar cada jornada.user_cierre_id a _recolectarDatosJornada', async () => {
+      const mockJornadaUser1: Jornada = {
+        ...mockJornadaCerrada,
+        id: 20,
+        fecha: '2026-06-01',
+        user_cierre_id: 5,
+      };
+      const mockJornadaUser2: Jornada = {
+        ...mockJornadaCerrada,
+        id: 21,
+        fecha: '2026-06-02',
+        user_cierre_id: 3,
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1, mockJornadaUser2]) // jornadasDelMes
+        .mockResolvedValueOnce([]) // ventas jornada 20
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]); // ventas jornada 21
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+
+      // Both jornadas should have data collected
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg).toHaveLength(2);
+    });
+  });
+
+  describe('jornadasDelMes', () => {
+    const mockJornadaJunio1: Jornada = {
+      ...mockJornadaCerrada,
+      id: 10,
+      fecha: '2026-06-05',
+    };
+    const mockJornadaJunio2: Jornada = {
+      ...mockJornadaCerrada,
+      id: 11,
+      fecha: '2026-06-15',
+    };
+
+    it('C9 RED: debería llamar SQL con fecha BETWEEN y estado = cerrada para el mes', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // constructor
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([
+        mockJornadaJunio1,
+        mockJornadaJunio2,
+      ]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.jornadasDelMes(2026, 5));
+
+      expect(resultado).toHaveLength(2);
+      for (const j of resultado) {
+        expect(j.estado).toBe('cerrada');
+      }
+
+      const sqlCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('fecha BETWEEN'),
+      );
+      expect(sqlCall).toBeTruthy();
+      expect(sqlCall![1]).toEqual(['2026-06-01', '2026-06-30', 'cerrada']);
+    });
+
+    it('C9 RED: debería retornar array vacío si no hay jornadas en el mes', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // constructor
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // no results
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.jornadasDelMes(2026, 1));
+
+      expect(resultado).toEqual([]);
+    });
+
+    it('C9 RED: debería usar el rango de fechas correcto para diciembre', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // constructor
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.jornadasDelMes(2026, 11));
+
+      const sqlCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('fecha BETWEEN'),
+      );
+      expect(sqlCall).toBeTruthy();
+      expect(sqlCall![1]).toEqual(['2026-12-01', '2026-12-31', 'cerrada']);
     });
   });
 });

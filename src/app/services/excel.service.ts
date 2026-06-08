@@ -133,6 +133,145 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
   }
 
+  /**
+   * Genera un Excel multi-hoja mensual:
+   * - "Resumen del Mes": totales consolidados de todas las jornadas
+   * - Una hoja por jornada (fecha): resumen + ventas + movimientos
+   */
+  generarExcelMensual(data: JornadaReportData[]): string {
+    const wb = XLSX.utils.book_new();
+
+    this._agregarResumenDelMes(wb, data);
+
+    for (const d of data) {
+      this._agregarJornadaSheet(wb, d);
+    }
+
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  }
+
+  private _agregarResumenDelMes(wb: XLSX.WorkBook, data: JornadaReportData[]): void {
+    const totalVentas = data.reduce((s, d) => s + d.jornada.total_ventas, 0);
+    const totalGastos = data.reduce((s, d) => s + d.jornada.total_gastos, 0);
+    const totalCosto = data.reduce((s, d) => s + (d.totalCosto ?? 0), 0);
+    const totalEfectivo = data.reduce(
+      (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'efectivo').reduce((ss, v) => ss + v.total, 0),
+      0,
+    );
+    const totalTransferencia = data.reduce(
+      (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'transferencia').reduce((ss, v) => ss + v.total, 0),
+      0,
+    );
+    const sumSaldoEsperado = data.reduce((s, d) => s + d.jornada.saldo_esperado, 0);
+    const sumSaldoReal = data.reduce(
+      (s, d) => s + (d.jornada.saldo_real ?? 0),
+      0,
+    );
+
+    // Obtener mes/año de la primera jornada
+    const primera = data[0]?.jornada;
+    const fecha = primera ? new Date(primera.fecha + 'T12:00:00') : new Date();
+    const mesLabel = fecha.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+
+    const filas: unknown[][] = [
+      ['Mipime-Cuentas — Resumen del Mes'],
+      [],
+      ['Mes', mesLabel],
+      ['Cantidad de jornadas', data.length],
+      [],
+      ['Total ventas', totalVentas],
+      ['Total efectivo', totalEfectivo],
+      ['Total transferencia', totalTransferencia],
+      ['Total gastos', totalGastos],
+      ['Ganancia bruta', totalVentas - totalCosto],
+      [],
+      ['Diferencia consolidada', sumSaldoEsperado - sumSaldoReal],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 24 }, { wch: 20 }];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen del Mes');
+  }
+
+  private _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const j = data.jornada;
+    const filas: unknown[][] = [
+      ['Mipime-Cuentas — Resumen de Jornada'],
+      [],
+      ['Fecha', j.fecha],
+      ['Apertura', j.hora_apertura],
+      ['Cierre', j.hora_cierre ?? '—'],
+      ['Estado', 'Cerrada'],
+      [],
+      ['Monto inicial', j.monto_inicial],
+      ['Total ventas', j.total_ventas],
+      ['Total gastos', j.total_gastos],
+      ['Ganancia bruta', j.total_ventas - (data.totalCosto ?? 0)],
+    ];
+
+    if (j.saldo_real !== null) {
+      filas.push(['Saldo esperado', j.saldo_esperado]);
+      filas.push(['Saldo real', j.saldo_real]);
+      filas.push(['Diferencia', j.saldo_esperado - j.saldo_real]);
+    }
+
+    if (data.userCierreNombre) {
+      filas.push(['Firmado por', data.userCierreNombre]);
+    }
+
+    // Blank row before Ventas table
+    filas.push([]);
+    filas.push(['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago']);
+
+    const pmap = data.productosMap;
+    let granTotal = 0;
+    for (const venta of data.ventas) {
+      for (const detalle of venta.detalles) {
+        const info = pmap?.get(detalle.producto_id);
+        const nombreProducto = info?.nombre ?? detalle.producto_id;
+        const precioBase = info?.precio_costo ?? null;
+        filas.push([
+          nombreProducto,
+          detalle.cantidad,
+          detalle.precio_unitario,
+          precioBase,
+          detalle.subtotal,
+          (venta as any).forma_pago ?? 'efectivo',
+        ]);
+        granTotal += detalle.subtotal;
+      }
+    }
+
+    filas.push([], ['Total ingresos', '', '', '', granTotal, '']);
+
+    // Blank row before Movimientos table
+    filas.push([]);
+    filas.push(['Tipo', 'Descripción', 'Monto']);
+
+    for (const mov of data.movimientos) {
+      filas.push([
+        mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra',
+        mov.descripcion,
+        mov.monto,
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 16 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, `${j.fecha} (${j.id})`);
+  }
+
   private _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const filas: unknown[][] = [
       ['Tipo', 'Descripción', 'Monto'],

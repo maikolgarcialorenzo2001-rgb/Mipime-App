@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { from, map, Observable, tap } from 'rxjs';
+import { from, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
-import { ExcelService } from './excel.service';
+import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
 import type { Jornada, JornadaReporte } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
@@ -251,6 +251,134 @@ export class JornadaService {
     return jornada;
   }
 
+  /**
+   * Genera la exportación mensual de todas las jornadas cerradas del mes.
+   * @returns Observable que emite el base64 del Excel multi-hoja
+   */
+  generarExportacionMensual(year: number, month: number): Observable<string> {
+    return this.jornadasDelMes(year, month).pipe(
+      switchMap((jornadas) => {
+        if (jornadas.length === 0) {
+          throw new Error('No hay jornadas cerradas en este mes.');
+        }
+        const dataPromises = jornadas.map((j) =>
+          this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
+            (datos): JornadaReportData => ({
+              jornada: j,
+              ventas: datos.ventas,
+              movimientos: datos.movimientos,
+              productosMap: datos.productosMap,
+              totalCosto: datos.totalCosto,
+              userCierreNombre: datos.userCierreNombre,
+            }),
+          ),
+        );
+        return from(Promise.all(dataPromises));
+      }),
+      map((allData) => this._excelService.generarExcelMensual(allData)),
+    );
+  }
+
+  /**
+   * Obtiene todos los datos detallados de una jornada (ventas con detalles, movimientos, costos).
+   * Útil para vista previa o exportación.
+   */
+  obtenerDatosJornada(jornadaId: number, userId: number | null): Observable<JornadaReportData> {
+    return from(this._recolectarDatosJornada(jornadaId, userId)).pipe(
+      map((datos) => ({
+        // jornada no se usa desde preview (el caller ya tiene la referencia),
+        // pero JornadaReportData lo requiere
+        jornada: { id: jornadaId } as Jornada,
+        ventas: datos.ventas,
+        movimientos: datos.movimientos,
+        productosMap: datos.productosMap,
+        totalCosto: datos.totalCosto,
+        userCierreNombre: datos.userCierreNombre,
+      })),
+    );
+  }
+
+  /**
+   * Recolecta todos los datos necesarios para generar el Excel de una jornada:
+   * ventas con detalles, movimientos, productosMap, totalCosto y nombre del usuario.
+   */
+  private async _recolectarDatosJornada(jornadaId: number, userId: number | null): Promise<{
+    ventas: VentaConDetalles[];
+    movimientos: Movimiento[];
+    productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
+    totalCosto: number;
+    userCierreNombre: string | null;
+  }> {
+    // 1. Obtener ventas con detalles de esta jornada
+    const ventas = await this._db.sql<Venta>(
+      'SELECT * FROM ventas WHERE jornada_id = ? ORDER BY id',
+      [jornadaId],
+    );
+
+    const ventaIds = ventas.map((v) => v.id);
+    let detalles: DetalleVenta[] = [];
+    if (ventaIds.length > 0) {
+      const placeholders = ventaIds.map(() => '?').join(', ');
+      detalles = await this._db.sql<DetalleVenta>(
+        `SELECT * FROM detalle_ventas WHERE venta_id IN (${placeholders}) ORDER BY id`,
+        ventaIds,
+      );
+    }
+
+    // 2. Obtener movimientos de la jornada
+    const movimientos = await this._db.sql<Movimiento>(
+      'SELECT * FROM movimientos WHERE jornada_id = ? ORDER BY id',
+      [jornadaId],
+    );
+
+    // 3. Obtener productos para el mapa de nombres + precio_costo
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
+      'SELECT id, nombre, precio_costo FROM productos',
+    );
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    for (const p of productos) {
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
+    }
+
+    // 4. Calcular costo total de productos vendidos
+    let totalCosto = 0;
+    if (ventaIds.length > 0) {
+      const costoPlaceholders = ventaIds.map(() => '?').join(', ');
+      const costoResult = await this._db.sql<{ total_costo: number }>(
+        `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
+         FROM detalle_ventas dv
+         JOIN productos p ON p.id = dv.producto_id
+         WHERE dv.venta_id IN (${costoPlaceholders})`,
+        ventaIds,
+      );
+      totalCosto = costoResult[0]?.total_costo ?? 0;
+    }
+
+    // 5. Obtener nombre del usuario que cerró
+    let userCierreNombre: string | null = null;
+    if (userId !== null) {
+      const users = await this._db.sql<{ nombre: string }>(
+        'SELECT nombre FROM usuarios WHERE id = ?',
+        [userId],
+      );
+      userCierreNombre = users[0]?.nombre ?? null;
+    }
+
+    // 6. Agrupar detalles por venta
+    const ventasConDetalles = ventas.map((v) => ({
+      ...v,
+      detalles: detalles.filter((d) => d.venta_id === v.id),
+    }));
+
+    return {
+      ventas: ventasConDetalles,
+      movimientos,
+      productosMap,
+      totalCosto,
+      userCierreNombre,
+    };
+  }
+
   /** Obtiene el reporte Excel de una jornada cerrada. */
   obtenerReporte(jornadaId: number): Observable<JornadaReporte | null> {
     return from(
@@ -271,6 +399,23 @@ export class JornadaService {
         [hoy, 'abierta'],
       ),
     ).pipe(map((rows) => rows[0] ?? null));
+  }
+
+  /**
+   * Retorna las jornadas cerradas de un mes específico.
+   * @param year año (ej. 2026)
+   * @param month mes 0-indexed (0 = enero)
+   */
+  jornadasDelMes(year: number, month: number): Observable<Jornada[]> {
+    const desde = new Date(year, month, 1).toISOString().split('T')[0];
+    const hasta = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    return from(
+      this._db.sql<Jornada>(
+        'SELECT * FROM jornadas WHERE fecha BETWEEN ? AND ? AND estado = ? ORDER BY fecha',
+        [desde, hasta, 'cerrada'],
+      ),
+    );
   }
 
   /** Historial de jornadas ordenado por fecha descendente. */

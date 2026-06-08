@@ -1,12 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { HistorialPage } from './historial.page';
 import { JornadaService } from '../../services/jornada.service';
-import type { Jornada } from '../../models';
+import type { Jornada, JornadaReporte } from '../../models';
+import type { JornadaReportData } from '../../services/excel.service';
 
 registerLocaleData(localeEs);
+
+const mockExcelBase64 = 'AAAA'; // minimal valid base64 (3 null bytes)
 
 const mockJornadas: Jornada[] = [
   {
@@ -56,6 +59,15 @@ const mockJornadas: Jornada[] = [
   },
 ];
 
+const mockPreviewData: JornadaReportData = {
+  jornada: mockJornadas[0],
+  ventas: [],
+  movimientos: [],
+  productosMap: new Map(),
+  totalCosto: 0,
+  userCierreNombre: null,
+};
+
 describe('HistorialPage', () => {
   let fixture: ComponentFixture<HistorialPage>;
   let component: HistorialPage;
@@ -68,6 +80,9 @@ describe('HistorialPage', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of(mockJornadas),
+            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            obtenerReporte: vi.fn().mockReturnValue(of(null)),
+            obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
         },
       ],
@@ -164,6 +179,197 @@ describe('HistorialPage', () => {
     expect(downloadBtn).toBeTruthy();
     expect(downloadBtn?.textContent).toContain('Descargar Excel');
   });
+
+  describe('Exportar mes', () => {
+    it('C9 RED: tieneJornadasCerradas debería ser true cuando hay cerradas en el mes actual', () => {
+      expect(component.tieneJornadasCerradas()).toBe(true);
+    });
+
+    it('C9 RED: tieneJornadasCerradas debería ser false si solo hay abiertas en el mes', () => {
+      // Navigate to a month without closed jornadas
+      component.currentMonth.set(new Date(2025, 0, 1)); // January 2025
+      fixture.detectChanges();
+      expect(component.tieneJornadasCerradas()).toBe(false);
+    });
+
+    it('C9 RED: exportando debería empezar como false', () => {
+      expect(component.exportando()).toBe(false);
+    });
+
+    it('C9 RED: exportarMes debería llamar al servicio con año/mes correctos', () => {
+      const service = TestBed.inject(JornadaService);
+      component.exportarMes();
+      expect(service.generarExportacionMensual).toHaveBeenCalledWith(2026, 5);
+    });
+
+    it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', () => {
+      const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+
+      component.exportarMes();
+
+      expect(createUrlSpy).toHaveBeenCalled();
+      expect(component.exportando()).toBe(false);
+      expect(component.errorExport()).toBeNull();
+
+      createUrlSpy.mockRestore();
+    });
+
+    it('C9 RED: botón "Exportar mes" debería estar visible cuando hay cerradas', () => {
+      fixture.detectChanges();
+      const btn = fixture.nativeElement.querySelector('[data-testid="btn-exportar-mes"]');
+      expect(btn).toBeTruthy();
+    });
+
+    it('C9 RED: botón debería estar oculto cuando no hay cerradas en el mes', () => {
+      component.currentMonth.set(new Date(2025, 0, 1));
+      fixture.detectChanges();
+      const btn = fixture.nativeElement.querySelector('[data-testid="btn-exportar-mes"]');
+      expect(btn).toBeFalsy();
+    });
+
+    it('C9 RED: botón debería estar disabled y mostrar "Generando..." mientras exportando', () => {
+      component.exportando.set(true);
+      fixture.detectChanges();
+      const btn: HTMLButtonElement = fixture.nativeElement.querySelector(
+        '[data-testid="btn-exportar-mes"]',
+      );
+      expect(btn).toBeTruthy();
+      expect(btn.disabled).toBe(true);
+      expect(btn.textContent).toContain('Generando');
+    });
+
+    it('C9 RED: errorExport debería mostrarse cuando la exportación falla', () => {
+      const service = TestBed.inject(JornadaService);
+      vi.mocked(service.generarExportacionMensual).mockReturnValue(
+        throwError(() => new Error('Error de red')),
+      );
+
+      component.exportarMes();
+      // Manually advance the observable
+      fixture.detectChanges();
+
+      expect(component.errorExport()).toBe('Error de red');
+      expect(component.exportando()).toBe(false);
+    });
+
+    it('C9 RED: después de exportación exitosa, exportando vuelve a false', () => {
+      component.exportarMes();
+      // The observable completes synchronously with of()
+      expect(component.exportando()).toBe(false);
+      expect(component.errorExport()).toBeNull();
+    });
+  });
+
+  describe('Descargar Excel', () => {
+    it('debería llamar a obtenerReporte con el id de la jornada', () => {
+      const service = TestBed.inject(JornadaService);
+      component.descargarExcel(mockJornadas[0]);
+      expect(service.obtenerReporte).toHaveBeenCalledWith(3);
+    });
+
+    it('debería descargar el archivo cuando existe el reporte', () => {
+      const service = TestBed.inject(JornadaService);
+      const mockReporte: JornadaReporte = {
+        id: 1,
+        jornada_id: 3,
+        content_type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        content_base64: mockExcelBase64,
+        filename: 'jornada_2026-06-04.xlsx',
+        created_at: '2026-06-04T18:30:00Z',
+      };
+      vi.mocked(service.obtenerReporte).mockReturnValue(of(mockReporte));
+
+      const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+      component.descargarExcel(mockJornadas[0]);
+
+      expect(createUrlSpy).toHaveBeenCalled();
+
+      createUrlSpy.mockRestore();
+    });
+
+    it('debería no hacer nada cuando el reporte es null', () => {
+      const service = TestBed.inject(JornadaService);
+      vi.mocked(service.obtenerReporte).mockReturnValue(of(null));
+
+      const createUrlSpy = vi.spyOn(URL, 'createObjectURL');
+      component.descargarExcel(mockJornadas[0]);
+
+      expect(createUrlSpy).not.toHaveBeenCalled();
+
+      createUrlSpy.mockRestore();
+    });
+  });
+
+  describe('Vista previa', () => {
+    it('debería abrir preview con los datos de la jornada', () => {
+      const service = TestBed.inject(JornadaService);
+      const jornada = mockJornadas[0];
+      component.verPreview(jornada);
+
+      expect(component.showPreview()).toBe(true);
+      expect(component.previewJornada()).toEqual(jornada);
+      expect(service.obtenerDatosJornada).toHaveBeenCalledWith(jornada.id, jornada.user_cierre_id);
+      expect(component.previewLoading()).toBe(false);
+      expect(component.previewData()).toEqual(mockPreviewData);
+    });
+
+    it('debería mostrar loading mientras se cargan los datos de preview', () => {
+      const service = TestBed.inject(JornadaService);
+      // Usamos un observable que nunca completa para simular carga
+      vi.mocked(service.obtenerDatosJornada).mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-empty-function — intencional: observable que nunca emite
+        new Observable(() => {}),
+      );
+
+      component.verPreview(mockJornadas[0]);
+
+      expect(component.previewLoading()).toBe(true);
+      expect(component.previewData()).toBeNull();
+    });
+
+    it('debería cerrar preview al hacer click en el botón cerrar', () => {
+      component.verPreview(mockJornadas[0]);
+      fixture.detectChanges();
+
+      const closeBtn: HTMLElement | null = fixture.nativeElement.querySelector(
+        '[data-testid="btn-cerrar-preview"]',
+      );
+      expect(closeBtn).toBeTruthy();
+      closeBtn!.click();
+      fixture.detectChanges();
+
+      expect(component.showPreview()).toBe(false);
+      expect(component.previewJornada()).toBeNull();
+    });
+
+    it('debería cerrar preview al presionar Escape', () => {
+      component.verPreview(mockJornadas[0]);
+      fixture.detectChanges();
+
+      const backdrop: HTMLElement | null = fixture.nativeElement.querySelector(
+        '[data-testid="preview-backdrop"]',
+      );
+      expect(backdrop).toBeTruthy();
+      backdrop!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+
+      expect(component.showPreview()).toBe(false);
+    });
+
+    it('debería cerrar preview al hacer click en el backdrop', () => {
+      component.verPreview(mockJornadas[0]);
+      fixture.detectChanges();
+
+      const backdrop: HTMLElement | null = fixture.nativeElement.querySelector(
+        '[data-testid="preview-backdrop"]',
+      );
+      expect(backdrop).toBeTruthy();
+      backdrop!.click();
+      fixture.detectChanges();
+
+      expect(component.showPreview()).toBe(false);
+    });
+  });
 });
 
 describe('HistorialPage — vacío', () => {
@@ -177,6 +383,9 @@ describe('HistorialPage — vacío', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
+            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            obtenerReporte: vi.fn().mockReturnValue(of(null)),
+            obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
         },
       ],
@@ -208,6 +417,9 @@ describe('HistorialPage — error', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
+            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            obtenerReporte: vi.fn().mockReturnValue(of(null)),
+            obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
         },
       ],
