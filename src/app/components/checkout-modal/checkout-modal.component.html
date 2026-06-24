@@ -6,21 +6,21 @@
   (keydown)="onKeydown($event)"
 >
   <div
-    class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+    class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
   >
-    <h3 class="text-lg font-semibold text-gray-900 mb-4">Confirmar venta</h3>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Confirmar venta</h3>
 
     @if (errorMessage(); as msg) {
-      <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+      <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
         {{ msg }}
       </div>
     }
 
-    <ul class="mb-4 divide-y divide-gray-100 text-sm">
+    <ul class="mb-4 divide-y divide-gray-100 dark:divide-gray-800 text-sm">
       @for (item of items(); track item.producto.id) {
         <li class="flex justify-between py-2">
-          <span class="text-gray-600 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
-          <span class="font-medium text-gray-900 tabular-nums">
+          <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
+          <span class="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
             {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
           </span>
         </li>
@@ -29,17 +29,22 @@
 
     <!-- Selector de forma de pago -->
     <div class="mb-4">
-      <p class="text-sm font-medium text-gray-700 mb-2">Forma de pago</p>
+      <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Forma de pago</p>
       <div class="flex gap-2">
         <button
           type="button"
           class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
           [class.bg-blue-600]="formaPago() === 'efectivo'"
+          [class.dark:bg-blue-500]="formaPago() === 'efectivo'"
           [class.text-white]="formaPago() === 'efectivo'"
           [class.border-blue-600]="formaPago() === 'efectivo'"
+          [class.dark:border-blue-400]="formaPago() === 'efectivo'"
           [class.border-gray-300]="formaPago() !== 'efectivo'"
+          [class.dark:border-gray-600]="formaPago() !== 'efectivo'"
           [class.text-gray-700]="formaPago() !== 'efectivo'"
+          [class.dark:text-gray-300]="formaPago() !== 'efectivo'"
           [class.hover:bg-gray-50]="formaPago() !== 'efectivo'"
+          [class.dark:hover:bg-gray-800]="formaPago() !== 'efectivo'"
           (click)="seleccionarFormaPago('efectivo')"
         >
           <span class="inline-flex items-center gap-1.5">
@@ -51,11 +56,16 @@
           type="button"
           class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
           [class.bg-blue-600]="formaPago() === 'transferencia'"
+          [class.dark:bg-blue-500]="formaPago() === 'transferencia'"
           [class.text-white]="formaPago() === 'transferencia'"
           [class.border-blue-600]="formaPago() === 'transferencia'"
+          [class.dark:border-blue-400]="formaPago() === 'transferencia'"
           [class.border-gray-300]="formaPago() !== 'transferencia'"
+          [class.dark:border-gray-600]="formaPago() !== 'transferencia'"
           [class.text-gray-700]="formaPago() !== 'transferencia'"
+          [class.dark:text-gray-300]="formaPago() !== 'transferencia'"
           [class.hover:bg-gray-50]="formaPago() !== 'transferencia'"
+          [class.dark:hover:bg-gray-800]="formaPago() !== 'transferencia'"
           (click)="seleccionarFormaPago('transferencia')"
         >
           <span class="inline-flex items-center gap-1.5">
@@ -66,9 +76,9 @@
       </div>
     </div>
 
-    <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 pt-3">
-      <span class="text-base font-semibold text-gray-900">Total</span>
-      <span class="text-xl font-semibold text-gray-900">
+    <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
+      <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total</span>
+      <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
         {{ total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
       </span>
     </div>
@@ -76,7 +86,7 @@
     <div class="flex gap-3">
       <button
         type="button"
-        class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         (click)="cancelar.emit()"
       >
         <span class="inline-flex items-center gap-1.5">
@@ -86,7 +96,7 @@
       </button>
       <button
         type="button"
-        class="flex-1 cursor-pointer rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors"
+        class="flex-1 cursor-pointer rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 transition-colors"
         (click)="onConfirmar()"
       >
         <span class="inline-flex items-center gap-1.5">

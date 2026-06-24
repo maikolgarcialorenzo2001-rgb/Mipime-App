@@ -1,18 +1,18 @@
 <button
   type="button"
-  class="flex h-full w-full cursor-pointer flex-col justify-between rounded-xl border-2 p-4 text-left transition-all hover:shadow-md active:scale-[0.97]"
+  class="flex h-full w-full cursor-pointer flex-col justify-between rounded-xl border-2 p-4 text-left transition-all hover:shadow-md dark:hover:shadow-gray-900/50 active:scale-[0.97]"
   [ngClass]="selected()
-    ? 'border-blue-500 bg-blue-50 shadow-sm'
-    : 'border-gray-200 bg-white hover:border-gray-300'"
+    ? 'border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30'
+    : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'"
   (click)="clicked.emit()"
 >
-  <span class="text-sm font-medium text-gray-900 leading-tight line-clamp-2">{{ producto().nombre }}</span>
+  <span class="text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight line-clamp-2">{{ producto().nombre }}</span>
   <div class="mt-2">
-    <span class="text-lg font-semibold text-blue-600">
+    <span class="text-lg font-semibold text-blue-600 dark:text-blue-400">
       {{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
     </span>
     <div class="mt-1 flex items-center gap-1">
-      <span class="text-xs text-gray-500">Stock: </span>
+      <span class="text-xs text-gray-500 dark:text-gray-400">Stock: </span>
       <app-stock-badge [stock]="producto().stock_actual" />
     </div>
   </div>

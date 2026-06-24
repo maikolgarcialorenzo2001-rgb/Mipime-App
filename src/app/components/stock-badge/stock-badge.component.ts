@@ -10,8 +10,8 @@ export class StockBadgeComponent {
 
   protected readonly stockLevel = computed(() => {
     const s = this.stock();
-    if (s > 10) return 'bg-green-100 text-green-700';
-    if (s >= 1) return 'bg-yellow-100 text-yellow-600';
-    return 'bg-red-100 text-red-700';
+    if (s > 10) return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+    if (s >= 1) return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/40 dark:text-yellow-400';
+    return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
   });
 }

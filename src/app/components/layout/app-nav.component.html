@@ -1,16 +1,17 @@
 @if (auth.isLoggedIn()) {
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 bg-white">
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-1 py-3">
-      <span class="text-lg font-bold text-gray-900">Mipime-App</span>
+      <span class="text-lg font-bold text-gray-900 dark:text-gray-100">Mipime-App</span>
 
       <div class="flex items-center gap-4 text-sm font-medium">
         <a
           routerLink="/pos"
           routerLinkActive #pos="routerLinkActive"
           [class.text-blue-600]="pos.isActive"
+          [class.dark:text-blue-400]="pos.isActive"
           [class.font-semibold]="pos.isActive"
           [class.underline]="pos.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">point_of_sale</span>
@@ -21,9 +22,10 @@
           routerLink="/productos"
           routerLinkActive #productos="routerLinkActive"
           [class.text-blue-600]="productos.isActive"
+          [class.dark:text-blue-400]="productos.isActive"
           [class.font-semibold]="productos.isActive"
           [class.underline]="productos.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">inventory_2</span>
@@ -34,9 +36,10 @@
           routerLink="/jornada"
           routerLinkActive #jornada="routerLinkActive"
           [class.text-blue-600]="jornada.isActive"
+          [class.dark:text-blue-400]="jornada.isActive"
           [class.font-semibold]="jornada.isActive"
           [class.underline]="jornada.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">calendar_month</span>
@@ -47,9 +50,10 @@
           routerLink="/inventario"
           routerLinkActive #inventario="routerLinkActive"
           [class.text-blue-600]="inventario.isActive"
+          [class.dark:text-blue-400]="inventario.isActive"
           [class.font-semibold]="inventario.isActive"
           [class.underline]="inventario.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">warehouse</span>
@@ -60,9 +64,10 @@
           routerLink="/historial"
           routerLinkActive #historial="routerLinkActive"
           [class.text-blue-600]="historial.isActive"
+          [class.dark:text-blue-400]="historial.isActive"
           [class.font-semibold]="historial.isActive"
           [class.underline]="historial.isActive"
-          class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">history</span>
@@ -74,9 +79,10 @@
             routerLink="/admin"
             routerLinkActive #admin="routerLinkActive"
             [class.text-blue-600]="admin.isActive"
+            [class.dark:text-blue-400]="admin.isActive"
             [class.font-semibold]="admin.isActive"
             [class.underline]="admin.isActive"
-            class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
+            class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
           >
             <span class="inline-flex items-center gap-1.5">
               <span class="material-symbols-outlined leading-none text-sm">admin_panel_settings</span>
@@ -92,7 +98,7 @@
           @if (puedeAbrir) {
             <button
               type="button"
-              class="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition-colors"
+              class="cursor-pointer rounded-lg bg-emerald-600 dark:bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 active:bg-emerald-800 dark:active:bg-emerald-700 transition-colors"
               (click)="abrirModalApertura()"
             >
               <span class="inline-flex items-center gap-1.5">
@@ -105,7 +111,7 @@
           @if (puedeCerrar) {
             <button
               type="button"
-              class="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors"
+              class="cursor-pointer rounded-lg bg-red-600 dark:bg-red-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 dark:hover:bg-red-600 active:bg-red-800 dark:active:bg-red-700 transition-colors"
               (click)="abrirModalCierre()"
             >
               <span class="inline-flex items-center gap-1.5">
@@ -119,7 +125,7 @@
         <button
           type="button"
           (click)="themeService.toggle()"
-          class="cursor-pointer rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors leading-none"
+          class="cursor-pointer rounded-lg p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors leading-none"
           aria-label="Cambiar tema"
         >
           @if (themeService.isDark()) {
@@ -129,10 +135,10 @@
           }
         </button>
 
-        <span class="text-gray-500">{{ auth.usuario()?.nombre }}</span>
+        <span class="text-gray-500 dark:text-gray-400">{{ auth.usuario()?.nombre }}</span>
         <button
           (click)="logout()"
-          class="text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+          class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">logout</span>
@@ -154,26 +160,27 @@
     (keydown)="onModalKeydown($event)"
   >
     <div
-      class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+      class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
     >
-      <h3 class="mb-4 text-lg font-semibold text-gray-900">Iniciar jornada</h3>
+      <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Iniciar jornada</h3>
 
       @if (abrirError(); as err) {
-        <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {{ err }}
         </div>
       }
 
       <div class="mb-4">
-        <label for="monto-inicial-nav" class="mb-1 block text-sm font-medium text-gray-700">
+        <label for="monto-inicial-nav" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Monto inicial ($)
         </label>
         <input
           id="monto-inicial-nav"
           type="text"
           inputmode="numeric"
-          class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-lg font-medium text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-lg font-medium text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
           [class.border-red-400]="abrirError()"
+          [class.dark:border-red-500]="abrirError()"
           placeholder="0"
           (input)="onMontoInicialChange($any($event.target).value)"
           (keydown)="onModalKeydown($event)"
@@ -183,7 +190,7 @@
       <div class="flex gap-3">
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           [disabled]="abriendo()"
           (click)="cerrarModalApertura()"
         >
@@ -194,7 +201,7 @@
         </button>
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex-1 cursor-pointer rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 active:bg-emerald-800 dark:active:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           [disabled]="abriendo()"
           (click)="confirmarApertura()"
         >
@@ -225,26 +232,26 @@
     (keydown)="onModalKeydown($event)"
   >
     <div
-      class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+      class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
     >
-      <h3 class="mb-4 text-lg font-semibold text-gray-900">Terminar jornada</h3>
+      <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Terminar jornada</h3>
 
       @if (cerrarError(); as err) {
-        <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {{ err }}
         </div>
       }
 
       <div class="mb-4">
-        <label class="mb-1 block text-sm font-medium text-gray-700">
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Saldo esperado ($)
         </label>
-        <div class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-lg font-semibold text-gray-900">
+        <div class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950/50 px-4 py-2.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
           {{ jornadaService.jornadaAbierta()?.saldo_esperado?.toLocaleString() ?? '—' }}
         </div>
       </div>
 
-      <div class="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800 mb-4">
+      <div class="rounded-lg bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300 mb-4">
         <strong class="font-semibold">Confirmación requerida.</strong>
         Al terminar la jornada se generará un reporte Excel y no podrás registrar más ventas.
       </div>
@@ -252,7 +259,7 @@
       <div class="flex gap-3">
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           [disabled]="cerrando()"
           (click)="cerrarModalCierre()"
         >
@@ -263,7 +270,7 @@
         </button>
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex-1 cursor-pointer rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 dark:hover:bg-red-600 active:bg-red-800 dark:active:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           [disabled]="cerrando()"
           (click)="confirmarCierre()"
         >

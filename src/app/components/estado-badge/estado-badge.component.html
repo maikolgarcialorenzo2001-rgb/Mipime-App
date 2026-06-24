@@ -1,8 +1,8 @@
 <span
   class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium"
   [ngClass]="estado() === 'abierta'
-    ? 'bg-green-100 text-green-700'
-    : 'bg-gray-100 text-gray-600'"
+    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'"
 >
   @if (estado() === 'abierta') {
     <span class="material-symbols-outlined leading-none text-sm">check_circle</span>

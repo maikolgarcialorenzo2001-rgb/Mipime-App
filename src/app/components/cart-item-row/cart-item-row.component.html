@@ -1,24 +1,24 @@
 <li class="flex items-center gap-3 py-3">
   <div class="flex-1 min-w-0">
-    <p class="truncate text-sm font-medium text-gray-900">{{ item().producto.nombre }}</p>
-    <p class="text-xs text-gray-400">{{ item().producto.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
+    <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{{ item().producto.nombre }}</p>
+    <p class="text-xs text-gray-400 dark:text-gray-500">{{ item().producto.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
   </div>
 
   <div class="flex items-center gap-1">
     <button
       type="button"
-      class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+      class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       (click)="cantidadReducir.emit()"
       aria-label="Reducir cantidad"
     >
       <span class="material-symbols-outlined leading-none text-sm">remove</span>
     </button>
 
-    <span class="w-8 text-center text-sm font-semibold tabular-nums">{{ item().cantidad }}</span>
+    <span class="w-8 text-center text-sm font-semibold tabular-nums dark:text-gray-200">{{ item().cantidad }}</span>
 
     <button
       type="button"
-      class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+      class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
       (click)="cantidadAumentar.emit()"
       aria-label="Aumentar cantidad"
     >
@@ -26,13 +26,13 @@
     </button>
   </div>
 
-  <span class="w-20 text-right text-sm font-semibold tabular-nums text-gray-900">
+  <span class="w-20 text-right text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
     {{ item().subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
   </span>
 
   <button
     type="button"
-    class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+    class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-gray-300 dark:text-gray-600 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400 transition-colors"
     (click)="quitar.emit()"
       aria-label="Quitar del carrito"
     >

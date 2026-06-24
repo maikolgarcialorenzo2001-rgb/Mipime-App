@@ -1,26 +1,26 @@
-<div class="rounded-xl bg-white p-6 shadow-sm">
+<div class="rounded-xl bg-white dark:bg-gray-900 p-6 shadow-sm dark:shadow-gray-900/50">
   <div class="flex items-center gap-3 mb-4">
     <app-estado-badge [estado]="jornada().estado" />
-    <span class="text-sm text-gray-500">
+    <span class="text-sm text-gray-500 dark:text-gray-400">
       {{ jornada().fecha | date }}
     </span>
   </div>
 
   <dl class="grid grid-cols-2 gap-4">
     <div>
-      <dt class="text-sm text-gray-500">Monto inicial</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Monto inicial</dt>
       <dd class="text-lg font-semibold">${{ jornada().monto_inicial }}</dd>
     </div>
     <div>
-      <dt class="text-sm text-gray-500">Total ventas</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Total ventas</dt>
       <dd class="text-lg font-semibold">${{ jornada().total_ventas }}</dd>
     </div>
     <div>
-      <dt class="text-sm text-gray-500">Total gastos</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Total gastos</dt>
       <dd class="text-lg font-semibold">${{ jornada().total_gastos }}</dd>
     </div>
     <div>
-      <dt class="text-sm text-gray-500">Saldo esperado</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Saldo esperado</dt>
       <dd class="text-lg font-semibold">${{ jornada().saldo_esperado }}</dd>
     </div>
   </dl>
