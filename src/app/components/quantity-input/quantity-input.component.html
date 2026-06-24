@@ -17,7 +17,7 @@
       [value]="cantidad()"
       (input)="cantidad.set(+$any($event.target).value || 1)"
       (keydown)="onInputKeydown($event)"
-      class="mb-4 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 px-4 py-3 text-center text-2xl font-semibold text-gray-700 dark:text-gray-300 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors"
+      class="mb-4 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 px-4 py-3 text-center text-2xl font-semibold text-gray-700 dark:text-gray-300 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors dark:bg-gray-900 placeholder-gray-400 dark:placeholder-gray-500"
     />
 
     @if (soloNumeros()) {

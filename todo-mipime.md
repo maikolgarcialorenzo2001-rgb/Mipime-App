@@ -3,8 +3,8 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `feature/auth-y-pages`
-> Tests: **235 / 22 test files** (↑ desde 209)
-> Última actualización: 2026-06-08
+> Tests: **244 / 23 test files** (↑ desde 209)
+> Última actualización: 2026-06-24
 
 ---
 
@@ -129,9 +129,9 @@ verPreview(_jornada: Jornada): void {
 **Commit:** `30d6931`
 **Hecho:** Thresholds unificados entre StockBadgeComponent y ProductCardComponent. StockBadge usa computed signal (`>10` green, `>=1` yellow, `≤0` red). ProductCard ahora reusa `<app-stock-badge>`. Tests: 8 tests (5 nuevos + 3 migrados).
 
-### C10. Modo oscuro
-**Contexto:** Toda la UI es modo claro.
-**Posible approach:** Clase `.dark` + persistencia en localStorage. Tailwind 4 tiene soporte nativo.
+### ~~C10. Modo oscuro + Material Icons~~ ✅
+**PRs:** `40d7e84` (infra), `f5e026a` (icons), `0f7c2ad` (dark nav+shared), `d31f1f1` (dark pages)
+Material Symbols icons en toda la UI (nav, botones, SVGs reemplazados) + modo oscuro con persistencia en localStorage vía Tailwind 4 `@custom-variant dark`. 30 archivos, 4 PRs encadenados.
 
 ---
 
@@ -139,6 +139,7 @@ verPreview(_jornada: Jornada): void {
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-06-24 | C10: Modo oscuro + Material Icons — 4 PRs (infra/icons/dark-nav/dark-pages) | `40d7e84`, `f5e026a`, `0f7c2ad`, `d31f1f1` |
 | 2026-06-08 | A2+C9: HistorialPage handlers + Exportación mensual | `3bf7bb3` |
 | 2026-06-08 | C8: Stock thresholds unificados — StockBadge computed signal + ProductCard reuse | `30d6931` |
 | 2026-06-05 | A1: ErrorAlert en POS `_buscar()` | `f8e72e8` |

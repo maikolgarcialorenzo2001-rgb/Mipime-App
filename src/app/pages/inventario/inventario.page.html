@@ -9,7 +9,7 @@
       [value]="searchQuery()"
       (input)="searchQuery.set($any($event.target).value)"
       placeholder="Buscar producto..."
-      class="w-full border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600"
+      class="w-full border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
     />
   </div>
 
@@ -101,7 +101,7 @@
                         placeholder="Cantidad"
                         required
                         min="1"
-                        class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600"
+                        class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                       />
                     </div>
                     <div>
@@ -112,14 +112,14 @@
                           name="movimientoMotivo"
                           placeholder="Motivo (obligatorio)"
                           required
-                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600"
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                       } @else {
                         <input
                           [(ngModel)]="movimientoMotivo"
                           name="movimientoMotivo"
                           placeholder="Motivo (opcional)"
-                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600"
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                       }
                     </div>

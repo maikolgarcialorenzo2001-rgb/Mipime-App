@@ -38,16 +38,16 @@
         }
 
         <div class="mb-3">
-          <select (change)="tipo.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5">
+          <select (change)="tipo.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 dark:bg-gray-900 dark:text-gray-200">
             <option value="gasto">Gasto</option>
             <option value="ingreso_extra">Ingreso extra</option>
           </select>
         </div>
         <div class="mb-3">
-          <input type="text" placeholder="Descripción" (input)="descripcion.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5" />
+          <input type="text" placeholder="Descripción" (input)="descripcion.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" />
         </div>
         <div class="mb-4">
-          <input type="text" inputmode="numeric" placeholder="Monto" (input)="monto.set(+$any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5" />
+          <input type="text" inputmode="numeric" placeholder="Monto" (input)="monto.set(+$any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500" />
         </div>
         <button (click)="registrarMovimiento()" [disabled]="registrando()" class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-blue-600">
           <span class="inline-flex items-center gap-1.5">

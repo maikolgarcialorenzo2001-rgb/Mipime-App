@@ -23,7 +23,7 @@
         name="newNombre"
         placeholder="Nombre"
         required
-        class="border rounded px-3 py-2 w-full"
+        class="border rounded px-3 py-2 w-full dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
       />
       <input
         [(ngModel)]="newPassword"
@@ -31,12 +31,12 @@
         type="password"
         placeholder="Contraseña"
         required
-        class="border rounded px-3 py-2 w-full"
+        class="border rounded px-3 py-2 w-full dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
       />
       <select
         [(ngModel)]="newRol"
         name="newRol"
-        class="border rounded px-3 py-2 w-full"
+        class="border rounded px-3 py-2 w-full dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600"
       >
         <option value="trabajador">Trabajador</option>
         <option value="admin">Admin</option>
@@ -102,7 +102,7 @@
               <td class="px-4 py-3">
                 <select
                   [disabled]="user.id === seedAdminId()"
-                  class="border rounded px-3 py-1 text-sm"
+                  class="border rounded px-3 py-1 text-sm dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600"
                   [class.opacity-50]="user.id === seedAdminId()"
                   [class.cursor-not-allowed]="user.id === seedAdminId()"
                   (change)="onUpdateRol(user.id, $event)"
@@ -151,7 +151,7 @@
                       name="resetPasswordValue"
                       type="password"
                       placeholder="Nueva contraseña"
-                      class="border rounded px-2 py-1 text-sm w-36"
+                      class="border rounded px-2 py-1 text-sm w-36 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                     <button
                       class="bg-green-600 dark:bg-green-500 text-white rounded px-2 py-1 text-sm hover:bg-green-700 dark:hover:bg-green-600 transition-colors"
