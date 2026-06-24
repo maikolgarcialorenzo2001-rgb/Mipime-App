@@ -53,7 +53,7 @@
         </button>
         <button
           type="button"
-          class="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-4 py-2 hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+          class="bg-gray-400 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-4 py-2 hover:bg-gray-500 dark:hover:bg-gray-500 transition-colors"
           (click)="showCreateForm.set(false)"
         >
           <span class="inline-flex items-center gap-1.5">
@@ -77,7 +77,7 @@
     <app-empty-state message="No hay usuarios registrados" />
   } @else {
     <div class="overflow-x-auto">
-      <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+      <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50">
         <thead>
           <tr class="bg-gray-100 dark:bg-gray-800 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">
             <th class="px-4 py-3">Nombre</th>
@@ -163,7 +163,7 @@
                       </span>
                     </button>
                     <button
-                      class="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-2 py-1 text-sm hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                      class="bg-gray-400 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-2 py-1 text-sm hover:bg-gray-500 dark:hover:bg-gray-500 transition-colors"
                       (click)="resetPasswordUserId.set(null)"
                     >
                       <span class="inline-flex items-center gap-1">

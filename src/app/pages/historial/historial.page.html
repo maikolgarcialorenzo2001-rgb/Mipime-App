@@ -62,7 +62,7 @@
     }
 
     <!-- Grid del calendario — siempre visible -->
-    <div class="rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
+    <div class="rounded-xl bg-white dark:bg-gray-900 shadow-lg dark:shadow-gray-950/50 ring-1 ring-gray-200 dark:ring-gray-700">
       <!-- Cabecera de días de la semana -->
       <div class="grid grid-cols-7 border-b border-gray-100 dark:border-gray-800">
         @for (dia of diasSemana(); track $index) {
@@ -132,7 +132,7 @@
 
     <!-- Panel de detalle del día seleccionado -->
     @if (diaSeleccionado(); as sel) {
-      <div class="mt-4 rounded-xl bg-white dark:bg-gray-900 p-5 shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
+      <div class="mt-4 rounded-xl bg-white dark:bg-gray-900 p-5 shadow-lg dark:shadow-gray-950/50 ring-1 ring-gray-200 dark:ring-gray-700">
         <div class="mb-3 flex items-center justify-between">
           <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
             {{ sel.fecha | date:'fullDate' }}
@@ -237,7 +237,7 @@
         >
           <div
             data-testid="modal-panel"
-            class="mx-4 w-full max-w-3xl rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl max-h-[80vh] overflow-y-auto"
+            class="mx-4 w-full max-w-3xl rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80 max-h-[80vh] overflow-y-auto"
           >
             <!-- Header -->
             <div class="mb-4 flex items-center justify-between">

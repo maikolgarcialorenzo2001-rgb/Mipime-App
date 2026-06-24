@@ -2,7 +2,7 @@
   type="button"
   class="flex h-full w-full cursor-pointer flex-col justify-between rounded-xl border-2 p-4 text-left transition-all hover:shadow-md dark:hover:shadow-gray-900/50 active:scale-[0.97]"
   [ngClass]="selected()
-    ? 'border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30'
+    ? 'border-blue-500 bg-blue-50 shadow-md dark:border-blue-400 dark:bg-blue-900/30 dark:shadow-gray-950/30'
     : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-gray-600'"
   (click)="clicked.emit()"
 >
