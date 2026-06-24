@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-nav',
@@ -13,6 +14,7 @@ export class AppNavComponent {
   private readonly _router = inject(Router);
   private readonly _auth = inject(AuthService);
   readonly jornadaService = inject(JornadaService);
+  readonly themeService = inject(ThemeService);
 
   protected readonly auth = this._auth;
 

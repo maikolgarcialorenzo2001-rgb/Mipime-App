@@ -88,6 +88,19 @@
           }
         }
 
+        <button
+          type="button"
+          (click)="themeService.toggle()"
+          class="cursor-pointer rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 hover:text-blue-600 transition-colors leading-none"
+          aria-label="Cambiar tema"
+        >
+          @if (themeService.isDark()) {
+            <span class="material-symbols-outlined text-base leading-none">light_mode</span>
+          } @else {
+            <span class="material-symbols-outlined text-base leading-none">dark_mode</span>
+          }
+        </button>
+
         <span class="text-gray-500">{{ auth.usuario()?.nombre }}</span>
         <button
           (click)="logout()"
