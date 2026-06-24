@@ -41,7 +41,12 @@
           [class.text-gray-700]="formaPago() !== 'efectivo'"
           [class.hover:bg-gray-50]="formaPago() !== 'efectivo'"
           (click)="seleccionarFormaPago('efectivo')"
-        >Efectivo</button>
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">payments</span>
+            Efectivo
+          </span>
+        </button>
         <button
           type="button"
           class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
@@ -52,7 +57,12 @@
           [class.text-gray-700]="formaPago() !== 'transferencia'"
           [class.hover:bg-gray-50]="formaPago() !== 'transferencia'"
           (click)="seleccionarFormaPago('transferencia')"
-        >Transferencia</button>
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">swap_horiz</span>
+            Transferencia
+          </span>
+        </button>
       </div>
     </div>
 
@@ -68,12 +78,22 @@
         type="button"
         class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
         (click)="cancelar.emit()"
-      >Cancelar</button>
+      >
+        <span class="inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined leading-none text-sm">close</span>
+          Cancelar
+        </span>
+      </button>
       <button
         type="button"
         class="flex-1 cursor-pointer rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 active:bg-green-800 transition-colors"
         (click)="onConfirmar()"
-      >Confirmar venta</button>
+      >
+        <span class="inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined leading-none text-sm">shopping_cart_checkout</span>
+          Confirmar venta
+        </span>
+      </button>
     </div>
   </div>
 </div>

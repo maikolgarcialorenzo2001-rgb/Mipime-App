@@ -40,7 +40,14 @@
         class="w-full bg-blue-600 text-white rounded px-4 py-2 font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         [disabled]="cargando()"
       >
-        {{ cargando() ? 'Ingresando…' : 'Iniciar sesión' }}
+        @if (cargando()) {
+          Ingresando…
+        } @else {
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">login</span>
+            Iniciar sesión
+          </span>
+        }
       </button>
     </form>
   </div>

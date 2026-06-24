@@ -5,7 +5,10 @@
       class="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition-colors"
       (click)="toggleCreateForm()"
     >
-      + Nuevo usuario
+      <span class="inline-flex items-center gap-1.5">
+        <span class="material-symbols-outlined leading-none text-sm">person_add</span>
+        Nuevo usuario
+      </span>
     </button>
   </div>
 
@@ -43,14 +46,20 @@
           type="submit"
           class="bg-green-600 text-white rounded px-4 py-2 hover:bg-green-700 transition-colors"
         >
-          Guardar
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">save</span>
+            Guardar
+          </span>
         </button>
         <button
           type="button"
           class="bg-gray-300 text-gray-700 rounded px-4 py-2 hover:bg-gray-400 transition-colors"
           (click)="showCreateForm.set(false)"
         >
-          Cancelar
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">cancel</span>
+            Cancelar
+          </span>
         </button>
       </div>
     </form>
@@ -144,13 +153,19 @@
                       class="bg-green-600 text-white rounded px-2 py-1 text-sm hover:bg-green-700 transition-colors"
                       (click)="onResetPass(user.id)"
                     >
-                      Guardar
+                      <span class="inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined leading-none text-sm">save</span>
+                        Guardar
+                      </span>
                     </button>
                     <button
                       class="bg-gray-300 text-gray-700 rounded px-2 py-1 text-sm hover:bg-gray-400 transition-colors"
                       (click)="resetPasswordUserId.set(null)"
                     >
-                      Cancelar
+                      <span class="inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined leading-none text-sm">cancel</span>
+                        Cancelar
+                      </span>
                     </button>
                   </div>
                 } @else {
@@ -158,7 +173,10 @@
                     class="text-blue-600 hover:text-blue-800 text-sm underline transition-colors"
                     (click)="startResetPass(user.id)"
                   >
-                    Resetear contraseña
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="material-symbols-outlined leading-none text-sm">key</span>
+                      Resetear contraseña
+                    </span>
                   </button>
                 }
               </td>

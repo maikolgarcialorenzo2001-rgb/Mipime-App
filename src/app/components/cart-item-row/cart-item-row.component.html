@@ -10,7 +10,9 @@
       class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
       (click)="cantidadReducir.emit()"
       aria-label="Reducir cantidad"
-    >−</button>
+    >
+      <span class="material-symbols-outlined leading-none text-sm">remove</span>
+    </button>
 
     <span class="w-8 text-center text-sm font-semibold tabular-nums">{{ item().cantidad }}</span>
 
@@ -19,7 +21,9 @@
       class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
       (click)="cantidadAumentar.emit()"
       aria-label="Aumentar cantidad"
-    >+</button>
+    >
+      <span class="material-symbols-outlined leading-none text-sm">add</span>
+    </button>
   </div>
 
   <span class="w-20 text-right text-sm font-semibold tabular-nums text-gray-900">
@@ -30,6 +34,8 @@
     type="button"
     class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
     (click)="quitar.emit()"
-    aria-label="Quitar del carrito"
-  >✕</button>
+      aria-label="Quitar del carrito"
+    >
+      <span class="material-symbols-outlined leading-none text-sm">close</span>
+    </button>
 </li>

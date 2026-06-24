@@ -12,7 +12,10 @@
           [class.underline]="pos.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
         >
-          POS
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">point_of_sale</span>
+            POS
+          </span>
         </a>
         <a
           routerLink="/productos"
@@ -22,7 +25,10 @@
           [class.underline]="productos.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
         >
-          Productos
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">inventory_2</span>
+            Productos
+          </span>
         </a>
         <a
           routerLink="/jornada"
@@ -32,7 +38,10 @@
           [class.underline]="jornada.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
         >
-          Jornada
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">calendar_month</span>
+            Jornada
+          </span>
         </a>
         <a
           routerLink="/inventario"
@@ -42,7 +51,10 @@
           [class.underline]="inventario.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
         >
-          Inventario
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">warehouse</span>
+            Inventario
+          </span>
         </a>
         <a
           routerLink="/historial"
@@ -52,7 +64,10 @@
           [class.underline]="historial.isActive"
           class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
         >
-          Historial
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">history</span>
+            Historial
+          </span>
         </a>
         @if (auth.hasRole('admin')) {
           <a
@@ -63,7 +78,10 @@
             [class.underline]="admin.isActive"
             class="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 decoration-2"
           >
-            Admin
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">admin_panel_settings</span>
+              Admin
+            </span>
           </a>
         }
       </div>
@@ -76,7 +94,12 @@
               type="button"
               class="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition-colors"
               (click)="abrirModalApertura()"
-            >+ Iniciar jornada</button>
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <span class="material-symbols-outlined leading-none text-xs">play_arrow</span>
+                Iniciar jornada
+              </span>
+            </button>
           }
 
           @if (puedeCerrar) {
@@ -84,7 +107,12 @@
               type="button"
               class="cursor-pointer rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors"
               (click)="abrirModalCierre()"
-            >Terminar jornada</button>
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <span class="material-symbols-outlined leading-none text-xs">stop</span>
+                Terminar jornada
+              </span>
+            </button>
           }
         }
 
@@ -106,7 +134,10 @@
           (click)="logout()"
           class="text-red-600 hover:text-red-800 transition-colors cursor-pointer"
         >
-          Cerrar sesión
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">logout</span>
+            Cerrar sesión
+          </span>
         </button>
       </div>
     </div>
@@ -155,7 +186,12 @@
           class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           [disabled]="abriendo()"
           (click)="cerrarModalApertura()"
-        >Cancelar</button>
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">close</span>
+            Cancelar
+          </span>
+        </button>
         <button
           type="button"
           class="flex-1 cursor-pointer rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -168,7 +204,10 @@
               Abriendo...
             </span>
           } @else {
-            Iniciar
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">play_arrow</span>
+              Iniciar
+            </span>
           }
         </button>
       </div>
@@ -216,7 +255,12 @@
           class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           [disabled]="cerrando()"
           (click)="cerrarModalCierre()"
-        >Cancelar</button>
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">close</span>
+            Cancelar
+          </span>
+        </button>
         <button
           type="button"
           class="flex-1 cursor-pointer rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -229,7 +273,10 @@
               Cerrando...
             </span>
           } @else {
-            Terminar y descargar
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">stop</span>
+              Terminar y descargar
+            </span>
           }
         </button>
       </div>
