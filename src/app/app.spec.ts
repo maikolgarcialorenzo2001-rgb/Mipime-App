@@ -89,12 +89,12 @@ describe('App component nav', () => {
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
     const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
 
-    expect(linkTexts).toContain('POS');
-    expect(linkTexts).toContain('Productos');
-    expect(linkTexts).toContain('Jornada');
-    expect(linkTexts).toContain('Inventario');
-    expect(linkTexts).toContain('Historial');
-    expect(linkTexts).toContain('Admin');
+    expect(linkTexts.some((t) => t?.includes('POS'))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes('Productos'))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes('Jornada'))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes('Inventario'))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes('Historial'))).toBe(true);
+    expect(linkTexts.some((t) => t?.includes('Admin'))).toBe(true);
   });
 
   it('debería mostrar nombre de usuario y botón de logout cuando está logueado', async () => {
@@ -145,8 +145,8 @@ describe('App component nav', () => {
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
     const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
 
-    expect(linkTexts).not.toContain('Admin');
-    expect(linkTexts).toContain('POS');
+    expect(linkTexts.some((t) => t?.includes('Admin'))).toBe(false);
+    expect(linkTexts.some((t) => t?.includes('POS'))).toBe(true);
   });
 
   it('no debería mostrar nav completo cuando no hay sesión', () => {
@@ -179,7 +179,7 @@ describe('App component nav', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
-    const logoutBtn = fixture.nativeElement.querySelector('button');
+    const logoutBtn = fixture.nativeElement.querySelector('nav button:last-child');
     expect(logoutBtn).toBeTruthy();
 
     logoutBtn.click();

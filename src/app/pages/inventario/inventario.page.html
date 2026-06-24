@@ -1,15 +1,15 @@
 <div class="p-6 max-w-4xl mx-auto space-y-6">
-  <h1 class="text-2xl font-bold text-gray-800">Inventario — Gestión de Stock</h1>
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Inventario — Gestión de Stock</h1>
 
   <!-- Search bar -->
   <div class="relative">
-    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 leading-none text-lg">search</span>
+    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 leading-none text-lg">search</span>
     <input
       type="text"
       [value]="searchQuery()"
       (input)="searchQuery.set($any($event.target).value)"
       placeholder="Buscar producto..."
-      class="w-full border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      class="w-full border rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600"
     />
   </div>
 
@@ -25,9 +25,9 @@
     <app-empty-state message="No hay productos" />
   } @else {
     <div class="overflow-x-auto">
-      <table class="w-full border-collapse bg-white rounded-lg shadow-sm">
+      <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-sm">
         <thead>
-          <tr class="bg-gray-100 text-left text-sm font-semibold text-gray-600">
+          <tr class="bg-gray-100 dark:bg-gray-800 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">
             <th class="px-4 py-3">Producto</th>
             <th class="px-4 py-3">Stock</th>
             <th class="px-4 py-3">Acciones</th>
@@ -35,8 +35,8 @@
         </thead>
         <tbody>
           @for (producto of filteredProductos(); track producto.id) {
-            <tr class="border-t hover:bg-gray-50 transition-colors">
-              <td class="px-4 py-3 font-medium text-gray-900">
+            <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                 {{ producto.nombre }}
               </td>
               <td class="px-4 py-3">
@@ -45,7 +45,7 @@
               <td class="px-4 py-3">
                 <div class="flex flex-wrap gap-2">
                   <button
-                    class="bg-green-600 text-white rounded px-3 py-1 text-sm hover:bg-green-700 transition-colors"
+                    class="bg-green-600 dark:bg-green-500 text-white rounded px-3 py-1 text-sm hover:bg-green-700 dark:hover:bg-green-600 transition-colors"
                     (click)="selectedAction.set({productoId: producto.id, tipo: 'entrada'})"
                   >
                     <span class="inline-flex items-center gap-1">
@@ -54,7 +54,7 @@
                     </span>
                   </button>
                   <button
-                    class="bg-orange-500 text-white rounded px-3 py-1 text-sm hover:bg-orange-600 transition-colors"
+                    class="bg-orange-500 dark:bg-orange-400 text-white rounded px-3 py-1 text-sm hover:bg-orange-600 dark:hover:bg-orange-500 transition-colors"
                     (click)="selectedAction.set({productoId: producto.id, tipo: 'salida'})"
                   >
                     <span class="inline-flex items-center gap-1">
@@ -63,7 +63,7 @@
                     </span>
                   </button>
                   <button
-                    class="bg-blue-600 text-white rounded px-3 py-1 text-sm hover:bg-blue-700 transition-colors"
+                    class="bg-blue-600 dark:bg-blue-500 text-white rounded px-3 py-1 text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                     (click)="selectedAction.set({productoId: producto.id, tipo: 'ajuste'})"
                   >
                     <span class="inline-flex items-center gap-1">
@@ -72,7 +72,7 @@
                     </span>
                   </button>
                   <button
-                    class="text-gray-600 border border-gray-300 rounded px-3 py-1 text-sm hover:bg-gray-100 transition-colors"
+                    class="text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     (click)="toggleHistory(producto.id)"
                   >
                     <span class="inline-flex items-center gap-1">
@@ -86,14 +86,14 @@
 
             <!-- Inline movement form -->
             @if (selectedAction()?.productoId === producto.id) {
-              <tr class="bg-gray-50">
+              <tr class="bg-gray-50 dark:bg-gray-800/50">
                 <td colspan="3" class="px-4 py-3">
                   <form
                     (ngSubmit)="onSubmitMovimiento()"
                     class="flex flex-wrap items-end gap-3"
                   >
                     <div>
-                      <label class="block text-xs text-gray-500 mb-1">Cantidad</label>
+                      <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad</label>
                       <input
                         type="number"
                         [(ngModel)]="movimientoCantidad"
@@ -101,32 +101,32 @@
                         placeholder="Cantidad"
                         required
                         min="1"
-                        class="border rounded px-3 py-2 text-sm w-28"
+                        class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600"
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500 mb-1">Motivo</label>
+                      <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Motivo</label>
                       @if (selectedAction()?.tipo === 'ajuste') {
                         <input
                           [(ngModel)]="movimientoMotivo"
                           name="movimientoMotivo"
                           placeholder="Motivo (obligatorio)"
                           required
-                          class="border rounded px-3 py-2 text-sm w-48"
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600"
                         />
                       } @else {
                         <input
                           [(ngModel)]="movimientoMotivo"
                           name="movimientoMotivo"
                           placeholder="Motivo (opcional)"
-                          class="border rounded px-3 py-2 text-sm w-48"
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600"
                         />
                       }
                     </div>
                     <div class="flex gap-2">
                       <button
                         type="submit"
-                        class="bg-blue-600 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 transition-colors"
+                        class="bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
                       >
                         <span class="inline-flex items-center gap-1">
                           <span class="material-symbols-outlined leading-none text-sm">check</span>
@@ -135,7 +135,7 @@
                       </button>
                       <button
                         type="button"
-                        class="bg-gray-300 text-gray-700 rounded px-4 py-2 text-sm hover:bg-gray-400 transition-colors"
+                        class="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-4 py-2 text-sm hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
                         (click)="selectedAction.set(null); movimientoCantidad.set(0); movimientoMotivo.set('')"
                       >
                         <span class="inline-flex items-center gap-1">
@@ -151,7 +151,7 @@
 
             <!-- History rows -->
             @if (showHistoryId() === producto.id) {
-              <tr class="bg-gray-50/50">
+              <tr class="bg-gray-50/50 dark:bg-gray-800/50">
                 <td colspan="3" class="px-4 py-3">
                   @if (movimientosLoading()) {
                     <app-loading-spinner />
@@ -159,7 +159,7 @@
                     <div class="overflow-x-auto">
                       <table class="w-full border-collapse text-sm">
                         <thead>
-                          <tr class="text-left text-xs font-semibold text-gray-500 uppercase">
+                          <tr class="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
                             <th class="px-3 py-2">Fecha</th>
                             <th class="px-3 py-2">Tipo</th>
                             <th class="px-3 py-2">Cantidad</th>
@@ -168,24 +168,24 @@
                         </thead>
                         <tbody>
                           @for (m of movimientos(); track m.id) {
-                            <tr class="border-t hover:bg-gray-100 transition-colors">
-                              <td class="px-3 py-2 text-gray-500 whitespace-nowrap">
+                            <tr class="border-t dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                              <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                 {{ m.created_at | date:'short' }}
                               </td>
                               <td class="px-3 py-2">
                                 <span
                                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                                   [class]="{
-                                    'bg-green-100 text-green-700': m.tipo === 'entrada',
-                                    'bg-red-100 text-red-700': m.tipo === 'salida',
-                                    'bg-blue-100 text-blue-700': m.tipo === 'ajuste',
+                                    'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400': m.tipo === 'entrada',
+                                    'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400': m.tipo === 'salida',
+                                    'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400': m.tipo === 'ajuste',
                                   }"
                                 >
                                   {{ m.tipo === 'entrada' ? 'Entrada' : m.tipo === 'salida' ? 'Salida' : 'Ajuste' }}
                                 </span>
                               </td>
                               <td class="px-3 py-2 font-medium">{{ m.cantidad }}</td>
-                              <td class="px-3 py-2 text-gray-500">{{ m.motivo }}</td>
+                              <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.motivo }}</td>
                             </tr>
                           }
                         </tbody>

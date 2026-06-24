@@ -57,8 +57,9 @@ describe('CheckoutModalComponent', () => {
       (b) => b.textContent?.trim().includes('Efectivo'),
     );
     expect(efectivoBtn).toBeTruthy();
-    // El botón efectivo debería tener clase activa/selected
+    // El botón efectivo debería tener clase activa/selected (con dark: companion)
     expect(efectivoBtn!.className).toContain('bg-blue');
+    expect(efectivoBtn!.className).toContain('dark:bg-blue');
   });
 
   it('3.1 RED: debería emitir formaPago al confirmar', () => {

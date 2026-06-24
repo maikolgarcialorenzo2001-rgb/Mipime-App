@@ -1,12 +1,12 @@
-<div class="mx-auto max-w-5xl min-h-screen bg-gray-50 p-6">
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">Productos</h1>
+<div class="mx-auto max-w-5xl min-h-screen bg-gray-50 dark:bg-gray-950/50 p-6">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Productos</h1>
 
   @if (error()) {
-    <div class="rounded-lg bg-red-50 p-4 text-red-700 mb-4 flex items-center justify-between gap-4">
+    <div class="rounded-lg bg-red-50 dark:bg-red-900/30 p-4 text-red-700 dark:text-red-400 mb-4 flex items-center justify-between gap-4">
       <span>{{ error() }}</span>
       <button
         type="button"
-        class="shrink-0 cursor-pointer rounded bg-red-200 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-300 transition-colors"
+        class="shrink-0 cursor-pointer rounded bg-red-200 dark:bg-red-900/40 px-3 py-1 text-sm font-medium text-red-800 dark:text-red-400 hover:bg-red-300 dark:hover:bg-red-800 transition-colors"
         (click)="recargar()"
         >
           <span class="inline-flex items-center gap-1">
@@ -18,49 +18,49 @@
   }
 
   <div class="relative mb-6">
-    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 leading-none text-lg">search</span>
+    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 leading-none text-lg">search</span>
     <input
       type="text"
       placeholder="Buscar por nombre…"
-      class="w-full max-w-md rounded-lg border border-gray-300 pl-10 pr-4 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      class="w-full max-w-md rounded-lg border border-gray-300 dark:border-gray-600 pl-10 pr-4 py-2 text-sm shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-800"
       [value]="query()"
       (input)="onSearch($any($event.target).value)"
     />
   </div>
 
   @if (buscando()) {
-    <div class="text-center text-gray-500 py-12">Cargando…</div>
+    <div class="text-center text-gray-500 dark:text-gray-400 py-12">Cargando…</div>
   } @else if (productos().length === 0) {
-    <div class="rounded-xl bg-white p-12 text-center text-gray-500 shadow-sm">
+    <div class="rounded-xl bg-white dark:bg-gray-900 p-12 text-center text-gray-500 dark:text-gray-400 shadow-sm">
       No hay productos cargados.
     </div>
   } @else {
-    <div class="overflow-hidden rounded-xl bg-white shadow-sm">
+    <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-900 shadow-sm">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Precio venta</th>
             <th class="px-6 py-3">Stock</th>
             <th class="px-6 py-3">Existencias</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
           @for (p of productos(); track p.id) {
-            <tr class="hover:bg-gray-50 transition-colors">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               <td class="px-6 py-4">
-                <div class="font-medium text-gray-900">{{ p.nombre }}</div>
+                <div class="font-medium text-gray-900 dark:text-gray-100">{{ p.nombre }}</div>
                 @if (p.descripcion) {
-                  <div class="text-xs text-gray-400 mt-0.5">{{ p.descripcion }}</div>
+                  <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ p.descripcion }}</div>
                 }
               </td>
-              <td class="px-6 py-4 font-medium text-gray-900">
+              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                 {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
               </td>
               <td class="px-6 py-4">
                 <app-stock-badge [stock]="p.stock_actual" />
               </td>
-              <td class="px-6 py-4 font-medium text-gray-900 tabular-nums">
+              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
                 {{ p.stock_actual }}
               </td>
             </tr>
@@ -69,7 +69,7 @@
       </table>
     </div>
 
-    <p class="mt-3 text-xs text-gray-400">
+    <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
       {{ productos().length }} producto{{ productos().length !== 1 ? 's' : '' }}
     </p>
   }

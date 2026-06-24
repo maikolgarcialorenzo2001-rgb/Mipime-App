@@ -1,11 +1,11 @@
-<div class="mx-auto max-w-5xl min-h-screen bg-gray-50 p-6">
+<div class="mx-auto max-w-5xl min-h-screen bg-gray-50 dark:bg-gray-950/50 p-6">
   <div class="mb-6 flex items-center justify-between">
-    <h1 class="text-2xl font-bold text-gray-900">Jornada del día</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Jornada del día</h1>
 
     @if (puedeCerrar) {
       <button
         type="button"
-        class="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors"
+        class="cursor-pointer rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 dark:hover:bg-red-600 active:bg-red-800 dark:active:bg-red-700 transition-colors"
         (click)="abrirModalCierre()"
       >
         <span class="inline-flex items-center gap-1.5">
@@ -22,7 +22,7 @@
 
   @if (jornadaService.jornadaCargando()) {
     <div class="flex justify-center py-12">
-      <div class="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" role="status">
+      <div class="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 dark:border-gray-600 border-t-blue-600 dark:border-t-blue-400" role="status">
         <span class="sr-only">Cargando...</span>
       </div>
     </div>
@@ -30,26 +30,26 @@
     <app-jornada-summary-card [jornada]="j" />
 
     @if (isAdmin) {
-      <div class="mt-6 rounded-xl border border-gray-200 bg-white p-6">
-        <h3 class="mb-4 text-lg font-semibold text-gray-900">Registrar movimiento</h3>
+      <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Registrar movimiento</h3>
 
         @if (formError(); as err) {
           <app-error-alert [message]="err" />
         }
 
         <div class="mb-3">
-          <select (change)="tipo.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5">
+          <select (change)="tipo.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5">
             <option value="gasto">Gasto</option>
             <option value="ingreso_extra">Ingreso extra</option>
           </select>
         </div>
         <div class="mb-3">
-          <input type="text" placeholder="Descripción" (input)="descripcion.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5" />
+          <input type="text" placeholder="Descripción" (input)="descripcion.set($any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5" />
         </div>
         <div class="mb-4">
-          <input type="text" inputmode="numeric" placeholder="Monto" (input)="monto.set(+$any($event.target).value)" class="w-full rounded-lg border border-gray-300 px-4 py-2.5" />
+          <input type="text" inputmode="numeric" placeholder="Monto" (input)="monto.set(+$any($event.target).value)" class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5" />
         </div>
-        <button (click)="registrarMovimiento()" [disabled]="registrando()" class="cursor-pointer rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+        <button (click)="registrarMovimiento()" [disabled]="registrando()" class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-blue-600">
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">add_circle</span>
             Registrar
@@ -71,21 +71,21 @@
     (keydown)="onModalKeydown($event)"
   >
     <div
-      class="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-    >
-      <h3 class="mb-4 text-lg font-semibold text-gray-900">Cerrar jornada</h3>
+      class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl"
+      >
+        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Cerrar jornada</h3>
 
       @if (cerrarError()) {
-        <div class="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {{ cerrarError() }}
         </div>
       }
 
       <div class="mb-4">
-        <label class="mb-1 block text-sm font-medium text-gray-700">
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Saldo esperado ($)
         </label>
-        <div class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-lg font-semibold text-gray-900">
+        <div class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
           {{ jornadaService.jornadaAbierta()?.saldo_esperado?.toLocaleString() ?? '—' }}
         </div>
       </div>
@@ -93,7 +93,7 @@
       <div class="flex gap-3">
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           [disabled]="cerrando()"
           (click)="cerrarModalCierre()"
         >
@@ -104,7 +104,7 @@
         </button>
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 active:bg-red-800 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex-1 cursor-pointer rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 dark:hover:bg-red-600 active:bg-red-800 dark:active:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           [disabled]="cerrando()"
           (click)="confirmarCierre()"
         >

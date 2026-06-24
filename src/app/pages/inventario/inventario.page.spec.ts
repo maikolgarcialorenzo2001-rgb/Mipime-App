@@ -212,10 +212,10 @@ describe('InventarioPage', () => {
 
     const buttons = form.querySelectorAll('button');
     const buttonTexts = Array.from(buttons).map((b) =>
-      (b as HTMLButtonElement).textContent?.trim(),
+      (b as HTMLButtonElement).textContent?.trim() ?? '',
     );
-    expect(buttonTexts).toContain('Guardar');
-    expect(buttonTexts).toContain('Cancelar');
+    expect(buttonTexts.some((t) => t.includes('Guardar'))).toBe(true);
+    expect(buttonTexts.some((t) => t.includes('Cancelar'))).toBe(true);
   });
 
   it('7. calls registrarEntrada on form submit', async () => {

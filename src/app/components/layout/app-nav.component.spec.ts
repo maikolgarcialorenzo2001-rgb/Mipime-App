@@ -116,6 +116,23 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(modalText).toContain('Saldo esperado');
   });
 
+  it('debería renderizar el botón de cambio de tema y alternar clase dark', () => {
+    const el = fixture.nativeElement as HTMLElement;
+    const themeBtn = el.querySelector('button[aria-label="Cambiar tema"]');
+    expect(themeBtn).toBeTruthy();
+
+    // Inicialmente en modo claro → ícono dark_mode
+    const icon = themeBtn!.querySelector('.material-symbols-outlined');
+    expect(icon?.textContent?.trim()).toBe('dark_mode');
+
+    // Click → modo oscuro
+    (themeBtn as HTMLElement).click();
+    fixture.detectChanges();
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    const iconDark = themeBtn!.querySelector('.material-symbols-outlined');
+    expect(iconDark?.textContent?.trim()).toBe('light_mode');
+  });
+
   it('5.2 RED: confirmarCierre debería pasar saldo_esperado como saldoReal a cerrar()', () => {
     component.abrirModalCierre();
     fixture.detectChanges();
