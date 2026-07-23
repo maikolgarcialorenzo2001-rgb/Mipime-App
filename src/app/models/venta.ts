@@ -5,6 +5,12 @@ export interface Venta {
   total: number;
   usuario_id: number | null;
   forma_pago: string;
+  divisa_tipo?: 'EUR' | 'USD';
+  monto_divisa?: number;
+  tasa_cambio?: number;
+  comprador_nombre?: string;
+  autorizado_por?: string;
+  descripcion?: string;
   created_at: string;
 }
 

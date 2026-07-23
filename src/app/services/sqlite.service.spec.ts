@@ -314,3 +314,128 @@ describe('SqliteService migration v5', () => {
     ).toBe(true);
   });
 });
+
+describe('SqliteService migration v6', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('1.6 RED: migration v6 debería recrear ventas con CHECK actualizado + cuenta_cosas', async () => {
+    mockSchemaVersion = 5;
+    await service.initialize();
+
+    // Debería crear ventas_v6 con CHECK(forma_pago IN) actualizado
+    const createV6 = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('ventas_v6'),
+    );
+    expect(createV6).toBeDefined();
+    expect(createV6!.query).toContain(
+      "CHECK(forma_pago IN ('efectivo','transferencia','divisas','pendiente')",
+    );
+
+    // Debería incluir las 6 columnas nuevas
+    expect(createV6!.query).toContain('divisa_tipo TEXT');
+    expect(createV6!.query).toContain('monto_divisa REAL');
+    expect(createV6!.query).toContain('tasa_cambio REAL');
+    expect(createV6!.query).toContain('comprador_nombre TEXT');
+    expect(createV6!.query).toContain('autorizado_por TEXT');
+    expect(createV6!.query).toContain('descripcion TEXT');
+
+    // Debería migrar datos existentes
+    const insertV6 = sqlCalls.find(
+      (c) =>
+        c.query.includes('INSERT INTO ventas_v6') &&
+        c.query.includes('SELECT'),
+    );
+    expect(insertV6).toBeDefined();
+    // Verificar que preserva columnas v5 y pone NULL en las nuevas
+    expect(insertV6!.query).toContain('NULL, NULL, NULL, NULL, NULL, NULL');
+
+    // Debería dropear tabla vieja y renombrar
+    expect(
+      sqlCalls.some((c) => c.query.includes('DROP TABLE ventas')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('ALTER TABLE ventas_v6 RENAME TO ventas'),
+      ),
+    ).toBe(true);
+
+    // Debería crear tabla cuenta_cosas
+    const createCC = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('cuenta_cosas'),
+    );
+    expect(createCC).toBeDefined();
+    expect(createCC!.query).toContain('jornada_id INTEGER NOT NULL REFERENCES jornadas(id)');
+    expect(createCC!.query).toContain('producto_id INTEGER NOT NULL REFERENCES productos(id)');
+    expect(createCC!.query).toContain('cantidad REAL NOT NULL');
+    expect(createCC!.query).toContain('descripcion TEXT');
+    expect(createCC!.query).toContain('autorizado_por TEXT NOT NULL');
+
+    // Debería insertar version 6
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (6)'),
+      ),
+    ).toBe(true);
+
+    // Debería estar envuelto en transacción
+    expect(
+      sqlCalls.some((c) => c.query.includes('BEGIN TRANSACTION')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) => c.query.includes('COMMIT')),
+    ).toBe(true);
+  });
+
+  it('1.6 RED: migration v6 debería preservar datos de v5', async () => {
+    mockSchemaVersion = 5;
+    await service.initialize();
+
+    const insertV6 = sqlCalls.find(
+      (c) =>
+        c.query.includes('INSERT INTO ventas_v6') &&
+        c.query.includes('SELECT'),
+    );
+    expect(insertV6).toBeDefined();
+    // Verifica que el SELECT preserva columnas de v5 en orden
+    expect(insertV6!.query).toContain('SELECT id, jornada_id, fecha_hora, total, created_at, usuario_id, forma_pago');
+  });
+});

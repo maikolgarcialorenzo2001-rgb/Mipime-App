@@ -90,6 +90,10 @@ export class SqliteService implements Database {
       await this._migrationV5(client);
     }
 
+    if (currentVersion < 6) {
+      await this._migrationV6(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -286,6 +290,43 @@ export class SqliteService implements Database {
     await client.sql('DROP TABLE ventas');
     await client.sql('ALTER TABLE ventas_v5 RENAME TO ventas');
     await client.sql('INSERT INTO schema_version (version) VALUES (5)');
+    await client.sql('COMMIT');
+  }
+
+  private async _migrationV6(client: SQLocal): Promise<void> {
+    await client.sql('BEGIN TRANSACTION');
+    await client.sql(`CREATE TABLE ventas_v6 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      fecha_hora TEXT NOT NULL,
+      total REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      usuario_id INTEGER REFERENCES usuarios(id),
+      forma_pago TEXT NOT NULL DEFAULT 'efectivo'
+        CHECK(forma_pago IN ('efectivo','transferencia','divisas','pendiente')),
+      divisa_tipo TEXT,
+      monto_divisa REAL,
+      tasa_cambio REAL,
+      comprador_nombre TEXT,
+      autorizado_por TEXT,
+      descripcion TEXT
+    )`);
+    await client.sql(`INSERT INTO ventas_v6
+      SELECT id, jornada_id, fecha_hora, total, created_at, usuario_id, forma_pago,
+        NULL, NULL, NULL, NULL, NULL, NULL
+      FROM ventas`);
+    await client.sql('DROP TABLE ventas');
+    await client.sql('ALTER TABLE ventas_v6 RENAME TO ventas');
+    await client.sql(`CREATE TABLE cuenta_cosas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      descripcion TEXT,
+      autorizado_por TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    await client.sql('INSERT INTO schema_version (version) VALUES (6)');
     await client.sql('COMMIT');
   }
 

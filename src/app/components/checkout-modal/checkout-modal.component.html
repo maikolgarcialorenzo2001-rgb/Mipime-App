@@ -27,13 +27,14 @@
       }
     </ul>
 
-    <!-- Selector de forma de pago -->
+    <!-- Selector de forma de pago: 5 opciones -->
     <div class="mb-4">
       <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Forma de pago</p>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
+        <!-- Efectivo -->
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-w-[calc(50%-0.25rem)]"
           [class.bg-blue-600]="formaPago() === 'efectivo'"
           [class.dark:bg-blue-500]="formaPago() === 'efectivo'"
           [class.text-white]="formaPago() === 'efectivo'"
@@ -52,9 +53,10 @@
             Efectivo
           </span>
         </button>
+        <!-- Transferencia -->
         <button
           type="button"
-          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-w-[calc(50%-0.25rem)]"
           [class.bg-blue-600]="formaPago() === 'transferencia'"
           [class.dark:bg-blue-500]="formaPago() === 'transferencia'"
           [class.text-white]="formaPago() === 'transferencia'"
@@ -73,8 +75,171 @@
             Transferencia
           </span>
         </button>
+        <!-- Divisas -->
+        <button
+          type="button"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-w-[calc(50%-0.25rem)]"
+          [class.bg-blue-600]="formaPago() === 'divisas'"
+          [class.dark:bg-blue-500]="formaPago() === 'divisas'"
+          [class.text-white]="formaPago() === 'divisas'"
+          [class.border-blue-600]="formaPago() === 'divisas'"
+          [class.dark:border-blue-400]="formaPago() === 'divisas'"
+          [class.border-gray-300]="formaPago() !== 'divisas'"
+          [class.dark:border-gray-600]="formaPago() !== 'divisas'"
+          [class.text-gray-700]="formaPago() !== 'divisas'"
+          [class.dark:text-gray-300]="formaPago() !== 'divisas'"
+          [class.hover:bg-gray-50]="formaPago() !== 'divisas'"
+          [class.dark:hover:bg-gray-800]="formaPago() !== 'divisas'"
+          (click)="seleccionarFormaPago('divisas')"
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">currency_exchange</span>
+            Divisas
+          </span>
+        </button>
+        <!-- Pendiente -->
+        <button
+          type="button"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-w-[calc(50%-0.25rem)]"
+          [class.bg-blue-600]="formaPago() === 'pendiente'"
+          [class.dark:bg-blue-500]="formaPago() === 'pendiente'"
+          [class.text-white]="formaPago() === 'pendiente'"
+          [class.border-blue-600]="formaPago() === 'pendiente'"
+          [class.dark:border-blue-400]="formaPago() === 'pendiente'"
+          [class.border-gray-300]="formaPago() !== 'pendiente'"
+          [class.dark:border-gray-600]="formaPago() !== 'pendiente'"
+          [class.text-gray-700]="formaPago() !== 'pendiente'"
+          [class.dark:text-gray-300]="formaPago() !== 'pendiente'"
+          [class.hover:bg-gray-50]="formaPago() !== 'pendiente'"
+          [class.dark:hover:bg-gray-800]="formaPago() !== 'pendiente'"
+          (click)="seleccionarFormaPago('pendiente')"
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">pending_actions</span>
+            Pendiente
+          </span>
+        </button>
+        <!-- Cuenta Cosas -->
+        <button
+          type="button"
+          class="flex-1 cursor-pointer rounded-lg border-2 px-4 py-2.5 text-sm font-semibold transition-colors min-w-[calc(50%-0.25rem)]"
+          [class.bg-blue-600]="formaPago() === 'cuenta_cosas'"
+          [class.dark:bg-blue-500]="formaPago() === 'cuenta_cosas'"
+          [class.text-white]="formaPago() === 'cuenta_cosas'"
+          [class.border-blue-600]="formaPago() === 'cuenta_cosas'"
+          [class.dark:border-blue-400]="formaPago() === 'cuenta_cosas'"
+          [class.border-gray-300]="formaPago() !== 'cuenta_cosas'"
+          [class.dark:border-gray-600]="formaPago() !== 'cuenta_cosas'"
+          [class.text-gray-700]="formaPago() !== 'cuenta_cosas'"
+          [class.dark:text-gray-300]="formaPago() !== 'cuenta_cosas'"
+          [class.hover:bg-gray-50]="formaPago() !== 'cuenta_cosas'"
+          [class.dark:hover:bg-gray-800]="formaPago() !== 'cuenta_cosas'"
+          (click)="seleccionarFormaPago('cuenta_cosas')"
+        >
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">receipt_long</span>
+            Cuenta Cosas
+          </span>
+        </button>
       </div>
     </div>
+
+    <!-- Sub-formularios condicionales -->
+    @if (formaPago() === 'divisas') {
+      <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
+          <select
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            [ngModel]="divisaTipo()"
+            (ngModelChange)="divisaTipo.set($event)"
+          >
+            <option value="USD">USD (Dólar)</option>
+            <option value="EUR">EUR (Euro)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto en divisa</label>
+          <input
+            type="number"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            placeholder="0"
+            [ngModel]="montoDivisa()"
+            (ngModelChange)="montoDivisa.set($event)"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X ARS)</label>
+          <input
+            type="number"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            placeholder="0"
+            [ngModel]="tasaCambio()"
+            (ngModelChange)="tasaCambio.set($event)"
+          />
+        </div>
+      </div>
+    }
+
+    @if (formaPago() === 'pendiente') {
+      <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador</label>
+          <input
+            type="text"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            placeholder="Nombre del comprador"
+            [ngModel]="compradorNombre()"
+            (ngModelChange)="compradorNombre.set($event)"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por</label>
+          <input
+            type="text"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            placeholder="Nombre de quien autoriza"
+            [ngModel]="autorizadoPor()"
+            (ngModelChange)="autorizadoPor.set($event)"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <textarea
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            rows="2"
+            placeholder="Motivo o detalle"
+            [ngModel]="descripcion()"
+            (ngModelChange)="descripcion.set($event)"
+          ></textarea>
+        </div>
+      </div>
+    }
+
+    @if (formaPago() === 'cuenta_cosas') {
+      <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por</label>
+          <input
+            type="text"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            placeholder="Nombre de quien autoriza"
+            [ngModel]="autorizadoPor()"
+            (ngModelChange)="autorizadoPor.set($event)"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <textarea
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            rows="2"
+            placeholder="Motivo o detalle"
+            [ngModel]="descripcion()"
+            (ngModelChange)="descripcion.set($event)"
+          ></textarea>
+        </div>
+      </div>
+    }
 
     <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
       <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total</span>
