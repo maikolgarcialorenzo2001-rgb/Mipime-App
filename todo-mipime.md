@@ -4,7 +4,7 @@
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `feature/auth-y-pages`
 > Tests: **244 / 23 test files** (↑ desde 209)
-> Última actualización: 2026-06-24
+> Última actualización: 2026-07-23
 
 ---
 
@@ -101,10 +101,6 @@ verPreview(_jornada: Jornada): void {
 ---
 
 ## ⏳ Por aprobar — Pendiente de decisión del cliente/empresa
-
-### C6. Dashboard / página de inicio
-**Contexto:** `/` redirige a `/pos`. No hay dashboard con KPIs del día.
-**Posible approach:** Página con tarjetas de resumen (ventas hoy, jornada, productos top, ganancia del día).
 
 ### C7. Imprimir ticket / comprobante
 **Contexto:** Después de cobrar, no se genera ningún comprobante.
