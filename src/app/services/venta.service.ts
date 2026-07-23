@@ -5,6 +5,19 @@ import { StockMovimientoService } from './stock-movimiento.service';
 import type { Venta } from '../models';
 import type { CartItem } from './cart.service';
 
+export interface VentaPayload {
+  jornadaId: number;
+  items: CartItem[];
+  usuarioId: number;
+  formaPago: string;
+  divisaTipo?: 'EUR' | 'USD';
+  montoDivisa?: number;
+  tasaCambio?: number;
+  compradorNombre?: string;
+  autorizadoPor?: string;
+  descripcion?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -14,29 +27,41 @@ export class VentaService {
 
   /**
    * Registra una venta en la DB:
-   * 1. INSERT en ventas
+   * 1. INSERT en ventas (con campos opcionales según formaPago)
    * 2. INSERT en detalle_ventas por cada item
    * 3. UPDATE stock en productos
-   * 4. UPDATE total_ventas / saldo_esperado en la jornada
+   * 4. UPDATE total_ventas / saldo_esperado en la jornada (excepto pendiente)
    * 5. Registrar salida de stock vía StockMovimientoService por cada item
    */
-  registrar(
-    jornadaId: number,
-    items: CartItem[],
-    usuarioId: number,
-    formaPago: string,
-  ): Observable<Venta> {
-    if (!usuarioId) {
+  registrar(payload: VentaPayload): Observable<Venta> {
+    if (!payload.usuarioId) {
       return new Observable((subscriber) => {
         subscriber.error(new Error('Usuario no autenticado'));
       });
     }
 
     const ahora = new Date().toISOString();
-    const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    // Para divisas: total = montoDivisa * tasaCambio
+    // Para otros: total = suma del carrito
+    let total: number;
+    if (payload.formaPago === 'divisas' && payload.montoDivisa != null && payload.tasaCambio != null) {
+      total = payload.montoDivisa * payload.tasaCambio;
+    } else {
+      total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
+    }
 
     return from(
-      this._ejecutar(jornadaId, items, total, ahora, usuarioId, formaPago),
+      this._ejecutar(
+        payload.jornadaId,
+        payload.items,
+        total,
+        ahora,
+        payload.usuarioId,
+        payload.formaPago,
+        payload.formaPago !== 'efectivo' && payload.formaPago !== 'transferencia',
+        payload,
+      ),
     ).pipe(map((rows) => rows[0]));
   }
 
@@ -60,17 +85,64 @@ export class VentaService {
     ahora: string,
     usuarioId: number,
     formaPago: string,
+    hasExtraFields: boolean,
+    payload: VentaPayload,
   ): Promise<Venta[]> {
     await this._validarStock(items);
     await this._db.sql('BEGIN TRANSACTION');
 
     try {
-      // 1. Insertar venta
+      // 1. Insertar venta con campos condicionales
+      const columnasBase = ['jornada_id', 'fecha_hora', 'total', 'created_at', 'usuario_id', 'forma_pago'];
+      const placeholdersBase = ['?', '?', '?', '?', '?', '?'];
+      const valoresBase: unknown[] = [jornadaId, ahora, total, ahora, usuarioId, formaPago];
+
+      const columnasExtra: string[] = [];
+      const placeholdersExtra: string[] = [];
+      const valoresExtra: unknown[] = [];
+
+      if (hasExtraFields) {
+        if (payload.divisaTipo != null) {
+          columnasExtra.push('divisa_tipo');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.divisaTipo);
+        }
+        if (payload.montoDivisa != null) {
+          columnasExtra.push('monto_divisa');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.montoDivisa);
+        }
+        if (payload.tasaCambio != null) {
+          columnasExtra.push('tasa_cambio');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.tasaCambio);
+        }
+        if (payload.compradorNombre) {
+          columnasExtra.push('comprador_nombre');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.compradorNombre);
+        }
+        if (payload.autorizadoPor) {
+          columnasExtra.push('autorizado_por');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.autorizadoPor);
+        }
+        if (payload.descripcion) {
+          columnasExtra.push('descripcion');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.descripcion);
+        }
+      }
+
+      const todasColumnas = [...columnasBase, ...columnasExtra].join(', ');
+      const todosPlaceholders = [...placeholdersBase, ...placeholdersExtra].join(', ');
+      const todosValores = [...valoresBase, ...valoresExtra];
+
       const ventas = await this._db.sql<Venta>(
-        `INSERT INTO ventas (jornada_id, fecha_hora, total, created_at, usuario_id, forma_pago)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO ventas (${todasColumnas})
+         VALUES (${todosPlaceholders})
          RETURNING *`,
-        [jornadaId, ahora, total, ahora, usuarioId, formaPago],
+        todosValores,
       );
       const venta = ventas[0];
 
@@ -121,15 +193,17 @@ export class VentaService {
         );
       }
 
-      // 3. Actualizar jornada
-      await this._db.sql(
-        `UPDATE jornadas
-         SET total_ventas = total_ventas + ?,
-              saldo_esperado = saldo_esperado + ?,
-              updated_at = ?
-         WHERE id = ?`,
-        [total, total, ahora, jornadaId],
-      );
+      // 3. Actualizar jornada SOLO si NO es pendiente
+      if (formaPago !== 'pendiente') {
+        await this._db.sql(
+          `UPDATE jornadas
+           SET total_ventas = total_ventas + ?,
+                saldo_esperado = saldo_esperado + ?,
+                updated_at = ?
+           WHERE id = ?`,
+          [total, total, ahora, jornadaId],
+        );
+      }
 
       // 4. Registrar salida de stock para cada item (dentro de la transacción)
       for (const item of items) {

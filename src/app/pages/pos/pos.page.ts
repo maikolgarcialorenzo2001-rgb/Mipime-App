@@ -1,14 +1,17 @@
 import { Component, inject, viewChild, ElementRef, afterNextRender, signal, DestroyRef } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
+import { from, Observable } from 'rxjs';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
+import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { AuthService } from '../../services/auth.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
+import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
 import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -25,6 +28,7 @@ export class PosPage {
   private readonly _cartService = inject(CartService);
   private readonly _jornadaService = inject(JornadaService);
   private readonly _ventaService = inject(VentaService);
+  private readonly _cuentaCosasService = inject(CuentaCosasService);
   private readonly _auth = inject(AuthService);
   private readonly _destroyRef = inject(DestroyRef);
 
@@ -166,7 +170,7 @@ export class PosPage {
     this.ventaError.set(null);
   }
 
-  confirmarVenta(formaPago: string): void {
+  confirmarVenta(payload: CheckoutPayload): void {
     const jId = this._jornadaService.jornadaAbierta()?.id;
     const usuarioId = this._auth.usuario()?.id;
     if (jId === undefined || !usuarioId) return;
@@ -174,7 +178,39 @@ export class PosPage {
     this.ventaError.set(null);
     const items = this.cart.items();
 
-    this._ventaService.registrar(jId, items, usuarioId, formaPago).subscribe({
+    let obs: Observable<unknown>;
+
+    if (payload.formaPago === 'cuenta_cosas') {
+      // Cuenta Cosas usa su propio servicio (no toca jornadas)
+      const productoId = items[0]?.producto.id;
+      const cantidad = items.reduce((sum, item) => sum + item.cantidad, 0);
+      obs = from(
+        this._cuentaCosasService.registrar(
+          jId,
+          productoId,
+          cantidad,
+          payload.descripcion ?? null,
+          payload.autorizadoPor ?? '',
+        ).then(() => ({})),
+      );
+    } else {
+      // VentaService recibe payload completo con campos opcionales
+      const ventaPayload = {
+        jornadaId: jId,
+        items,
+        usuarioId,
+        formaPago: payload.formaPago,
+        divisaTipo: payload.divisaTipo,
+        montoDivisa: payload.montoDivisa,
+        tasaCambio: payload.tasaCambio,
+        compradorNombre: payload.compradorNombre,
+        autorizadoPor: payload.autorizadoPor,
+        descripcion: payload.descripcion,
+      };
+      obs = this._ventaService.registrar(ventaPayload);
+    }
+
+    obs.subscribe({
       next: () => {
         this.showModal.set(false);
         this.cart.limpiar();

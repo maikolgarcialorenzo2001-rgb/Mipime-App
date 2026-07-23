@@ -45,18 +45,18 @@ Chain strategy: feature-branch-chain
 - [x] 2.4 RED: Test CheckoutPayload emitted with correct fields per formaPago
 - [x] 2.5 GREEN: Emit full `CheckoutPayload` from `confirmar` output
 
-### PR2b — Services (tasks 2.6-2.10)
+### PR2b — Services (tasks 2.6-2.10) ✅
 
-- [ ] 2.6 RED: Test CuentaCosasService INSERT + stock salida + no afecta jornada
-- [ ] 2.7 GREEN: Create `src/app/services/cuenta-cosa.service.ts`
-- [ ] 2.8 RED: Test divisas total = monto * tasa + UPDATE jornadas
-- [ ] 2.9 RED: Test pendiente INSERT + stock pero salta UPDATE jornadas
-- [ ] 2.10 GREEN: Update `VentaService._ejecutar()` with payload param + conditional UPDATE
+- [x] 2.6 RED: Test CuentaCosasService INSERT + stock salida + no afecta jornada
+- [x] 2.7 GREEN: Create `src/app/services/cuenta-cosa.service.ts`
+- [x] 2.8 RED: Test divisas total = monto * tasa + UPDATE jornadas
+- [x] 2.9 RED: Test pendiente INSERT + stock pero salta UPDATE jornadas
+- [x] 2.10 GREEN: Update `VentaService._ejecutar()` with payload param + conditional UPDATE
 
-### PR2c — PosPage routing (tasks 2.11-2.12)
+### PR2c — PosPage routing (tasks 2.11-2.12) ✅
 
-- [ ] 2.11 RED: Test pos.page routes cuenta_cosas to CuentaCosasService
-- [ ] 2.12 GREEN: Update `PosPage.confirmarVenta()` switch on formaPago
+- [x] 2.11 RED: Test pos.page routes cuenta_cosas to CuentaCosasService
+- [x] 2.12 GREEN: Update `PosPage.confirmarVenta()` switch on formaPago
 
 ## Phase 3: PR3 — Excel + Jornada
 

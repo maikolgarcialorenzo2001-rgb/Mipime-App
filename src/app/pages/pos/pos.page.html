@@ -119,7 +119,7 @@
     [items]="cart.items()"
     [total]="cart.total()"
     [errorMessage]="ventaError()"
-    (confirmar)="confirmarVenta($event.formaPago)"
+    (confirmar)="confirmarVenta($event)"
     (cancelar)="cerrarModal()"
   />
 }
