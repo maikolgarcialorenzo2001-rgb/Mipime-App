@@ -90,10 +90,10 @@
         <tbody>
           @for (user of usuarios(); track user.id) {
             <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">
                 {{ user.nombre }}
                 @if (user.id === seedAdminId()) {
-                  <span class="text-sm">🔒</span>
+                  <span class="text-sm dark:text-gray-300">🔒</span>
                 }
                 @if (user.id === currentUserId()) {
                   <span class="text-sm text-gray-500 dark:text-gray-400">(usted)</span>

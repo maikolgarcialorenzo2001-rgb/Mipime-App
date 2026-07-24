@@ -55,8 +55,8 @@ export class CheckoutModalComponent {
 
     if (this.formaPago() === 'divisas') {
       payload.divisaTipo = this.divisaTipo();
-      payload.montoDivisa = this.montoDivisa();
-      payload.tasaCambio = this.tasaCambio();
+      payload.montoDivisa = this.montoDivisa() ?? undefined;
+      payload.tasaCambio = this.tasaCambio() ?? undefined;
     } else if (this.formaPago() === 'pendiente') {
       payload.compradorNombre = this.compradorNombre();
       payload.autorizadoPor = this.autorizadoPor();
