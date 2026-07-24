@@ -26,6 +26,10 @@ const mockItems: CartItem[] = [
   },
 ];
 
+const mockConsumos = [
+  { lote_id: 1, cantidad: 2, precio_costo_real: 550 },
+];
+
 function createMockDb(): Database {
   return {
     sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
@@ -33,24 +37,32 @@ function createMockDb(): Database {
   };
 }
 
+function createMockStockService() {
+  return {
+    registrarSalida: vi.fn().mockResolvedValue(mockConsumos),
+    registrarEntrada: vi.fn().mockResolvedValue(undefined),
+    registrarAjuste: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('VentaService', () => {
   let mockDb: Database;
+  let mockStockService: ReturnType<typeof createMockStockService>;
   let service: VentaService;
-  let stockMovimientoService: StockMovimientoService;
 
   beforeEach(() => {
     mockDb = createMockDb();
+    mockStockService = createMockStockService();
 
     TestBed.configureTestingModule({
       providers: [
         VentaService,
-        StockMovimientoService,
+        { provide: StockMovimientoService, useValue: mockStockService },
         { provide: DATABASE, useValue: mockDb },
       ],
     });
 
     service = TestBed.inject(VentaService);
-    stockMovimientoService = TestBed.inject(StockMovimientoService);
   });
 
   afterEach(() => {
@@ -59,24 +71,16 @@ describe('VentaService', () => {
 
   describe('registrar', () => {
     it('debería llamar a StockMovimientoService.registrarSalida por cada item', async () => {
-      // Mock: _validarStock (2) + BEGIN (1) + INSERT ventas (1) + INSERT detalle (1) + UPDATE stock (1) + UPDATE jornada (1) + registrarSalida (6) + COMMIT (1) = 14
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_actual: 50 }])   // 0: _validarStock item 1
         .mockResolvedValueOnce([{ stock_actual: 50 }])   // 1: _validarStock item 2
         .mockResolvedValueOnce([])                       // 2: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 2600, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
         .mockResolvedValueOnce([])                       // 4: INSERT detalle_ventas
-        .mockResolvedValueOnce([])                       // 5: UPDATE stock productos
-        .mockResolvedValueOnce([]);                      // 6: UPDATE jornada
-
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 7: SELECT stock item 1 (registrarSalida)
-        .mockResolvedValueOnce([])                       // 8: INSERT movimiento item 1
-        .mockResolvedValueOnce([])                       // 9: UPDATE stock item 1
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 10: SELECT stock item 2 (registrarSalida)
-        .mockResolvedValueOnce([])                       // 11: INSERT movimiento item 2
-        .mockResolvedValueOnce([])                       // 12: UPDATE stock item 2
-        .mockResolvedValueOnce([]);                      // 13: COMMIT
+        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 1
+        .mockResolvedValueOnce([])                       // 7: INSERT venta_lotes item 2
+        .mockResolvedValueOnce([]);                      // 8: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -88,23 +92,14 @@ describe('VentaService', () => {
       expect(venta.id).toBe(1);
       expect(venta.total).toBe(2600);
 
-      // Verificar que se llamó a registrarSalida para cada item
-      const allCalls = vi.mocked(mockDb.sql).mock.calls;
-
-      // Call 7 (0-based) = SELECT stock_actual for producto 1 (from registrarSalida)
-      expect(allCalls[7][0]).toContain('SELECT stock_actual');
-      expect(allCalls[7][1]).toEqual([mockItems[0].producto.id]);
-
-      // Call 10 (0-based) = SELECT stock_actual for producto 2 (from registrarSalida)
-      expect(allCalls[10][0]).toContain('SELECT stock_actual');
-      expect(allCalls[10][1]).toEqual([mockItems[1].producto.id]);
-
-      // El INSERT debe incluir usuario_id y forma_pago
-      const insertVenta = allCalls[3];
-      expect(insertVenta[0]).toContain('usuario_id');
-      expect(insertVenta[0]).toContain('forma_pago');
-      expect(insertVenta[1]).toContain(1); // usuarioId
-      expect(insertVenta[1]).toContain('efectivo'); // formaPago
+      // Verify registrarSalida called for each item via mocked service
+      expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(2);
+      expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
+        mockItems[0].producto.id, mockItems[0].cantidad,
+      );
+      expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
+        mockItems[1].producto.id, mockItems[1].cantidad,
+      );
     });
 
     it('2.1 RED: debería rechazar si usuarioId es falsy', async () => {
@@ -134,15 +129,10 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 2: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 2600, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
         .mockResolvedValueOnce([])                       // 4: INSERT detalle_ventas
-        .mockResolvedValueOnce([])                       // 5: UPDATE stock productos
-        .mockResolvedValueOnce([])                       // 6: UPDATE jornada
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 7: registrarSalida SELECT item 1
-        .mockResolvedValueOnce([])                       // 8: registrarSalida INSERT
-        .mockResolvedValueOnce([])                       // 9: registrarSalida UPDATE
-        .mockResolvedValueOnce([{ stock_actual: 40 }])  // 10: registrarSalida SELECT item 2
-        .mockResolvedValueOnce([])                       // 11: registrarSalida INSERT
-        .mockResolvedValueOnce([])                       // 12: registrarSalida UPDATE
-        .mockResolvedValueOnce([]);                      // 13: COMMIT
+        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 1
+        .mockResolvedValueOnce([])                       // 7: INSERT venta_lotes item 2
+        .mockResolvedValueOnce([]);                      // 8: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -221,12 +211,9 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1950, divisa_tipo: 'USD', monto_divisa: 3, tasa_cambio: 650, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
         .mockResolvedValueOnce([])                       // 3: INSERT detalle_ventas
-        .mockResolvedValueOnce([])                       // 4: UPDATE stock productos
-        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 6: registrarSalida SELECT
-        .mockResolvedValueOnce([])                       // 7: registrarSalida INSERT
-        .mockResolvedValueOnce([])                       // 8: registrarSalida UPDATE
-        .mockResolvedValueOnce([]);                      // 9: COMMIT
+        .mockResolvedValueOnce([])                       // 4: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 6: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -261,12 +248,9 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1300, divisa_tipo: 'EUR', monto_divisa: 2, tasa_cambio: 650, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
         .mockResolvedValueOnce([])                       // 3: INSERT detalle
-        .mockResolvedValueOnce([])                       // 4: UPDATE stock
-        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 6: registrarSalida SELECT
-        .mockResolvedValueOnce([])                       // 7: registrarSalida INSERT
-        .mockResolvedValueOnce([])                       // 8: registrarSalida UPDATE
-        .mockResolvedValueOnce([]);                      // 9: COMMIT
+        .mockResolvedValueOnce([])                       // 4: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 6: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -293,15 +277,10 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 2: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 2600, comprador_nombre: 'Carlos', autorizado_por: 'María', descripcion: 'Pago quincenal', created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
         .mockResolvedValueOnce([])                       // 4: INSERT detalle
-        .mockResolvedValueOnce([])                       // 5: UPDATE stock
         // NO UPDATE jornada
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 6: registrarSalida SELECT item 1
-        .mockResolvedValueOnce([])                       // 7: registrarSalida INSERT item 1
-        .mockResolvedValueOnce([])                       // 8: registrarSalida UPDATE item 1
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 9: registrarSalida SELECT item 2
-        .mockResolvedValueOnce([])                       // 10: registrarSalida INSERT item 2
-        .mockResolvedValueOnce([])                       // 11: registrarSalida UPDATE item 2
-        .mockResolvedValueOnce([]);                      // 12: COMMIT
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes item 1
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 2
+        .mockResolvedValueOnce([]);                      // 7: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -330,14 +309,10 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 2: BEGIN TRANSACTION
         .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 2600, comprador_nombre: 'Ana', autorizado_por: 'Pedro', descripcion: null, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
         .mockResolvedValueOnce([])                       // 4: INSERT detalle
-        .mockResolvedValueOnce([])                       // 5: UPDATE stock
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 6: registrarSalida SELECT item 1
-        .mockResolvedValueOnce([])                       // 7: registrarSalida INSERT item 1
-        .mockResolvedValueOnce([])                       // 8: registrarSalida UPDATE item 1
-        .mockResolvedValueOnce([{ stock_actual: 50 }])  // 9: registrarSalida SELECT item 2
-        .mockResolvedValueOnce([])                       // 10: registrarSalida INSERT item 2
-        .mockResolvedValueOnce([])                       // 11: registrarSalida UPDATE item 2
-        .mockResolvedValueOnce([]);                      // 12: COMMIT
+        // NO UPDATE jornada
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes item 1
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 2
+        .mockResolvedValueOnce([]);                      // 7: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,

@@ -146,7 +146,7 @@ export class VentaService {
       );
       const venta = ventas[0];
 
-      // 2. Insertar detalle_ventas y actualizar stock (por lotes de 25)
+      // 2. Insertar detalle_ventas por cada item
       const batchSize = 25;
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
@@ -170,27 +170,6 @@ export class VentaService {
            VALUES ${placeholders}`,
           flatParams,
         );
-
-        // Actualizar stock de cada producto en el lote
-        const stockCases = batch
-          .map(() => 'WHEN ? THEN stock_actual - ?')
-          .join(' ');
-        const stockIds = batch.map(() => '?').join(', ');
-        const stockParams: unknown[] = [];
-        for (const item of batch) {
-          stockParams.push(item.producto.id, item.cantidad);
-        }
-        for (const item of batch) {
-          stockParams.push(item.producto.id);
-        }
-
-        await this._db.sql(
-          `UPDATE productos
-           SET stock_actual = CASE id ${stockCases} END,
-                updated_at = ?
-           WHERE id IN (${stockIds})`,
-          [...stockParams, ahora],
-        );
       }
 
       // 3. Actualizar jornada SOLO si NO es pendiente
@@ -205,12 +184,26 @@ export class VentaService {
         );
       }
 
-      // 4. Registrar salida de stock para cada item (dentro de la transacción)
+      // 4. Consumir stock vía FIFO y registrar venta_lotes
       for (const item of items) {
-        await this._stockMovimiento.registrarSalida(
+        const consumos = await this._stockMovimiento.registrarSalida(
           item.producto.id,
           item.cantidad,
         );
+
+        // Insert venta_lotes records
+        if (consumos.length > 0) {
+          const vlPlaceholders = consumos.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+          const vlParams: unknown[] = [];
+          for (const c of consumos) {
+            vlParams.push(venta.id, c.lote_id, item.producto.id, c.cantidad, c.precio_costo_real, ahora);
+          }
+          await this._db.sql(
+            `INSERT INTO venta_lotes (venta_id, lote_id, producto_id, cantidad, precio_costo_real, created_at)
+             VALUES ${vlPlaceholders}`,
+            vlParams,
+          );
+        }
       }
 
       await this._db.sql('COMMIT');

@@ -10,24 +10,36 @@ function createMockDb(): Database {
   };
 }
 
+const mockConsumos = [
+  { lote_id: 1, cantidad: 2, precio_costo_real: 550 },
+];
+
+function createMockStockService() {
+  return {
+    registrarSalida: vi.fn().mockResolvedValue(mockConsumos),
+    registrarEntrada: vi.fn().mockResolvedValue(undefined),
+    registrarAjuste: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 describe('CuentaCosasService', () => {
   let mockDb: Database;
+  let mockStockService: ReturnType<typeof createMockStockService>;
   let service: CuentaCosasService;
-  let stockMovimientoService: StockMovimientoService;
 
   beforeEach(() => {
     mockDb = createMockDb();
+    mockStockService = createMockStockService();
 
     TestBed.configureTestingModule({
       providers: [
         CuentaCosasService,
-        StockMovimientoService,
+        { provide: StockMovimientoService, useValue: mockStockService },
         { provide: DATABASE, useValue: mockDb },
       ],
     });
 
     service = TestBed.inject(CuentaCosasService);
-    stockMovimientoService = TestBed.inject(StockMovimientoService);
   });
 
   afterEach(() => {
@@ -35,18 +47,13 @@ describe('CuentaCosasService', () => {
   });
 
   describe('registrar', () => {
-    it('2.6 RED: debería INSERT en cuenta_cosas y registrar salida de stock', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])                       // 0: INSERT INTO cuenta_cosas
-        .mockResolvedValueOnce([{ stock_actual: 50 }])   // 1: SELECT stock (registrarSalida)
-        .mockResolvedValueOnce([])                       // 2: INSERT movimiento
-        .mockResolvedValueOnce([]);                      // 3: UPDATE stock
-
+    it('2.6 RED: debería INSERT en cuenta_cosas y delegar salida de stock', async () => {
       await service.registrar(1, 1, 2, 'Retiro familiar', 'Juan');
 
       const allCalls = vi.mocked(mockDb.sql).mock.calls;
 
-      // Call 0: INSERT INTO cuenta_cosas
+      // Only DB call: INSERT INTO cuenta_cosas (registrarSalida is mocked)
+      expect(allCalls).toHaveLength(1);
       expect(allCalls[0][0]).toContain('INSERT INTO cuenta_cosas');
       expect(allCalls[0][1]).toContain(1); // jornada_id
       expect(allCalls[0][1]).toContain(1); // producto_id
@@ -54,19 +61,11 @@ describe('CuentaCosasService', () => {
       expect(allCalls[0][1]).toContain('Retiro familiar'); // descripcion
       expect(allCalls[0][1]).toContain('Juan'); // autorizado_por
 
-      // Calls 1-3: delegado a StockMovimientoService.registrarSalida
-      expect(allCalls[1][0]).toContain('SELECT stock_actual');
-      expect(allCalls[2][0]).toContain('INSERT INTO stock_movimientos');
-      expect(allCalls[3][0]).toContain('UPDATE productos');
+      // registrarSalida was delegated to StockMovimientoService
+      expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 2);
     });
 
     it('2.6 RED: NO debería modificar jornadas (sin UPDATE jornadas)', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])                       // 0: INSERT INTO cuenta_cosas
-        .mockResolvedValueOnce([{ stock_actual: 50 }])   // 1: registrarSalida SELECT
-        .mockResolvedValueOnce([])                       // 2: registrarSalida INSERT
-        .mockResolvedValueOnce([]);                      // 3: registrarSalida UPDATE
-
       await service.registrar(1, 1, 2, 'Retiro familiar', 'Juan');
 
       const allCalls = vi.mocked(mockDb.sql).mock.calls;

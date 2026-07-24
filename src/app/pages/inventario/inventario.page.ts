@@ -41,6 +41,7 @@ export class InventarioPage implements OnInit {
   } | null>(null);
   readonly showHistoryId = signal<number | null>(null);
   readonly movimientoCantidad = signal<number>(0);
+  readonly movimientoCosto = signal<number>(0);
   readonly movimientoMotivo = signal('');
 
   readonly filteredProductos = computed(() => {
@@ -79,13 +80,15 @@ export class InventarioPage implements OnInit {
     this.error.set(null);
     try {
       switch (action.tipo) {
-        case 'entrada':
+        case 'entrada': {
           await this.stockService.registrarEntrada(
             action.productoId,
             this.movimientoCantidad(),
+            this.movimientoCosto(),
             this.movimientoMotivo() || undefined,
           );
           break;
+        }
         case 'salida':
           await this.stockService.registrarSalida(
             action.productoId,

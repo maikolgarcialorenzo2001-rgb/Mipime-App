@@ -237,6 +237,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     component.movimientoCantidad.set(5);
+    component.movimientoCosto.set(500);
     component.movimientoMotivo.set('Repo');
     fixture.detectChanges();
 
@@ -246,6 +247,7 @@ describe('InventarioPage', () => {
     expect(mockStockService.registrarEntrada).toHaveBeenCalledWith(
       1,
       5,
+      500,
       'Repo',
     );
   });

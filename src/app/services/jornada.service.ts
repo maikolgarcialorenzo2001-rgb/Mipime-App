@@ -203,18 +203,29 @@ export class JornadaService {
       productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
     }
 
-    // 5. Calcular costo total de productos vendidos
+    // 5. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
     let totalCosto = 0;
     if (ventaIds.length > 0) {
       const costoPlaceholders = ventaIds.map(() => '?').join(', ');
       const costoResult = await this._db.sql<{ total_costo: number }>(
-        `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
-         FROM detalle_ventas dv
-         JOIN productos p ON p.id = dv.producto_id
-         WHERE dv.venta_id IN (${costoPlaceholders})`,
+        `SELECT COALESCE(SUM(vl.cantidad * vl.precio_costo_real), 0) as total_costo
+         FROM venta_lotes vl
+         WHERE vl.venta_id IN (${costoPlaceholders})`,
         ventaIds,
       );
       totalCosto = costoResult[0]?.total_costo ?? 0;
+
+      // Fallback: if no venta_lotes records (pre-FIFO sales), use product current cost
+      if (totalCosto === 0) {
+        const fallbackResult = await this._db.sql<{ total_costo: number }>(
+          `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
+           FROM detalle_ventas dv
+           JOIN productos p ON p.id = dv.producto_id
+           WHERE dv.venta_id IN (${costoPlaceholders})`,
+          ventaIds,
+        );
+        totalCosto = fallbackResult[0]?.total_costo ?? 0;
+      }
     }
 
     // 6. Obtener nombre del usuario que cerró
@@ -367,18 +378,29 @@ export class JornadaService {
       productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
     }
 
-    // 4. Calcular costo total de productos vendidos
+    // 4. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
     let totalCosto = 0;
     if (ventaIds.length > 0) {
       const costoPlaceholders = ventaIds.map(() => '?').join(', ');
       const costoResult = await this._db.sql<{ total_costo: number }>(
-        `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
-         FROM detalle_ventas dv
-         JOIN productos p ON p.id = dv.producto_id
-         WHERE dv.venta_id IN (${costoPlaceholders})`,
+        `SELECT COALESCE(SUM(vl.cantidad * vl.precio_costo_real), 0) as total_costo
+         FROM venta_lotes vl
+         WHERE vl.venta_id IN (${costoPlaceholders})`,
         ventaIds,
       );
       totalCosto = costoResult[0]?.total_costo ?? 0;
+
+      // Fallback for pre-FIFO sales
+      if (totalCosto === 0) {
+        const fallbackResult = await this._db.sql<{ total_costo: number }>(
+          `SELECT COALESCE(SUM(dv.cantidad * COALESCE(p.precio_costo, 0)), 0) as total_costo
+           FROM detalle_ventas dv
+           JOIN productos p ON p.id = dv.producto_id
+           WHERE dv.venta_id IN (${costoPlaceholders})`,
+          ventaIds,
+        );
+        totalCosto = fallbackResult[0]?.total_costo ?? 0;
+      }
     }
 
     // 5. Obtener nombre del usuario que cerró
