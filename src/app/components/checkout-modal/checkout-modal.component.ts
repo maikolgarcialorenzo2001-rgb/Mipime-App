@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { CartItem } from '../../services/cart.service';
@@ -30,8 +30,20 @@ export class CheckoutModalComponent {
 
   // Divisas sub-form
   readonly divisaTipo = signal<'EUR' | 'USD'>('USD');
-  readonly montoDivisa = signal<number | null>(null);
+  readonly montoDivisa = computed<number | null>(() => {
+    const tasa = this.tasaCambio();
+    const t = this.total();
+    if (tasa == null || tasa <= 0 || t <= 0) return null;
+    return Math.ceil(t / tasa);
+  });
   readonly tasaCambio = signal<number | null>(null);
+  readonly vuelto = computed<number | null>(() => {
+    const md = this.montoDivisa();
+    const tasa = this.tasaCambio();
+    const t = this.total();
+    if (md == null || tasa == null || tasa <= 0) return null;
+    return md * tasa - t;
+  });
 
   // Pendiente / Cuenta Cosas sub-form
   readonly compradorNombre = signal<string>('');

@@ -147,8 +147,8 @@ describe('CheckoutModalComponent', () => {
 
     component.seleccionarFormaPago('divisas');
     component.divisaTipo.set('USD');
-    component.montoDivisa.set(3);
     component.tasaCambio.set(650);
+    // montoDivisa is now computed: Math.ceil(1700 / 650) = 3
     component['onConfirmar']();
 
     expect(spy).toHaveBeenCalledWith({
@@ -211,5 +211,50 @@ describe('CheckoutModalComponent', () => {
     component['onConfirmar']();
 
     expect(spy).toHaveBeenCalledWith({ formaPago: 'transferencia' });
+  });
+
+  // ─── Bug 4: Divisas — montoDivisa computed y vuelto ───────────────
+
+  it('5.4 RED: montoDivisa debe ser computed como Math.ceil(total / tasaCambio)', () => {
+    component.tasaCambio.set(1000);
+    // total is 1700 (set in beforeEach)
+    expect(component.montoDivisa()).toBe(2); // Math.ceil(1700 / 1000) = 2
+  });
+
+  it('5.4 RED: montoDivisa debe ser null cuando total <= 0', () => {
+    fixture.componentRef.setInput('total', 0);
+    fixture.detectChanges();
+    component.tasaCambio.set(1000);
+    expect(component.montoDivisa()).toBeNull();
+  });
+
+  it('5.4 RED: montoDivisa debe ser null cuando tasaCambio es null o <= 0', () => {
+    expect(component.montoDivisa()).toBeNull(); // tasaCambio is null
+    component.tasaCambio.set(0);
+    expect(component.montoDivisa()).toBeNull();
+  });
+
+  it('5.4 RED: vuelto debe ser computed como md * tasa - total', () => {
+    component.tasaCambio.set(1000);
+    // montoDivisa = Math.ceil(1700 / 1000) = 2
+    // vuelto = 2 * 1000 - 1700 = 300
+    expect(component.vuelto()).toBe(300);
+  });
+
+  it('5.4 RED: vuelto debe ser null cuando montoDivisa es null', () => {
+    expect(component.vuelto()).toBeNull(); // no tasaCambio set
+  });
+
+  it('5.4 RED: input montoDivisa debe ser readonly', () => {
+    component.seleccionarFormaPago('divisas');
+    component.tasaCambio.set(1000);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const numberInputs = el.querySelectorAll('input[type="number"]');
+    // Find the montoDivisa input (first number input in divisas sub-form)
+    const montoInput = numberInputs[0];
+    expect(montoInput).toBeTruthy();
+    expect(montoInput.hasAttribute('readonly')).toBe(true);
   });
 });

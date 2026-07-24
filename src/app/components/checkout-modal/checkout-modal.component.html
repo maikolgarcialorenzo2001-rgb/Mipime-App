@@ -162,10 +162,10 @@
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Monto en divisa</label>
           <input
             type="number"
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+            readonly
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 cursor-not-allowed"
             placeholder="0"
             [ngModel]="montoDivisa()"
-            (ngModelChange)="montoDivisa.set($event)"
           />
         </div>
         <div>
@@ -248,6 +248,17 @@
       </span>
     </div>
 
+    @if (formaPago() === 'divisas'; as _) {
+      @if (vuelto(); as v) {
+        <div class="mb-6 flex items-baseline justify-between">
+          <span class="text-sm font-medium text-green-600 dark:text-green-400">Vuelto estimado</span>
+          <span class="text-lg font-semibold text-green-600 dark:text-green-400">
+            {{ v | currency:'ARS':'symbol-narrow':'1.0-0' }}
+          </span>
+        </div>
+      }
+    }
+
     <div class="flex gap-3">
       <button
         type="button"
@@ -261,7 +272,8 @@
       </button>
       <button
         type="button"
-        class="flex-1 cursor-pointer rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 transition-colors"
+        class="flex-1 cursor-pointer rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        [disabled]="formaPago() === 'divisas' && (tasaCambio() == null || tasaCambio()! <= 0)"
         (click)="onConfirmar()"
       >
         <span class="inline-flex items-center gap-1.5">
