@@ -1,0 +1,62 @@
+# electron-builder configuration
+# Docs: https://www.electron.build/configuration/configuration
+
+appId: com.mipime.cuentas
+productName: Tienda - App
+copyright: Copyright © 2026 Mipime
+
+directories:
+  output: release
+
+# Compiled Electron sources (tsc output)
+files:
+  - dist-electron/main.js
+  - dist-electron/preload.js
+  - dist-electron/window-state.js
+  - dist/Mipime-Cuentas/browser/**/*
+  - package.json
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Tienda - App
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  category: public.app-category.finance
+  hardenedRuntime: true
+
+dmg:
+  title: Tienda - App
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Finance
+  icon: build/icon.png
+
+# Publish configuration for electron-updater
+publish:
+  provider: github
+  owner: mipime
+  repo: mipime-cuentas
+  releaseType: draft

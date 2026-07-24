@@ -70,7 +70,7 @@ export class ExcelService {
     const cc = data.cuentaCosas ?? [];
 
     const filas: unknown[][] = [
-      ['Mipime-Cuentas — Resumen de Jornada'],
+      ['Tienda - App — Resumen de Jornada'],
       [],
       ['Fecha', j.fecha],
       ['Apertura', j.hora_apertura],
@@ -246,7 +246,7 @@ export class ExcelService {
     const mesLabel = fecha.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
 
     const filas: unknown[][] = [
-      ['Mipime-Cuentas — Resumen del Mes'],
+      ['Tienda - App — Resumen del Mes'],
       [],
       ['Mes', mesLabel],
       ['Cantidad de jornadas', data.length],
@@ -270,7 +270,7 @@ export class ExcelService {
   private _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const j = data.jornada;
     const filas: unknown[][] = [
-      ['Mipime-Cuentas — Resumen de Jornada'],
+      ['Tienda - App — Resumen de Jornada'],
       [],
       ['Fecha', j.fecha],
       ['Apertura', j.hora_apertura],
