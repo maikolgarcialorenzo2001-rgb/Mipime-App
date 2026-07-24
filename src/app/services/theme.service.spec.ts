@@ -2,6 +2,11 @@ import { TestBed } from '@angular/core/testing';
 import { ThemeService } from './theme.service';
 
 describe('ThemeService', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+  });
+
   afterEach(() => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
