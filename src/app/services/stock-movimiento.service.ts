@@ -12,19 +12,25 @@ export class StockMovimientoService {
     productoId: number,
     cantidad: number,
     motivo?: string,
+    jornadaId?: number,
   ): Promise<void> {
     const ahora = new Date().toISOString();
 
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
+    const placeholders = '?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
+    const params: unknown[] = [productoId, cantidad, 'entrada', motivo ?? null, ahora];
+    if (jornadaId !== undefined) params.push(jornadaId);
+
     await this._db.sql(
-      `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
-       VALUES (?, ?, 'entrada', ?, ?)`,
-      [productoId, cantidad, motivo ?? null, ahora],
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (${placeholders})`,
+      params,
     );
 
     await this._db.sql(
       `UPDATE productos
        SET stock_actual = stock_actual + ?,
-           updated_at = ?
+            updated_at = ?
        WHERE id = ?`,
       [cantidad, ahora, productoId],
     );
@@ -34,6 +40,7 @@ export class StockMovimientoService {
     productoId: number,
     cantidad: number,
     motivo?: string,
+    jornadaId?: number,
   ): Promise<void> {
     const ahora = new Date().toISOString();
 
@@ -47,16 +54,21 @@ export class StockMovimientoService {
       throw new Error('Stock insuficiente');
     }
 
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
+    const placeholders = '?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
+    const params: unknown[] = [productoId, cantidad, 'salida', motivo ?? null, ahora];
+    if (jornadaId !== undefined) params.push(jornadaId);
+
     await this._db.sql(
-      `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
-       VALUES (?, ?, 'salida', ?, ?)`,
-      [productoId, cantidad, motivo ?? null, ahora],
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (${placeholders})`,
+      params,
     );
 
     await this._db.sql(
       `UPDATE productos
        SET stock_actual = stock_actual - ?,
-           updated_at = ?
+            updated_at = ?
        WHERE id = ?`,
       [cantidad, ahora, productoId],
     );
@@ -66,6 +78,7 @@ export class StockMovimientoService {
     productoId: number,
     cantidad: number,
     motivo: string,
+    jornadaId?: number,
   ): Promise<void> {
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
@@ -73,16 +86,21 @@ export class StockMovimientoService {
 
     const ahora = new Date().toISOString();
 
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
+    const placeholders = '?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
+    const params: unknown[] = [productoId, cantidad, 'ajuste', motivo, ahora];
+    if (jornadaId !== undefined) params.push(jornadaId);
+
     await this._db.sql(
-      `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
-       VALUES (?, ?, 'ajuste', ?, ?)`,
-      [productoId, cantidad, motivo, ahora],
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (${placeholders})`,
+      params,
     );
 
     await this._db.sql(
       `UPDATE productos
        SET stock_actual = ?,
-           updated_at = ?
+            updated_at = ?
        WHERE id = ?`,
       [cantidad, ahora, productoId],
     );

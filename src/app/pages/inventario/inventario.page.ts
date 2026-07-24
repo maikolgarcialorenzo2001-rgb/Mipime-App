@@ -137,4 +137,127 @@ export class InventarioPage implements OnInit {
       this.movimientosLoading.set(false);
     }
   }
+
+  // ── CRUD Productos ──────────────────────────────────────────────
+
+  readonly showProductoModal = signal(false);
+  readonly editandoProductoId = signal<number | null>(null);
+  readonly formNombre = signal('');
+  readonly formCosto = signal<number>(0);
+  readonly formPrecioVenta = signal<number>(0);
+  readonly formUnidades = signal<number>(0);
+  readonly formError = signal<string | null>(null);
+  readonly confirmandoEliminar = signal<number | null>(null);
+  readonly procesando = signal(false);
+
+  abrirNuevoProducto(): void {
+    this.formNombre.set('');
+    this.formCosto.set(0);
+    this.formPrecioVenta.set(0);
+    this.formUnidades.set(0);
+    this.formError.set(null);
+    this.procesando.set(false);
+    this.editandoProductoId.set(null);
+    this.showProductoModal.set(true);
+  }
+
+  abrirEditarProducto(p: Producto): void {
+    this.formNombre.set(p.nombre);
+    this.formCosto.set(p.precio_costo ?? 0);
+    this.formPrecioVenta.set(p.precio_venta);
+    this.formUnidades.set(p.stock_actual);
+    this.formError.set(null);
+    this.procesando.set(false);
+    this.editandoProductoId.set(p.id);
+    this.showProductoModal.set(true);
+  }
+
+  cerrarModal(): void {
+    this.showProductoModal.set(false);
+    this.editandoProductoId.set(null);
+    this.formNombre.set('');
+    this.formCosto.set(0);
+    this.formPrecioVenta.set(0);
+    this.formUnidades.set(0);
+    this.formError.set(null);
+    this.procesando.set(false);
+  }
+
+  async guardarProducto(): Promise<void> {
+    // Validate required fields
+    if (!this.formNombre()?.trim()) {
+      this.formError.set('El nombre es obligatorio');
+      return;
+    }
+    if (!this.formCosto() && this.formCosto() !== 0) {
+      this.formError.set('El precio de costo es obligatorio');
+      return;
+    }
+    if (!this.formPrecioVenta() && this.formPrecioVenta() !== 0) {
+      this.formError.set('El precio de venta es obligatorio');
+      return;
+    }
+    if (!this.editandoProductoId() && !this.formUnidades() && this.formUnidades() !== 0) {
+      this.formError.set('Las unidades son obligatorias');
+      return;
+    }
+
+    this.procesando.set(true);
+    this.formError.set(null);
+
+    try {
+      if (this.editandoProductoId()) {
+        await firstValueFrom(
+          this.productoService.actualizar(this.editandoProductoId()!, {
+            nombre: this.formNombre().trim(),
+            precio_costo: this.formCosto(),
+            precio_venta: this.formPrecioVenta(),
+          }),
+        );
+      } else {
+        await firstValueFrom(
+          this.productoService.crear({
+            nombre: this.formNombre().trim(),
+            precio_costo: this.formCosto(),
+            precio_venta: this.formPrecioVenta(),
+            stock_actual: this.formUnidades(),
+          }),
+        );
+      }
+      this.cerrarModal();
+      await this.loadProductos();
+    } catch (e) {
+      this.formError.set(
+        e instanceof Error ? e.message : 'Error al guardar producto',
+      );
+    } finally {
+      this.procesando.set(false);
+    }
+  }
+
+  confirmarEliminar(id: number): void {
+    this.confirmandoEliminar.set(id);
+  }
+
+  cancelarEliminar(): void {
+    this.confirmandoEliminar.set(null);
+  }
+
+  async ejecutarEliminar(): Promise<void> {
+    const id = this.confirmandoEliminar();
+    if (id === null) return;
+
+    this.procesando.set(true);
+    try {
+      await firstValueFrom(this.productoService.eliminar(id));
+      this.confirmandoEliminar.set(null);
+      await this.loadProductos();
+    } catch (e) {
+      this.error.set(
+        e instanceof Error ? e.message : 'Error al eliminar producto',
+      );
+    } finally {
+      this.procesando.set(false);
+    }
+  }
 }

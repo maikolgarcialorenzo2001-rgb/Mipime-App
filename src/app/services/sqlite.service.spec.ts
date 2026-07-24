@@ -439,3 +439,89 @@ describe('SqliteService migration v6', () => {
     expect(insertV6!.query).toContain('SELECT id, jornada_id, fecha_hora, total, created_at, usuario_id, forma_pago');
   });
 });
+
+describe('SqliteService migration v7', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('C1 RED: migration v7 debería agregar columna jornada_id a stock_movimientos', async () => {
+    mockSchemaVersion = 6;
+    await service.initialize();
+
+    // Debería ejecutar ALTER TABLE con jornada_id
+    const alterTable = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('stock_movimientos') &&
+        c.query.includes('ADD COLUMN'),
+    );
+    expect(alterTable).toBeDefined();
+    expect(alterTable!.query).toContain('jornada_id');
+    expect(alterTable!.query).toContain('REFERENCES jornadas(id)');
+
+    // Debería insertar version 7
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (7)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('C1 RED: migration v7 debería ser segura con try/catch si columna ya existe', async () => {
+    mockSchemaVersion = 6;
+    await service.initialize();
+
+    // El ALTER TABLE no debería romper si la columna ya existe (envuelto en try/catch)
+    const alterCalls = sqlCalls.filter(
+      (c) => c.query.includes('ALTER TABLE') && c.query.includes('stock_movimientos'),
+    );
+    // En condiciones normales debe ejecutarse al menos una vez
+    expect(alterCalls.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('C1 RED: migration v7 no debería ejecutarse si version >= 7', async () => {
+    mockSchemaVersion = 7;
+    await service.initialize();
+
+    const alterCalls = sqlCalls.filter(
+      (c) => c.query.includes('ALTER TABLE') && c.query.includes('stock_movimientos'),
+    );
+    expect(alterCalls.length).toBe(0);
+  });
+});

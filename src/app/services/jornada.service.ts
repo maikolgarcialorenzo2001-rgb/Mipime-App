@@ -5,6 +5,7 @@ import { ExcelService, type JornadaReportData, type VentaConDetalles } from './e
 import type { Jornada, JornadaReporte } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
+import type { StockMovimiento } from '../models/stock-movimiento';
 
 @Injectable({
   providedIn: 'root',
@@ -223,20 +224,34 @@ export class JornadaService {
     );
     const userCierreNombre = users[0]?.nombre ?? null;
 
-    // 7. Agrupar detalles por venta
+    // 7. Obtener cuenta_cosas de la jornada
+    const cuentaCosas = await this._db.sql<import('../models/cuenta-cosa').CuentaCosa>(
+      'SELECT * FROM cuenta_cosas WHERE jornada_id = ? ORDER BY id',
+      [id],
+    );
+
+    // 8. Agrupar detalles por venta
     const ventasConDetalles = ventas.map((v) => ({
       ...v,
       detalles: detalles.filter((d) => d.venta_id === v.id),
     }));
 
-    // 8. Generar Excel con estado fresco y nombres de producto
+    // 9. Obtener movimientos de stock de la jornada
+    const stockMovimientos = await this._db.sql<StockMovimiento>(
+      'SELECT * FROM stock_movimientos WHERE jornada_id = ? ORDER BY created_at',
+      [id],
+    );
+
+    // 10. Generar Excel con estado fresco y nombres de producto
     const base64 = this._excelService.generarExcelJornada({
       jornada,
       ventas: ventasConDetalles,
       movimientos,
+      stockMovimientos,
       productosMap,
       totalCosto,
       userCierreNombre,
+      cuentaCosas,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
@@ -267,9 +282,11 @@ export class JornadaService {
               jornada: j,
               ventas: datos.ventas,
               movimientos: datos.movimientos,
+              stockMovimientos: datos.stockMovimientos,
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
+              cuentaCosas: datos.cuentaCosas,
             }),
           ),
         );
@@ -291,9 +308,11 @@ export class JornadaService {
         jornada: { id: jornadaId } as Jornada,
         ventas: datos.ventas,
         movimientos: datos.movimientos,
+        stockMovimientos: datos.stockMovimientos,
         productosMap: datos.productosMap,
         totalCosto: datos.totalCosto,
         userCierreNombre: datos.userCierreNombre,
+        cuentaCosas: datos.cuentaCosas,
       })),
     );
   }
@@ -305,9 +324,11 @@ export class JornadaService {
   private async _recolectarDatosJornada(jornadaId: number, userId: number | null): Promise<{
     ventas: VentaConDetalles[];
     movimientos: Movimiento[];
+    stockMovimientos: StockMovimiento[];
     productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
     totalCosto: number;
     userCierreNombre: string | null;
+    cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
   }> {
     // 1. Obtener ventas con detalles de esta jornada
     const ventas = await this._db.sql<Venta>(
@@ -328,6 +349,12 @@ export class JornadaService {
     // 2. Obtener movimientos de la jornada
     const movimientos = await this._db.sql<Movimiento>(
       'SELECT * FROM movimientos WHERE jornada_id = ? ORDER BY id',
+      [jornadaId],
+    );
+
+    // 2b. Obtener movimientos de stock de la jornada
+    const stockMovimientos = await this._db.sql<StockMovimiento>(
+      'SELECT * FROM stock_movimientos WHERE jornada_id = ? ORDER BY created_at',
       [jornadaId],
     );
 
@@ -364,7 +391,13 @@ export class JornadaService {
       userCierreNombre = users[0]?.nombre ?? null;
     }
 
-    // 6. Agrupar detalles por venta
+    // 6. Obtener cuenta_cosas de la jornada
+    const cuentaCosas = await this._db.sql<import('../models/cuenta-cosa').CuentaCosa>(
+      'SELECT * FROM cuenta_cosas WHERE jornada_id = ? ORDER BY id',
+      [jornadaId],
+    );
+
+    // 7. Agrupar detalles por venta
     const ventasConDetalles = ventas.map((v) => ({
       ...v,
       detalles: detalles.filter((d) => d.venta_id === v.id),
@@ -373,9 +406,11 @@ export class JornadaService {
     return {
       ventas: ventasConDetalles,
       movimientos,
+      stockMovimientos,
       productosMap,
       totalCosto,
       userCierreNombre,
+      cuentaCosas,
     };
   }
 
@@ -415,6 +450,51 @@ export class JornadaService {
         'SELECT * FROM jornadas WHERE fecha BETWEEN ? AND ? AND estado = ? ORDER BY fecha',
         [desde, hasta, 'cerrada'],
       ),
+    );
+  }
+
+  /**
+   * Retorna las jornadas cerradas en un rango de fechas.
+   * @param desde fecha ISO (YYYY-MM-DD)
+   * @param hasta fecha ISO (YYYY-MM-DD)
+   */
+  jornadasDelRango(desde: string, hasta: string): Observable<Jornada[]> {
+    return from(
+      this._db.sql<Jornada>(
+        'SELECT * FROM jornadas WHERE fecha BETWEEN ? AND ? AND estado = ? ORDER BY fecha',
+        [desde, hasta, 'cerrada'],
+      ),
+    );
+  }
+
+  /**
+   * Genera la exportación por rango de fechas.
+   * Recolecta datos de cada jornada y genera Excel multi-hoja.
+   * @returns Observable que emite el base64 del Excel
+   */
+  generarExportacionPorRango(desde: string, hasta: string): Observable<string> {
+    return this.jornadasDelRango(desde, hasta).pipe(
+      switchMap((jornadas) => {
+        if (jornadas.length === 0) {
+          throw new Error('No hay jornadas en el rango seleccionado.');
+        }
+        const dataPromises = jornadas.map((j) =>
+          this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
+            (datos): JornadaReportData => ({
+              jornada: j,
+              ventas: datos.ventas,
+              movimientos: datos.movimientos,
+              stockMovimientos: datos.stockMovimientos,
+              productosMap: datos.productosMap,
+              totalCosto: datos.totalCosto,
+              userCierreNombre: datos.userCierreNombre,
+              cuentaCosas: datos.cuentaCosas,
+            }),
+          ),
+        );
+        return from(Promise.all(dataPromises));
+      }),
+      map((allData) => this._excelService.generarExcelMensual(allData)),
     );
   }
 

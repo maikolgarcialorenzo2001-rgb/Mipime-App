@@ -28,6 +28,21 @@ const mockJornadas: Jornada[] = [
     updated_at: '2026-06-04T18:30:00Z',
   },
   {
+    id: 4,
+    fecha: '2026-06-04',
+    hora_apertura: '14:00:00',
+    hora_cierre: '22:30:00',
+    monto_inicial: 3000,
+    total_ventas: 15000,
+    total_gastos: 1000,
+    saldo_esperado: 17000,
+    saldo_real: 16900,
+    estado: 'cerrada',
+    user_cierre_id: 2,
+    created_at: '2026-06-04T14:00:00Z',
+    updated_at: '2026-06-04T22:30:00Z',
+  },
+  {
     id: 2,
     fecha: '2026-06-03',
     hora_apertura: '08:30:00',
@@ -81,6 +96,7 @@ describe('HistorialPage', () => {
           useValue: {
             historial: () => of(mockJornadas),
             generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -121,12 +137,14 @@ describe('HistorialPage', () => {
     const dayButtons = Array.from(buttons).filter(
       (b) => b instanceof HTMLElement && b.querySelector('app-estado-badge'),
     );
+    // 3 unique days with jornadas (Jun 1, Jun 3, Jun 4)
     expect(dayButtons.length).toBe(3);
   });
 
-  it('debería mostrar estado badge en celdas con jornada', () => {
+  it('debería mostrar estado badge en celdas con jornada — ahora 4 badges (2 en Jun 4 + 1 Jun 3 + 1 Jun 1)', () => {
     const badges = fixture.nativeElement.querySelectorAll('app-estado-badge');
-    expect(badges.length).toBe(3);
+    // 2 badges on Jun 4 + 1 on Jun 3 + 1 on Jun 1 = 4
+    expect(badges.length).toBe(4);
   });
 
   it('debería seleccionar/deseleccionar un día al hacer click', () => {
@@ -300,6 +318,132 @@ describe('HistorialPage', () => {
     });
   });
 
+  describe('Multi-jornada (Feature A)', () => {
+    it('A.1 RED: _jornadasPorFecha debería agrupar múltiples jornadas de la misma fecha', () => {
+      // Arrange: 2 jornadas on 2026-06-04 (mockJornadas[0] and mockJornadas[1])
+      const map = (component as any)._jornadasPorFecha();
+      const arr = map.get('2026-06-04');
+      expect(arr).toBeDefined();
+      expect(arr.length).toBe(2);
+      expect(arr[0].id).toBe(3);
+      expect(arr[1].id).toBe(4);
+    });
+
+    it('A.1 RED: _jornadasPorFecha debería tener jornadas únicas para fechas sin duplicados', () => {
+      const map = (component as any)._jornadasPorFecha();
+      expect(map.get('2026-06-03')!.length).toBe(1);
+      expect(map.get('2026-06-01')!.length).toBe(1);
+    });
+
+    it('A.2 RED: diaSeleccionado debería retornar array de jornadas cuando hay múltiples', () => {
+      component.seleccionarDia('2026-06-04');
+      fixture.detectChanges();
+
+      const sel = component.diaSeleccionado();
+      expect(sel).not.toBeNull();
+      expect(sel!.fecha).toBe('2026-06-04');
+      expect(sel!.jornadas.length).toBe(2);
+    });
+
+    it('A.2 RED: diaSeleccionado debería retornar array vacío cuando no hay jornada', () => {
+      component.seleccionarDia('2026-06-02');
+      fixture.detectChanges();
+
+      const sel = component.diaSeleccionado();
+      expect(sel).not.toBeNull();
+      expect(sel!.jornadas).toEqual([]);
+    });
+
+    it('A.3 RED: calendario debería mostrar 4 badges (2 en el día 4, 1 en el 3, 1 en el 1)', () => {
+      fixture.detectChanges();
+      const badges = fixture.nativeElement.querySelectorAll('app-estado-badge');
+      // 2 badges on junio 4 (id=3, id=4) + 1 badge on junio 3 + 1 badge on junio 1 = 4
+      expect(badges.length).toBe(4);
+    });
+
+    it('A.2 RED: panel de detalle debería mostrar 2 tarjetas cuando hay 2 jornadas', () => {
+      component.seleccionarDia('2026-06-04');
+      fixture.detectChanges();
+
+      // Each jornada card is a div inside the detail panel with its own Descargar Excel button
+      const downloadButtons = fixture.nativeElement.querySelectorAll(
+        '.rounded-xl.bg-white.p-5 button',
+      );
+      // There should be at least 2 buttons (one per jornada card)
+      // Filter: find buttons containing "Descargar Excel"
+      const excelBtns = Array.from(downloadButtons).filter(
+        (b) => b instanceof HTMLElement && b.textContent?.includes('Descargar Excel'),
+      );
+      // 2 jornadas on Jun 4 → 2 Descargar Excel buttons (one per jornada card)
+      expect(excelBtns.length).toBe(2);
+    });
+
+    it('A.2 RED: panel de detalle con fecha sin jornada muestra mensaje vacío', () => {
+      component.seleccionarDia('2026-06-02');
+      fixture.detectChanges();
+
+      const detailPanel: HTMLElement | null = fixture.nativeElement.querySelector('.rounded-xl.bg-white.p-5');
+      expect(detailPanel).toBeTruthy();
+      expect(detailPanel?.textContent).toContain('No hay jornada registrada');
+    });
+  });
+
+  describe('Exportar rango (Feature D)', () => {
+    it('D.1 RED: showRangePicker debería empezar como false', () => {
+      expect(component.showRangePicker()).toBe(false);
+    });
+
+    it('D.1 RED: toggleRangePicker debería cambiar showRangePicker', () => {
+      component.toggleRangePicker();
+      fixture.detectChanges();
+      expect(component.showRangePicker()).toBe(true);
+
+      component.toggleRangePicker();
+      expect(component.showRangePicker()).toBe(false);
+    });
+
+    it('D.2 RED: exportarRango debería llamar al servicio con fechas correctas', () => {
+      const service = TestBed.inject(JornadaService);
+      component.rangeDesde.set('2026-06-01');
+      component.rangeHasta.set('2026-06-15');
+      component.exportarRango();
+
+      expect(service.generarExportacionPorRango).toHaveBeenCalledWith('2026-06-01', '2026-06-15');
+    });
+
+    it('D.2 RED: exportarRango debería mostrar error si faltan fechas', () => {
+      component.rangeDesde.set('');
+      component.rangeHasta.set('2026-06-15');
+      component.exportarRango();
+
+      expect(component.errorExport()).toBe('Seleccioná fecha desde y hasta para exportar.');
+    });
+
+    it('D.2 RED: exportarRango debería limpiar error al completar', () => {
+      const service = TestBed.inject(JornadaService);
+      component.errorExport.set('error previo');
+      component.rangeDesde.set('2026-06-01');
+      component.rangeHasta.set('2026-06-15');
+      component.exportarRango();
+
+      expect(component.errorExport()).toBeNull();
+    });
+
+    it('D.2 RED: exportarRango debería manejar error del servicio', () => {
+      const service = TestBed.inject(JornadaService);
+      vi.mocked(service.generarExportacionPorRango).mockReturnValue(
+        throwError(() => new Error('Error al exportar')),
+      );
+
+      component.rangeDesde.set('2026-06-01');
+      component.rangeHasta.set('2026-06-15');
+      component.exportarRango();
+
+      expect(component.errorExport()).toBe('Error al exportar');
+      expect(component.exportandoRango()).toBe(false);
+    });
+  });
+
   describe('Vista previa', () => {
     it('debería abrir preview con los datos de la jornada', () => {
       const service = TestBed.inject(JornadaService);
@@ -384,6 +528,7 @@ describe('HistorialPage — vacío', () => {
           useValue: {
             historial: () => of([]),
             generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -418,6 +563,7 @@ describe('HistorialPage — error', () => {
           useValue: {
             historial: () => of([]),
             generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },

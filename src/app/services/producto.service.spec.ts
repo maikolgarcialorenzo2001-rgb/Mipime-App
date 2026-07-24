@@ -124,4 +124,95 @@ describe('ProductoService', () => {
       expect(resultado).toBeNull();
     });
   });
+
+  describe('crear', () => {
+    it('debería insertar un nuevo producto y retornarlo', async () => {
+      const nuevoProducto: Producto = {
+        id: 4,
+        nombre: 'Nuevo Producto',
+        descripcion: null,
+        precio_venta: 1500,
+        precio_costo: 1000,
+        stock_actual: 20,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.crear({
+          nombre: 'Nuevo Producto',
+          precio_costo: 1000,
+          precio_venta: 1500,
+          stock_actual: 20,
+        }),
+      );
+
+      expect(resultado).toEqual(nuevoProducto);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO productos'),
+        expect.arrayContaining([
+          'Nuevo Producto',
+          null,
+          1000,
+          1500,
+          20,
+        ]),
+      );
+    });
+  });
+
+  describe('actualizar', () => {
+    it('debería actualizar un producto existente y retornarlo', async () => {
+      const productoActualizado: Producto = {
+        id: 1,
+        nombre: 'Harina 0000 1kg Editado',
+        descripcion: 'Harina de trigo',
+        precio_venta: 900,
+        precio_costo: 600,
+        stock_actual: 50,
+        created_at: '2026-06-02T22:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+
+      vi.mocked(mockDb.sql).mockResolvedValue([productoActualizado]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.actualizar(1, {
+          nombre: 'Harina 0000 1kg Editado',
+          precio_costo: 600,
+          precio_venta: 900,
+        }),
+      );
+
+      expect(resultado).toEqual(productoActualizado);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE productos'),
+        expect.arrayContaining([
+          'Harina 0000 1kg Editado',
+          600,
+          900,
+          1,
+        ]),
+      );
+    });
+  });
+
+  describe('eliminar', () => {
+    it('debería eliminar un producto por id', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(service.eliminar(1));
+
+      expect(resultado).toBeUndefined();
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM productos'),
+        [1],
+      );
+    });
+  });
 });

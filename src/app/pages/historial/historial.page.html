@@ -19,7 +19,7 @@
         <span class="material-symbols-outlined leading-none text-gray-600 dark:text-gray-400">chevron_left</span>
       </button>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 capitalize">{{ mesTitulo() }}</h2>
 
         @if (tieneJornadasCerradas()) {
@@ -42,6 +42,18 @@
               </span>
             }
           </button>
+
+          <button
+            type="button"
+            data-testid="btn-exportar-rango"
+            class="cursor-pointer rounded-lg border border-blue-600 dark:border-blue-500 px-3 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+            (click)="toggleRangePicker()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-xs">date_range</span>
+              Exportar rango
+            </span>
+          </button>
         }
       </div>
 
@@ -61,6 +73,63 @@
       </div>
     }
 
+    <!-- Selector de rango de fechas -->
+    @if (showRangePicker()) {
+      <div class="mb-4 rounded-xl bg-white dark:bg-gray-900 p-4 shadow-lg dark:shadow-gray-950/50 ring-1 ring-gray-200 dark:ring-gray-700">
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1" for="range-desde">Desde</label>
+            <input
+              id="range-desde"
+              type="date"
+              data-testid="input-range-desde"
+              class="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              [ngModel]="rangeDesde()"
+              (ngModelChange)="rangeDesde.set($event)"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1" for="range-hasta">Hasta</label>
+            <input
+              id="range-hasta"
+              type="date"
+              data-testid="input-range-hasta"
+              class="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              [ngModel]="rangeHasta()"
+              (ngModelChange)="rangeHasta.set($event)"
+            />
+          </div>
+          <button
+            type="button"
+            data-testid="btn-confirmar-rango"
+            class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            [disabled]="exportandoRango()"
+            (click)="exportarRango()"
+          >
+            @if (exportandoRango()) {
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                Generando…
+              </span>
+            } @else {
+              <span class="inline-flex items-center gap-1.5">
+                <span class="material-symbols-outlined leading-none text-xs">download</span>
+                Exportar
+              </span>
+            }
+          </button>
+          <button
+            type="button"
+            data-testid="btn-cancelar-rango"
+            class="cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            (click)="toggleRangePicker()"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    }
+
     <!-- Grid del calendario — siempre visible -->
     <div class="rounded-xl bg-white dark:bg-gray-900 shadow-lg dark:shadow-gray-950/50 ring-1 ring-gray-200 dark:ring-gray-700">
       <!-- Cabecera de días de la semana -->
@@ -75,46 +144,52 @@
       <!-- Días del mes -->
       <div class="grid grid-cols-7">
         @for (cell of grid(); track $index) {
-          @if (cell.day !== null && cell.jornada) {
-            <!-- Día con jornada -->
-            <button
-              type="button"
-              class="flex cursor-pointer flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 min-h-[90px]"
-              [class.bg-blue-50]="selectedDateStr() === cell.dateStr"
-              [class.dark:bg-blue-900/30]="selectedDateStr() === cell.dateStr"
-              [class.ring-2]="selectedDateStr() === cell.dateStr"
-              [class.ring-inset]="selectedDateStr() === cell.dateStr"
-              [class.ring-blue-500]="selectedDateStr() === cell.dateStr"
-              [class.dark:ring-blue-400]="selectedDateStr() === cell.dateStr"
-              (click)="seleccionarDia(cell.dateStr)"
-            >
-              <span
-                class="mb-1 text-sm font-semibold"
-                [class.text-blue-600]="cell.isToday"
-                [class.dark:text-blue-400]="cell.isToday"
-                [class.text-gray-900]="!cell.isToday"
-                [class.dark:text-gray-100]="!cell.isToday"
-              >{{ cell.day }}</span>
+          @if (cell.day !== null) {
+            @if (cell.jornadas.length > 0) {
+              <!-- Día con jornada(s) -->
+              <button
+                type="button"
+                class="flex cursor-pointer flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 min-h-[90px]"
+                [class.bg-blue-50]="selectedDateStr() === cell.dateStr"
+                [class.dark:bg-blue-900/30]="selectedDateStr() === cell.dateStr"
+                [class.ring-2]="selectedDateStr() === cell.dateStr"
+                [class.ring-inset]="selectedDateStr() === cell.dateStr"
+                [class.ring-blue-500]="selectedDateStr() === cell.dateStr"
+                [class.dark:ring-blue-400]="selectedDateStr() === cell.dateStr"
+                (click)="seleccionarDia(cell.dateStr)"
+              >
+                <span
+                  class="mb-1 text-sm font-semibold"
+                  [class.text-blue-600]="cell.isToday"
+                  [class.dark:text-blue-400]="cell.isToday"
+                  [class.text-gray-900]="!cell.isToday"
+                  [class.dark:text-gray-100]="!cell.isToday"
+                >{{ cell.day }}</span>
 
-              <app-estado-badge [estado]="cell.jornada.estado" />
+                <div class="flex flex-wrap gap-0.5 justify-center">
+                  @for (j of cell.jornadas; track j.id) {
+                    <app-estado-badge [estado]="j.estado" />
+                  }
+                </div>
 
-              <span class="mt-1 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums leading-tight">
-                ${{ cell.jornada.total_ventas | number:'1.0-0' }}
-              </span>
-
-              @if (cell.jornada.saldo_real !== null) {
-                <span class="text-[10px] text-green-600 dark:text-green-400 tabular-nums leading-tight">
-                  ${{ cell.jornada.saldo_real | number:'1.0-0' }}
+                <span class="mt-1 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums leading-tight">
+                  ${{ cell.jornadas[0].total_ventas | number:'1.0-0' }}
                 </span>
-              }
-            </button>
-          } @else if (cell.day !== null) {
-            <!-- Día sin jornada -->
-            <div
-              class="flex flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 min-h-[90px]"
-            >
-              <span class="text-sm text-gray-300 dark:text-gray-600">{{ cell.day }}</span>
-            </div>
+
+                @if (cell.jornadas[0].saldo_real !== null) {
+                  <span class="text-[10px] text-green-600 dark:text-green-400 tabular-nums leading-tight">
+                    ${{ cell.jornadas[0].saldo_real | number:'1.0-0' }}
+                  </span>
+                }
+              </button>
+            } @else {
+              <!-- Día sin jornada -->
+              <div
+                class="flex flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 min-h-[90px]"
+              >
+                <span class="text-sm text-gray-300 dark:text-gray-600">{{ cell.day }}</span>
+              </div>
+            }
           } @else {
             <!-- Celda vacía (padding) -->
             <div class="min-h-[90px] border-b border-r border-gray-50 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/50"></div>
@@ -133,92 +208,96 @@
     <!-- Panel de detalle del día seleccionado -->
     @if (diaSeleccionado(); as sel) {
       <div class="mt-4 rounded-xl bg-white dark:bg-gray-900 p-5 shadow-lg dark:shadow-gray-950/50 ring-1 ring-gray-200 dark:ring-gray-700">
-        <div class="mb-3 flex items-center justify-between">
+        <div class="mb-3">
           <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">
             {{ sel.fecha | date:'fullDate' }}
           </h3>
-          @if (sel.jornada) {
-            <app-estado-badge [estado]="sel.jornada.estado" />
-          }
         </div>
 
-        @if (sel.jornada; as j) {
-          <div class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Apertura</span>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.hora_apertura }}</span>
+        @for (j of sel.jornadas; track j.id) {
+          <div class="border-b border-gray-100 dark:border-gray-800 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0">
+            <div class="mb-2">
+              <app-estado-badge [estado]="j.estado" />
             </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Cierre</span>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.hora_cierre ?? '—' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Ventas</span>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_gastos | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo esperado</span>
-              <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo real</span>
-              <span
-                class="font-semibold"
-                [class.text-gray-900]="j.saldo_real !== null"
-                [class.dark:text-gray-100]="j.saldo_real !== null"
-                [class.text-gray-400]="j.saldo_real === null"
-                [class.dark:text-gray-500]="j.saldo_real === null"
-              >{{ j.saldo_real !== null ? (j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Monto inicial</span>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
-            </div>
-            <div>
-              <span class="block text-xs text-gray-500 dark:text-gray-400">Diferencia</span>
-              @if (j.saldo_real !== null) {
+            <div class="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Apertura</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.hora_apertura }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Cierre</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.hora_cierre ?? '—' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Ventas</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_gastos | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo esperado</span>
+                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo real</span>
                 <span
-                  class="font-semibold tabular-nums"
-                  [class.text-green-600]="j.saldo_esperado - j.saldo_real >= 0"
-                  [class.dark:text-green-400]="j.saldo_esperado - j.saldo_real >= 0"
-                  [class.text-red-600]="j.saldo_esperado - j.saldo_real < 0"
-                  [class.dark:text-red-400]="j.saldo_esperado - j.saldo_real < 0"
-                >{{ j.saldo_esperado - j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
-              } @else {
-                <span class="text-gray-400 dark:text-gray-500">—</span>
-              }
+                  class="font-semibold"
+                  [class.text-gray-900]="j.saldo_real !== null"
+                  [class.dark:text-gray-100]="j.saldo_real !== null"
+                  [class.text-gray-400]="j.saldo_real === null"
+                  [class.dark:text-gray-500]="j.saldo_real === null"
+                >{{ j.saldo_real !== null ? (j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Monto inicial</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+              </div>
+              <div>
+                <span class="block text-xs text-gray-500 dark:text-gray-400">Diferencia</span>
+                @if (j.saldo_real !== null) {
+                  <span
+                    class="font-semibold tabular-nums"
+                    [class.text-green-600]="j.saldo_esperado - j.saldo_real >= 0"
+                    [class.dark:text-green-400]="j.saldo_esperado - j.saldo_real >= 0"
+                    [class.text-red-600]="j.saldo_esperado - j.saldo_real < 0"
+                    [class.dark:text-red-400]="j.saldo_esperado - j.saldo_real < 0"
+                  >{{ j.saldo_esperado - j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                } @else {
+                  <span class="text-gray-400 dark:text-gray-500">—</span>
+                }
+              </div>
             </div>
-          </div>
 
-          @if (j.estado === 'cerrada') {
-            <div class="mt-4 flex gap-3">
-              <button
-                type="button"
-                class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 transition-colors"
-                (click)="descargarExcel(j)"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <span class="material-symbols-outlined leading-none text-sm">file_download</span>
-                  Descargar Excel
-                </span>
-              </button>
-              <button
-                type="button"
-                class="cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                (click)="verPreview(j)"
-              >
-                <span class="inline-flex items-center gap-1.5">
-                  <span class="material-symbols-outlined leading-none text-sm">visibility</span>
-                  Vista previa
-                </span>
-              </button>
-            </div>
-          }
-        } @else {
+            @if (j.estado === 'cerrada') {
+              <div class="mt-4 flex gap-3">
+                <button
+                  type="button"
+                  class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 transition-colors"
+                  (click)="descargarExcel(j)"
+                >
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="material-symbols-outlined leading-none text-sm">file_download</span>
+                    Descargar Excel
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  (click)="verPreview(j)"
+                >
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="material-symbols-outlined leading-none text-sm">visibility</span>
+                    Vista previa
+                  </span>
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        @if (sel.jornadas.length === 0) {
           <p class="text-sm text-gray-500 dark:text-gray-400">No hay jornada registrada para este día.</p>
         }
       </div>

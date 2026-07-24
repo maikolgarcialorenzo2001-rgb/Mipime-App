@@ -3,6 +3,8 @@ import * as XLSX from 'xlsx';
 import type { Jornada } from '../models/jornada';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
+import type { CuentaCosa } from '../models/cuenta-cosa';
+import type { StockMovimiento } from '../models/stock-movimiento';
 
 export interface ProductoInfo {
   nombre: string;
@@ -20,6 +22,8 @@ export interface JornadaReportData {
   productosMap?: Map<number, ProductoInfo>;
   totalCosto: number;
   userCierreNombre: string | null;
+  cuentaCosas?: CuentaCosa[];
+  stockMovimientos?: StockMovimiento[];
 }
 
 @Injectable({
@@ -40,6 +44,7 @@ export class ExcelService {
     this._agregarResumen(wb, data);
     this._agregarVentas(wb, data);
     this._agregarMovimientos(wb, data);
+    this._agregarMovimientosStock(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
@@ -56,6 +61,13 @@ export class ExcelService {
     const totalTransferencia = ventas
       .filter((v) => v.forma_pago === 'transferencia')
       .reduce((sum, v) => sum + v.total, 0);
+    const totalDivisas = ventas
+      .filter((v) => v.forma_pago === 'divisas')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalPendientes = ventas
+      .filter((v) => v.forma_pago === 'pendiente')
+      .reduce((sum, v) => sum + v.total, 0);
+    const cc = data.cuentaCosas ?? [];
 
     const filas: unknown[][] = [
       ['Mipime-Cuentas — Resumen de Jornada'],
@@ -83,6 +95,33 @@ export class ExcelService {
       filas.push(['Firmado por', data.userCierreNombre]);
     }
 
+    // Fila informativa de divisas
+    if (totalDivisas > 0) {
+      filas.push(['Total divisas', totalDivisas]);
+    }
+
+    // Fila informativa de pendientes (entre paréntesis)
+    if (totalPendientes > 0) {
+      filas.push(['Pendientes del día', `(${totalPendientes})`]);
+    }
+
+    // Tabla Cuenta Cosas
+    if (cc.length > 0) {
+      filas.push([]);
+      filas.push(['Cuenta Cosas']);
+      filas.push(['Producto', 'Cantidad', 'Descripción', 'Autorizado por', 'Total']);
+      const pmap = data.productosMap;
+      let totalCc = 0;
+      for (const item of cc) {
+        const info = pmap?.get(item.producto_id);
+        const nombre = info?.nombre ?? item.producto_id;
+        const valor = -item.cantidad; // negativo
+        totalCc += item.cantidad;
+        filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, valor]);
+      }
+      filas.push(['Total C.C.', '', '', '', -totalCc]);
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(filas);
 
     // Ajustar ancho de columnas
@@ -93,9 +132,16 @@ export class ExcelService {
   }
 
   private _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): void {
-    const filas: unknown[][] = [
-      ['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago'],
-    ];
+    // Determinar si hay columnas condicionales
+    const tieneDivisas = data.ventas.some((v) => v.forma_pago === 'divisas');
+    const tienePendientes = data.ventas.some((v) => v.forma_pago === 'pendiente');
+
+    const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago'];
+    const headerExtra: string[] = [];
+    if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos');
+    if (tienePendientes) headerExtra.push('Comprador');
+
+    const filas: unknown[][] = [[...headerBase, ...headerExtra]];
 
     const pmap = data.productosMap;
 
@@ -105,19 +151,42 @@ export class ExcelService {
         const info = pmap?.get(detalle.producto_id);
         const nombreProducto = info?.nombre ?? detalle.producto_id;
         const precioBase = info?.precio_costo ?? null;
-        filas.push([
+        const fila: unknown[] = [
           nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
           precioBase,
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
-        ]);
+        ];
+        // Columnas condicionales
+        if (tieneDivisas) {
+          if (venta.forma_pago === 'divisas') {
+            fila.push((venta as any).divisa_tipo ?? '—');
+            fila.push((venta as any).monto_divisa ?? '—');
+            fila.push((venta as any).tasa_cambio ?? '—');
+            fila.push(venta.total);
+          } else {
+            fila.push('', '', '', '');
+          }
+        }
+        if (tienePendientes) {
+          if (venta.forma_pago === 'pendiente') {
+            fila.push((venta as any).comprador_nombre ?? '—');
+          } else {
+            fila.push('');
+          }
+        }
+        filas.push(fila);
         granTotal += detalle.subtotal;
       }
     }
 
-    filas.push([], ['Total ingresos', '', '', '', granTotal, '']);
+    const footerLen = headerBase.length + headerExtra.length;
+    const footer = Array(footerLen).fill('');
+    footer[0] = 'Total ingresos';
+    footer[4] = granTotal;
+    filas.push([], footer);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
@@ -127,6 +196,8 @@ export class ExcelService {
       { wch: 10 },
       { wch: 14 },
       { wch: 16 },
+      ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }] : []),
+      ...(tienePendientes ? [{ wch: 16 }] : []),
     ];
     ws['!protect'] = {};
 
@@ -142,6 +213,7 @@ export class ExcelService {
     const wb = XLSX.utils.book_new();
 
     this._agregarResumenDelMes(wb, data);
+    this._agregarStockConsolidado(wb, data);
 
     for (const d of data) {
       this._agregarJornadaSheet(wb, d);
@@ -258,6 +330,23 @@ export class ExcelService {
       ]);
     }
 
+    // Cuenta Cosas section
+    const cc = data.cuentaCosas ?? [];
+    if (cc.length > 0) {
+      filas.push([]);
+      filas.push(['Cuenta Cosas']);
+      filas.push(['Producto', 'Cantidad', 'Descripción', 'Autorizado por', 'Total']);
+      const pmap = data.productosMap;
+      let totalCc = 0;
+      for (const item of cc) {
+        const info = pmap?.get(item.producto_id);
+        const nombre = info?.nombre ?? item.producto_id;
+        totalCc += item.cantidad;
+        filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, -item.cantidad]);
+      }
+      filas.push(['Total C.C.', '', '', '', -totalCc]);
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
       { wch: 20 },
@@ -294,5 +383,91 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+  }
+
+  private _agregarMovimientosStock(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const stock = data.stockMovimientos;
+    if (!stock || stock.length === 0) return;
+
+    const pmap = data.productosMap;
+
+    const filas: unknown[][] = [
+      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha'],
+    ];
+
+    for (const mov of stock) {
+      const info = pmap?.get(mov.producto_id);
+      const nombreProducto = info?.nombre ?? mov.producto_id;
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : 'Ajuste';
+      filas.push([
+        nombreProducto,
+        tipoLabel,
+        mov.cantidad,
+        mov.motivo ?? '',
+        mov.created_at,
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 30 },
+      { wch: 20 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+  }
+
+  private _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): void {
+    // Recolectar todos los stockMovimientos de todas las jornadas
+    const todos: StockMovimiento[] = [];
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+
+    for (const d of allData) {
+      if (d.stockMovimientos) {
+        todos.push(...d.stockMovimientos);
+      }
+      if (d.productosMap) {
+        for (const [id, info] of d.productosMap) {
+          if (!productosMap.has(id)) {
+            productosMap.set(id, info);
+          }
+        }
+      }
+    }
+
+    if (todos.length === 0) return;
+
+    const filas: unknown[][] = [
+      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha'],
+    ];
+
+    for (const mov of todos) {
+      const info = productosMap.get(mov.producto_id);
+      const nombreProducto = info?.nombre ?? mov.producto_id;
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : 'Ajuste';
+      filas.push([
+        nombreProducto,
+        tipoLabel,
+        mov.cantidad,
+        mov.motivo ?? '',
+        mov.created_at,
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 30 },
+      { wch: 20 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Movimientos de Stock');
   }
 }

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
@@ -11,7 +12,7 @@ import type { JornadaReportData } from '../../services/excel.service';
 export interface DiaCalendario {
   day: number | null;
   dateStr: string | null;
-  jornada?: Jornada;
+  jornadas: Jornada[];
   isToday: boolean;
   isCurrentMonth: boolean;
 }
@@ -22,6 +23,7 @@ export interface DiaCalendario {
     CurrencyPipe,
     DatePipe,
     DecimalPipe,
+    FormsModule,
     ErrorAlertComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
@@ -46,6 +48,18 @@ export class HistorialPage {
 
   /** Controla la visibilidad del modal de vista previa. */
   readonly showPreview = signal(false);
+
+  /** Controla la visibilidad del picker de rango de fechas. */
+  readonly showRangePicker = signal(false);
+
+  /** Fecha desde para exportar rango. */
+  readonly rangeDesde = signal('');
+
+  /** Fecha hasta para exportar rango. */
+  readonly rangeHasta = signal('');
+
+  /** Señal de carga para la exportación por rango. */
+  readonly exportandoRango = signal(false);
 
   /** Jornada activa en el modal de vista previa. */
   readonly previewJornada = signal<Jornada | null>(null);
@@ -95,20 +109,22 @@ export class HistorialPage {
     return this.jornadas().some((j) => j.estado === 'cerrada' && j.fecha >= lo && j.fecha <= hi);
   });
 
-  /** Mapa fecha → jornada para lookup O(1). */
+  /** Mapa fecha → jornada[] para lookup O(1). */
   private readonly _jornadasPorFecha = computed(() => {
-    const map = new Map<string, Jornada>();
+    const map = new Map<string, Jornada[]>();
     for (const j of this.jornadas()) {
-      map.set(j.fecha, j);
+      const arr = map.get(j.fecha);
+      if (arr) arr.push(j);
+      else map.set(j.fecha, [j]);
     }
     return map;
   });
 
-  /** Día seleccionado con su jornada (si existe). */
-  readonly diaSeleccionado = computed<{ fecha: string; jornada?: Jornada } | null>(() => {
+  /** Día seleccionado con sus jornadas (array). */
+  readonly diaSeleccionado = computed<{ fecha: string; jornadas: Jornada[] } | null>(() => {
     const ds = this.selectedDateStr();
     if (!ds) return null;
-    return { fecha: ds, jornada: this._jornadasPorFecha().get(ds) };
+    return { fecha: ds, jornadas: this._jornadasPorFecha().get(ds) ?? [] };
   });
 
   readonly mesTitulo = computed(() =>
@@ -155,19 +171,19 @@ export class HistorialPage {
 
     // Celdas vacías antes del día 1
     for (let i = 0; i < startOffset; i++) {
-      cells.push({ day: null, dateStr: null, isToday: false, isCurrentMonth: false });
+      cells.push({ day: null, dateStr: null, jornadas: [], isToday: false, isCurrentMonth: false });
     }
 
     // Días del mes
     for (let d = 1; d <= totalDias; d++) {
       const date = new Date(year, mes, d);
       const dateStr = date.toISOString().split('T')[0];
-      const jornada = jornadasMap.get(dateStr);
+      const jornadas = jornadasMap.get(dateStr) ?? [];
 
       cells.push({
         day: d,
         dateStr,
-        jornada,
+        jornadas,
         isToday: dateStr === hoyStr,
         isCurrentMonth: true,
       });
@@ -176,7 +192,7 @@ export class HistorialPage {
     // Completar la última semana
     const remaining = 7 - (cells.length % 7 || 7);
     for (let i = 0; i < remaining; i++) {
-      cells.push({ day: null, dateStr: null, isToday: false, isCurrentMonth: false });
+      cells.push({ day: null, dateStr: null, jornadas: [], isToday: false, isCurrentMonth: false });
     }
 
     return cells;
@@ -263,6 +279,58 @@ export class HistorialPage {
         this.exportando.set(false);
       },
     });
+  }
+
+  /** Alterna la visibilidad del picker de rango. */
+  toggleRangePicker(): void {
+    this.showRangePicker.update((v) => !v);
+  }
+
+  /** Exporta todas las jornadas cerradas en el rango seleccionado. */
+  exportarRango(): void {
+    const desde = this.rangeDesde();
+    const hasta = this.rangeHasta();
+
+    if (!desde || !hasta) {
+      this.errorExport.set('Seleccioná fecha desde y hasta para exportar.');
+      return;
+    }
+
+    this.exportandoRango.set(true);
+    this.errorExport.set(null);
+
+    this._jornadaService.generarExportacionPorRango(desde, hasta).subscribe({
+      next: (base64) => {
+        this._descargarBase64Rango(base64, desde, hasta);
+        this.exportandoRango.set(false);
+        this.showRangePicker.set(false);
+      },
+      error: (err: unknown) => {
+        this.errorExport.set(
+          err instanceof Error ? err.message : 'Error al exportar',
+        );
+        this.exportandoRango.set(false);
+      },
+    });
+  }
+
+  private _descargarBase64Rango(base64: string, desde: string, hasta: string): void {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jornadas_${desde}_a_${hasta}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   private _descargarBase64(base64: string, month: Date): void {

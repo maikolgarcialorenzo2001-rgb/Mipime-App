@@ -94,6 +94,10 @@ export class SqliteService implements Database {
       await this._migrationV6(client);
     }
 
+    if (currentVersion < 7) {
+      await this._migrationV7(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -328,6 +332,17 @@ export class SqliteService implements Database {
     )`);
     await client.sql('INSERT INTO schema_version (version) VALUES (6)');
     await client.sql('COMMIT');
+  }
+
+  private async _migrationV7(client: SQLocal): Promise<void> {
+    // ALTER TABLE con try/catch por si la columna ya existe
+    try {
+      await client.sql(
+        'ALTER TABLE stock_movimientos ADD COLUMN jornada_id INTEGER REFERENCES jornadas(id)',
+      );
+    } catch { /* columna ya existe */ }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (7)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

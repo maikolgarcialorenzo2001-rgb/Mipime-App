@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal, type WritableSignal } from '@angular/core';
+import { signal, type Signal, type WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { routes } from '../../app.routes';
@@ -43,7 +43,7 @@ const mockAdmin: UsuarioPublico = {
 };
 
 interface MockAuthService {
-  usuario: ReturnType<typeof signal<UsuarioPublico | null>>['readonly'];
+  usuario: Signal<UsuarioPublico | null>;
   isLoggedIn: ReturnType<typeof vi.fn>;
   hasRole: ReturnType<typeof vi.fn>;
   logout: ReturnType<typeof vi.fn>;

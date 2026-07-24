@@ -68,17 +68,11 @@ describe('StockMovimientoService', () => {
 
       await service.registrarEntrada(1, 50, 'Compra a proveedor');
 
-      // INSERT en stock_movimientos — tipo 'entrada' va en el SQL, no en params
+      // INSERT en stock_movimientos — tipo 'entrada' va como parámetro
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         1,
         expect.stringContaining("INSERT INTO stock_movimientos"),
-        expect.arrayContaining([1, 50, "Compra a proveedor"]),
-      );
-
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining("entrada"),
-        expect.arrayContaining([1, 50, "Compra a proveedor"]),
+        expect.arrayContaining([1, 50, 'entrada', "Compra a proveedor"]),
       );
 
       // UPDATE stock_actual += cantidad
@@ -102,6 +96,32 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([1, 25, null]),
       );
     });
+
+    it('C2 RED: debería insertar jornada_id cuando se proporciona en entrada', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
+
+      await service.registrarEntrada(1, 50, 'Compra', 42);
+
+      // El INSERT debe incluir jornada_id en columnas y valor
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('jornada_id'),
+        expect.arrayContaining([1, 50, 'entrada', 'Compra', 42]),
+      );
+    });
+
+    it('C2 RED: debería omitir jornada_id en INSERT cuando no se proporciona', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
+
+      await service.registrarEntrada(1, 25);
+
+      // El INSERT NO debe mencionar jornada_id
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.not.stringContaining('jornada_id'),
+        expect.arrayContaining([1, 25, null]),
+      );
+    });
   });
 
   describe('registrarSalida', () => {
@@ -120,11 +140,11 @@ describe('StockMovimientoService', () => {
         [1],
       );
 
-      // INSERT en stock_movimientos — tipo 'salida' va en SQL, no en params
+      // INSERT en stock_movimientos — tipo 'salida' va como parámetro
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         2,
         expect.stringContaining('INSERT INTO stock_movimientos'),
-        expect.arrayContaining([1, 30, 'Venta al público']),
+        expect.arrayContaining([1, 30, 'salida', 'Venta al público']),
       );
 
       // UPDATE stock_actual -= cantidad
@@ -151,6 +171,35 @@ describe('StockMovimientoService', () => {
         [1],
       );
     });
+
+    it('C2 RED: debería insertar jornada_id cuando se proporciona en salida', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_actual: 100 }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await service.registrarSalida(1, 30, 'Venta', 42);
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('jornada_id'),
+        expect.arrayContaining([1, 30, 'salida', 'Venta', 42]),
+      );
+    });
+
+    it('C2 RED: debería omitir jornada_id en salida cuando no se proporciona', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_actual: 100 }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await service.registrarSalida(1, 30);
+
+      const insertCall = vi.mocked(mockDb.sql).mock.calls[1];
+      expect(insertCall[0]).toContain('INSERT INTO stock_movimientos');
+      expect(insertCall[0]).not.toContain('jornada_id');
+      expect(insertCall[1]).toHaveLength(5); // 5 params, no jornada_id
+    });
   });
 
   describe('registrarAjuste', () => {
@@ -162,7 +211,7 @@ describe('StockMovimientoService', () => {
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         1,
         expect.stringContaining('INSERT INTO stock_movimientos'),
-        expect.arrayContaining([1, 80, 'Corrección de inventario']),
+        expect.arrayContaining([1, 80, 'ajuste', 'Corrección de inventario']),
       );
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
@@ -188,6 +237,29 @@ describe('StockMovimientoService', () => {
       ).rejects.toThrow('El motivo es obligatorio');
 
       expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('C2 RED: debería insertar jornada_id cuando se proporciona en ajuste', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
+
+      await service.registrarAjuste(1, 80, 'Corrección', 42);
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('jornada_id'),
+        expect.arrayContaining([1, 80, 'ajuste', 'Corrección', 42]),
+      );
+    });
+
+    it('C2 RED: debería omitir jornada_id en ajuste cuando no se proporciona', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
+
+      await service.registrarAjuste(1, 80, 'Corrección');
+
+      const insertCall = vi.mocked(mockDb.sql).mock.calls[0];
+      expect(insertCall[0]).toContain('INSERT INTO stock_movimientos');
+      expect(insertCall[0]).not.toContain('jornada_id');
+      expect(insertCall[1]).toHaveLength(5);
     });
   });
 

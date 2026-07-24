@@ -37,4 +37,42 @@ export class ProductoService {
       ),
     ).pipe(map((rows) => rows[0] ?? null));
   }
+
+  /** Crea un nuevo producto y lo retorna. */
+  crear(data: {
+    nombre: string;
+    precio_costo: number;
+    precio_venta: number;
+    stock_actual: number;
+  }): Observable<Producto> {
+    const ahora = new Date().toISOString();
+    return from(
+      this._db.sql<Producto>(
+        `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_actual, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        [data.nombre, null, data.precio_costo, data.precio_venta, data.stock_actual, ahora, ahora],
+      ),
+    ).pipe(map((rows) => rows[0]));
+  }
+
+  /** Actualiza un producto existente y lo retorna. */
+  actualizar(
+    id: number,
+    data: { nombre: string; precio_costo: number; precio_venta: number },
+  ): Observable<Producto> {
+    const ahora = new Date().toISOString();
+    return from(
+      this._db.sql<Producto>(
+        `UPDATE productos SET nombre = ?, precio_costo = ?, precio_venta = ?, updated_at = ? WHERE id = ? RETURNING *`,
+        [data.nombre, data.precio_costo, data.precio_venta, ahora, id],
+      ),
+    ).pipe(map((rows) => rows[0]));
+  }
+
+  /** Elimina un producto por ID. */
+  eliminar(id: number): Observable<void> {
+    return from(
+      this._db.sql('DELETE FROM productos WHERE id = ?', [id]),
+    ).pipe(map(() => undefined));
+  }
 }
