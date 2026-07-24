@@ -98,6 +98,10 @@ export class SqliteService implements Database {
       await this._migrationV7(client);
     }
 
+    if (currentVersion < 8) {
+      await this._migrationV8(client);
+    }
+
     await this._seedIfEmpty(client);
   }
 
@@ -343,6 +347,43 @@ export class SqliteService implements Database {
     } catch { /* columna ya existe */ }
 
     await client.sql('INSERT INTO schema_version (version) VALUES (7)');
+  }
+
+  private async _migrationV8(client: SQLocal): Promise<void> {
+    await client.sql(`CREATE TABLE IF NOT EXISTS lotes_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      precio_costo REAL NOT NULL,
+      fecha_ingreso TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+
+    await client.sql(`CREATE TABLE IF NOT EXISTS venta_lotes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      venta_id INTEGER NOT NULL REFERENCES ventas(id),
+      lote_id INTEGER NOT NULL REFERENCES lotes_stock(id),
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      precio_costo_real REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+
+    await client.sql(
+      'CREATE INDEX IF NOT EXISTS idx_lotes_stock_producto_fecha ON lotes_stock(producto_id, fecha_ingreso)',
+    );
+
+    await client.sql(
+      'CREATE INDEX IF NOT EXISTS idx_venta_lotes_venta ON venta_lotes(venta_id)',
+    );
+
+    // Backfill: crear lotes para productos existentes con stock > 0
+    await client.sql(`INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
+      SELECT id, stock_actual, COALESCE(precio_costo, 0), created_at, created_at
+      FROM productos
+      WHERE stock_actual > 0`);
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (8)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

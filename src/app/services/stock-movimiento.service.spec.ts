@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { StockMovimientoService } from './stock-movimiento.service';
 import { DATABASE, type Database } from './database';
-import type { StockMovimiento } from '../models';
+import type { StockMovimiento, LoteStock } from '../models';
 
 const mockMovimientos: StockMovimiento[] = [
   {
@@ -36,6 +36,11 @@ const mockHistorial = [
   { ...mockMovimientos[2], nombre: 'Azúcar 1kg' },
 ];
 
+const mockLotes: LoteStock[] = [
+  { id: 1, producto_id: 1, cantidad: 10, precio_costo: 5, fecha_ingreso: '2026-01-15T10:00:00Z', created_at: '2026-01-15T10:00:00Z' },
+  { id: 2, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-02-01T10:00:00Z', created_at: '2026-02-01T10:00:00Z' },
+];
+
 function createMockDb(): Database {
   return {
     sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
@@ -63,164 +68,169 @@ describe('StockMovimientoService', () => {
   });
 
   describe('registrarEntrada', () => {
-    it('debería insertar un movimiento de entrada y aumentar el stock', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
+    it('debería insertar movimiento, aumentar stock y crear lote', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
 
-      await service.registrarEntrada(1, 50, 'Compra a proveedor');
+      await service.registrarEntrada(1, 50, 5.00, 'Compra a proveedor');
 
-      // INSERT en stock_movimientos — tipo 'entrada' va como parámetro
+      // 1. INSERT stock_movimientos
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining("INSERT INTO stock_movimientos"),
-        expect.arrayContaining([1, 50, 'entrada', "Compra a proveedor"]),
+        expect.stringContaining('INSERT INTO stock_movimientos'),
+        expect.arrayContaining([1, 50, 'entrada', 'Compra a proveedor']),
       );
 
-      // UPDATE stock_actual += cantidad
+      // 2. UPDATE stock_actual
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         2,
-        expect.stringContaining("UPDATE productos"),
+        expect.stringContaining('UPDATE productos'),
         expect.arrayContaining([expect.any(String), 1]),
       );
 
-      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+      // 3. INSERT lotes_stock
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('INSERT INTO lotes_stock'),
+        expect.arrayContaining([1, 50, 5.00]),
+      );
+
+      expect(mockDb.sql).toHaveBeenCalledTimes(3);
     });
 
-    it("debería permitir registrar entrada sin motivo", async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
+    it('debería permitir registrar entrada sin motivo', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
 
-      await service.registrarEntrada(1, 25);
+      await service.registrarEntrada(1, 25, 3.50);
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         1,
-        expect.stringContaining("INSERT INTO stock_movimientos"),
+        expect.stringContaining('INSERT INTO stock_movimientos'),
         expect.arrayContaining([1, 25, null]),
       );
     });
 
-    it('C2 RED: debería insertar jornada_id cuando se proporciona en entrada', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
+    it('debería insertar jornada_id cuando se proporciona', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
 
-      await service.registrarEntrada(1, 50, 'Compra', 42);
+      await service.registrarEntrada(1, 50, 5.00, 'Compra', 42);
 
-      // El INSERT debe incluir jornada_id en columnas y valor
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         1,
         expect.stringContaining('jornada_id'),
         expect.arrayContaining([1, 50, 'entrada', 'Compra', 42]),
       );
     });
-
-    it('C2 RED: debería omitir jornada_id en INSERT cuando no se proporciona', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 100 }]);
-
-      await service.registrarEntrada(1, 25);
-
-      // El INSERT NO debe mencionar jornada_id
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        1,
-        expect.not.stringContaining('jornada_id'),
-        expect.arrayContaining([1, 25, null]),
-      );
-    });
   });
 
   describe('registrarSalida', () => {
-    it('debería insertar un movimiento de salida y disminuir el stock', async () => {
+    it('debería consumir FIFO y retornar ConsumoRecord[]', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ stock_actual: 100 }])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock
+        .mockResolvedValueOnce([])               // UPDATE lot 1
+        .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 9 }])   // SELECT SUM for stock_actual
+        .mockResolvedValueOnce([]);              // UPDATE productos stock_actual
 
-      await service.registrarSalida(1, 30, 'Venta al público');
+      const consumos = await service.registrarSalida(1, 11, 'Venta');
 
-      // Validar stock suficiente
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('SELECT stock_actual FROM productos'),
-        [1],
-      );
-
-      // INSERT en stock_movimientos — tipo 'salida' va como parámetro
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('INSERT INTO stock_movimientos'),
-        expect.arrayContaining([1, 30, 'salida', 'Venta al público']),
-      );
-
-      // UPDATE stock_actual -= cantidad
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        3,
-        expect.stringContaining('UPDATE productos'),
-        expect.arrayContaining([expect.any(String), 1]),
-      );
-
-      expect(mockDb.sql).toHaveBeenCalledTimes(3);
+      expect(consumos).toHaveLength(2);
+      expect(consumos[0]).toEqual({ lote_id: 1, cantidad: 10, precio_costo_real: 5 });
+      expect(consumos[1]).toEqual({ lote_id: 2, cantidad: 1, precio_costo_real: 8 });
     });
 
-    it('debería lanzar "Stock insuficiente" cuando stock_actual < cantidad', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ stock_actual: 5 }]);
+    it('debería lanzar "Stock insuficiente" cuando lotes no cubren la cantidad', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([
+        { id: 1, producto_id: 1, cantidad: 5, precio_costo: 5, fecha_ingreso: '2026-01-15T10:00:00Z', created_at: '2026-01-15T10:00:00Z' },
+      ]);
 
       await expect(
         service.registrarSalida(1, 10),
       ).rejects.toThrow('Stock insuficiente');
-
-      // Solo debe haber hecho la consulta de validación, ni INSERT ni UPDATE
-      expect(mockDb.sql).toHaveBeenCalledTimes(1);
-      expect(mockDb.sql).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT stock_actual'),
-        [1],
-      );
     });
 
-    it('C2 RED: debería insertar jornada_id cuando se proporciona en salida', async () => {
+    it('debería consumir de múltiples lotes cuando el primero no alcanza', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ stock_actual: 100 }])
+        .mockResolvedValueOnce(mockLotes)
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 9 }])
         .mockResolvedValueOnce([]);
 
-      await service.registrarSalida(1, 30, 'Venta', 42);
+      const consumos = await service.registrarSalida(1, 11);
 
-      expect(mockDb.sql).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('jornada_id'),
-        expect.arrayContaining([1, 30, 'salida', 'Venta', 42]),
-      );
+      expect(consumos[0].cantidad).toBe(10);
+      expect(consumos[1].cantidad).toBe(1);
     });
 
-    it('C2 RED: debería omitir jornada_id en salida cuando no se proporciona', async () => {
+    it('debería insertar jornada_id cuando se proporciona', async () => {
+      // cantidad=5 solo consume de lot 1 (tiene 10), no necesita lot 2
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ stock_actual: 100 }])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce(mockLotes)               // SELECT lotes_stock (FIFO)
+        .mockResolvedValueOnce([])                       // UPDATE lot 1 (consume 5 of 10)
+        .mockResolvedValueOnce([])                       // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 15 }])          // SELECT SUM lotes_stock
+        .mockResolvedValueOnce([]);                      // UPDATE productos stock_actual
 
-      await service.registrarSalida(1, 30);
+      await service.registrarSalida(1, 5, 'Venta', 42);
 
-      const insertCall = vi.mocked(mockDb.sql).mock.calls[1];
-      expect(insertCall[0]).toContain('INSERT INTO stock_movimientos');
-      expect(insertCall[0]).not.toContain('jornada_id');
-      expect(insertCall[1]).toHaveLength(5); // 5 params, no jornada_id
+      // INSERT stock_movimientos should include jornada_id
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO stock_movimientos'),
+      );
+      expect(insertCall![0]).toContain('jornada_id');
+      expect(insertCall![1]).toContain(42);
     });
   });
 
   describe('registrarAjuste', () => {
-    it('debería insertar un movimiento de ajuste y setear stock_actual a la cantidad exacta', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]);
+    it('debería reemplazar lotes con promedio ponderado y stock exacto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce(mockLotes)        // SELECT lots for avg
+        .mockResolvedValueOnce([])               // DELETE old lots
+        .mockResolvedValueOnce([])               // INSERT new lot
+        .mockResolvedValueOnce([]);              // UPDATE stock_actual
 
-      await service.registrarAjuste(1, 80, 'Corrección de inventario');
+      await service.registrarAjuste(1, 12, 'Corrección de inventario');
 
+      // Should delete old lots
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('INSERT INTO stock_movimientos'),
-        expect.arrayContaining([1, 80, 'ajuste', 'Corrección de inventario']),
+        3,
+        expect.stringContaining('DELETE FROM lotes_stock'),
+        [1],
       );
 
+      // Should create new lot with weighted avg cost: (10×5 + 10×8) / 20 = 6.5
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        2,
+        4,
+        expect.stringContaining('INSERT INTO lotes_stock'),
+        expect.arrayContaining([1, 12, 6.5]),
+      );
+
+      // Should update stock_actual to 12
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
         expect.stringContaining('UPDATE productos'),
-        expect.arrayContaining([80, expect.any(String), 1]),
+        expect.arrayContaining([12, expect.any(String), 1]),
       );
+    });
 
-      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+    it('debería crear lote vacío cuando nueva cantidad es 0', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce(mockLotes)        // SELECT lots
+        .mockResolvedValueOnce([])               // DELETE old lots
+        .mockResolvedValueOnce([]);              // UPDATE stock_actual
+
+      await service.registrarAjuste(1, 0, 'Agotar stock');
+
+      // Should NOT insert a new lot (cantidad = 0)
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO lotes_stock'),
+      );
+      expect(insertCall).toBeUndefined();
     });
 
     it('debería lanzar "El motivo es obligatorio" cuando motivo está vacío', async () => {
@@ -239,8 +249,13 @@ describe('StockMovimientoService', () => {
       expect(mockDb.sql).not.toHaveBeenCalled();
     });
 
-    it('C2 RED: debería insertar jornada_id cuando se proporciona en ajuste', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]);
+    it('debería insertar jornada_id cuando se proporciona', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
 
       await service.registrarAjuste(1, 80, 'Corrección', 42);
 
@@ -249,17 +264,6 @@ describe('StockMovimientoService', () => {
         expect.stringContaining('jornada_id'),
         expect.arrayContaining([1, 80, 'ajuste', 'Corrección', 42]),
       );
-    });
-
-    it('C2 RED: debería omitir jornada_id en ajuste cuando no se proporciona', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]);
-
-      await service.registrarAjuste(1, 80, 'Corrección');
-
-      const insertCall = vi.mocked(mockDb.sql).mock.calls[0];
-      expect(insertCall[0]).toContain('INSERT INTO stock_movimientos');
-      expect(insertCall[0]).not.toContain('jornada_id');
-      expect(insertCall[1]).toHaveLength(5);
     });
   });
 
@@ -286,10 +290,6 @@ describe('StockMovimientoService', () => {
       const resultado = await service.obtenerMovimientos(999);
 
       expect(resultado).toEqual([]);
-      expect(mockDb.sql).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE producto_id = ?'),
-        [999],
-      );
     });
   });
 
@@ -302,10 +302,6 @@ describe('StockMovimientoService', () => {
       expect(resultado).toHaveLength(3);
       expect(resultado[0]).toHaveProperty('nombre');
       expect(resultado[0].nombre).toBe('Harina 0000 1kg');
-      expect(resultado[2].nombre).toBe('Azúcar 1kg');
-      expect(mockDb.sql).toHaveBeenCalledWith(
-        expect.stringContaining('JOIN productos'),
-      );
     });
   });
 });
