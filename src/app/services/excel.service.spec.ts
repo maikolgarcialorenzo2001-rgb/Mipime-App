@@ -172,8 +172,8 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Header row + 4 detail rows + empty row + footer row
-      expect(json.length).toBe(7);
+      // Header row + 4 detail rows + empty row + 3 footer rows (Total ingresos, Pendientes del día, Total esperado)
+      expect(json.length).toBe(9);
 
       // Primera fila de detalle: [producto_id, cantidad, precio_unitario, subtotal, forma_pago]
       expect(json[1]).toContainEqual(850);
@@ -182,10 +182,13 @@ describe('ExcelService', () => {
       expect(json[3]).toContainEqual(1100);
       expect(json[4]).toContainEqual(150);
 
-      // Footer row (index 4 = columna Total por Precio base agregado)
+      // Footer rows: index 5 = empty row, 6 = Total ingresos, 7 = Pendientes del día, 8 = Total esperado
       const footerRow = json[6] as unknown[];
       expect(footerRow[0]).toBe('Total ingresos');
       expect(footerRow[4]).toBe(3800);
+      expect(json[7][0]).toBe('Pendientes del día');
+      expect(json[8][0]).toBe('Total esperado');
+      expect(json[8][4]).toBe(3800);
     });
 
     it('debería listar los movimientos', () => {
@@ -218,7 +221,7 @@ describe('ExcelService', () => {
 
       const ventasSheet = workbook.Sheets['Ventas'];
       const ventasJson = XLSX.utils.sheet_to_json(ventasSheet, { header: 1 }) as unknown[][];
-      expect(ventasJson.length).toBe(3); // header + empty row + footer row
+      expect(ventasJson.length).toBe(5); // header + empty row + 3 footer rows
     });
   });
 
@@ -648,7 +651,11 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
     });
 
     it('3.3 RED: Resumen debe mostrar tabla Cuenta Cosas con valores negativos', () => {
-      const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas };
+      const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
+        [2, { nombre: 'Coca cola', precio_costo: 100 }],
+        [3, { nombre: 'Papas', precio_costo: 50 }],
+      ]);
+      const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
       const result = service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
@@ -691,6 +698,50 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       // Fila pendiente debe tener el nombre del comprador
       const filaPendiente = json.find((r) => r[5] === 'pendiente') as unknown[];
       expect(filaPendiente[6]).toBe('Juan Pérez');
+    });
+
+    // ─── Bug 2: CuentaCosas debe usar precio_costo ───────────
+    it('5.1 RED: Cuenta Cosas debe usar cantidad * precio_costo para calcular valores', () => {
+      const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
+        [2, { nombre: 'Coca cola', precio_costo: 100 }],
+        [3, { nombre: 'Papas', precio_costo: 50 }],
+      ]);
+      const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
+      const result = service.generarExcelJornada(dataTest);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      const filas = json as unknown[][];
+      // Buscar las filas de Coca cola (3 * 100 = -300) y Papas (2 * 50 = -100)
+      const cocaFila = filas.find((r) => r[0] === 'Coca cola');
+      const papasFila = filas.find((r) => r[0] === 'Papas');
+      expect(cocaFila).toBeTruthy();
+      expect(papasFila).toBeTruthy();
+      // index 1 = cantidad, index 4 = total
+      expect(cocaFila![4]).toBe(-300); // -(3 * 100)
+      expect(papasFila![4]).toBe(-100); // -(2 * 50)
+      const totalFila = filas.find((r) => r[0] === 'Total C.C.');
+      expect(totalFila![4]).toBe(-400); // -(300 + 100)
+    });
+
+    // ─── Bug 3: Pendientes separados en 3 filas de footer ───
+    it('5.2 RED: Ventas sheet debe separar pendientes en 3 filas de footer', () => {
+      const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
+      const result = service.generarExcelJornada(dataTest);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      const filas = json as unknown[][];
+      const ingresosRow = filas.find((f) => f[0] === 'Total ingresos');
+      const pendientesRow = filas.find((f) => f[0] === 'Pendientes del día');
+      const esperadoRow = filas.find((f) => f[0] === 'Total esperado');
+      expect(ingresosRow).toBeTruthy();
+      expect(pendientesRow).toBeTruthy();
+      expect(esperadoRow).toBeTruthy();
+      // efectivo: 850, pendiente: 1500
+      expect(ingresosRow![4]).toBe(850);
+      expect(pendientesRow![4]).toBe(1500);
+      expect(esperadoRow![4]).toBe(2350); // 850 + 1500
     });
 
   describe('C3 — Stock Movements en Excel', () => {
@@ -790,7 +841,11 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
   });
 
     it('3.5 GREEN: Cuenta Cosas en hoja por jornada del Excel mensual', () => {
-      const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas };
+      const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
+        [2, { nombre: 'Coca cola', precio_costo: 100 }],
+        [3, { nombre: 'Papas', precio_costo: 50 }],
+      ]);
+      const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
       const result = service.generarExcelMensual([dataTest]);
       const workbook = XLSX.read(result, { type: 'base64' });
       // La hoja por jornada debería tener la sección Cuenta Cosas
@@ -800,7 +855,7 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const filas = json as unknown[][];
       const totalFila = filas.find((r) => r[0] === 'Total C.C.');
       expect(totalFila).toBeDefined();
-      expect(totalFila![4]).toBe(-5); // -(3+2)
+      expect(totalFila![4]).toBe(-400); // -(3*100 + 2*50)
     });
   });
 });

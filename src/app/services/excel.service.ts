@@ -115,8 +115,9 @@ export class ExcelService {
       for (const item of cc) {
         const info = pmap?.get(item.producto_id);
         const nombre = info?.nombre ?? item.producto_id;
-        const valor = -item.cantidad; // negativo
-        totalCc += item.cantidad;
+        const costo = info?.precio_costo ?? 0;
+        const valor = -(item.cantidad * costo); // negativo
+        totalCc += item.cantidad * costo;
         filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, valor]);
       }
       filas.push(['Total C.C.', '', '', '', -totalCc]);
@@ -145,7 +146,8 @@ export class ExcelService {
 
     const pmap = data.productosMap;
 
-    let granTotal = 0;
+    let totalSinPendientes = 0;
+    let totalPendientes = 0;
     for (const venta of data.ventas) {
       for (const detalle of venta.detalles) {
         const info = pmap?.get(detalle.producto_id);
@@ -178,15 +180,25 @@ export class ExcelService {
           }
         }
         filas.push(fila);
-        granTotal += detalle.subtotal;
+        if (venta.forma_pago === 'pendiente') {
+          totalPendientes += detalle.subtotal;
+        } else {
+          totalSinPendientes += detalle.subtotal;
+        }
       }
     }
 
     const footerLen = headerBase.length + headerExtra.length;
-    const footer = Array(footerLen).fill('');
-    footer[0] = 'Total ingresos';
-    footer[4] = granTotal;
-    filas.push([], footer);
+    const ingresosFooter = Array(footerLen).fill('');
+    ingresosFooter[0] = 'Total ingresos';
+    ingresosFooter[4] = totalSinPendientes;
+    const pendientesFooter = Array(footerLen).fill('');
+    pendientesFooter[0] = 'Pendientes del día';
+    pendientesFooter[4] = totalPendientes;
+    const esperadoFooter = Array(footerLen).fill('');
+    esperadoFooter[0] = 'Total esperado';
+    esperadoFooter[4] = totalSinPendientes + totalPendientes;
+    filas.push([], ingresosFooter, pendientesFooter, esperadoFooter);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
@@ -298,7 +310,8 @@ export class ExcelService {
     filas.push(['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago']);
 
     const pmap = data.productosMap;
-    let granTotal = 0;
+    let totalSinPendientes = 0;
+    let totalPendientes = 0;
     for (const venta of data.ventas) {
       for (const detalle of venta.detalles) {
         const info = pmap?.get(detalle.producto_id);
@@ -312,11 +325,17 @@ export class ExcelService {
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
         ]);
-        granTotal += detalle.subtotal;
+        if (venta.forma_pago === 'pendiente') {
+          totalPendientes += detalle.subtotal;
+        } else {
+          totalSinPendientes += detalle.subtotal;
+        }
       }
     }
 
-    filas.push([], ['Total ingresos', '', '', '', granTotal, '']);
+    filas.push([], ['Total ingresos', '', '', '', totalSinPendientes, '']);
+    filas.push(['Pendientes del día', '', '', '', totalPendientes, '']);
+    filas.push(['Total esperado', '', '', '', totalSinPendientes + totalPendientes, '']);
 
     // Blank row before Movimientos table
     filas.push([]);
@@ -341,8 +360,9 @@ export class ExcelService {
       for (const item of cc) {
         const info = pmap?.get(item.producto_id);
         const nombre = info?.nombre ?? item.producto_id;
-        totalCc += item.cantidad;
-        filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, -item.cantidad]);
+        const costo = info?.precio_costo ?? 0;
+        totalCc += item.cantidad * costo;
+        filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, -(item.cantidad * costo)]);
       }
       filas.push(['Total C.C.', '', '', '', -totalCc]);
     }
