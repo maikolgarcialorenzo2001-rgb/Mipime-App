@@ -216,6 +216,8 @@ export class PosPage {
         this.cart.limpiar();
         this.successMessage.set('¡Venta registrada con éxito!');
         setTimeout(() => this.successMessage.set(null), 2000);
+        // Refrescar productos para mostrar stock actualizado
+        this._buscar(this.query());
         this.searchInput()?.nativeElement.focus();
       },
       error: (err: unknown) => {

@@ -294,7 +294,7 @@ describe('AuthService - session heartbeat', () => {
     expect(sessionStorage.getItem('session_heartbeat')).toBe('1');
   });
 
-  it('1.2 RED: debería limpiar sesión si hay session en localStorage pero no heartbeat ni pending_close', () => {
+  it('1.2 RED: debería limpiar sesión si hay session en localStorage pero no heartbeat', () => {
     const session: UsuarioPublico = {
       id: 1,
       nombre: 'admin',
@@ -304,7 +304,7 @@ describe('AuthService - session heartbeat', () => {
       updated_at: '2026-06-04T00:00:00Z',
     };
     localStorage.setItem('mipime_session', JSON.stringify(session));
-    // No session_heartbeat, no pending_close
+    // No session_heartbeat
 
     TestBed.configureTestingModule({
       providers: [
@@ -340,33 +340,5 @@ describe('AuthService - session heartbeat', () => {
     const service = TestBed.inject(AuthService);
     expect(service.isLoggedIn()).toBe(true);
     expect(service.usuario()?.nombre).toBe('admin');
-  });
-
-  it('1.3b RED: debería preservar sesión si hay pending_close aunque no haya heartbeat', () => {
-    const session: UsuarioPublico = {
-      id: 1,
-      nombre: 'admin',
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    };
-    localStorage.setItem('mipime_session', JSON.stringify(session));
-    localStorage.setItem(
-      'mipime_pending_close',
-      JSON.stringify({ jornadaId: 1, userId: 1, timestamp: new Date().toISOString() }),
-    );
-    // No session_heartbeat
-
-    TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
-      ],
-    });
-
-    const service = TestBed.inject(AuthService);
-    // Session should be kept because pending_close exists — App will process it
-    expect(service.isLoggedIn()).toBe(true);
   });
 });

@@ -114,28 +114,6 @@ export class JornadaService {
     );
   }
 
-  /**
-   * Cierra una jornada sin verificar rol de admin.
-   * Usado por pending_close para auto-cierre desde App.ngOnInit.
-   * Usa saldo_esperado como saldo_real.
-   */
-  cerrarSinAuth(jornadaId: number, userId: number): Observable<Jornada> {
-    return from(this._cerrarSinAuthAsync(jornadaId, userId)).pipe(
-      tap(() => this.jornadaAbierta.set(null)),
-    );
-  }
-
-  private async _cerrarSinAuthAsync(id: number, userId: number): Promise<Jornada> {
-    // Obtener saldo_esperado antes de cerrar
-    const preJornada = await this._db.sql<Jornada>(
-      'SELECT * FROM jornadas WHERE id = ?',
-      [id],
-    );
-    if (preJornada.length === 0) throw new Error('Jornada no encontrada');
-
-    return this._ejecutarCierre(id, preJornada[0].saldo_esperado, userId);
-  }
-
   private async _cerrarAsync(
     id: number,
     saldoReal: number,

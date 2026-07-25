@@ -259,37 +259,6 @@ describe('JornadaService', () => {
     });
   });
 
-  describe('cerrarSinAuth', () => {
-    it('3.1 RED: debería cerrar sin verificar rol admin', async () => {
-      vi.mocked(mockDb.sql)
-        // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([])
-        // _cerrarSinAuthAsync: SELECT jornada para saldo_esperado
-        .mockResolvedValueOnce([mockJornada])
-        // _ejecutarCierre: ventas
-        .mockResolvedValueOnce([])
-        // movimientos
-        .mockResolvedValueOnce([])
-        // UPDATE jornada RETURNING *
-        .mockResolvedValueOnce([mockJornadaCerrada])
-        // SELECT productos
-        .mockResolvedValueOnce([])
-        // INSERT reporte
-        .mockResolvedValueOnce([]);
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.cerrarSinAuth(1, 2));
-
-      expect(resultado.estado).toBe('cerrada');
-
-      // Verificar que NO se llamó a SELECT rol (admin check)
-      const adminCheckCalls = vi.mocked(mockDb.sql).mock.calls.filter(
-        (call) => typeof call[0] === 'string' && call[0].includes('SELECT rol FROM usuarios'),
-      );
-      expect(adminCheckCalls).toHaveLength(0);
-    });
-  });
-
   describe('total_costo y userCierreNombre en _ejecutarCierre', () => {
     it('2.1 RED: debería calcular total_costo mediante JOIN y pasarlo a ExcelService', async () => {
       const mockVentasConDetalles: Venta[] = [

@@ -468,5 +468,11 @@ export class SqliteService implements Database {
         ...flatParams,
       );
     }
+
+    // Crear lotes_stock para los productos seed (requerido para FIFO)
+    await client.sql(`INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
+      SELECT id, stock_actual, COALESCE(precio_costo, 0), created_at, created_at
+      FROM productos
+      WHERE stock_actual > 0`);
   }
 }

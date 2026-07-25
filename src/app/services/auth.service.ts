@@ -6,7 +6,6 @@ import type { Usuario, UsuarioPublico } from '../models';
 
 const SESSION_KEY = 'mipime_session';
 const HEARTBEAT_KEY = 'session_heartbeat';
-const PENDING_CLOSE_KEY = 'mipime_pending_close';
 
 @Injectable({
   providedIn: 'root',
@@ -124,15 +123,10 @@ export class AuthService {
       if (!raw) return;
 
       // Si no hay heartbeat en sessionStorage, es una tab nueva tras cerrar la app.
-      // Pero si hay pending_close, la sesión se conserva temporalmente para que
-      // App.ngOnInit procese el cierre pendiente y luego haga logout.
       const heartbeat = sessionStorage.getItem(HEARTBEAT_KEY);
       if (!heartbeat) {
-        const pendingClose = localStorage.getItem(PENDING_CLOSE_KEY);
-        if (!pendingClose) {
-          localStorage.removeItem(SESSION_KEY);
-          return;
-        }
+        localStorage.removeItem(SESSION_KEY);
+        return;
       }
 
       const session = JSON.parse(raw) as UsuarioPublico;
