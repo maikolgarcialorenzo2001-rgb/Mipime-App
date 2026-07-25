@@ -13,7 +13,7 @@
 |------|--------|-------------|
 | **1. Capacitor Setup** | ✅ Completada | Infraestructura base: deps, config, platforms |
 | **2. Tablet Breakpoints** | ✅ Completada | Responsive design: nav, POS, grids |
-| **3. Touch Optimizations** | ⏳ Pendiente | Tap areas, safe areas, gestures |
+| **3. Touch Optimizations** | ✅ Completada | Tap areas, safe areas, touch feedback |
 | **4. Build & Test APK** | ⏳ Pendiente | Build release, test en emulador/device |
 
 ---
@@ -78,17 +78,25 @@
 
 ---
 
-## Fase 3: Touch Optimizations ⏳
+## Fase 3: Touch Optimizations ✅
 
-### Objetivo
-Optimizar interacción táctil para tablets y móviles.
+### Completado
+- [x] **Tap areas 44px**: Cart +/- buttons (28px→44px), remove button (24px→40px), quantity input (48px)
+- [x] **Touch feedback**: `active:scale-95`/`active:scale-[0.98]` on all interactive elements, `active:bg-*` highlights
+- [x] **Product card**: `min-h-[100px]` + `touch-manipulation` for better tap target
+- [x] **Checkout modal**: 48px buttons with `active:scale-[0.98]`
+- [x] **Global CSS**: `touch-action: manipulation` (no double-tap zoom), `font-size: 16px` on inputs (no iOS zoom), `-webkit-tap-highlight-color: transparent`
+- [x] **Safe areas**: `safe-top`/`safe-bottom` for iOS notch/home indicator
+- [x] Commit: `20e071d`
 
-### Tareas planificadas
-- [ ] Tap areas mínimas 44x44px (Apple HIG / Material Design)
-- [ ] Touch feedback (ripple o highlight en taps)
-- [ ] Swipe gestures para carrito (opcional)
-- [ ] Pull-to-refresh en historial (opcional)
-- [ ] Virtual keyboard handling (input focus, scroll into view)
+### Archivos modificados
+| Archivo | Cambio |
+|---------|--------|
+| `src/styles.css` | Touch global CSS, keyboard handling, safe areas |
+| `src/app/components/cart-item-row/*.html` | Botones 44px, touch-manipulation |
+| `src/app/components/product-card/*.html` | min-h, active feedback |
+| `src/app/components/quantity-input/*.html` | 48px buttons, safe-bottom |
+| `src/app/components/checkout-modal/*.html` | 48px buttons, active feedback |
 
 ---
 
