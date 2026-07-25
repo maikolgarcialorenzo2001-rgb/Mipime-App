@@ -38,7 +38,7 @@ export class ProductoService {
     ).pipe(map((rows) => rows[0] ?? null));
   }
 
-  /** Crea un nuevo producto y lo retorna. */
+  /** Crea un nuevo producto y lo retorna. Si tiene stock inicial, crea el lote FIFO. */
   crear(data: {
     nombre: string;
     precio_costo: number;
@@ -51,7 +51,18 @@ export class ProductoService {
         `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_actual, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         [data.nombre, null, data.precio_costo, data.precio_venta, data.stock_actual, ahora, ahora],
-      ),
+      ).then(async (rows) => {
+        const producto = rows[0];
+        // Crear lote FIFO si hay stock inicial (requerido para ventas)
+        if (data.stock_actual > 0) {
+          await this._db.sql(
+            `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+            [producto.id, data.stock_actual, data.precio_costo ?? 0, ahora, ahora],
+          );
+        }
+        return rows;
+      }),
     ).pipe(map((rows) => rows[0]));
   }
 
@@ -69,10 +80,15 @@ export class ProductoService {
     ).pipe(map((rows) => rows[0]));
   }
 
-  /** Elimina un producto por ID. */
+  /** Elimina un producto y sus lotes/movimientos asociados por ID. */
   eliminar(id: number): Observable<void> {
     return from(
-      this._db.sql('DELETE FROM productos WHERE id = ?', [id]),
+      (async () => {
+        await this._db.sql('DELETE FROM venta_lotes WHERE producto_id = ?', [id]);
+        await this._db.sql('DELETE FROM stock_movimientos WHERE producto_id = ?', [id]);
+        await this._db.sql('DELETE FROM lotes_stock WHERE producto_id = ?', [id]);
+        await this._db.sql('DELETE FROM productos WHERE id = ?', [id]);
+      })(),
     ).pipe(map(() => undefined));
   }
 }
