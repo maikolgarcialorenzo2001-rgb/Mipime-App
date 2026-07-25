@@ -13,6 +13,10 @@
     "electron:build:win": "ng build && tsc -p electron/tsconfig.json && electron-builder --win",
     "electron:build:mac": "ng build && tsc -p electron/tsconfig.json && electron-builder --mac",
     "electron:build:linux": "ng build && tsc -p electron/tsconfig.json && electron-builder --linux",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios",
+    "cap:build:android": "ng build && npx cap sync android",
     "test": "ng test",
     "test:electron": "vitest run --config vitest.electron.config.ts",
     "lint": "ng lint"
@@ -28,6 +32,9 @@
     "@angular/platform-browser": "^21.2.0",
     "@angular/platform-browser-dynamic": "21.2.15",
     "@angular/router": "^21.2.0",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "electron-updater": "^6.8.9",
     "material-symbols": "^0.45.3",
     "rxjs": "~7.8.0",
@@ -37,6 +44,7 @@
   },
   "devDependencies": {
     "@angular-eslint/builder": "21.4.0",
+    "@capacitor/cli": "^8.4.2",
     "@angular/build": "^21.2.7",
     "@angular/cli": "^21.2.7",
     "@angular/compiler-cli": "^21.2.0",

@@ -46,5 +46,9 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 
+# Capacitor native projects (generated locally, not committed)
+/android
+/ios
+
 # Stray artifact files
 nul
