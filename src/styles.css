@@ -12,6 +12,10 @@
 
 body {
   overflow-x: hidden;
+  /* Prevent text selection on touch */
+  -webkit-tap-highlight-color: transparent;
+  /* Better touch scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Safe area for notch (iOS) */
@@ -21,4 +25,27 @@ body {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Touch-friendly form inputs */
+input, select, textarea {
+  font-size: 16px !important; /* Prevent iOS zoom on focus */
+}
+
+/* Virtual keyboard: keep focused input visible */
+@supports (height: 100dvh) {
+  .keyboard-open {
+    height: 50dvh;
+  }
+}
+
+/* Disable double-tap zoom on buttons/links */
+button, a, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Scrollable areas with momentum */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
