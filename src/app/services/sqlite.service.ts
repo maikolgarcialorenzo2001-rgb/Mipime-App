@@ -102,7 +102,9 @@ export class SqliteService implements Database {
       await this._migrationV8(client);
     }
 
-    await this._seedIfEmpty(client);
+    if (environment.seedEnabled) {
+      await this._seedIfEmpty(client);
+    }
   }
 
   private async _migrationV1(client: SQLocal): Promise<void> {
@@ -202,17 +204,18 @@ export class SqliteService implements Database {
 
     // Seed admin: solo si no existe
     const [{ count }] = await client.sql<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM usuarios WHERE nombre = 'admin'",
+      "SELECT COUNT(*) AS count FROM usuarios WHERE nombre = ?",
+      environment.adminUser,
     );
     if (count === 0) {
       const ahora = new Date().toISOString();
       const { generateSalt, hashPassword } = await import('./hash-password');
       const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
+      const hash = await hashPassword(environment.adminPassword, salt);
       await client.sql(
         `INSERT INTO usuarios (nombre, password_hash, salt, rol, activo, created_at, updated_at)
          VALUES (?, ?, ?, 'admin', 1, ?, ?)`,
-        'admin', hash, salt, ahora, ahora,
+        environment.adminUser, hash, salt, ahora, ahora,
       );
     }
 

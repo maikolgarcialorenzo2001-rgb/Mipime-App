@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
+import { environment } from '../../environments/environment';
 import type { UsuarioPublico } from '../../models';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -43,7 +44,7 @@ export class AdminPage implements OnInit {
   readonly currentUserId = computed(() => this.auth.usuario()?.id ?? null);
   readonly seedAdminId = computed(() => {
     const admin = this.usuarios().find(
-      (u) => u.nombre === 'admin' && u.rol === 'admin',
+      (u) => u.nombre === environment.adminUser && u.rol === 'admin',
     );
     return admin?.id ?? null;
   });

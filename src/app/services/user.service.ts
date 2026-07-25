@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { DATABASE, type Database } from './database';
 import { AuthService } from './auth.service';
 import { generateSalt, hashPassword } from './hash-password';
+import { environment } from '../environments/environment';
 import type { Usuario, UsuarioPublico } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -61,7 +62,7 @@ export class UserService {
 
     const seedAdmin = await this._db.sql<Pick<Usuario, 'id'>>(
       'SELECT id FROM usuarios WHERE nombre = ? AND rol = ? LIMIT 1',
-      ['admin', 'admin'],
+      [environment.adminUser, 'admin'],
     );
 
     if (seedAdmin.length > 0 && id === seedAdmin[0].id) {
@@ -81,7 +82,7 @@ export class UserService {
   ): Promise<void> {
     const seedAdmin = await this._db.sql<Pick<Usuario, 'id'>>(
       'SELECT id FROM usuarios WHERE nombre = ? AND rol = ? LIMIT 1',
-      ['admin', 'admin'],
+      [environment.adminUser, 'admin'],
     );
 
     if (seedAdmin.length > 0 && id === seedAdmin[0].id) {

@@ -17,7 +17,8 @@ class MockSQLocalClient {
       return [{ version: mockSchemaVersion ?? 1 }];
     }
     // Check if admin user exists: return count 0 so seed runs
-    if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE nombre = 'admin'")) {
+    if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE nombre = ?") &&
+        params.includes(environment.adminUser)) {
       return [{ count: 0 }];
     }
     // Seed check for productos (after migration)
