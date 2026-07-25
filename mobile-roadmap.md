@@ -12,7 +12,7 @@
 | Fase | Estado | Descripción |
 |------|--------|-------------|
 | **1. Capacitor Setup** | ✅ Completada | Infraestructura base: deps, config, platforms |
-| **2. Tablet Breakpoints** | ⏳ Pendiente | Responsive design: nav, POS, grids |
+| **2. Tablet Breakpoints** | ✅ Completada | Responsive design: nav, POS, grids |
 | **3. Touch Optimizations** | ⏳ Pendiente | Tap areas, safe areas, gestures |
 | **4. Build & Test APK** | ⏳ Pendiente | Build release, test en emulador/device |
 
@@ -45,32 +45,36 @@
 
 ---
 
-## Fase 2: Tablet Breakpoints ⏳
+## Fase 2: Tablet Breakpoints ✅
 
-### Objetivo
-Hacer que la UI se adapte a tablets Android (768px-1024px) y móviles (<768px).
+### Completado
+- [x] **Nav bar**: Bottom tab bar en móvil/tablet (`<lg`), top bar en desktop (`lg+`)
+  - Links de navegación se ocultan en móvil, aparecen como iconos en bottom bar
+  - Botones de jornada (Iniciar/Cerrar) se compactan en móvil
+  - Usuario y logout se ocultan en móvil
+- [x] **POS page**: Layout completamente adaptable
+  - Móvil: carrito como bottom sheet fijo abajo (max 50vh, handle bar)
+  - Tablet (`lg+`: sidebar derecho fijo (w-80/xl:w-96)
+  - Product grid: 2 cols → 3 cols (md) → 4 cols (xl) → 5 cols (2xl)
+  - Padding responsive: `p-4 sm:p-6`
+- [x] **Todas las páginas**: Padding responsive `p-4 sm:p-6`
+  - `safe-top` / `safe-bottom` para notch de iOS
+  - Títulos responsive: `text-xl sm:text-2xl`
+- [x] Build Angular: 640 kB (OK, budget warning)
+- [x] Commits: `2bfe4f1`
 
-### Tareas planificadas
-- [ ] Definir breakpoints custom en Tailwind: `tablet: 768px`, `tablet-lg: 1024px`
-- [ ] **Nav bar**: Bottom tab bar en móvil/tablet, top bar en desktop
-- [ ] **POS page**: Layout apilado en móvil (carrito colapsa), 2 cols en tablet, 3+ en desktop
-- [ ] **Carrito**: Modo móvil (drawer/sheet), modo desktop (sidebar fijo)
-- [ ] **HistorialPage**: Grid adaptativo (1 col móvil, 2 tablet, 4 desktop)
-- [ ] **AdminPage**: Formularios adaptables
-- [ ] **InventarioPage**: Tabla responsive (cards en móvil, tabla en desktop)
-- [ ] **LoginPage**: Centrado y sizing para tablet
-
-### Archivos a modificar
+### Archivos modificados
 | Archivo | Cambio |
 |---------|--------|
-| `src/styles.css` | Breakpoints custom |
-| `src/app/components/layout/app-nav.component.html` | Bottom bar responsive |
-| `src/app/pages/pos/pos.page.html` | Layout adaptable |
-| `src/app/pages/historial/historial.page.html` | Grid responsive |
-| `src/app/pages/admin/admin.page.html` | Forms adaptables |
-| `src/app/pages/inventario/inventario.page.html` | Tabla/cards responsive |
-| `src/app/pages/jornada/jornada.page.html` | Layout adaptable |
-| `src/app/pages/login/login.page.html` | Centering tablet |
+| `src/styles.css` | Utility classes `safe-top`/`safe-bottom` |
+| `src/app/components/layout/app-nav.component.html` | Bottom tab bar + top bar responsive |
+| `src/app/pages/pos/pos.page.html` | Bottom sheet cart + responsive grid |
+| `src/app/pages/admin/admin.page.html` | Padding responsive |
+| `src/app/pages/historial/historial.page.html` | Padding responsive |
+| `src/app/pages/inventario/inventario.page.html` | Padding responsive |
+| `src/app/pages/jornada/jornada.page.html` | Padding responsive |
+| `src/app/pages/login/login.page.html` | Padding + safe area |
+| `src/app/pages/productos/producto.page.html` | Padding responsive |
 
 ---
 
@@ -81,7 +85,6 @@ Optimizar interacción táctil para tablets y móviles.
 
 ### Tareas planificadas
 - [ ] Tap areas mínimas 44x44px (Apple HIG / Material Design)
-- [ ] Bottom safe area para iOS (notch/home indicator)
 - [ ] Touch feedback (ripple o highlight en taps)
 - [ ] Swipe gestures para carrito (opcional)
 - [ ] Pull-to-refresh en historial (opcional)
@@ -113,6 +116,7 @@ Generar APK funcional y verificar en emulador/device real.
 | Runtime nativo | Capacitor | PWA installable | **Capacitor** | Más control, plugins nativos, APK real |
 | SQLite en móvil | SQLocal (WASM) | @capacitor-community/sqlite | **SQLocal** (primero) | Misma DB que web/desktop, sin migración. Fallback a plugin nativo si OPFS falla |
 | Branch | Mezclar con prod-features | Separada | **Separada** (`mobile-capacitor`) | Desktop (Electron) y mobile (Capacitor) son targets independientes |
+| Nav bar | Drawer hamburger | Bottom tab bar | **Bottom tab bar** | Estándar en mobile, accesible con pulgar, 5 tabs caben |
 
 ---
 
@@ -121,5 +125,5 @@ Generar APK funcional y verificar en emulador/device real.
 | Riesgo | Probabilidad | Impacto | Mitigation |
 |--------|-------------|---------|------------|
 | SQLocal/OPFS no funciona en WebView | Media | Alto | Migrar a `@capacitor-community/sqlite` (plugin nativo) |
-| Budget warning (634 kB > 500 kB) | Alta | Bajo | Aumentar budget o lazy load xxl chunks |
+| Budget warning (640 kB > 500 kB) | Alta | Bajo | Aumentar budget o lazy load xxl chunks |
 | Android Studio no instalado | Variable | Medio | Guiar instalación |
