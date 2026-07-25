@@ -13,3 +13,12 @@
 body {
   overflow-x: hidden;
 }
+
+/* Safe area for notch (iOS) */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}

@@ -1,14 +1,14 @@
-<div class="flex h-[calc(100vh-53px)] bg-gray-50 dark:bg-gray-950">
+<div class="flex flex-col lg:flex-row h-[calc(100vh-53px)] lg:h-[calc(100vh-53px)] bg-gray-50 dark:bg-gray-950">
   <!-- Columna izquierda: buscador + productos -->
   <div class="flex flex-1 flex-col overflow-hidden">
     <!-- Buscador -->
-    <div class="relative border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-3">
-      <span class="material-symbols-outlined absolute left-9 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 leading-none text-lg">search</span>
+    <div class="relative border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 sm:px-6 py-3">
+      <span class="material-symbols-outlined absolute left-7 sm:left-9 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 leading-none text-lg">search</span>
       <input
         #searchInput
         type="text"
-        placeholder="Buscar productos por nombre… (Escape para limpiar, ←↑↓→ para navegar)"
-        class="w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 pl-10 pr-4 py-3 text-lg shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+        placeholder="Buscar productos…"
+        class="w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 pl-10 pr-4 py-2.5 sm:py-3 text-base sm:text-lg shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
         [value]="query()"
         (input)="onQueryChange($any($event.target).value)"
         (keydown)="onKeydown($event)"
@@ -17,19 +17,19 @@
 
     <!-- Error de búsqueda -->
     @if (searchError(); as err) {
-      <div class="px-6 pt-3">
+      <div class="px-4 sm:px-6 pt-3">
         <app-error-alert [message]="err" />
       </div>
     }
 
     <!-- Resultados -->
-    <div class="flex-1 overflow-y-auto p-6">
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6">
       @if (buscando()) {
         <app-loading-spinner />
       } @else if (resultados().length === 0) {
         <app-empty-state message="Escribe para buscar productos" />
       } @else {
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           @for (p of resultados(); track p.id; let i = $index) {
             <app-product-card
               [producto]="p"
@@ -43,23 +43,34 @@
   </div>
 
   <!-- Columna derecha: carrito -->
-  <div class="flex w-96 flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+  <!-- Móvil: drawer bottom sheet fijo abajo | Tablet+: sidebar derecho -->
+  <div class="flex flex-col border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900
+              fixed bottom-0 left-0 right-0 z-40 lg:static lg:z-auto
+              max-h-[50vh] lg:max-h-none
+              rounded-t-xl lg:rounded-none
+              shadow-[0_-4px_20px_rgba(0,0,0,0.1)] lg:shadow-none
+              lg:w-80 xl:w-96">
+    <!-- Handle bar (solo móvil) -->
+    <div class="flex justify-center py-2 lg:hidden">
+      <div class="h-1 w-10 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+    </div>
+
     <!-- Alerta si no hay jornada -->
     @if (sinJornada) {
-      <div class="border-b border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 px-5 py-3 text-sm text-yellow-800 dark:text-yellow-300">
-        No hay una jornada abierta. Inicia el día en Jornada para poder cobrar.
+      <div class="border-b border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/30 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm text-yellow-800 dark:text-yellow-300">
+        No hay jornada abierta. Iniciá el día en Jornada.
       </div>
     }
 
-    <div class="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
-      <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">
-        Carrito ({{ cart.cantidadItems() }} producto{{ cart.cantidadItems() !== 1 ? 's' : '' }})
+    <div class="border-b border-gray-200 dark:border-gray-700 px-4 sm:px-5 py-3 sm:py-4">
+      <h2 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
+        Carrito ({{ cart.cantidadItems() }})
       </h2>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-5 py-2">
+    <div class="flex-1 overflow-y-auto px-4 sm:px-5 py-2">
       @if (cart.items().length === 0) {
-        <p class="mt-10 text-center text-sm text-gray-400 dark:text-gray-500">
+        <p class="mt-6 sm:mt-10 text-center text-sm text-gray-400 dark:text-gray-500">
           El carrito está vacío
         </p>
       } @else {
@@ -78,17 +89,17 @@
 
     <!-- Total + Cobrar -->
     @if (cart.items().length > 0) {
-      <div class="border-t border-gray-200 dark:border-gray-700 px-5 py-4">
-        <div class="mb-4 flex items-baseline justify-between">
-          <span class="text-sm text-gray-500 dark:text-gray-400">Total</span>
-          <span class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+      <div class="border-t border-gray-200 dark:border-gray-700 px-4 sm:px-5 py-3 sm:py-4 safe-bottom">
+        <div class="mb-3 sm:mb-4 flex items-baseline justify-between">
+          <span class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total</span>
+          <span class="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100">
             {{ cart.total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
           </span>
         </div>
         <button
           type="button"
           [disabled]="sinJornada"
-          class="w-full rounded-lg px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors"
+          class="w-full rounded-lg px-6 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white shadow-sm transition-colors"
           [class]="sinJornada
             ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
             : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 cursor-pointer'"

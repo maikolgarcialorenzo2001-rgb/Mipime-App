@@ -1,9 +1,11 @@
 @if (auth.isLoggedIn()) {
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none">
-    <div class="mx-auto flex max-w-7xl items-center justify-between gap-8 px-4 py-3">
+  <!-- TOP BAR: visible en desktop (lg+), simplificado en móvil -->
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-top">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
       <span class="text-lg font-bold text-gray-900 dark:text-gray-100">Mipime-App</span>
 
-      <div class="flex items-center gap-8 text-sm font-medium whitespace-nowrap">
+      <!-- Desktop links: hidden en móvil/tablet -->
+      <div class="hidden lg:flex items-center gap-8 text-sm font-medium whitespace-nowrap">
         <a
           routerLink="/pos"
           routerLinkActive #pos="routerLinkActive"
@@ -92,8 +94,8 @@
         }
       </div>
 
-      <div class="flex items-center gap-6 text-sm whitespace-nowrap">
-        <!-- Botones de jornada -->
+      <div class="flex items-center gap-4 text-sm whitespace-nowrap">
+        <!-- Botones de jornada: compactos en móvil -->
         @if (!jornadaService.jornadaCargando()) {
           @if (puedeAbrir) {
             <button
@@ -103,7 +105,7 @@
             >
               <span class="inline-flex items-center gap-1">
                 <span class="material-symbols-outlined leading-none text-xs">play_arrow</span>
-                Iniciar
+                <span class="hidden sm:inline">Iniciar</span>
               </span>
             </button>
           }
@@ -116,7 +118,7 @@
             >
               <span class="inline-flex items-center gap-1">
                 <span class="material-symbols-outlined leading-none text-xs">stop</span>
-                Cerrar
+                <span class="hidden sm:inline">Cerrar</span>
               </span>
             </button>
           }
@@ -135,20 +137,89 @@
           }
         </button>
 
-        <span class="text-gray-500 dark:text-gray-400">{{ auth.usuario()?.nombre }}</span>
+        <!-- Nombre usuario: solo desktop -->
+        <span class="hidden md:inline text-gray-500 dark:text-gray-400">{{ auth.usuario()?.nombre }}</span>
 
-        <span class="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700"></span>
+        <span class="hidden md:inline mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700"></span>
 
         <button
           (click)="logout()"
-          class="ml-auto text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-400 transition-colors cursor-pointer"
+          class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">logout</span>
-            Cerrar sesión
+            <span class="hidden sm:inline">Cerrar sesión</span>
           </span>
         </button>
       </div>
+    </div>
+  </nav>
+
+  <!-- BOTTOM TAB BAR: visible solo en móvil/tablet (<lg) -->
+  <nav class="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-bottom">
+    <div class="flex items-center justify-around px-2 py-1">
+      <a
+        routerLink="/pos"
+        routerLinkActive #posBottom="routerLinkActive"
+        [class.text-blue-600]="posBottom.isActive"
+        [class.dark:text-blue-400]="posBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+      >
+        <span class="material-symbols-outlined text-xl leading-none">point_of_sale</span>
+        <span class="font-medium">POS</span>
+      </a>
+      <a
+        routerLink="/productos"
+        routerLinkActive #productosBottom="routerLinkActive"
+        [class.text-blue-600]="productosBottom.isActive"
+        [class.dark:text-blue-400]="productosBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+      >
+        <span class="material-symbols-outlined text-xl leading-none">inventory_2</span>
+        <span class="font-medium">Productos</span>
+      </a>
+      <a
+        routerLink="/jornada"
+        routerLinkActive #jornadaBottom="routerLinkActive"
+        [class.text-blue-600]="jornadaBottom.isActive"
+        [class.dark:text-blue-400]="jornadaBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+      >
+        <span class="material-symbols-outlined text-xl leading-none">calendar_month</span>
+        <span class="font-medium">Jornada</span>
+      </a>
+      <a
+        routerLink="/inventario"
+        routerLinkActive #inventarioBottom="routerLinkActive"
+        [class.text-blue-600]="inventarioBottom.isActive"
+        [class.dark:text-blue-400]="inventarioBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+      >
+        <span class="material-symbols-outlined text-xl leading-none">warehouse</span>
+        <span class="font-medium">Inventario</span>
+      </a>
+      <a
+        routerLink="/historial"
+        routerLinkActive #historialBottom="routerLinkActive"
+        [class.text-blue-600]="historialBottom.isActive"
+        [class.dark:text-blue-400]="historialBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+      >
+        <span class="material-symbols-outlined text-xl leading-none">history</span>
+        <span class="font-medium">Historial</span>
+      </a>
+      @if (auth.hasRole('admin')) {
+        <a
+          routerLink="/admin"
+          routerLinkActive #adminBottom="routerLinkActive"
+          [class.text-blue-600]="adminBottom.isActive"
+          [class.dark:text-blue-400]="adminBottom.isActive"
+          class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[48px]"
+        >
+          <span class="material-symbols-outlined text-xl leading-none">admin_panel_settings</span>
+          <span class="font-medium">Admin</span>
+        </a>
+      }
     </div>
   </nav>
 }
