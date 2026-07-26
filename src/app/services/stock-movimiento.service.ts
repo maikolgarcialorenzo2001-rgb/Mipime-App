@@ -191,6 +191,72 @@ export class StockMovimientoService {
     );
   }
 
+  /**
+   * Registra una merma (rotura/pérdida) de producto:
+   * 1. Consume stock desde los lotes más antiguos (FIFO)
+   * 2. Calcula costo_total = Σ(cantidad × precio_costo_real)
+   * 3. Inserta stock_movimiento con tipo='merma' y costo_total
+   * 4. Actualiza stock_actual del producto (derivado de lotes)
+   * 5. Actualiza total_merma y saldo_esperado de la jornada
+   */
+  async registrarMerma(
+    productoId: number,
+    cantidad: number,
+    motivo?: string,
+    jornadaId?: number,
+  ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
+    const ahora = new Date().toISOString();
+
+    // 1. Consume from oldest lots (FIFO)
+    const consumos = await this._consumirFIFO(productoId, cantidad);
+
+    // 2. Calculate total cost
+    const costoTotal = consumos.reduce(
+      (sum, c) => sum + c.cantidad * c.precio_costo_real,
+      0,
+    );
+
+    // 3. Register movement
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at, costo_total' + (jornadaId !== undefined ? ', jornada_id' : '');
+    const placeholders = '?, ?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
+    const params: unknown[] = [productoId, cantidad, 'merma', motivo ?? null, ahora, costoTotal];
+    if (jornadaId !== undefined) params.push(jornadaId);
+
+    await this._db.sql(
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (${placeholders})`,
+      params,
+    );
+
+    // 4. Update product stock (derived from lots)
+    const [{ total }] = await this._db.sql<{ total: number }>(
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ?',
+      [productoId],
+    );
+
+    await this._db.sql(
+      `UPDATE productos
+       SET stock_actual = ?,
+            updated_at = ?
+       WHERE id = ?`,
+      [total, ahora, productoId],
+    );
+
+    // 5. Update jornada financials
+    if (jornadaId !== undefined) {
+      await this._db.sql(
+        `UPDATE jornadas
+         SET total_merma = total_merma + ?,
+             saldo_esperado = saldo_esperado - ?,
+             updated_at = ?
+         WHERE id = ?`,
+        [costoTotal, costoTotal, ahora, jornadaId],
+      );
+    }
+
+    return { consumos, costoTotal };
+  }
+
   async obtenerMovimientos(
     productoId: number,
   ): Promise<StockMovimiento[]> {

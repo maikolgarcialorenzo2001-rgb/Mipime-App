@@ -219,6 +219,7 @@ export class PosPage {
         // Refrescar productos para mostrar stock actualizado
         this._buscar(this.query());
         this.searchInput()?.nativeElement.focus();
+        this._jornadaService.refreshJornadaAbierta();
       },
       error: (err: unknown) => {
         this.ventaError.set(

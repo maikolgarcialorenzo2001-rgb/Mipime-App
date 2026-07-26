@@ -5,6 +5,7 @@ import { ExcelService } from './excel.service';
 import { DATABASE, type Database } from './database';
 import type { Jornada } from '../models';
 import type { Producto } from '../models';
+import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
@@ -21,6 +22,8 @@ const mockJornada: Jornada = {
   saldo_real: null,
   estado: 'abierta',
   user_cierre_id: null,
+  user_apertura_id: null,
+  total_merma: 0,
   created_at: '2026-06-02T08:00:00Z',
   updated_at: '2026-06-02T08:00:00Z',
 };
@@ -781,6 +784,155 @@ describe('JornadaService', () => {
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
       expect(callArg).toHaveLength(2);
+    });
+  });
+
+  describe('calcularTotalMerma', () => {
+    it('debería retornar 0 cuando no hay mermas', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([{ total: 0 }]); // SELECT SUM
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.calcularTotalMerma(1);
+
+      expect(resultado).toBe(0);
+    });
+
+    it('debería retornar la suma de costo_total de mermas', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([{ total: 580 }]); // SELECT SUM
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.calcularTotalMerma(1);
+
+      expect(resultado).toBe(580);
+    });
+
+    it('debería llamar SQL con filtro tipo=merma', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([{ total: 0 }]);
+
+      const service = TestBed.inject(JornadaService);
+      await service.calcularTotalMerma(42);
+
+      const sqlCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes("tipo = 'merma'"),
+      );
+      expect(sqlCall).toBeTruthy();
+      expect(sqlCall![1]).toEqual([42]);
+    });
+  });
+
+  describe('saldo_esperado con merma', () => {
+    it('debería restar total_merma de saldo_esperado al cerrar', async () => {
+      const mockJornadaConMerma: Jornada = {
+        ...mockJornadaCerrada,
+        total_merma: 300,
+        saldo_esperado: 4700, // 5000 - 300
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([mockJornadaConMerma]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.cerrar(1, 4700, 1));
+
+      expect(resultado.total_merma).toBe(300);
+      expect(resultado.saldo_esperado).toBe(4700);
+    });
+
+    it('saldo_esperado inicial debería ser monto_inicial sin merma', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([mockJornada]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.abrir(5000));
+
+      expect(resultado.saldo_esperado).toBe(5000);
+      expect(resultado.total_merma).toBe(0);
+    });
+  });
+
+  describe('autoCerrarSiOtroUsuario', () => {
+    const mockUser1: UsuarioPublico = { id: 1, nombre: 'Admin', rol: 'admin', activo: 1, created_at: '', updated_at: '' };
+    const mockUser2: UsuarioPublico = { id: 2, nombre: 'Worker', rol: 'trabajador', activo: 1, created_at: '', updated_at: '' };
+
+    const mockJornadaUser1: Jornada = { ...mockJornada, user_apertura_id: 1 };
+    const mockJornadaLegacy: Jornada = { ...mockJornada, user_apertura_id: null };
+
+    it('debería retornar null si no hay jornada abierta', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]); // constructor: obtenerAbierta -> null
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.autoCerrarSiOtroUsuario(mockUser1);
+
+      expect(resultado).toBeNull();
+    });
+
+    it('debería retornar la jornada si user_apertura_id coincide (mismo usuario)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([mockJornadaUser1]); // SELECT open jornada
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.autoCerrarSiOtroUsuario(mockUser1);
+
+      expect(resultado).toEqual(mockJornadaUser1);
+      expect(resultado!.user_apertura_id).toBe(1);
+    });
+
+    it('debería retornar la jornada si user_apertura_id es NULL (legacy)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaLegacy]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      expect(resultado).toEqual(mockJornadaLegacy);
+      expect(resultado!.user_apertura_id).toBeNull();
+    });
+
+    it('debería cerrar la jornada si es de OTRO usuario y retornar null', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada (user1)
+        .mockResolvedValueOnce([]); // UPDATE (auto-close)
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      expect(resultado).toBeNull();
+
+      // Verificar que se llamó al UPDATE para cerrar
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes("estado = 'cerrada'"),
+      );
+      expect(updateCall).toBeTruthy();
+      expect(updateCall![1]).toContain(mockUser2.id); // user_cierre_id = usuario.id
+    });
+
+    it('debería usar saldo_esperado como saldo_real al auto-cerrar', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([]); // UPDATE
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('saldo_real = saldo_esperado'),
+      );
+      expect(updateCall).toBeTruthy();
     });
   });
 

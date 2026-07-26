@@ -293,6 +293,108 @@ describe('StockMovimientoService', () => {
     });
   });
 
+  describe('registrarMerma', () => {
+    it('debería consumir FIFO, calcular costoTotal y registrar merma', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock (FIFO)
+        .mockResolvedValueOnce([])               // UPDATE lot 1
+        .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM lotes_stock
+        .mockResolvedValueOnce([])               // UPDATE productos stock_actual
+        .mockResolvedValueOnce([]);              // UPDATE jornadas
+
+      const result = await service.registrarMerma(1, 11, 'Rotura');
+
+      // FIFO consumption: lot 1 (10×5) + lot 2 (1×8) = 50 + 8 = 58
+      expect(result.consumos).toHaveLength(2);
+      expect(result.costoTotal).toBe(58);
+      expect(result.consumos[0]).toEqual({ lote_id: 1, cantidad: 10, precio_costo_real: 5 });
+      expect(result.consumos[1]).toEqual({ lote_id: 2, cantidad: 1, precio_costo_real: 8 });
+
+      // Verify INSERT stock_movimientos with tipo='merma' and costo_total
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO stock_movimientos'),
+      );
+      expect(insertCall).toBeTruthy();
+      expect(insertCall![1]).toContain('merma');
+      expect(insertCall![1]).toContain(58);
+    });
+
+    it('debería lanzar "Stock insuficiente" si no hay suficientes lotes', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([
+        { id: 1, producto_id: 1, cantidad: 5, precio_costo: 5, fecha_ingreso: '2026-01-15T10:00:00Z', created_at: '2026-01-15T10:00:00Z' },
+      ]);
+
+      await expect(
+        service.registrarMerma(1, 10),
+      ).rejects.toThrow('Stock insuficiente');
+    });
+
+    it('debería actualizar stock_actual después de la merma', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ id: 1, producto_id: 1, cantidad: 5, precio_costo: 10, fecha_ingreso: '2026-01-15T10:00:00Z', created_at: '2026-01-15T10:00:00Z' }])  // consumir 2 de 5
+        .mockResolvedValueOnce([])               // UPDATE lot
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 3 }])   // SELECT SUM lotes_stock -> 3 restantes
+        .mockResolvedValueOnce([]);              // UPDATE productos
+
+      await service.registrarMerma(1, 2, 'Prueba');
+
+      const stockUpdate = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos'),
+      );
+      expect(stockUpdate![1][0]).toBe(3); // stock_actual = 3
+    });
+
+    it('debería actualizar jornada total_merma y saldo_esperado cuando se proporciona jornadaId', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock
+        .mockResolvedValueOnce([])               // UPDATE lot 1
+        .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM
+        .mockResolvedValueOnce([])               // UPDATE productos
+        .mockResolvedValueOnce([]);              // UPDATE jornadas
+
+      await service.registrarMerma(1, 11, 'Rotura', 42);
+
+      const jornadaUpdate = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
+      );
+      expect(jornadaUpdate).toBeTruthy();
+      expect(jornadaUpdate![1]).toContain(58); // total_merma += 58
+      expect(jornadaUpdate![1]).toContain(58); // saldo_esperado -= 58
+    });
+
+    it('debería retornar costoTotal 0 si consumo es 0 (sin lotes)', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // SELECT lotes_stock -> empty
+
+      await expect(
+        service.registrarMerma(1, 1),
+      ).rejects.toThrow('Stock insuficiente');
+    });
+
+    it('debería insertar jornada_id cuando se proporciona', async () => {
+      // consume solo del lote 1 (tiene 10, necesitamos 5)
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockLotes)
+        .mockResolvedValueOnce([])               // UPDATE lot 1
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM
+        .mockResolvedValueOnce([])               // UPDATE productos
+        .mockResolvedValueOnce([]);              // UPDATE jornadas
+
+      await service.registrarMerma(1, 5, 'Test', 42);
+
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO stock_movimientos'),
+      );
+      expect(insertCall![0]).toContain('jornada_id');
+      expect(insertCall![1]).toContain(42);
+    });
+  });
+
   describe('obtenerHistorial', () => {
     it('debería retornar movimientos con nombre del producto', async () => {
       vi.mocked(mockDb.sql).mockResolvedValue(mockHistorial);

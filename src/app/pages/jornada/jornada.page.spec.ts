@@ -4,8 +4,18 @@ import { of } from 'rxjs';
 import { JornadaPage } from './jornada.page';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
-import type { Jornada } from '../../models';
+import { DATABASE, type Database } from '../../services/database';
+import type { Jornada, StockMovimiento } from '../../models';
 import type { UsuarioPublico } from '../../models';
+import type { Movimiento } from '../../models/movimiento';
+import type { Venta } from '../../models/venta';
+
+function createMockDb(): Database {
+  return {
+    sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
+    initialize: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 interface MockJornadaService {
   jornadaAbierta: WritableSignal<Jornada | null>;
@@ -15,6 +25,7 @@ interface MockJornadaService {
   obtenerReporte: ReturnType<typeof vi.fn>;
   registrarMovimiento: ReturnType<typeof vi.fn>;
   refreshJornadaAbierta: ReturnType<typeof vi.fn>;
+  calcularTotalMerma: ReturnType<typeof vi.fn>;
 }
 
 interface MockJornadaServiceInput {
@@ -25,6 +36,7 @@ interface MockJornadaServiceInput {
   obtenerReporte?: ReturnType<typeof vi.fn>;
   registrarMovimiento?: ReturnType<typeof vi.fn>;
   refreshJornadaAbierta?: ReturnType<typeof vi.fn>;
+  calcularTotalMerma?: ReturnType<typeof vi.fn>;
 }
 
 function createMockJornadaService(overrides: MockJornadaServiceInput = {}): MockJornadaService {
@@ -36,6 +48,7 @@ function createMockJornadaService(overrides: MockJornadaServiceInput = {}): Mock
     obtenerReporte: overrides.obtenerReporte ?? vi.fn(),
     registrarMovimiento: overrides.registrarMovimiento ?? vi.fn(),
     refreshJornadaAbierta: overrides.refreshJornadaAbierta ?? vi.fn(),
+    calcularTotalMerma: overrides.calcularTotalMerma ?? vi.fn(),
   };
 }
 
@@ -51,6 +64,8 @@ const mockJornadaAbierta: Jornada = {
   saldo_real: null,
   estado: 'abierta',
   user_cierre_id: null,
+  user_apertura_id: null,
+  total_merma: 500,
   created_at: '2026-06-04T09:00:00Z',
   updated_at: '2026-06-04T09:00:00Z',
 };
@@ -94,7 +109,10 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
     let component: JornadaPage;
 
+    let mockDb: Database;
+
     beforeEach(() => {
+      mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -108,6 +126,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -148,6 +167,7 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
 
     beforeEach(() => {
+      const mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -160,6 +180,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockWorker) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -177,6 +198,7 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
 
     beforeEach(() => {
+      const mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -189,6 +211,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -206,6 +229,7 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
 
     beforeEach(() => {
+      const mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -218,6 +242,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -240,6 +265,7 @@ describe('JornadaPage', () => {
 
     beforeEach(() => {
       registrarSpy = vi.fn().mockReturnValue(of({ id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'test', monto: 100, created_at: '' }));
+      const mockDb = createMockDb();
 
       TestBed.configureTestingModule({
         imports: [JornadaPage],
@@ -254,6 +280,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -349,6 +376,7 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
 
     beforeEach(() => {
+      const mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -361,6 +389,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockWorker) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -380,6 +409,7 @@ describe('JornadaPage', () => {
     let fixture: ComponentFixture<JornadaPage>;
 
     beforeEach(() => {
+      const mockDb = createMockDb();
       TestBed.configureTestingModule({
         imports: [JornadaPage],
         providers: [
@@ -392,6 +422,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -412,6 +443,7 @@ describe('JornadaPage', () => {
 
     beforeEach(() => {
       cerrarSpy = vi.fn().mockReturnValue(of(mockJornadaCerrada));
+      const mockDb = createMockDb();
 
       TestBed.configureTestingModule({
         imports: [JornadaPage],
@@ -434,6 +466,7 @@ describe('JornadaPage', () => {
             }),
           },
           { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
         ],
       });
 
@@ -443,6 +476,10 @@ describe('JornadaPage', () => {
     });
 
     it('5.3 RED: modal de cierre debería pasar saldo_esperado como saldoReal sin input manual', () => {
+      // Cerrar modal de reapertura (user_apertura_id=null dispara modal)
+      component.showReopenModal.set(false);
+      fixture.detectChanges();
+
       component.abrirModalCierre();
       fixture.detectChanges();
 
@@ -467,6 +504,83 @@ describe('JornadaPage', () => {
 
       const errorEl: HTMLElement | null = fixture.nativeElement.querySelector('.bg-red-50');
       expect(errorEl?.textContent).toContain('Error de DB');
+    });
+  });
+
+  describe('tabla diaria con merma', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+    let component: JornadaPage;
+    let mockDb: Database;
+
+    beforeEach(() => {
+      mockDb = createMockDb();
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(mockJornadaAbierta),
+              cerrar: vi.fn().mockReturnValue(of(mockJornadaCerrada)),
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      // Cerrar el modal de reapertura que se muestra automáticamente
+      component.showReopenModal.set(false);
+      fixture.detectChanges();
+    });
+
+    it('debería mostrar sección de mermas cuando existen mermas', async () => {
+      const mermasMock: StockMovimiento[] = [
+        { id: 1, producto_id: 1, cantidad: 5, tipo: 'merma', motivo: 'Rotura', costo_total: 250, created_at: '2026-06-04T10:00:00Z' },
+      ];
+      component.mermasDelDia.set(mermasMock);
+      fixture.detectChanges();
+
+      const texto = fixture.nativeElement.textContent;
+      expect(texto).toContain('Mermas');
+      expect(texto).toContain('Rotura');
+      expect(texto).toContain('250');
+    });
+
+    it('debería mostrar total_merma en el summary card en rojo', async () => {
+      fixture.detectChanges();
+
+      const texto = fixture.nativeElement.textContent;
+      // mockJornadaAbierta has total_merma: 500
+      expect(texto).toContain('Total mermas');
+      expect(texto).toContain('500');
+    });
+
+    it('debería ocultar sección de mermas cuando no hay mermas', async () => {
+      component.ventasDelDia.set([]);
+      component.movimientosDelDia.set([]);
+      component.mermasDelDia.set([]);
+      fixture.detectChanges();
+
+      // Check that no "Mermas" sub-header exists
+      const allH4 = fixture.nativeElement.querySelectorAll('h4');
+      const mermaHeader = Array.from(allH4).find(
+        (h) => (h as HTMLElement).textContent?.includes('Mermas'),
+      );
+      expect(mermaHeader).toBeFalsy();
+
+      // Daily table should not contain any merma rows
+      const mermaRows = fixture.nativeElement.querySelectorAll('tbody tr');
+      const mermaRowText = Array.from(mermaRows).map(
+        (r) => (r as HTMLElement).textContent,
+      );
+      expect(mermaRowText.some((t) => t?.includes('Rotura'))).toBe(false);
     });
   });
 });

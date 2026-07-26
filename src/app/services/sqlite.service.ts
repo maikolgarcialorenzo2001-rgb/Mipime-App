@@ -102,7 +102,13 @@ export class SqliteService implements Database {
       await this._migrationV8(client);
     }
 
-    await this._seedIfEmpty(client);
+    if (currentVersion < 9) {
+      await this._migrationV9(client);
+    }
+
+    if (environment.seedEnabled) {
+      await this._seedIfEmpty(client);
+    }
   }
 
   private async _migrationV1(client: SQLocal): Promise<void> {
@@ -384,6 +390,19 @@ export class SqliteService implements Database {
       WHERE stock_actual > 0`);
 
     await client.sql('INSERT INTO schema_version (version) VALUES (8)');
+  }
+
+  private async _migrationV9(client: SQLocal): Promise<void> {
+    // ALTER TABLEs con try/catch por si la columna ya existe
+    for (const q of [
+      'ALTER TABLE jornadas ADD COLUMN user_apertura_id INTEGER REFERENCES usuarios(id)',
+      'ALTER TABLE stock_movimientos ADD COLUMN costo_total REAL DEFAULT 0',
+      'ALTER TABLE jornadas ADD COLUMN total_merma REAL DEFAULT 0',
+    ]) {
+      try { await client.sql(q); } catch { /* columna ya existe */ }
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (9)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

@@ -157,6 +157,32 @@ describe('App component nav', () => {
     expect(links.length).toBe(0);
   });
 
+  it('debería renderizar router-outlet cuando ttl no ha expirado', () => {
+    localStorage.removeItem('mipime_ttl_expired');
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const routerOutlet = fixture.nativeElement.querySelector('router-outlet');
+    expect(routerOutlet).toBeTruthy();
+
+    const ttlExpired = fixture.nativeElement.querySelector('app-ttl-expired');
+    expect(ttlExpired).toBeFalsy();
+  });
+
+  it('debería renderizar app-ttl-expired cuando la prueba expiró', () => {
+    localStorage.setItem('mipime_ttl_expired', 'true');
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const routerOutlet = fixture.nativeElement.querySelector('router-outlet');
+    expect(routerOutlet).toBeFalsy();
+
+    const ttlExpired = fixture.nativeElement.querySelector('app-ttl-expired');
+    expect(ttlExpired).toBeTruthy();
+  });
+
   it('debería llamar a logout cuando se hace clic en el botón', async () => {
     const salt = generateSalt();
     const hash = await hashPassword('admin123', salt);

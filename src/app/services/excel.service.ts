@@ -82,6 +82,7 @@ export class ExcelService {
       ['Total efectivo', totalEfectivo],
       ['Total transferencia', totalTransferencia],
       ['Total gastos', j.total_gastos],
+      ['Total merma', j.total_merma ?? 0],
       ['Ganancia bruta', gananciaBruta],
       ['Saldo esperado', j.saldo_esperado],
     ];
@@ -418,7 +419,7 @@ export class ExcelService {
     for (const mov of stock) {
       const info = pmap?.get(mov.producto_id);
       const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : 'Ajuste';
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : 'Ajuste';
       filas.push([
         nombreProducto,
         tipoLabel,
@@ -468,7 +469,7 @@ export class ExcelService {
     for (const mov of todos) {
       const info = productosMap.get(mov.producto_id);
       const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : 'Ajuste';
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : 'Ajuste';
       filas.push([
         nombreProducto,
         tipoLabel,

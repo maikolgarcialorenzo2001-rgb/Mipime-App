@@ -519,9 +519,10 @@ describe('SqliteService migration v7', () => {
     mockSchemaVersion = 7;
     await service.initialize();
 
-    const alterCalls = sqlCalls.filter(
-      (c) => c.query.includes('ALTER TABLE') && c.query.includes('stock_movimientos'),
+    // Solo la ALTER que agrega jornada_id pertenece a v7 (no la de costo_total de v9)
+    const v7AlterCalls = sqlCalls.filter(
+      (c) => c.query.includes('ALTER TABLE') && c.query.includes('jornada_id'),
     );
-    expect(alterCalls.length).toBe(0);
+    expect(v7AlterCalls.length).toBe(0);
   });
 });

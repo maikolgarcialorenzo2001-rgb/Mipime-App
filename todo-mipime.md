@@ -3,8 +3,8 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `feature/auth-y-pages`
-> Tests: **244 / 23 test files** (↑ desde 209)
-> Última actualización: 2026-07-23
+> Tests: **392 / 34 test files** (↑ desde 375)
+> Última actualización: 2026-07-26
 
 ---
 
@@ -13,6 +13,10 @@
 ### ~~A1. ErrorAlert en POS — `_buscar()` traga errores~~ ✅
 **Commit:** `f8e72e8`
 Se agregó `searchError` signal + `ErrorAlertComponent` en el template. Si falla la búsqueda, el usuario ve el error.
+
+### ~~A2. HistorialPage — handlers vacíos~~ ✅
+**Commit:** `3bf7bb3`
+Implementados `descargarExcel()`, `verPreview()` con modal completo (productos + movimientos), `cerrarPreview()` por botón/Escape/backdrop, fix sheet name collision.
 
 ### ~~B1. `_debounceId` sin cleanup~~ ✅
 **Commit:** `0f1e3f5`
@@ -42,44 +46,47 @@ Formulario inline en JornadaPage (admin-only) para registrar gastos/ingresos_ext
 **Commit:** `db2fc91`
 Selector efectivo/transferencia en checkout, desglose en Excel, migración v5.
 
-### ~~BUG: Transacción no atómica en ventas~~ ✅
-**Commit:** `db2fc91`
-`_validarStock()` upfront + BEGIN/COMMIT/ROLLBACK en todas las escrituras.
+### ~~C5. Componentes sin tests — todos completados~~ ✅
+**Commit:** 2026-07-26
+Tests para cart-item-row (8 tests), empty-state (4), error-alert (4), estado-badge (7). Los demás ya tenían spec: stock-badge, quantity-input, checkout-modal, product-card, app-nav.
 
-### ~~A2. HistorialPage — handlers vacíos~~ ✅
-**Commit:** `3bf7bb3`
-Implementados `descargarExcel()`, `verPreview()` con modal completo (productos + movimientos), `cerrarPreview()` por botón/Escape/backdrop, fix sheet name collision.
+### ~~C8. Stock mínimo / alertas~~ ✅
+**Commit:** `30d6931`
+Thresholds unificados entre StockBadgeComponent y ProductCardComponent. StockBadge usa computed signal (`>10` green, `>=1` yellow, `≤0` red). ProductCard ahora reusa `<app-stock-badge>`. Tests: 8 tests (5 nuevos + 3 migrados).
 
 ### ~~C9. Exportación de datos histórica~~ ✅
 **Commit:** `3bf7bb3`
 Botón "Exportar mes" en HistorialPage con `generarExcelMensual()` multi-hoja, `jornadasDelMes()` en JornadaService, resumen del mes + hoja por jornada.
 
----
+### ~~C10. Modo oscuro + Material Icons~~ ✅
+**PRs:** `40d7e84` (infra), `f5e026a` (icons), `0f7c2ad` (dark nav+shared), `d31f1f1` (dark pages)
+Material Symbols icons en toda la UI (nav, botones, SVGs reemplazados) + modo oscuro con persistencia en localStorage vía Tailwind 4 `@custom-variant dark`. 30 archivos, 4 PRs encadenados.
 
-## 🔴 Prioridad Alta — Funcionalidades rotas / incompletas
+### ~~P1. Jornada refresh post-venta~~ ✅
+**Commit:** 2026-07-26
+`pos.page.ts` — `confirmarVenta()` ahora llama `refreshJornadaAbierta()` después de venta exitosa. Totales de jornada se reflejan sin recarga manual. 2 tests nuevos en `pos.page.spec.ts`.
 
-### A2. HistorialPage — handlers vacíos
-**Archivo:** `src/app/pages/historial/historial.page.ts` (líneas 145-152)
-**Problema:** Al clickear un día con jornada cerrada, los botones **"Descargar Excel"** y **"Vista previa"** no hacen nada:
-```typescript
-descargarExcel(_jornada: Jornada): void {
-  // TODO: 4.3 — JornadaService.cerrar() guarda el Excel,
-  // acá lo recuperamos de jornada_reportes y lo descargamos
-}
-verPreview(_jornada: Jornada): void {
-  // TODO: 4.3 — Mostrar el Excel in-app (tabla readonly)
-}
-```
-**Fix Descargar:** Usar `JornadaService.obtenerReporte(j.id)` → `_descargarExcel(base64)` (el mismo patrón que ya funciona en `app-nav.component.ts` y `jornada.page.ts`).
-**Fix Vista previa:** Mostrar un modal con tabla readonly con los datos de la jornada (reusar lógica de ExcelService).
+### ~~P2. Dark mode jornada numbers~~ ✅
+**Commit:** 2026-07-26
+`jornada-summary-card.component.html` — `text-gray-900 dark:text-gray-100` en los 4 `<dd>` (monto_inicial, total_ventas, total_gastos, saldo_esperado).
 
-### A3. Editar / eliminar movimientos
-**Contexto:** Hoy los movimientos (gastos/ingresos_extra) solo se pueden registrar, no modificar ni eliminar.
-**Posible approach:** Botones editar/eliminar en cada fila del formulario de movimientos en JornadaPage.
+### ~~P3. Test environment con TTL 7 días~~ ✅
+**Commit:** 2026-07-26
+`bun ng build --configuration=test` activa TTL de 7 días. Componentes nuevos:
+- `environment.test.ts` (clone de prod + `ttlDays:7, testMode:true`)
+- `initializers/ttl-check.ts` — APP_INITIALIZER que guarda `mipime_first_launch` en localStorage
+- `ttl-expired.component.ts` — overlay full-screen con Material Symbols `timer_off`
+- `app.config.ts` — registro condicional del initializer
+- `app.ts` + `app.html` — `ttlExpired` signal + `@if` condicional
+- 5 tests en `ttl-check.spec.ts`, 8 tests en `ttl-expired.component.spec.ts`, 2 tests en `app.spec.ts`
 
-### A4. CRUD completo de productos desde la UI
-**Contexto:** `ProductosPage` solo lista y busca. `AdminPage` solo maneja usuarios. No hay forma de crear, editar o eliminar productos desde la app; solo existen los 50 productos del seed en `sqlite.service.ts`.
-**Posible approach:** Formulario de alta/edición en AdminPage o ProductosPage. Confirmación para baja.
+### ~~P4. Limpieza A3/A4 del TODO~~ ✅
+**Commit:** 2026-07-26
+A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime.md`. Métodos de `ProductoService` se mantienen (no se borran).
+
+### ~~BUG: Transacción no atómica en ventas~~ ✅
+**Commit:** `db2fc91`
+`_validarStock()` upfront + BEGIN/COMMIT/ROLLBACK en todas las escrituras.
 
 ---
 
@@ -89,14 +96,13 @@ verPreview(_jornada: Jornada): void {
 **Contexto:** Si una jornada se cierra por error (o el `pending_close` la cierra sin querer), no hay forma de reabrirla.
 **Posible approach:** Botón "Reabrir" en HistorialPage para jornadas del día actual, solo admin. `UPDATE estado = 'abierta'`, limpia `hora_cierre`, `saldo_real`, `user_cierre_id`.
 
-### B5. LoginPage sin tests
-**Archivo:** `src/app/pages/login/login.page.ts` — **no tiene spec**
-**Contexto:** La página de login es crítica (auth) y no tiene cobertura de tests.
-**Posible approach:** Testear flujo login exitoso, error de credenciales, redirect a POS.
+### ~~B5. LoginPage sin tests~~ ✅
+**Commit:** 2026-07-26
+11 tests: render formulario, inputs, botón, credenciales válidas → navega /pos, credenciales inválidas → error, estado loading, limpieza de error.
 
-### B6. ProductosPage sin tests
-**Archivo:** `src/app/pages/productos/producto.page.ts` — **no tiene spec**
-**Contexto:** Página de listado/búsqueda de productos sin cobertura.
+### ~~B6. ProductosPage sin tests~~ ✅
+**Commit:** 2026-07-26
+16 tests: carga inicial, tabla, búsqueda con debounce, estados vacío/loading/error, recargar, cantidad singular/plural, precio y stock.
 
 ---
 
@@ -108,26 +114,10 @@ verPreview(_jornada: Jornada): void {
 
 ---
 
-## 🟢 Prioridad Baja — Features nuevas / deuda técnica
+## 🟢 Prioridad Baja — Pendientes otros
 
-### C5. Componentes sin tests (8)
-**Archivos:**
-- `src/app/components/cart-item-row/cart-item-row.component` — sin spec
-- `src/app/components/empty-state/empty-state.component` — sin spec
-- `src/app/components/error-alert/error-alert.component` — sin spec
-- `src/app/components/estado-badge/estado-badge.component` — sin spec
-- `src/app/components/jornada-summary-card/jornada-summary-card.component` — sin spec
-- `src/app/components/loading-spinner/loading-spinner.component` — sin spec
-- `src/app/components/quantity-input/quantity-input.component` — sin spec
-- `src/app/components/stock-badge/stock-badge.component` — sin spec
-
-### ~~C8. Stock mínimo / alertas~~ ✅
-**Commit:** `30d6931`
-**Hecho:** Thresholds unificados entre StockBadgeComponent y ProductCardComponent. StockBadge usa computed signal (`>10` green, `>=1` yellow, `≤0` red). ProductCard ahora reusa `<app-stock-badge>`. Tests: 8 tests (5 nuevos + 3 migrados).
-
-### ~~C10. Modo oscuro + Material Icons~~ ✅
-**PRs:** `40d7e84` (infra), `f5e026a` (icons), `0f7c2ad` (dark nav+shared), `d31f1f1` (dark pages)
-Material Symbols icons en toda la UI (nav, botones, SVGs reemplazados) + modo oscuro con persistencia en localStorage vía Tailwind 4 `@custom-variant dark`. 30 archivos, 4 PRs encadenados.
+- **Push a origin** — main está 112 commits adelante de `origin/main`
+- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio)
 
 ---
 
@@ -135,6 +125,8 @@ Material Symbols icons en toda la UI (nav, botones, SVGs reemplazados) + modo os
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-07-26 | P1-P4: prod-improvements-julio-2026 — jornada refresh, dark mode numbers, TTL 7d, limpieza TODO (17 tests nuevos) | — |
+| 2026-07-26 | C5: Tests de 4 componentes + B5: LoginPage tests + B6: ProductosPage tests (50 tests nuevos) | — |
 | 2026-06-24 | C10: Modo oscuro + Material Icons — 4 PRs (infra/icons/dark-nav/dark-pages) | `40d7e84`, `f5e026a`, `0f7c2ad`, `d31f1f1` |
 | 2026-06-08 | A2+C9: HistorialPage handlers + Exportación mensual | `3bf7bb3` |
 | 2026-06-08 | C8: Stock thresholds unificados — StockBadge computed signal + ProductCard reuse | `30d6931` |
