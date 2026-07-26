@@ -1,6 +1,6 @@
 {
   "name": "mipime-cuentas",
-  "version": "0.0.1-alpha",
+  "version": "0.0.1-test",
   "main": "dist-electron/main.js",
   "scripts": {
     "ng": "ng",

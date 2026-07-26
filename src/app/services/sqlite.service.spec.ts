@@ -121,7 +121,7 @@ describe('SqliteService migration v2', () => {
     const sql = createTableCalls[0].query;
     expect(sql).toContain('producto_id INTEGER NOT NULL REFERENCES productos(id)');
     expect(sql).toContain('cantidad REAL NOT NULL');
-    expect(sql).toContain("CHECK(tipo IN ('entrada', 'salida', 'ajuste')");
+    expect(sql).toContain("CHECK(tipo IN ('entrada', 'salida', 'ajuste', 'merma')");
     expect(sql).toContain('motivo TEXT');
   });
 

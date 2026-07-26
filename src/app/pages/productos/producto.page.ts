@@ -98,7 +98,12 @@ export class ProductosPage implements OnInit {
 
   async onSubmitMerma(): Promise<void> {
     const productoId = this.selectedProductoId();
-    if (!productoId || this.mermaCantidad() <= 0) return;
+    if (!productoId) return;
+
+    if (this.mermaCantidad() <= 0) {
+      this.mermaError.set('La cantidad debe ser mayor a 0');
+      return;
+    }
 
     this.mermaProcesando.set(true);
     this.mermaError.set(null);

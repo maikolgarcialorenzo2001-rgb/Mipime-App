@@ -45,6 +45,9 @@ export class JornadaPage {
   readonly showReopenModal = signal(false);
   readonly reopening = signal(false);
 
+  /** Guard: prevent reopen modal from showing more than once per jornada session */
+  private _reopenModalShown = false;
+
   readonly usuario = this._authService.usuario;
 
   constructor() {
@@ -54,10 +57,11 @@ export class JornadaPage {
       const user = this.usuario();
 
       // Cuando termina la carga y hay jornada abierta del mismo usuario → mostrar modal
-      if (j && !loading && user && j.estado === 'abierta') {
+      if (j && !loading && user && j.estado === 'abierta' && !this._reopenModalShown) {
         const aperturaId = j.user_apertura_id;
         // Mismo usuario o legacy (sin user_apertura_id) → puede reabrir
         if (aperturaId === null || aperturaId === user.id) {
+          this._reopenModalShown = true;
           this.showReopenModal.set(true);
         }
       }
