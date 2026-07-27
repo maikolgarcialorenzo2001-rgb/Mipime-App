@@ -195,7 +195,7 @@ export class InventarioPage implements OnInit {
     this.formNombre.set(p.nombre);
     this.formCosto.set(p.precio_costo ?? null);
     this.formPrecioVenta.set(p.precio_venta);
-    this.formUnidades.set(p.stock_actual);
+    this.formUnidades.set(p.stock_almacen);
     this.formError.set(null);
     this.procesando.set(false);
     this.editandoProductoId.set(p.id);
@@ -250,7 +250,7 @@ export class InventarioPage implements OnInit {
             nombre: this.formNombre().trim(),
             precio_costo: this.formCosto()!,
             precio_venta: this.formPrecioVenta()!,
-            stock_actual: this.formUnidades()!,
+            stock_almacen: this.formUnidades()!,
           }),
         );
       }

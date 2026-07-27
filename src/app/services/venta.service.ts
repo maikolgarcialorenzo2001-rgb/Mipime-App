@@ -67,11 +67,11 @@ export class VentaService {
 
   private async _validarStock(items: CartItem[]): Promise<void> {
     for (const item of items) {
-      const rows = await this._db.sql<{ stock_actual: number }>(
-        'SELECT stock_actual FROM productos WHERE id = ?',
+      const rows = await this._db.sql<{ stock_shop: number }>(
+        'SELECT stock_shop FROM productos WHERE id = ?',
         [item.producto.id],
       );
-      const stockActual = rows[0]?.stock_actual ?? 0;
+      const stockActual = rows[0]?.stock_shop ?? 0;
       if (item.cantidad > stockActual) {
         throw new Error('Stock insuficiente');
       }

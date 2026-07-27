@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { DATABASE } from './database';
+import { AuthService } from './auth.service';
 import type { StockMovimiento, LoteStock, ConsumoRecord } from '../models';
 
 @Injectable({
@@ -7,48 +8,63 @@ import type { StockMovimiento, LoteStock, ConsumoRecord } from '../models';
 })
 export class StockMovimientoService {
   private readonly _db = inject(DATABASE);
+  private readonly _auth = inject(AuthService);
 
   /**
-   * Consume stock from the oldest lots (FIFO).
-   * ReturnsConsumoRecord[] detailing which lots were consumed and at what cost.
-   * Throws if insufficient stock across all lots.
+   * Throws if the current user is not an admin.
+   * Call at the top of admin-only operations.
+   */
+  private _checkAdmin(): void {
+    const user = this._auth.usuario();
+    if (!user || user.rol !== 'admin') {
+      throw new Error('Solo administradores');
+    }
+  }
+
+  /**
+   * Consume stock from the oldest lots (FIFO) filtered by location.
+   * Returns ConsumoRecord[] detailing which lots were consumed and at what cost.
+   * Throws if insufficient stock across all lots for the given location.
    */
   async _consumirFIFO(
     productoId: number,
     cantidadRequerida: number,
+    ubicacion: 'almacen' | 'shop',
   ): Promise<ConsumoRecord[]> {
     let lotes = await this._db.sql<LoteStock>(
       `SELECT * FROM lotes_stock
-       WHERE producto_id = ? AND cantidad > 0
+       WHERE producto_id = ? AND cantidad > 0 AND ubicacion = ?
        ORDER BY fecha_ingreso ASC, id ASC`,
-      [productoId],
+      [productoId, ubicacion],
     );
 
-    // Safety net: if no lotes exist but stock_actual > 0, create a default lote
+    // Safety net: if no lotes exist but stock_{ubicacion} > 0, create a default lote
     if (lotes.length === 0) {
-      const [{ stock_actual, precio_costo }] = await this._db.sql<{
-        stock_actual: number;
+      const stockCol = ubicacion === 'almacen' ? 'stock_almacen' : 'stock_shop';
+      const [row] = await this._db.sql<{
+        stock: number;
         precio_costo: number | null;
       }>(
-        'SELECT stock_actual, precio_costo FROM productos WHERE id = ?',
+        `SELECT ${stockCol} AS stock, precio_costo FROM productos WHERE id = ?`,
         [productoId],
       );
 
-      if (stock_actual > 0) {
+      if (row.stock > 0) {
         const ahora = new Date().toISOString();
         const insertResult = await this._db.sql<{ id: number }>(
-          `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)
            RETURNING id`,
-          [productoId, stock_actual, precio_costo ?? 0, ahora, ahora],
+          [productoId, row.stock, row.precio_costo ?? 0, ahora, ubicacion, ahora],
         );
         lotes = [
           {
             id: insertResult[0].id,
             producto_id: productoId,
-            cantidad: stock_actual,
-            precio_costo: precio_costo ?? 0,
+            cantidad: row.stock,
+            precio_costo: row.precio_costo ?? 0,
             fecha_ingreso: ahora,
+            ubicacion,
             created_at: ahora,
           },
         ];
@@ -97,13 +113,22 @@ export class StockMovimientoService {
     return consumos;
   }
 
+  /**
+   * Helper: returns the correct stock column name for a given ubicacion.
+   */
+  private _stockCol(ubicacion: 'almacen' | 'shop'): string {
+    return ubicacion === 'almacen' ? 'stock_almacen' : 'stock_shop';
+  }
+
   async registrarEntrada(
     productoId: number,
     cantidad: number,
     precioCosto: number,
     motivo?: string,
     jornadaId?: number,
+    ubicacion: 'almacen' | 'shop' = 'almacen',
   ): Promise<void> {
+    this._checkAdmin();
     const ahora = new Date().toISOString();
 
     // 1. Register movement
@@ -118,20 +143,20 @@ export class StockMovimientoService {
       params,
     );
 
-    // 2. Update product stock
+    // 2. Update product stock for this location
     await this._db.sql(
       `UPDATE productos
-       SET stock_actual = stock_actual + ?,
+       SET ${this._stockCol(ubicacion)} = ${this._stockCol(ubicacion)} + ?,
             updated_at = ?
        WHERE id = ?`,
       [cantidad, ahora, productoId],
     );
 
-    // 3. Create lot
+    // 3. Create lot with ubicacion
     await this._db.sql(
-      `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [productoId, cantidad, precioCosto, ahora, ahora],
+      `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [productoId, cantidad, precioCosto, ahora, ubicacion, ahora],
     );
   }
 
@@ -140,11 +165,13 @@ export class StockMovimientoService {
     cantidad: number,
     motivo?: string,
     jornadaId?: number,
+    ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<ConsumoRecord[]> {
+    this._checkAdmin();
     const ahora = new Date().toISOString();
 
-    // 1. Consume from oldest lots (FIFO)
-    const consumos = await this._consumirFIFO(productoId, cantidad);
+    // 1. Consume from oldest lots (FIFO) at the given location
+    const consumos = await this._consumirFIFO(productoId, cantidad, ubicacion);
 
     // 2. Register movement
     const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
@@ -158,15 +185,15 @@ export class StockMovimientoService {
       params,
     );
 
-    // 3. Update product stock (derived from lots)
+    // 3. Update product stock (derived from lots at this location)
     const [{ total }] = await this._db.sql<{ total: number }>(
-      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ?',
-      [productoId],
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
+      [productoId, ubicacion],
     );
 
     await this._db.sql(
       `UPDATE productos
-       SET stock_actual = ?,
+       SET ${this._stockCol(ubicacion)} = ?,
             updated_at = ?
        WHERE id = ?`,
       [total, ahora, productoId],
@@ -175,12 +202,27 @@ export class StockMovimientoService {
     return consumos;
   }
 
+  /**
+   * Registra una entrada (entrada de mercadería a almacén).
+   * Alias para registrarEntrada con ubicacion='almacen' — mantiene compatibilidad.
+   */
+  async registrarEntradaAlmacen(
+    productoId: number,
+    cantidad: number,
+    precioCosto: number,
+    motivo?: string,
+    jornadaId?: number,
+  ): Promise<void> {
+    return this.registrarEntrada(productoId, cantidad, precioCosto, motivo, jornadaId, 'almacen');
+  }
+
   async registrarAjuste(
     productoId: number,
     nuevaCantidad: number,
     motivo: string,
     jornadaId?: number,
   ): Promise<void> {
+    this._checkAdmin();
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
     }
@@ -220,16 +262,17 @@ export class StockMovimientoService {
 
     if (nuevaCantidad > 0) {
       await this._db.sql(
-        `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+         VALUES (?, ?, ?, ?, 'almacen', ?)`,
         [productoId, nuevaCantidad, costoPromedio, ahora, ahora],
       );
     }
 
-    // 4. Update product stock
+    // 4. Update product stock (sum across both locations to set stock_almacen)
+    //    Full ajuste replaces all lots — set stock_almacen and keep stock_shop as-is
     await this._db.sql(
       `UPDATE productos
-       SET stock_actual = ?,
+       SET stock_almacen = ?,
             updated_at = ?
        WHERE id = ?`,
       [nuevaCantidad, ahora, productoId],
@@ -237,11 +280,117 @@ export class StockMovimientoService {
   }
 
   /**
+   * Transfiere stock desde almacén a tienda.
+   * 1. Consume FIFO desde almacén
+   * 2. Crea nuevos lotes en tienda con el mismo costo
+   * 3. Registra movimiento tipo 'traslado'
+   * 4. Recalcula stock_almacen y stock_shop
+   */
+  async registrarTraslado(
+    productoId: number,
+    cantidad: number,
+    jornadaId?: number,
+  ): Promise<ConsumoRecord[]> {
+    const ahora = new Date().toISOString();
+
+    // 1. Consume from almacen FIFO
+    const consumos = await this._consumirFIFO(productoId, cantidad, 'almacen');
+
+    // 2. Create new shop lots with same costs
+    for (const consumo of consumos) {
+      await this._db.sql(
+        `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+         VALUES (?, ?, ?, ?, 'shop', ?)`,
+        [productoId, consumo.cantidad, consumo.precio_costo_real, ahora, ahora],
+      );
+    }
+
+    // 3. Register movement
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
+    const placeholders = '?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
+    const params: unknown[] = [productoId, cantidad, 'traslado', null, ahora];
+    if (jornadaId !== undefined) params.push(jornadaId);
+
+    await this._db.sql(
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (${placeholders})`,
+      params,
+    );
+
+    // 4. Recalculate both stock columns
+    const [{ totalAlmacen }] = await this._db.sql<{ totalAlmacen: number }>(
+      "SELECT COALESCE(SUM(cantidad), 0) AS totalAlmacen FROM lotes_stock WHERE producto_id = ? AND ubicacion = 'almacen'",
+      [productoId],
+    );
+    const [{ totalShop }] = await this._db.sql<{ totalShop: number }>(
+      "SELECT COALESCE(SUM(cantidad), 0) AS totalShop FROM lotes_stock WHERE producto_id = ? AND ubicacion = 'shop'",
+      [productoId],
+    );
+
+    await this._db.sql(
+      `UPDATE productos
+       SET stock_almacen = ?, stock_shop = ?, updated_at = ?
+       WHERE id = ?`,
+      [totalAlmacen, totalShop, ahora, productoId],
+    );
+
+    return consumos;
+  }
+
+  /**
+   * Ajusta la cantidad de un lote específico y recalcula el stock de la ubicación.
+   */
+  async registrarAjusteLote(
+    productoId: number,
+    loteId: number,
+    nuevaCantidad: number,
+    motivo: string,
+    ubicacion: 'almacen' | 'shop',
+  ): Promise<void> {
+    this._checkAdmin();
+    if (!motivo || motivo.trim().length === 0) {
+      throw new Error('El motivo es obligatorio');
+    }
+
+    const ahora = new Date().toISOString();
+
+    // 1. Register movement
+    const columnas = 'producto_id, cantidad, tipo, motivo, created_at';
+    const params: unknown[] = [productoId, nuevaCantidad, 'ajuste', motivo, ahora];
+
+    await this._db.sql(
+      `INSERT INTO stock_movimientos (${columnas})
+       VALUES (?, ?, ?, ?, ?)`,
+      params,
+    );
+
+    // 2. Update the specific lot
+    await this._db.sql(
+      'UPDATE lotes_stock SET cantidad = ?, updated_at = ? WHERE id = ?',
+      [nuevaCantidad, ahora, loteId],
+    );
+
+    // 3. Recalculate stock for this ubicacion
+    const [{ total }] = await this._db.sql<{ total: number }>(
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
+      [productoId, ubicacion],
+    );
+
+    await this._db.sql(
+      `UPDATE productos
+       SET ${this._stockCol(ubicacion)} = ?,
+            updated_at = ?
+       WHERE id = ?`,
+      [total, ahora, productoId],
+    );
+  }
+
+  /**
    * Registra una merma (rotura/pérdida) de producto:
-   * 1. Consume stock desde los lotes más antiguos (FIFO)
+   * 1. Consume stock desde los lotes más antiguos de TIENDA (FIFO)
    * 2. Calcula costo_total = Σ(cantidad × precio_costo_real)
    * 3. Inserta stock_movimiento con tipo='merma' y costo_total
-   * 4. Actualiza stock_actual del producto (derivado de lotes)
+   * 4. Actualiza stock_shop del producto (derivado de lotes de tienda)
    * 5. Actualiza total_merma y saldo_esperado de la jornada
    */
   async registrarMerma(
@@ -250,10 +399,11 @@ export class StockMovimientoService {
     motivo?: string,
     jornadaId?: number,
   ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
+    this._checkAdmin();
     const ahora = new Date().toISOString();
 
-    // 1. Consume from oldest lots (FIFO)
-    const consumos = await this._consumirFIFO(productoId, cantidad);
+    // 1. Consume from oldest shop lots (FIFO)
+    const consumos = await this._consumirFIFO(productoId, cantidad, 'shop');
 
     // 2. Calculate total cost
     const costoTotal = consumos.reduce(
@@ -273,15 +423,15 @@ export class StockMovimientoService {
       params,
     );
 
-    // 4. Update product stock (derived from lots)
+    // 4. Update product stock_shop (derived from shop lots only)
     const [{ total }] = await this._db.sql<{ total: number }>(
-      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ?',
+      "SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = 'shop'",
       [productoId],
     );
 
     await this._db.sql(
       `UPDATE productos
-       SET stock_actual = ?,
+       SET stock_shop = ?,
             updated_at = ?
        WHERE id = ?`,
       [total, ahora, productoId],
@@ -292,8 +442,8 @@ export class StockMovimientoService {
       await this._db.sql(
         `UPDATE jornadas
          SET total_merma = total_merma + ?,
-             saldo_esperado = saldo_esperado - ?,
-             updated_at = ?
+              saldo_esperado = saldo_esperado - ?,
+              updated_at = ?
          WHERE id = ?`,
         [costoTotal, costoTotal, ahora, jornadaId],
       );

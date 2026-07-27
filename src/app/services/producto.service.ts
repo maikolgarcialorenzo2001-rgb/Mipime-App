@@ -40,28 +40,28 @@ export class ProductoService {
     ).pipe(map((rows) => rows[0] ?? null));
   }
 
-  /** Crea un nuevo producto y lo retorna. Si tiene stock inicial, crea un lote FIFO. */
+  /** Crea un nuevo producto y lo retorna. Si tiene stock inicial, crea un lote FIFO en almacén. */
   crear(data: {
     nombre: string;
     precio_costo: number;
     precio_venta: number;
-    stock_actual: number;
+    stock_almacen: number;
   }): Observable<Producto> {
     const ahora = new Date().toISOString();
     return from(
       this._db.sql<Producto>(
-        `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_actual, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, ?, ?) RETURNING *`,
+        `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_almacen, stock_shop, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?) RETURNING *`,
         [data.nombre, null, data.precio_costo, data.precio_venta, ahora, ahora],
       ),
     ).pipe(
       map((rows) => rows[0]),
       switchMap((producto) => {
-        if (data.stock_actual > 0) {
+        if (data.stock_almacen > 0) {
           return from(
             this._stockMovimiento.registrarEntrada(
               producto.id,
-              data.stock_actual,
+              data.stock_almacen,
               data.precio_costo,
             ),
           ).pipe(map(() => producto));

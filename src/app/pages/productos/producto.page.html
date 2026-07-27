@@ -59,10 +59,10 @@
                 {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
               </td>
               <td class="px-6 py-4">
-                <app-stock-badge [stock]="p.stock_actual" />
+                <app-stock-badge [stock]="p.stock_almacen" />
               </td>
               <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                {{ p.stock_actual }}
+                {{ p.stock_almacen }}
               </td>
               <td class="px-6 py-4">
                 <button
