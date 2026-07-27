@@ -110,6 +110,10 @@ export class SqliteService implements Database {
       await this._migrationV10(client);
     }
 
+    if (currentVersion < 11) {
+      await this._migrationV11(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -434,6 +438,60 @@ export class SqliteService implements Database {
     await client.sql('COMMIT');
   }
 
+  private async _migrationV11(client: SQLocal): Promise<void> {
+    // v11: rename productos.stock_actual→stock_almacen, add stock_shop;
+    //      add lotes_stock.ubicacion;
+    //      add 'traslado' to stock_movimientos CHECK
+    await client.sql('BEGIN TRANSACTION');
+
+    // 1. Recreate productos with dual stock columns
+    await client.sql(`CREATE TABLE productos_v11 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      descripcion TEXT,
+      precio_venta REAL NOT NULL,
+      precio_costo REAL,
+      stock_almacen REAL NOT NULL DEFAULT 0,
+      stock_shop REAL NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    await client.sql(`INSERT INTO productos_v11
+      SELECT id, nombre, descripcion, precio_venta, precio_costo,
+             stock_actual, 0, created_at, updated_at
+      FROM productos`);
+    await client.sql('DROP TABLE productos');
+    await client.sql('ALTER TABLE productos_v11 RENAME TO productos');
+
+    // 2. Add ubicacion to lotes_stock (safe ALTER with try/catch)
+    try {
+      await client.sql(
+        "ALTER TABLE lotes_stock ADD COLUMN ubicacion TEXT NOT NULL DEFAULT 'almacen' CHECK(ubicacion IN ('almacen','shop'))",
+      );
+    } catch { /* columna ya existe */ }
+
+    // 3. Recreate stock_movimientos to add 'traslado' to CHECK
+    await client.sql(`CREATE TABLE stock_movimientos_v11 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      tipo TEXT NOT NULL CHECK(tipo IN ('entrada','salida','ajuste','merma','traslado')),
+      motivo TEXT,
+      created_at TEXT NOT NULL,
+      jornada_id INTEGER REFERENCES jornadas(id),
+      costo_total REAL DEFAULT 0
+    )`);
+    await client.sql(`INSERT INTO stock_movimientos_v11
+      SELECT id, producto_id, cantidad, tipo, motivo, created_at,
+             jornada_id, costo_total
+      FROM stock_movimientos`);
+    await client.sql('DROP TABLE stock_movimientos');
+    await client.sql('ALTER TABLE stock_movimientos_v11 RENAME TO stock_movimientos');
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (11)');
+    await client.sql('COMMIT');
+  }
+
   private async _seedIfEmpty(client: SQLocal): Promise<void> {
     const [{ count }] = await client.sql<{ count: number }>(
       'SELECT COUNT(*) AS count FROM productos',
@@ -502,16 +560,16 @@ export class SqliteService implements Database {
     for (let i = 0; i < total; i += batchSize) {
       const batch = productos.slice(i, i + batchSize);
       const placeholders = batch
-        .map(() => '(?, ?, ?, ?, ?, ?, ?)')
+        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?)')
         .join(', ');
 
       const flatParams: unknown[] = [];
       for (const [nombre, descripcion, precioVenta, precioCosto, stock] of batch) {
-        flatParams.push(nombre, descripcion, precioVenta, precioCosto ?? null, stock, ahora, ahora);
+        flatParams.push(nombre, descripcion, precioVenta, precioCosto ?? null, stock, 0, ahora, ahora);
       }
 
       await client.sql(
-        `INSERT INTO productos (nombre, descripcion, precio_venta, precio_costo, stock_actual, created_at, updated_at)
+        `INSERT INTO productos (nombre, descripcion, precio_venta, precio_costo, stock_almacen, stock_shop, created_at, updated_at)
          VALUES ${placeholders}`,
         ...flatParams,
       );
@@ -519,8 +577,8 @@ export class SqliteService implements Database {
 
     // Crear lotes_stock para los productos seed (requerido para FIFO)
     await client.sql(`INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
-      SELECT id, stock_actual, COALESCE(precio_costo, 0), created_at, created_at
+      SELECT id, stock_almacen, COALESCE(precio_costo, 0), created_at, created_at
       FROM productos
-      WHERE stock_actual > 0`);
+      WHERE stock_almacen > 0`);
   }
 }
