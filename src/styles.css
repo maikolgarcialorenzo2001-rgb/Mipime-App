@@ -1,7 +1,7 @@
 @import 'material-symbols/outlined.css';
 @import 'tailwindcss';
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 /* Smooth dark/light mode transition */
 *,
@@ -12,4 +12,10 @@
 
 body {
   overflow-x: hidden;
+}
+
+/* Ensure native select/option elements respect dark mode */
+.dark select,
+.dark select option {
+  color-scheme: dark;
 }
