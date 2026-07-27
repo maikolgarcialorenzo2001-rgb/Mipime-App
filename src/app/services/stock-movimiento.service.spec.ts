@@ -128,6 +128,8 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock
         .mockResolvedValueOnce([])               // UPDATE lot 1
         .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([{ precio_costo: 8 }]) // SELECT next lot for precio_costo
+        .mockResolvedValueOnce([])               // UPDATE productos precio_costo
         .mockResolvedValueOnce([])               // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 9 }])   // SELECT SUM for stock_actual
         .mockResolvedValueOnce([]);              // UPDATE productos stock_actual
@@ -154,6 +156,8 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce(mockLotes)
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ precio_costo: 8 }]) // SELECT next lot
+        .mockResolvedValueOnce([])               // UPDATE precio_costo
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ total: 9 }])
         .mockResolvedValueOnce([]);
@@ -169,6 +173,8 @@ describe('StockMovimientoService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce(mockLotes)               // SELECT lotes_stock (FIFO)
         .mockResolvedValueOnce([])                       // UPDATE lot 1 (consume 5 of 10)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])   // SELECT next lot (still lot 1)
+        .mockResolvedValueOnce([])                       // UPDATE precio_costo
         .mockResolvedValueOnce([])                       // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 15 }])          // SELECT SUM lotes_stock
         .mockResolvedValueOnce([]);                      // UPDATE productos stock_actual
@@ -299,6 +305,8 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock (FIFO)
         .mockResolvedValueOnce([])               // UPDATE lot 1
         .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([{ precio_costo: 8 }]) // SELECT next lot
+        .mockResolvedValueOnce([])               // UPDATE precio_costo
         .mockResolvedValueOnce([])               // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM lotes_stock
         .mockResolvedValueOnce([])               // UPDATE productos stock_actual
@@ -335,6 +343,8 @@ describe('StockMovimientoService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ id: 1, producto_id: 1, cantidad: 5, precio_costo: 10, fecha_ingreso: '2026-01-15T10:00:00Z', created_at: '2026-01-15T10:00:00Z' }])  // consumir 2 de 5
         .mockResolvedValueOnce([])               // UPDATE lot
+        .mockResolvedValueOnce([{ precio_costo: 10 }]) // SELECT next lot
+        .mockResolvedValueOnce([])               // UPDATE precio_costo
         .mockResolvedValueOnce([])               // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 3 }])   // SELECT SUM lotes_stock -> 3 restantes
         .mockResolvedValueOnce([]);              // UPDATE productos
@@ -342,7 +352,7 @@ describe('StockMovimientoService', () => {
       await service.registrarMerma(1, 2, 'Prueba');
 
       const stockUpdate = vi.mocked(mockDb.sql).mock.calls.find(
-        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos'),
+        (call) => typeof call[0] === 'string' && call[0].includes('stock_actual'),
       );
       expect(stockUpdate![1][0]).toBe(3); // stock_actual = 3
     });
@@ -352,6 +362,8 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce(mockLotes)       // SELECT lotes_stock
         .mockResolvedValueOnce([])               // UPDATE lot 1
         .mockResolvedValueOnce([])               // UPDATE lot 2
+        .mockResolvedValueOnce([{ precio_costo: 8 }]) // SELECT next lot
+        .mockResolvedValueOnce([])               // UPDATE precio_costo
         .mockResolvedValueOnce([])               // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM
         .mockResolvedValueOnce([])               // UPDATE productos
@@ -383,6 +395,8 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce([{ stock_actual: 10, precio_costo: 5 }]) // SELECT productos -> has stock
         .mockResolvedValueOnce([{ id: 99 }]) // INSERT default lote -> RETURNING id
         .mockResolvedValueOnce([])  // UPDATE lote (consume)
+        .mockResolvedValueOnce([{ precio_costo: 5 }]) // SELECT next lot
+        .mockResolvedValueOnce([])  // UPDATE precio_costo
         .mockResolvedValueOnce([])  // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 9 }]) // SELECT SUM
         .mockResolvedValueOnce([]); // UPDATE productos
@@ -397,6 +411,8 @@ describe('StockMovimientoService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce(mockLotes)
         .mockResolvedValueOnce([])               // UPDATE lot 1
+        .mockResolvedValueOnce([{ precio_costo: 5 }]) // SELECT next lot
+        .mockResolvedValueOnce([])               // UPDATE precio_costo
         .mockResolvedValueOnce([])               // INSERT stock_movimientos
         .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM
         .mockResolvedValueOnce([])               // UPDATE productos

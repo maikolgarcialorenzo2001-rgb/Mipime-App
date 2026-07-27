@@ -80,6 +80,20 @@ export class StockMovimientoService {
       throw new Error('Stock insuficiente');
     }
 
+    // Update product precio_costo to the next available lot (FIFO front)
+    const [siguienteLote] = await this._db.sql<{ precio_costo: number }>(
+      `SELECT precio_costo FROM lotes_stock
+       WHERE producto_id = ? AND cantidad > 0
+       ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
+      [productoId],
+    );
+    if (siguienteLote) {
+      await this._db.sql(
+        'UPDATE productos SET precio_costo = ?, updated_at = ? WHERE id = ?',
+        [siguienteLote.precio_costo, new Date().toISOString(), productoId],
+      );
+    }
+
     return consumos;
   }
 
