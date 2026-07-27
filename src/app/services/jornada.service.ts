@@ -158,8 +158,7 @@ export class JornadaService {
     );
   }
 
-  /**
-   * Cierra la jornada:
+  /** Cierra la jornada:
    * 1. Verifica que el usuario sea admin
    * 2. Ejecuta el cierre (UPDATE → SELECT → Excel → reporte)
    */
@@ -286,12 +285,23 @@ export class JornadaService {
       [id],
     );
 
-    // 10. Generar Excel con estado fresco y nombres de producto
+    // 10. Obtener venta_lotes para desglose FIFO en Excel
+    let ventaLotes: import('../models/venta-lote').VentaLote[] = [];
+    if (ventaIds.length > 0) {
+      const vlPlaceholders = ventaIds.map(() => '?').join(', ');
+      ventaLotes = await this._db.sql<import('../models/venta-lote').VentaLote>(
+        `SELECT * FROM venta_lotes WHERE venta_id IN (${vlPlaceholders})`,
+        ventaIds,
+      );
+    }
+
+    // 11. Generar Excel con estado fresco y nombres de producto
     const base64 = this._excelService.generarExcelJornada({
       jornada,
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
+      ventaLotes,
       productosMap,
       totalCosto,
       userCierreNombre,
@@ -327,6 +337,7 @@ export class JornadaService {
               ventas: datos.ventas,
               movimientos: datos.movimientos,
               stockMovimientos: datos.stockMovimientos,
+              ventaLotes: datos.ventaLotes,
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
@@ -353,6 +364,7 @@ export class JornadaService {
         ventas: datos.ventas,
         movimientos: datos.movimientos,
         stockMovimientos: datos.stockMovimientos,
+        ventaLotes: datos.ventaLotes,
         productosMap: datos.productosMap,
         totalCosto: datos.totalCosto,
         userCierreNombre: datos.userCierreNombre,
@@ -369,6 +381,7 @@ export class JornadaService {
     ventas: VentaConDetalles[];
     movimientos: Movimiento[];
     stockMovimientos: StockMovimiento[];
+    ventaLotes: import('../models/venta-lote').VentaLote[];
     productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
     totalCosto: number;
     userCierreNombre: string | null;
@@ -401,6 +414,16 @@ export class JornadaService {
       'SELECT * FROM stock_movimientos WHERE jornada_id = ? ORDER BY created_at',
       [jornadaId],
     );
+
+    // 2c. Obtener venta_lotes para desglose FIFO en Excel
+    let ventaLotes: import('../models/venta-lote').VentaLote[] = [];
+    if (ventaIds.length > 0) {
+      const vlPlaceholders = ventaIds.map(() => '?').join(', ');
+      ventaLotes = await this._db.sql<import('../models/venta-lote').VentaLote>(
+        `SELECT * FROM venta_lotes WHERE venta_id IN (${vlPlaceholders})`,
+        ventaIds,
+      );
+    }
 
     // 3. Obtener productos para el mapa de nombres + precio_costo
     const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
@@ -462,6 +485,7 @@ export class JornadaService {
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
+      ventaLotes,
       productosMap,
       totalCosto,
       userCierreNombre,
@@ -540,6 +564,7 @@ export class JornadaService {
               ventas: datos.ventas,
               movimientos: datos.movimientos,
               stockMovimientos: datos.stockMovimientos,
+              ventaLotes: datos.ventaLotes,
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,

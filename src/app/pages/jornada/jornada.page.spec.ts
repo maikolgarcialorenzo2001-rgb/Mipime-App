@@ -476,10 +476,6 @@ describe('JornadaPage', () => {
     });
 
     it('5.3 RED: modal de cierre debería pasar saldo_esperado como saldoReal sin input manual', () => {
-      // Cerrar modal de reapertura (user_apertura_id=null dispara modal)
-      component.showReopenModal.set(false);
-      fixture.detectChanges();
-
       component.abrirModalCierre();
       fixture.detectChanges();
 
@@ -533,10 +529,6 @@ describe('JornadaPage', () => {
 
       fixture = TestBed.createComponent(JornadaPage);
       component = fixture.componentInstance;
-      fixture.detectChanges();
-
-      // Cerrar el modal de reapertura que se muestra automáticamente
-      component.showReopenModal.set(false);
       fixture.detectChanges();
     });
 

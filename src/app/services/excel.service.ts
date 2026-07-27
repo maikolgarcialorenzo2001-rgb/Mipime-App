@@ -5,6 +5,7 @@ import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { VentaLote } from '../models/venta-lote';
 
 export interface ProductoInfo {
   nombre: string;
@@ -24,6 +25,7 @@ export interface JornadaReportData {
   userCierreNombre: string | null;
   cuentaCosas?: CuentaCosa[];
   stockMovimientos?: StockMovimiento[];
+  ventaLotes?: VentaLote[];
 }
 
 @Injectable({
@@ -53,6 +55,7 @@ export class ExcelService {
     const j = data.jornada;
     const ventas = data.ventas;
     const gananciaBruta = j.total_ventas - data.totalCosto;
+    const gananciaPct = j.total_ventas > 0 ? ((gananciaBruta / j.total_ventas) * 100).toFixed(1) : '0.0';
 
     // Calcular desglose por forma de pago
     const totalEfectivo = ventas
@@ -84,6 +87,7 @@ export class ExcelService {
       ['Total gastos', j.total_gastos],
       ['Total merma', j.total_merma ?? 0],
       ['Ganancia bruta', gananciaBruta],
+      ['Ganancia %', `${gananciaPct}%`],
       ['Saldo esperado', j.saldo_esperado],
     ];
 
@@ -146,6 +150,7 @@ export class ExcelService {
     const filas: unknown[][] = [[...headerBase, ...headerExtra]];
 
     const pmap = data.productosMap;
+    const vlotes = data.ventaLotes ?? [];
 
     let totalSinPendientes = 0;
     let totalPendientes = 0;
@@ -181,6 +186,22 @@ export class ExcelService {
           }
         }
         filas.push(fila);
+
+        // Desglose de lotes para este detalle
+        const lotesDelDetalle = vlotes.filter(
+          (vl) => vl.venta_id === venta.id && vl.producto_id === detalle.producto_id,
+        );
+        if (lotesDelDetalle.length > 1) {
+          for (const vl of lotesDelDetalle) {
+            const loteFila: unknown[] = Array(headerBase.length + headerExtra.length).fill('');
+            loteFila[0] = `  └ Lote #${vl.lote_id}`;
+            loteFila[1] = vl.cantidad;
+            loteFila[3] = vl.precio_costo_real;
+            loteFila[4] = vl.cantidad * vl.precio_costo_real;
+            filas.push(loteFila);
+          }
+        }
+
         if (venta.forma_pago === 'pendiente') {
           totalPendientes += detalle.subtotal;
         } else {
@@ -294,6 +315,7 @@ export class ExcelService {
       ['Total ventas', j.total_ventas],
       ['Total gastos', j.total_gastos],
       ['Ganancia bruta', j.total_ventas - (data.totalCosto ?? 0)],
+      ['Ganancia %', j.total_ventas > 0 ? `${(((j.total_ventas - (data.totalCosto ?? 0)) / j.total_ventas) * 100).toFixed(1)}%` : '0.0%'],
     ];
 
     if (j.saldo_real !== null) {
@@ -311,6 +333,7 @@ export class ExcelService {
     filas.push(['Producto', 'Cantidad', 'Precio unitario', 'Precio base', 'Total', 'Forma de pago']);
 
     const pmap = data.productosMap;
+    const vlotes = data.ventaLotes ?? [];
     let totalSinPendientes = 0;
     let totalPendientes = 0;
     for (const venta of data.ventas) {
@@ -326,6 +349,24 @@ export class ExcelService {
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
         ]);
+
+        // Desglose de lotes para este detalle
+        const lotesDelDetalle = vlotes.filter(
+          (vl) => vl.venta_id === venta.id && vl.producto_id === detalle.producto_id,
+        );
+        if (lotesDelDetalle.length > 1) {
+          for (const vl of lotesDelDetalle) {
+            filas.push([
+              `  └ Lote #${vl.lote_id}`,
+              vl.cantidad,
+              '',
+              vl.precio_costo_real,
+              vl.cantidad * vl.precio_costo_real,
+              '',
+            ]);
+          }
+        }
+
         if (venta.forma_pago === 'pendiente') {
           totalPendientes += detalle.subtotal;
         } else {
