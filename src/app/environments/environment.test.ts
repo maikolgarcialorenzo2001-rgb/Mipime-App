@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
-  dbName: 'mipime-prod.db',
+  dbName: 'tienda-app-test.db',
   adminUser: 'e.z',
   adminPassword: 'softwarez',
   seedEnabled: false,

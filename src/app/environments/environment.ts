@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  dbName: 'mipime-cuentas.db',
+  dbName: 'tienda-app-dev.db',
   adminUser: 'admin',
   adminPassword: 'admin123',
   testMode: false,
