@@ -398,12 +398,13 @@ export class StockMovimientoService {
     cantidad: number,
     motivo?: string,
     jornadaId?: number,
+    ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
     this._checkAdmin();
     const ahora = new Date().toISOString();
 
-    // 1. Consume from oldest shop lots (FIFO)
-    const consumos = await this._consumirFIFO(productoId, cantidad, 'shop');
+    // 1. Consume from oldest lots (FIFO) at the given ubicacion
+    const consumos = await this._consumirFIFO(productoId, cantidad, ubicacion);
 
     // 2. Calculate total cost
     const costoTotal = consumos.reduce(
@@ -423,22 +424,22 @@ export class StockMovimientoService {
       params,
     );
 
-    // 4. Update product stock_shop (derived from shop lots only)
+    // 4. Update product stock for this ubicacion
     const [{ total }] = await this._db.sql<{ total: number }>(
-      "SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = 'shop'",
-      [productoId],
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
+      [productoId, ubicacion],
     );
 
     await this._db.sql(
       `UPDATE productos
-       SET stock_shop = ?,
+       SET ${this._stockCol(ubicacion)} = ?,
             updated_at = ?
        WHERE id = ?`,
       [total, ahora, productoId],
     );
 
-    // 5. Update jornada financials
-    if (jornadaId !== undefined) {
+    // 5. Update jornada financials (only for shop merma — jornada tracks shop P&L)
+    if (jornadaId !== undefined && ubicacion === 'shop') {
       await this._db.sql(
         `UPDATE jornadas
          SET total_merma = total_merma + ?,

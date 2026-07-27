@@ -93,15 +93,6 @@
                         Ajustar
                       </span>
                     </button>
-                    <button
-                      class="bg-red-500 dark:bg-red-400 text-white rounded px-3 py-1 text-sm hover:bg-red-600 dark:hover:bg-red-500 transition-colors"
-                      (click)="onSelectAction(producto.id, 'merma')"
-                    >
-                      <span class="inline-flex items-center gap-1">
-                        <span class="material-symbols-outlined leading-none text-sm">delete</span>
-                        Merma
-                      </span>
-                    </button>
                   }
                   <button
                     class="bg-teal-600 dark:bg-teal-500 text-white rounded px-3 py-1 text-sm hover:bg-teal-700 dark:hover:bg-teal-600 transition-colors"
@@ -195,7 +186,6 @@
                           [value]="selectedLoteIndex() ?? ''"
                           (change)="selectedLoteIndex.set(toInt($any($event.target).value))"
                         >
-                          <option value="">Todos los lotes</option>
                           @for (lote of productoLotes(); track lote.id; let i = $index) {
                             <option [value]="i + 1">
                               Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
@@ -208,9 +198,9 @@
                     @if (selectedAction()?.tipo !== 'traslado') {
                       <div>
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                          {{ selectedAction()?.tipo === 'ajuste' || selectedAction()?.tipo === 'merma' ? 'Motivo (obligatorio)' : 'Motivo' }}
+                          {{ selectedAction()?.tipo === 'ajuste' ? 'Motivo (obligatorio)' : 'Motivo' }}
                         </label>
-                        @if (selectedAction()?.tipo === 'ajuste' || selectedAction()?.tipo === 'merma') {
+                        @if (selectedAction()?.tipo === 'ajuste') {
                           <input
                             [(ngModel)]="movimientoMotivo"
                             name="movimientoMotivo"
@@ -321,19 +311,21 @@
                                 <th class="px-3 py-2">Cantidad</th>
                                 <th class="px-3 py-2">Costo Unit.</th>
                                 <th class="px-3 py-2">Valor Total</th>
+                                <th class="px-3 py-2">Ubicación</th>
                               </tr>
                             </thead>
                             <tbody>
                               @for (lote of lotes(); track lote.id) {
-                                <tr class="border-t dark:border-gray-700 hover:bg-blue-100/50 dark:hover:bg-blue-800/20 transition-colors">
-                                  <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">#{{ lote.id }}</td>
-                                  <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                    {{ lote.fecha_ingreso | date:'short' }}
-                                  </td>
-                                  <td class="px-3 py-2 font-medium">{{ lote.cantidad }}</td>
-                                  <td class="px-3 py-2">${{ lote.precio_costo.toFixed(2) }}</td>
-                                  <td class="px-3 py-2 font-medium">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
-                                </tr>
+                                  <tr class="border-t dark:border-gray-700 hover:bg-blue-100/50 dark:hover:bg-blue-800/20 transition-colors">
+                                    <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">#{{ lote.id }}</td>
+                                    <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                      {{ lote.fecha_ingreso | date:'short' }}
+                                    </td>
+                                    <td class="px-3 py-2 font-medium">{{ lote.cantidad }}</td>
+                                    <td class="px-3 py-2">${{ lote.precio_costo.toFixed(2) }}</td>
+                                    <td class="px-3 py-2 font-medium">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
+                                    <td class="px-3 py-2">{{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }}</td>
+                                  </tr>
                               }
                           </tbody>
                         </table>

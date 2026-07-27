@@ -110,6 +110,19 @@
                         class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                       />
                     </div>
+                    @if (esAdmin()) {
+                      <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Ubicación</label>
+                        <select
+                          class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                          [(ngModel)]="mermaUbicacion"
+                          name="mermaUbicacion"
+                        >
+                          <option value="shop">Tienda</option>
+                          <option value="almacen">Almacén</option>
+                        </select>
+                      </div>
+                    }
                     <div class="flex gap-2">
                       <button
                         type="submit"

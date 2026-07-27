@@ -41,7 +41,7 @@ export class InventarioPage implements OnInit {
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
     productoId: number;
-    tipo: 'entrada' | 'salida' | 'ajuste' | 'merma' | 'traslado';
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado';
   } | null>(null);
   readonly showHistoryId = signal<number | null>(null);
   readonly movimientoCantidad = signal<number | null>(null);
@@ -110,38 +110,27 @@ export class InventarioPage implements OnInit {
             action.productoId,
             this.movimientoCantidad() ?? 0,
             this.movimientoMotivo() || undefined,
+            undefined,
+            'almacen',
           );
           break;
         case 'ajuste': {
           const loteIndex = this.selectedLoteIndex();
-          if (loteIndex !== null) {
-            const lotes = this.productoLotes();
-            const lote = lotes[loteIndex - 1];
-            if (lote) {
-              await this.stockService.registrarAjusteLote(
-                action.productoId,
-                lote.id,
-                this.movimientoCantidad() ?? 0,
-                this.movimientoMotivo(),
-                lote.ubicacion,
-              );
-            }
-          } else {
-            await this.stockService.registrarAjuste(
-              action.productoId,
-              this.movimientoCantidad() ?? 0,
-              this.movimientoMotivo(),
-            );
+          const lotes = this.productoLotes();
+          const lote = lotes[loteIndex !== null ? loteIndex - 1 : -1];
+          if (!lote) {
+            this.error.set('Debe seleccionar un lote para ajustar');
+            return;
           }
-          break;
-        }
-        case 'merma':
-          await this.stockService.registrarMerma(
+          await this.stockService.registrarAjusteLote(
             action.productoId,
+            lote.id,
             this.movimientoCantidad() ?? 0,
-            this.movimientoMotivo() || undefined,
+            this.movimientoMotivo(),
+            lote.ubicacion,
           );
           break;
+        }
         case 'traslado':
           await this.stockService.registrarTraslado(
             action.productoId,
@@ -214,7 +203,7 @@ export class InventarioPage implements OnInit {
 
   async onSelectAction(
     productoId: number,
-    tipo: 'entrada' | 'salida' | 'ajuste' | 'merma' | 'traslado',
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado',
   ): Promise<void> {
     this.selectedAction.set({ productoId, tipo });
     this.selectedLoteIndex.set(null);
@@ -226,6 +215,9 @@ export class InventarioPage implements OnInit {
       try {
         const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
         this.productoLotes.set(lotes);
+        if (lotes.length > 0) {
+          this.selectedLoteIndex.set(1);
+        }
       } catch {
         this.productoLotes.set([]);
       }

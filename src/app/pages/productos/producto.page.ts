@@ -1,10 +1,11 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe } from '@angular/common';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
+import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
 
 @Component({
@@ -17,6 +18,9 @@ export class ProductosPage implements OnInit {
   private readonly _productoService = inject(ProductoService);
   private readonly _stockService = inject(StockMovimientoService);
   private readonly _jornadaService = inject(JornadaService);
+  private readonly _authService = inject(AuthService);
+
+  readonly esAdmin = computed(() => this._authService.usuario()?.rol === 'admin');
 
   readonly productos = signal<Producto[]>([]);
   readonly buscando = signal(false);
@@ -27,6 +31,7 @@ export class ProductosPage implements OnInit {
   readonly selectedProductoId = signal<number | null>(null);
   readonly mermaCantidad = signal<number | null>(null);
   readonly mermaMotivo = signal('');
+  readonly mermaUbicacion = signal<'almacen' | 'shop'>('shop');
   readonly mermaError = signal<string | null>(null);
   readonly mermaProcesando = signal(false);
 
@@ -86,6 +91,7 @@ export class ProductosPage implements OnInit {
     this.selectedProductoId.set(productoId);
     this.mermaCantidad.set(null);
     this.mermaMotivo.set('');
+    this.mermaUbicacion.set('shop');
     this.mermaError.set(null);
   }
 
@@ -93,6 +99,7 @@ export class ProductosPage implements OnInit {
     this.selectedProductoId.set(null);
     this.mermaCantidad.set(null);
     this.mermaMotivo.set('');
+    this.mermaUbicacion.set('shop');
     this.mermaError.set(null);
   }
 
@@ -113,6 +120,7 @@ export class ProductosPage implements OnInit {
         this.mermaCantidad()!,
         this.mermaMotivo() || undefined,
         this._jornadaService.jornadaAbierta()?.id,
+        this.mermaUbicacion(),
       );
       this.cancelarMerma();
       this._cargar();

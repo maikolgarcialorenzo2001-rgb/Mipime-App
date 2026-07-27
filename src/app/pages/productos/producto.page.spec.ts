@@ -3,6 +3,7 @@ import { ProductosPage } from './producto.page';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
+import { AuthService } from '../../services/auth.service';
 import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { Producto } from '../../models';
@@ -27,8 +28,13 @@ describe('ProductosPage', () => {
   let mockStockService: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockJornadaService: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockAuthService: any;
 
   beforeEach(() => {
+    mockAuthService = {
+      usuario: vi.fn().mockReturnValue({ id: 1, nombre: 'Admin', rol: 'admin' }),
+    };
     mockStockService = {
       registrarMerma: vi.fn().mockResolvedValue({ consumos: [], costoTotal: 0 }),
     };
@@ -41,6 +47,7 @@ describe('ProductosPage', () => {
       providers: [
         ProductoService,
         { provide: DATABASE, useValue: createMockDb() },
+        { provide: AuthService, useValue: mockAuthService },
         { provide: StockMovimientoService, useValue: mockStockService },
         { provide: JornadaService, useValue: mockJornadaService },
       ],
@@ -218,7 +225,7 @@ describe('ProductosPage', () => {
     expect(form).toBeTruthy();
   });
 
-  it('submits merma calls registrarMerma', async () => {
+  it('submits merma calls registrarMerma with default shop ubicacion', async () => {
     component.abrirMerma(1);
     component.mermaCantidad.set(3);
     component.mermaMotivo.set('Rotura en depósito');
@@ -232,6 +239,7 @@ describe('ProductosPage', () => {
       3,
       'Rotura en depósito',
       undefined,
+      'shop',
     );
   });
 

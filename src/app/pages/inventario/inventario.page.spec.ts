@@ -240,7 +240,7 @@ describe('InventarioPage', () => {
     expect(buttonText).toContain('Entrada');
     expect(buttonText).toContain('Salida');
     expect(buttonText).toContain('Ajustar');
-    expect(buttonText).toContain('Merma');
+    expect(buttonText).not.toContain('Merma');
     expect(buttonText).toContain('A Tienda');
   });
 
@@ -310,29 +310,7 @@ describe('InventarioPage', () => {
     expect(mockStockService.registrarTraslado).toHaveBeenCalledWith(1, 5);
   });
 
-  it('11. calls registrarMerma on form submit', async () => {
-    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
-
-    fixture = TestBed.createComponent(InventarioPage);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    await component.onSelectAction(1, 'merma');
-    fixture.detectChanges();
-
-    component.movimientoCantidad.set(3);
-    component.movimientoMotivo.set('Roto');
-    fixture.detectChanges();
-
-    await component.onSubmitMovimiento();
-    fixture.detectChanges();
-
-    expect(mockStockService.registrarMerma).toHaveBeenCalledWith(1, 3, 'Roto');
-  });
-
-  it('12. calls registrarEntrada on form submit', async () => {
+  it('11. calls registrarEntrada on form submit', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -357,7 +335,7 @@ describe('InventarioPage', () => {
     );
   });
 
-  it('13. calls registrarSalida on form submit', async () => {
+  it('12. calls registrarSalida on form submit (consumes from almacen)', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -375,10 +353,14 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 3, undefined);
+    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 3, undefined, undefined, 'almacen');
   });
 
-  it('14. calls registrarAjuste on form submit (no lot selected)', async () => {
+  it('13. calls registrarAjusteLote on form submit (with lot selected)', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -390,6 +372,8 @@ describe('InventarioPage', () => {
     await component.onSelectAction(1, 'ajuste');
     fixture.detectChanges();
 
+    expect(component.selectedLoteIndex()).toBe(1);
+
     component.movimientoCantidad.set(150);
     component.movimientoMotivo.set('Inventario físico');
     fixture.detectChanges();
@@ -397,12 +381,12 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarAjuste).toHaveBeenCalledWith(
-      1, 150, 'Inventario físico',
+    expect(mockStockService.registrarAjusteLote).toHaveBeenCalledWith(
+      1, 42, 150, 'Inventario físico', 'almacen',
     );
   });
 
-  it('15. shows history on toggle', async () => {
+  it('14. shows history on toggle', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
     mockStockService.obtenerMovimientos.mockResolvedValue(movimientos);
 
@@ -431,7 +415,7 @@ describe('InventarioPage', () => {
     expect(mockStockService.obtenerMovimientos).toHaveBeenCalledWith(1);
   });
 
-  it('16. hides form on cancel', async () => {
+  it('15. hides form on cancel', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -454,7 +438,7 @@ describe('InventarioPage', () => {
     expect(component.selectedAction()).toBeNull();
   });
 
-  it('17. shows ID Lote column in lot details', async () => {
+  it('16. shows Ubicación column in lot details', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
     mockStockService.obtenerLotesPorProducto.mockResolvedValue([
       { id: 5, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
@@ -478,6 +462,8 @@ describe('InventarioPage', () => {
     const lotesText = fixture.nativeElement.textContent;
     expect(lotesText).toContain('ID Lote');
     expect(lotesText).toContain('#5');
+    expect(lotesText).toContain('Ubicación');
+    expect(lotesText).toContain('Almacén');
   });
 
   // ── CRUD Modal Tests ──────────────────────────────────────────
@@ -496,7 +482,7 @@ describe('InventarioPage', () => {
     vi.clearAllMocks();
   }
 
-  it('18. shows Precio Costo column in table', async () => {
+  it('17. shows Precio Costo column in table', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -512,7 +498,7 @@ describe('InventarioPage', () => {
     expect(precioCell).toBeTruthy();
   });
 
-  it('19. "Nuevo producto" button exists and opens modal', async () => {
+  it('18. "Nuevo producto" button exists and opens modal', async () => {
     await setupLoaded();
 
     const allBtns = fixture.nativeElement.querySelectorAll('button');
@@ -534,7 +520,7 @@ describe('InventarioPage', () => {
     expect(overlay.textContent).toContain('Nuevo Producto');
   });
 
-  it('20. opens modal pre-filled for editing', async () => {
+  it('19. opens modal pre-filled for editing', async () => {
     await setupLoaded();
 
     const allEditBtns = fixture.nativeElement.querySelectorAll('button');
@@ -557,7 +543,7 @@ describe('InventarioPage', () => {
     expect(overlay.textContent).toContain('Editar Producto');
   });
 
-  it('21. validation rejects empty fields', async () => {
+  it('20. validation rejects empty fields', async () => {
     await setupLoaded();
 
     component.abrirNuevoProducto();
@@ -573,7 +559,7 @@ describe('InventarioPage', () => {
     expect(mockProductoService.crear).not.toHaveBeenCalled();
   });
 
-  it('22. save calls ProductoService.crear for new product', async () => {
+  it('21. save calls ProductoService.crear for new product', async () => {
     const productoCreado: Producto = {
       id: 99,
       nombre: 'Test Producto',
@@ -610,7 +596,7 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
-  it('23. save calls ProductoService.actualizar for editing', async () => {
+  it('22. save calls ProductoService.actualizar for editing', async () => {
     const productoActualizado: Producto = {
       id: 1,
       nombre: 'Coca Cola Editado',
@@ -649,7 +635,7 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
-  it('24. delete confirmation flow — confirm', async () => {
+  it('23. delete confirmation flow — confirm', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
     mockProductoService.eliminar.mockReturnValue(of(undefined));
 
@@ -674,7 +660,7 @@ describe('InventarioPage', () => {
     expect(component.confirmandoEliminar()).toBeNull();
   });
 
-  it('25. delete confirmation flow — cancel', async () => {
+  it('24. delete confirmation flow — cancel', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -695,7 +681,7 @@ describe('InventarioPage', () => {
     expect(mockProductoService.eliminar).not.toHaveBeenCalled();
   });
 
-  it('26. cerrarModal hides modal and clears form', async () => {
+  it('25. cerrarModal hides modal and clears form', async () => {
     await setupLoaded();
 
     component.abrirNuevoProducto();
