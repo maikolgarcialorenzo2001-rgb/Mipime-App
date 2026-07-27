@@ -2,7 +2,7 @@
 # Docs: https://www.electron.build/configuration/configuration
 
 appId: com.mipime.cuentas
-productName: Tienda - Test
+productName: Tienda - App
 copyright: Copyright © 2026 Mipime
 
 directories:
@@ -32,7 +32,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Tienda - Test
+  shortcutName: Tienda - App
 
 mac:
   target:
@@ -44,7 +44,7 @@ mac:
   hardenedRuntime: true
 
 dmg:
-  title: Tienda - Test
+  title: Tienda - App
 
 linux:
   target:
