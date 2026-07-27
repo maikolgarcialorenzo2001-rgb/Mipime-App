@@ -4,6 +4,7 @@ export interface LoteStock {
   cantidad: number;
   precio_costo: number;
   fecha_ingreso: string;
+  ubicacion: 'almacen' | 'shop';
   created_at: string;
 }
 
