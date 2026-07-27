@@ -41,8 +41,8 @@
           <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Precio venta</th>
-            <th class="px-6 py-3">Stock</th>
-            <th class="px-6 py-3">Existencias</th>
+            <th class="px-6 py-3">Stock Almacén</th>
+            <th class="px-6 py-3">Stock Tienda</th>
             <th class="px-6 py-3">Acciones</th>
           </tr>
         </thead>
@@ -60,9 +60,11 @@
               </td>
               <td class="px-6 py-4">
                 <app-stock-badge [stock]="p.stock_almacen" />
+                <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_almacen }}</span>
               </td>
-              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                {{ p.stock_almacen }}
+              <td class="px-6 py-4">
+                <app-stock-badge [stock]="p.stock_shop" />
+                <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_shop }}</span>
               </td>
               <td class="px-6 py-4">
                 <button
