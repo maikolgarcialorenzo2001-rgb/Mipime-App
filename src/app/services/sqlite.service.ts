@@ -102,6 +102,14 @@ export class SqliteService implements Database {
       await this._migrationV8(client);
     }
 
+    if (currentVersion < 9) {
+      await this._migrationV9(client);
+    }
+
+    if (currentVersion < 10) {
+      await this._migrationV10(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -179,7 +187,7 @@ export class SqliteService implements Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       producto_id INTEGER NOT NULL REFERENCES productos(id),
       cantidad REAL NOT NULL,
-      tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida', 'ajuste')),
+      tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida', 'ajuste', 'merma')),
       motivo TEXT,
       created_at TEXT NOT NULL
     )`);
@@ -387,6 +395,43 @@ export class SqliteService implements Database {
       WHERE stock_actual > 0`);
 
     await client.sql('INSERT INTO schema_version (version) VALUES (8)');
+  }
+
+  private async _migrationV9(client: SQLocal): Promise<void> {
+    // ALTER TABLEs con try/catch por si la columna ya existe
+    for (const q of [
+      'ALTER TABLE jornadas ADD COLUMN user_apertura_id INTEGER REFERENCES usuarios(id)',
+      'ALTER TABLE stock_movimientos ADD COLUMN costo_total REAL DEFAULT 0',
+      'ALTER TABLE jornadas ADD COLUMN total_merma REAL DEFAULT 0',
+    ]) {
+      try { await client.sql(q); } catch { /* columna ya existe */ }
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (9)');
+  }
+
+  private async _migrationV10(client: SQLocal): Promise<void> {
+    // Recrear stock_movimientos con CHECK constraint actualizado: incluir 'merma'
+    await client.sql('BEGIN TRANSACTION');
+    await client.sql(`CREATE TABLE stock_movimientos_v10 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_id INTEGER NOT NULL REFERENCES productos(id),
+      cantidad REAL NOT NULL,
+      tipo TEXT NOT NULL CHECK(tipo IN ('entrada', 'salida', 'ajuste', 'merma')),
+      motivo TEXT,
+      created_at TEXT NOT NULL,
+      jornada_id INTEGER REFERENCES jornadas(id),
+      costo_total REAL DEFAULT 0
+    )`);
+    await client.sql(`INSERT INTO stock_movimientos_v10
+      SELECT id, producto_id, cantidad, tipo, motivo, created_at,
+        CASE WHEN jornada_id IS NULL THEN NULL ELSE jornada_id END,
+        CASE WHEN costo_total IS NULL THEN 0 ELSE costo_total END
+      FROM stock_movimientos`);
+    await client.sql('DROP TABLE stock_movimientos');
+    await client.sql('ALTER TABLE stock_movimientos_v10 RENAME TO stock_movimientos');
+    await client.sql('INSERT INTO schema_version (version) VALUES (10)');
+    await client.sql('COMMIT');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

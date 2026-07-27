@@ -76,6 +76,7 @@ describe('PosPage — toast de éxito', () => {
           useValue: {
             jornadaAbierta: vi.fn().mockReturnValue(mockJornada),
             jornadaCargando: vi.fn().mockReturnValue(false),
+            refreshJornadaAbierta: vi.fn(),
           },
         },
         {
@@ -264,5 +265,34 @@ describe('PosPage — toast de éxito', () => {
       'María',                 // autorizadoPor
     );
     expect(mockVentaService.registrar).not.toHaveBeenCalled();
+  });
+
+  // ─── Jornada refresh after sale ──────────────────────────────────
+
+  it('debería llamar refreshJornadaAbierta después de una venta exitosa', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    mockVentaService.registrar.mockReturnValue(of({ id: 1, total: 100 } as never));
+    const jornadaService = TestBed.inject(JornadaService);
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(jornadaService.refreshJornadaAbierta).toHaveBeenCalled();
+  });
+
+  it('NO debería llamar refreshJornadaAbierta si la venta falla', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    mockVentaService.registrar.mockReturnValue(
+      throwError(() => new Error('Error de prueba')),
+    );
+    const jornadaService = TestBed.inject(JornadaService);
+    vi.mocked(jornadaService.refreshJornadaAbierta).mockClear();
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(jornadaService.refreshJornadaAbierta).not.toHaveBeenCalled();
   });
 });

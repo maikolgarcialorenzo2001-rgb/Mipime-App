@@ -10,6 +10,8 @@ export interface Jornada {
   saldo_real: number | null;
   estado: 'abierta' | 'cerrada';
   user_cierre_id: number | null;
+  user_apertura_id: number | null;
+  total_merma: number;
   created_at: string;
   updated_at: string;
 }

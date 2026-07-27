@@ -3,6 +3,7 @@ import { from, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
 import type { Jornada, JornadaReporte } from '../models';
+import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
@@ -68,6 +69,18 @@ export class JornadaService {
     return movs[0];
   }
 
+  /**
+   * Calcula el total de merma de una jornada sumando costo_total de
+   * los stock_movimientos con tipo='merma'.
+   */
+  async calcularTotalMerma(jornadaId: number): Promise<number> {
+    const result = await this._db.sql<{ total: number }>(
+      `SELECT COALESCE(SUM(costo_total), 0) as total FROM stock_movimientos WHERE jornada_id = ? AND tipo = 'merma'`,
+      [jornadaId],
+    );
+    return result[0]?.total ?? 0;
+  }
+
   /** Recarga la jornada abierta desde la DB y actualiza `jornadaAbierta`. */
   refreshJornadaAbierta(): void {
     this.jornadaCargando.set(true);
@@ -83,8 +96,50 @@ export class JornadaService {
     });
   }
 
+  /**
+   * Auto-cierra la jornada abierta de hoy si fue abierta por OTRO usuario.
+   * - Sin jornada abierta → null
+   * - Mismo usuario → retorna la jornada (puede reabrir)
+   * - user_apertura_id NULL (legacy) → retorna la jornada
+   * - Otro usuario → cierra la jornada y retorna null
+   */
+  async autoCerrarSiOtroUsuario(usuario: UsuarioPublico): Promise<Jornada | null> {
+    const hoy = new Date().toISOString().split('T')[0];
+
+    const rows = await this._db.sql<Jornada>(
+      'SELECT * FROM jornadas WHERE fecha = ? AND estado = ? ORDER BY id DESC LIMIT 1',
+      [hoy, 'abierta'],
+    );
+
+    if (rows.length === 0) return null;
+
+    const jornada = rows[0];
+
+    // Legacy: no user_apertura_id → retornar (no se puede determinar dueño)
+    if (jornada.user_apertura_id === null) return jornada;
+
+    // Mismo usuario → retornar
+    if (jornada.user_apertura_id === usuario.id) return jornada;
+
+    // Distinto usuario → auto-cerrar
+    const ahora = new Date();
+    const hora = ahora.toLocaleTimeString();
+    const iso = ahora.toISOString();
+
+    await this._db.sql(
+      `UPDATE jornadas
+       SET estado = 'cerrada', hora_cierre = ?, saldo_real = saldo_esperado,
+           user_cierre_id = ?, updated_at = ?
+       WHERE id = ?`,
+      [hora, usuario.id, iso, jornada.id],
+    );
+
+    this.jornadaAbierta.set(null);
+    return null;
+  }
+
   /** Abre una nueva jornada con el monto inicial del día. */
-  abrir(montoInicial: number): Observable<Jornada> {
+  abrir(montoInicial: number, userId?: number): Observable<Jornada> {
     const ahora = new Date();
     const fecha = ahora.toISOString().split('T')[0];
     const hora = ahora.toLocaleTimeString();
@@ -92,10 +147,10 @@ export class JornadaService {
 
     return from(
       this._db.sql<Jornada>(
-        `INSERT INTO jornadas (fecha, hora_apertura, monto_inicial, total_ventas, total_gastos, saldo_esperado, estado, created_at, updated_at)
-         VALUES (?, ?, ?, 0, 0, ?, 'abierta', ?, ?)
+        `INSERT INTO jornadas (fecha, hora_apertura, monto_inicial, total_ventas, total_gastos, saldo_esperado, user_apertura_id, estado, created_at, updated_at)
+         VALUES (?, ?, ?, 0, 0, ?, ?, 'abierta', ?, ?)
          RETURNING *`,
-        [fecha, hora, montoInicial, montoInicial, iso, iso],
+        [fecha, hora, montoInicial, montoInicial, userId ?? null, iso, iso],
       ),
     ).pipe(
       map((rows) => rows[0]),
@@ -103,8 +158,7 @@ export class JornadaService {
     );
   }
 
-  /**
-   * Cierra la jornada:
+  /** Cierra la jornada:
    * 1. Verifica que el usuario sea admin
    * 2. Ejecuta el cierre (UPDATE → SELECT → Excel → reporte)
    */
@@ -231,12 +285,23 @@ export class JornadaService {
       [id],
     );
 
-    // 10. Generar Excel con estado fresco y nombres de producto
+    // 10. Obtener venta_lotes para desglose FIFO en Excel
+    let ventaLotes: import('../models/venta-lote').VentaLote[] = [];
+    if (ventaIds.length > 0) {
+      const vlPlaceholders = ventaIds.map(() => '?').join(', ');
+      ventaLotes = await this._db.sql<import('../models/venta-lote').VentaLote>(
+        `SELECT * FROM venta_lotes WHERE venta_id IN (${vlPlaceholders})`,
+        ventaIds,
+      );
+    }
+
+    // 11. Generar Excel con estado fresco y nombres de producto
     const base64 = this._excelService.generarExcelJornada({
       jornada,
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
+      ventaLotes,
       productosMap,
       totalCosto,
       userCierreNombre,
@@ -272,6 +337,7 @@ export class JornadaService {
               ventas: datos.ventas,
               movimientos: datos.movimientos,
               stockMovimientos: datos.stockMovimientos,
+              ventaLotes: datos.ventaLotes,
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
@@ -298,6 +364,7 @@ export class JornadaService {
         ventas: datos.ventas,
         movimientos: datos.movimientos,
         stockMovimientos: datos.stockMovimientos,
+        ventaLotes: datos.ventaLotes,
         productosMap: datos.productosMap,
         totalCosto: datos.totalCosto,
         userCierreNombre: datos.userCierreNombre,
@@ -314,6 +381,7 @@ export class JornadaService {
     ventas: VentaConDetalles[];
     movimientos: Movimiento[];
     stockMovimientos: StockMovimiento[];
+    ventaLotes: import('../models/venta-lote').VentaLote[];
     productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
     totalCosto: number;
     userCierreNombre: string | null;
@@ -346,6 +414,16 @@ export class JornadaService {
       'SELECT * FROM stock_movimientos WHERE jornada_id = ? ORDER BY created_at',
       [jornadaId],
     );
+
+    // 2c. Obtener venta_lotes para desglose FIFO en Excel
+    let ventaLotes: import('../models/venta-lote').VentaLote[] = [];
+    if (ventaIds.length > 0) {
+      const vlPlaceholders = ventaIds.map(() => '?').join(', ');
+      ventaLotes = await this._db.sql<import('../models/venta-lote').VentaLote>(
+        `SELECT * FROM venta_lotes WHERE venta_id IN (${vlPlaceholders})`,
+        ventaIds,
+      );
+    }
 
     // 3. Obtener productos para el mapa de nombres + precio_costo
     const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
@@ -407,6 +485,7 @@ export class JornadaService {
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
+      ventaLotes,
       productosMap,
       totalCosto,
       userCierreNombre,
@@ -485,6 +564,7 @@ export class JornadaService {
               ventas: datos.ventas,
               movimientos: datos.movimientos,
               stockMovimientos: datos.stockMovimientos,
+              ventaLotes: datos.ventaLotes,
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,

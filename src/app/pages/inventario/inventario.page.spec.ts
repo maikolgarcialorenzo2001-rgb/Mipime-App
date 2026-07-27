@@ -321,9 +321,9 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const historialBtn = fixture.nativeElement.querySelector(
-      'tbody tr button:last-child',
-    ) as HTMLButtonElement;
+    const historialBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('tbody tr button'),
+    ).find((b) => (b as HTMLButtonElement).textContent?.includes('Historial')) as HTMLButtonElement;
     historialBtn.click();
     fixture.detectChanges();
     expect(component.showHistoryId()).toBe(1);
@@ -414,7 +414,7 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(true);
     expect(component.editandoProductoId()).toBeNull();
     expect(component.formNombre()).toBe('');
-    expect(component.formCosto()).toBe(0);
+    expect(component.formCosto()).toBeNull();
 
     const overlay = fixture.nativeElement.querySelector('.modal-overlay');
     expect(overlay).toBeTruthy();

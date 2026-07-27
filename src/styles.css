@@ -1,7 +1,7 @@
 @import 'material-symbols/outlined.css';
 @import 'tailwindcss';
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:is(.dark, .dark *));
 
 /* Smooth dark/light mode transition */
 *,
@@ -48,4 +48,10 @@ button, a, [role="button"] {
 .scroll-touch {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+/* Ensure native select/option elements respect dark mode */
+.dark select,
+.dark select option {
+  color-scheme: dark;
 }

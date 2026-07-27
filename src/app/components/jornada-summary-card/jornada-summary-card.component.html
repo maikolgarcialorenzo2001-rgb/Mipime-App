@@ -9,19 +9,25 @@
   <dl class="grid grid-cols-2 gap-4">
     <div>
       <dt class="text-sm text-gray-500 dark:text-gray-400">Monto inicial</dt>
-      <dd class="text-lg font-semibold">${{ jornada().monto_inicial }}</dd>
+      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().monto_inicial }}</dd>
     </div>
     <div>
       <dt class="text-sm text-gray-500 dark:text-gray-400">Total ventas</dt>
-      <dd class="text-lg font-semibold">${{ jornada().total_ventas }}</dd>
+      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().total_ventas }}</dd>
     </div>
     <div>
       <dt class="text-sm text-gray-500 dark:text-gray-400">Total gastos</dt>
-      <dd class="text-lg font-semibold">${{ jornada().total_gastos }}</dd>
+      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().total_gastos }}</dd>
     </div>
+    @if (jornada().total_merma > 0) {
+      <div>
+        <dt class="text-sm text-gray-500 dark:text-gray-400">Total mermas</dt>
+        <dd class="text-lg font-semibold text-red-600 dark:text-red-400">${{ jornada().total_merma }}</dd>
+      </div>
+    }
     <div>
       <dt class="text-sm text-gray-500 dark:text-gray-400">Saldo esperado</dt>
-      <dd class="text-lg font-semibold">${{ jornada().saldo_esperado }}</dd>
+      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().saldo_esperado }}</dd>
     </div>
   </dl>
 </div>

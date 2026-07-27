@@ -122,7 +122,7 @@ describe('SqliteService migration v2', () => {
     const sql = createTableCalls[0].query;
     expect(sql).toContain('producto_id INTEGER NOT NULL REFERENCES productos(id)');
     expect(sql).toContain('cantidad REAL NOT NULL');
-    expect(sql).toContain("CHECK(tipo IN ('entrada', 'salida', 'ajuste')");
+    expect(sql).toContain("CHECK(tipo IN ('entrada', 'salida', 'ajuste', 'merma')");
     expect(sql).toContain('motivo TEXT');
   });
 
@@ -520,9 +520,10 @@ describe('SqliteService migration v7', () => {
     mockSchemaVersion = 7;
     await service.initialize();
 
-    const alterCalls = sqlCalls.filter(
-      (c) => c.query.includes('ALTER TABLE') && c.query.includes('stock_movimientos'),
+    // Solo la ALTER que agrega jornada_id pertenece a v7 (no la de costo_total de v9)
+    const v7AlterCalls = sqlCalls.filter(
+      (c) => c.query.includes('ALTER TABLE') && c.query.includes('jornada_id'),
     );
-    expect(alterCalls.length).toBe(0);
+    expect(v7AlterCalls.length).toBe(0);
   });
 });
