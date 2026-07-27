@@ -9,7 +9,8 @@ const baseProducto: Producto = {
   descripcion: null,
   precio_venta: 100,
   precio_costo: null,
-  stock_actual: 50,
+  stock_almacen: 100,
+  stock_shop: 50,
   created_at: '',
   updated_at: '',
 };
@@ -26,7 +27,7 @@ describe('ProductCardComponent — stock siempre visible con StockBadge', () => 
   });
 
   it('muestra <app-stock-badge> y "Stock:" en el DOM para stock alto (>10)', () => {
-    fixture.componentRef.setInput('producto', { ...baseProducto, stock_actual: 25 });
+    fixture.componentRef.setInput('producto', { ...baseProducto, stock_shop: 25 });
     fixture.detectChanges();
 
     const badge = fixture.nativeElement.querySelector('app-stock-badge');
@@ -38,7 +39,7 @@ describe('ProductCardComponent — stock siempre visible con StockBadge', () => 
   });
 
   it('muestra <app-stock-badge> y "Stock:" en el DOM para stock bajo (1-10)', () => {
-    fixture.componentRef.setInput('producto', { ...baseProducto, stock_actual: 5 });
+    fixture.componentRef.setInput('producto', { ...baseProducto, stock_shop: 5 });
     fixture.detectChanges();
 
     const badge = fixture.nativeElement.querySelector('app-stock-badge');
@@ -50,7 +51,7 @@ describe('ProductCardComponent — stock siempre visible con StockBadge', () => 
   });
 
   it('muestra <app-stock-badge> y "Stock:" en el DOM para stock = 0', () => {
-    fixture.componentRef.setInput('producto', { ...baseProducto, stock_actual: 0 });
+    fixture.componentRef.setInput('producto', { ...baseProducto, stock_shop: 0 });
     fixture.detectChanges();
 
     const badge = fixture.nativeElement.querySelector('app-stock-badge');

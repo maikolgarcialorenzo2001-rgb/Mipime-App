@@ -8,7 +8,8 @@ const harina: Producto = {
   descripcion: null,
   precio_venta: 850,
   precio_costo: 550,
-  stock_actual: 50,
+  stock_almacen: 50,
+  stock_shop: 0,
   created_at: '2026-06-02T22:00:00Z',
   updated_at: '2026-06-02T22:00:00Z',
 };
@@ -19,7 +20,8 @@ const leche: Producto = {
   descripcion: null,
   precio_venta: 1100,
   precio_costo: 750,
-  stock_actual: 30,
+  stock_almacen: 30,
+  stock_shop: 0,
   created_at: '2026-06-02T22:00:00Z',
   updated_at: '2026-06-02T22:00:00Z',
 };

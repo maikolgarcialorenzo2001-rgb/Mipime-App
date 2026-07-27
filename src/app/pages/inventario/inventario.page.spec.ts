@@ -20,7 +20,8 @@ describe('InventarioPage', () => {
       descripcion: null,
       precio_venta: 12,
       precio_costo: 8,
-      stock_actual: 100,
+      stock_almacen: 100,
+      stock_shop: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -30,7 +31,8 @@ describe('InventarioPage', () => {
       descripcion: null,
       precio_venta: 10,
       precio_costo: 7,
-      stock_actual: 50,
+      stock_almacen: 50,
+      stock_shop: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -40,7 +42,8 @@ describe('InventarioPage', () => {
       descripcion: null,
       precio_venta: 5,
       precio_costo: 2,
-      stock_actual: 200,
+      stock_almacen: 200,
+      stock_shop: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -53,6 +56,7 @@ describe('InventarioPage', () => {
       cantidad: 10,
       tipo: 'entrada',
       motivo: 'Compra proveedor',
+      costo_total: 0,
       created_at: '2026-02-01T10:00:00Z',
     },
     {
@@ -61,6 +65,7 @@ describe('InventarioPage', () => {
       cantidad: 3,
       tipo: 'salida',
       motivo: 'Venta mostrador',
+      costo_total: 0,
       created_at: '2026-02-02T14:30:00Z',
     },
   ];
@@ -467,7 +472,8 @@ describe('InventarioPage', () => {
       descripcion: null,
       precio_venta: 500,
       precio_costo: 200,
-      stock_actual: 10,
+      stock_almacen: 10,
+      stock_shop: 0,
       created_at: '2026-07-23T19:00:00Z',
       updated_at: '2026-07-23T19:00:00Z',
     };
@@ -491,7 +497,7 @@ describe('InventarioPage', () => {
       nombre: 'Test Producto',
       precio_costo: 200,
       precio_venta: 500,
-      stock_actual: 10,
+      stock_almacen: 10,
     });
     expect(component.showProductoModal()).toBe(false);
   });
@@ -503,7 +509,8 @@ describe('InventarioPage', () => {
       descripcion: null,
       precio_venta: 15,
       precio_costo: 8,
-      stock_actual: 100,
+      stock_almacen: 100,
+      stock_shop: 0,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-07-23T19:00:00Z',
     };

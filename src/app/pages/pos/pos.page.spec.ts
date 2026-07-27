@@ -34,7 +34,8 @@ const producto: Producto = {
   descripcion: null,
   precio_venta: 100,
   precio_costo: null,
-  stock_actual: 50,
+  stock_almacen: 100,
+  stock_shop: 50,
   created_at: '',
   updated_at: '',
 };

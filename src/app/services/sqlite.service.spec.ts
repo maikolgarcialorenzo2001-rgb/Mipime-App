@@ -527,3 +527,162 @@ describe('SqliteService migration v7', () => {
     expect(v7AlterCalls.length).toBe(0);
   });
 });
+
+describe('SqliteService migration v11', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('T2 RED: v11 debería recrear productos con stock_almacen + stock_shop', async () => {
+    mockSchemaVersion = 10;
+    await service.initialize();
+
+    // Verificar CREATE TABLE productos_v11 con nuevas columnas
+    const createV11 = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('productos_v11'),
+    );
+    expect(createV11).toBeDefined();
+    expect(createV11!.query).toContain('stock_almacen REAL NOT NULL DEFAULT 0');
+    expect(createV11!.query).toContain('stock_shop REAL NOT NULL DEFAULT 0');
+
+    // Verificar migración de datos: stock_actual → stock_almacen, stock_shop=0
+    const insertV11 = sqlCalls.find(
+      (c) =>
+        c.query.includes('INSERT INTO productos_v11') &&
+        c.query.includes('SELECT'),
+    );
+    expect(insertV11).toBeDefined();
+    expect(insertV11!.query).toContain('stock_actual');
+    expect(insertV11!.query).toContain('0'); // stock_shop default
+
+    // DROP y RENAME
+    expect(
+      sqlCalls.some((c) => c.query.includes('DROP TABLE productos')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('ALTER TABLE productos_v11 RENAME TO productos'),
+      ),
+    ).toBe(true);
+  });
+
+  it('T2 RED: v11 debería agregar ubicacion a lotes_stock vía ALTER TABLE', async () => {
+    mockSchemaVersion = 10;
+    await service.initialize();
+
+    const alterLotes = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('lotes_stock') &&
+        c.query.includes('ubicacion'),
+    );
+    expect(alterLotes).toBeDefined();
+    expect(alterLotes!.query).toContain("DEFAULT 'almacen'");
+    expect(alterLotes!.query).toContain("CHECK(ubicacion IN ('almacen','shop')");
+  });
+
+  it('T2 RED: v11 debería recrear stock_movimientos con traslado en CHECK', async () => {
+    mockSchemaVersion = 10;
+    await service.initialize();
+
+    const createSM = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') &&
+        c.query.includes('stock_movimientos_v11'),
+    );
+    expect(createSM).toBeDefined();
+    expect(createSM!.query).toContain("'traslado'");
+
+    const dropSM = sqlCalls.find(
+      (c) => c.query.includes('DROP TABLE') && c.query.includes('stock_movimientos'),
+    );
+    expect(dropSM).toBeDefined();
+
+    const renameSM = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('stock_movimientos_v11') &&
+        c.query.includes('RENAME TO'),
+    );
+    expect(renameSM).toBeDefined();
+  });
+
+  it('T2 RED: v11 debería ejecutarse dentro de transacción y registrar version 11', async () => {
+    mockSchemaVersion = 10;
+    await service.initialize();
+
+    expect(
+      sqlCalls.some((c) => c.query.includes('BEGIN TRANSACTION')),
+    ).toBe(true);
+
+    expect(
+      sqlCalls.some((c) => c.query.includes('COMMIT')),
+    ).toBe(true);
+
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (11)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('T2 RED: v11 no debería ejecutarse si schema_version >= 11', async () => {
+    mockSchemaVersion = 11;
+    await service.initialize();
+
+    const createV11 = sqlCalls.filter(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('productos_v11'),
+    );
+    expect(createV11.length).toBe(0);
+  });
+
+  it('T2 RED: fresh DB debería ejecutar v11 (schema_version=0)', async () => {
+    mockSchemaVersion = 0;
+    await service.initialize();
+
+    // Should run all migrations including v11
+    const v11Insert = sqlCalls.find(
+      (c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (11)'),
+    );
+    expect(v11Insert).toBeDefined();
+  });
+});

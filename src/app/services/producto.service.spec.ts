@@ -12,7 +12,8 @@ const mockProductos: Producto[] = [
     descripcion: 'Harina de trigo',
     precio_venta: 850,
     precio_costo: 550,
-    stock_actual: 50,
+    stock_almacen: 50,
+    stock_shop: 0,
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -22,7 +23,8 @@ const mockProductos: Producto[] = [
     descripcion: 'Azúcar blanca',
     precio_venta: 900,
     precio_costo: 600,
-    stock_actual: 40,
+    stock_almacen: 40,
+    stock_shop: 0,
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -32,7 +34,8 @@ const mockProductos: Producto[] = [
     descripcion: null,
     precio_venta: 1100,
     precio_costo: 750,
-    stock_actual: 30,
+    stock_almacen: 30,
+    stock_shop: 0,
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -130,14 +133,15 @@ describe('ProductoService', () => {
   });
 
   describe('crear', () => {
-    it('debería insertar un nuevo producto y retornarlo', async () => {
+    it('debería insertar un nuevo producto con stock_almacen y stock_shop', async () => {
       const nuevoProducto: Producto = {
         id: 4,
         nombre: 'Nuevo Producto',
         descripcion: null,
         precio_venta: 1500,
         precio_costo: 1000,
-        stock_actual: 20,
+        stock_almacen: 0,
+        stock_shop: 0,
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -150,7 +154,7 @@ describe('ProductoService', () => {
           nombre: 'Nuevo Producto',
           precio_costo: 1000,
           precio_venta: 1500,
-          stock_actual: 20,
+          stock_almacen: 20,
         }),
       );
 
@@ -166,14 +170,15 @@ describe('ProductoService', () => {
       );
     });
 
-    it('debería crear un lote FIFO cuando stock_actual > 0', async () => {
+    it('debería crear un lote FIFO en almacén cuando stock_almacen > 0', async () => {
       const nuevoProducto: Producto = {
         id: 5,
         nombre: 'Con Stock',
         descripcion: null,
         precio_venta: 500,
         precio_costo: 300,
-        stock_actual: 10,
+        stock_almacen: 10,
+        stock_shop: 0,
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -186,22 +191,24 @@ describe('ProductoService', () => {
           nombre: 'Con Stock',
           precio_costo: 300,
           precio_venta: 500,
-          stock_actual: 10,
+          stock_almacen: 10,
         }),
       );
 
       expect(resultado.id).toBe(5);
+      // registrarEntrada should be called with ubicacion='almacen' default
       expect(mockStockMovimiento.registrarEntrada).toHaveBeenCalledWith(5, 10, 300);
     });
 
-    it('no debería crear lote cuando stock_actual es 0', async () => {
+    it('no debería crear lote cuando stock_almacen es 0', async () => {
       const nuevoProducto: Producto = {
         id: 6,
         nombre: 'Sin Stock',
         descripcion: null,
         precio_venta: 500,
         precio_costo: 300,
-        stock_actual: 0,
+        stock_almacen: 0,
+        stock_shop: 0,
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -214,7 +221,7 @@ describe('ProductoService', () => {
           nombre: 'Sin Stock',
           precio_costo: 300,
           precio_venta: 500,
-          stock_actual: 0,
+          stock_almacen: 0,
         }),
       );
 
@@ -230,7 +237,8 @@ describe('ProductoService', () => {
         descripcion: 'Harina de trigo',
         precio_venta: 900,
         precio_costo: 600,
-        stock_actual: 50,
+        stock_almacen: 50,
+        stock_shop: 0,
         created_at: '2026-06-02T22:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };

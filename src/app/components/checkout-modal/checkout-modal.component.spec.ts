@@ -9,7 +9,8 @@ const mockProducto: Producto = {
   descripcion: null,
   precio_venta: 850,
   precio_costo: null,
-  stock_actual: 50,
+  stock_almacen: 50,
+  stock_shop: 0,
   created_at: '',
   updated_at: '',
 };
