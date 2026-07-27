@@ -10,6 +10,8 @@ import type { VentaLote } from '../models/venta-lote';
 export interface ProductoInfo {
   nombre: string;
   precio_costo: number | null;
+  stock_almacen?: number;
+  stock_shop?: number;
 }
 
 export interface VentaConDetalles extends Venta {
@@ -460,7 +462,7 @@ export class ExcelService {
     for (const mov of stock) {
       const info = pmap?.get(mov.producto_id);
       const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : 'Ajuste';
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
       filas.push([
         nombreProducto,
         tipoLabel,
@@ -486,7 +488,7 @@ export class ExcelService {
   private _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): void {
     // Recolectar todos los stockMovimientos de todas las jornadas
     const todos: StockMovimiento[] = [];
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    const productosMap = new Map<number, ProductoInfo>();
 
     for (const d of allData) {
       if (d.stockMovimientos) {
@@ -504,19 +506,21 @@ export class ExcelService {
     if (todos.length === 0) return;
 
     const filas: unknown[][] = [
-      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha'],
+      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha', 'Stock Almacén', 'Stock Tienda'],
     ];
 
     for (const mov of todos) {
       const info = productosMap.get(mov.producto_id);
       const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : 'Ajuste';
+      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
       filas.push([
         nombreProducto,
         tipoLabel,
         mov.cantidad,
         mov.motivo ?? '',
         mov.created_at,
+        info?.stock_almacen ?? '—',
+        info?.stock_shop ?? '—',
       ]);
     }
 
@@ -527,6 +531,8 @@ export class ExcelService {
       { wch: 10 },
       { wch: 30 },
       { wch: 20 },
+      { wch: 16 },
+      { wch: 16 },
     ];
     ws['!protect'] = {};
 
