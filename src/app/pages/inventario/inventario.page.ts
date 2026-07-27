@@ -41,7 +41,7 @@ export class InventarioPage implements OnInit {
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
     productoId: number;
-    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado';
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado' | 'editar';
   } | null>(null);
   readonly showHistoryId = signal<number | null>(null);
   readonly movimientoCantidad = signal<number | null>(null);
@@ -52,6 +52,16 @@ export class InventarioPage implements OnInit {
   readonly lotesLoading = signal(false);
   readonly selectedLoteIndex = signal<number | null>(null);
   readonly productoLotes = signal<LoteStock[]>([]);
+  readonly editarPrecioVenta = signal<number | null>(null);
+  readonly editarPrecioCosto = signal<number | null>(null);
+
+  /** Devuelve el lote actualmente seleccionado en el formulario editar. */
+  get loteActual(): LoteStock | null {
+    const idx = this.selectedLoteIndex();
+    const lotes = this.productoLotes();
+    if (idx === null || lotes.length === 0) return null;
+    return lotes[idx - 1] ?? null;
+  }
 
   /** Helper para convertir string a número en templates. */
   toInt(value: string | number | null): number | null {
@@ -131,6 +141,35 @@ export class InventarioPage implements OnInit {
           );
           break;
         }
+        case 'editar': {
+          const loteIdx = this.selectedLoteIndex();
+          const productoLotes = this.productoLotes();
+          const loteSel = productoLotes[loteIdx !== null ? loteIdx - 1 : -1];
+          if (!loteSel) {
+            this.error.set('Debe seleccionar un lote');
+            return;
+          }
+          const pv = this.editarPrecioVenta();
+          const pc = this.editarPrecioCosto();
+          if (pv === null) {
+            this.error.set('El precio de venta es obligatorio');
+            return;
+          }
+          if (pc === null) {
+            this.error.set('El precio de costo es obligatorio');
+            return;
+          }
+          await this.stockService.registrarEditar(
+            action.productoId,
+            loteSel.id,
+            pv,
+            pc,
+            this.movimientoCantidad() ?? 0,
+            this.movimientoMotivo(),
+            loteSel.ubicacion,
+          );
+          break;
+        }
         case 'traslado':
           await this.stockService.registrarTraslado(
             action.productoId,
@@ -143,6 +182,8 @@ export class InventarioPage implements OnInit {
       this.movimientoMotivo.set('');
       this.selectedLoteIndex.set(null);
       this.productoLotes.set([]);
+      this.editarPrecioVenta.set(null);
+      this.editarPrecioCosto.set(null);
       await this.loadProductos();
     } catch (e) {
       this.error.set(
@@ -203,19 +244,28 @@ export class InventarioPage implements OnInit {
 
   async onSelectAction(
     productoId: number,
-    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado',
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'traslado' | 'editar',
   ): Promise<void> {
     this.selectedAction.set({ productoId, tipo });
     this.selectedLoteIndex.set(null);
     this.movimientoCantidad.set(null);
     this.movimientoCosto.set(null);
     this.movimientoMotivo.set('');
+    this.editarPrecioVenta.set(null);
+    this.editarPrecioCosto.set(null);
 
-    if (tipo === 'ajuste') {
+    if (tipo === 'ajuste' || tipo === 'editar') {
       try {
         const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
         this.productoLotes.set(lotes);
-        if (lotes.length > 0) {
+        if (lotes.length > 0 && tipo === 'editar') {
+          this.selectedLoteIndex.set(1);
+          const firstLote = lotes[0];
+          const prod = this.productos().find((p) => p.id === productoId);
+          this.editarPrecioVenta.set(prod?.precio_venta ?? 0);
+          this.editarPrecioCosto.set(firstLote.precio_costo);
+          this.movimientoCantidad.set(firstLote.cantidad);
+        } else if (lotes.length > 0) {
           this.selectedLoteIndex.set(1);
         }
       } catch {
@@ -226,10 +276,18 @@ export class InventarioPage implements OnInit {
     }
   }
 
-  // ── CRUD Productos ──────────────────────────────────────────────
+  /** Actualiza placeholders de precio_costo y cantidad al cambiar de lote en editar. */
+  actualizarPlaceholdersEditar(): void {
+    const lote = this.loteActual;
+    if (lote) {
+      this.editarPrecioCosto.set(lote.precio_costo);
+      this.movimientoCantidad.set(lote.cantidad);
+    }
+  }
+
+  // ── CRUD Productos (Nuevo solo — Editar usa formulario inline) ──
 
   readonly showProductoModal = signal(false);
-  readonly editandoProductoId = signal<number | null>(null);
   readonly formNombre = signal('');
   readonly formCosto = signal<number | null>(null);
   readonly formPrecioVenta = signal<number | null>(null);
@@ -245,24 +303,11 @@ export class InventarioPage implements OnInit {
     this.formUnidades.set(null);
     this.formError.set(null);
     this.procesando.set(false);
-    this.editandoProductoId.set(null);
-    this.showProductoModal.set(true);
-  }
-
-  abrirEditarProducto(p: Producto): void {
-    this.formNombre.set(p.nombre);
-    this.formCosto.set(p.precio_costo ?? null);
-    this.formPrecioVenta.set(p.precio_venta);
-    this.formUnidades.set(p.stock_almacen);
-    this.formError.set(null);
-    this.procesando.set(false);
-    this.editandoProductoId.set(p.id);
     this.showProductoModal.set(true);
   }
 
   cerrarModal(): void {
     this.showProductoModal.set(false);
-    this.editandoProductoId.set(null);
     this.formNombre.set('');
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
@@ -285,7 +330,7 @@ export class InventarioPage implements OnInit {
       this.formError.set('El precio de venta es obligatorio');
       return;
     }
-    if (!this.editandoProductoId() && this.formUnidades() === null) {
+    if (this.formUnidades() === null) {
       this.formError.set('Las unidades son obligatorias');
       return;
     }
@@ -294,24 +339,14 @@ export class InventarioPage implements OnInit {
     this.formError.set(null);
 
     try {
-      if (this.editandoProductoId()) {
-        await firstValueFrom(
-          this.productoService.actualizar(this.editandoProductoId()!, {
-            nombre: this.formNombre().trim(),
-            precio_costo: this.formCosto()!,
-            precio_venta: this.formPrecioVenta()!,
-          }),
-        );
-      } else {
-        await firstValueFrom(
-          this.productoService.crear({
-            nombre: this.formNombre().trim(),
-            precio_costo: this.formCosto()!,
-            precio_venta: this.formPrecioVenta()!,
-            stock_almacen: this.formUnidades()!,
-          }),
-        );
-      }
+      await firstValueFrom(
+        this.productoService.crear({
+          nombre: this.formNombre().trim(),
+          precio_costo: this.formCosto()!,
+          precio_venta: this.formPrecioVenta()!,
+          stock_almacen: this.formUnidades()!,
+        }),
+      );
       this.cerrarModal();
       await this.loadProductos();
     } catch (e) {

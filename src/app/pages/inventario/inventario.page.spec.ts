@@ -92,6 +92,7 @@ describe('InventarioPage', () => {
       registrarSalida: vi.fn().mockResolvedValue(undefined),
       registrarAjuste: vi.fn().mockResolvedValue(undefined),
       registrarAjusteLote: vi.fn().mockResolvedValue(undefined),
+      registrarEditar: vi.fn().mockResolvedValue(undefined),
       registrarMerma: vi.fn().mockResolvedValue({ consumos: [], costoTotal: 0 }),
       registrarTraslado: vi.fn().mockResolvedValue([]),
       obtenerMovimientos: vi.fn().mockResolvedValue([]),
@@ -511,7 +512,6 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(component.showProductoModal()).toBe(true);
-    expect(component.editandoProductoId()).toBeNull();
     expect(component.formNombre()).toBe('');
     expect(component.formCosto()).toBeNull();
 
@@ -520,27 +520,38 @@ describe('InventarioPage', () => {
     expect(overlay.textContent).toContain('Nuevo Producto');
   });
 
-  it('19. opens modal pre-filled for editing', async () => {
-    await setupLoaded();
+  it('19. opens inline editar form with lot selector and fields on click', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
-    const allEditBtns = fixture.nativeElement.querySelectorAll('button');
-    const editBtns = Array.from(allEditBtns).filter(
-      (b) => (b as HTMLButtonElement).textContent?.includes('Editar'),
-    );
-    expect(editBtns.length).toBeGreaterThanOrEqual(1);
-
-    (editBtns[0] as HTMLButtonElement).click();
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(component.showProductoModal()).toBe(true);
-    expect(component.editandoProductoId()).toBe(productos[0].id);
-    expect(component.formNombre()).toBe(productos[0].nombre);
-    expect(component.formCosto()).toBe(productos[0].precio_costo);
-    expect(component.formPrecioVenta()).toBe(productos[0].precio_venta);
+    const editBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('tbody tr button'),
+    ).find((b) => (b as HTMLButtonElement).textContent?.includes('Editar')) as HTMLButtonElement;
+    expect(editBtn).toBeTruthy();
+    editBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
 
-    const overlay = fixture.nativeElement.querySelector('.modal-overlay');
-    expect(overlay).toBeTruthy();
-    expect(overlay.textContent).toContain('Editar Producto');
+    // Should show inline form (not modal)
+    expect(component.showProductoModal()).toBe(false);
+    expect(component.selectedAction()?.tipo).toBe('editar');
+    expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
+
+    // Should pre-fill values from product and first lot
+    expect(component.selectedLoteIndex()).toBe(1);
+    expect(component.editarPrecioVenta()).toBe(productos[0].precio_venta);
+    expect(component.editarPrecioCosto()).toBe(8);
+    expect(component.movimientoCantidad()).toBe(100);
   });
 
   it('20. validation rejects empty fields', async () => {
@@ -596,20 +607,12 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
-  it('22. save calls ProductoService.actualizar for editing', async () => {
-    const productoActualizado: Producto = {
-      id: 1,
-      nombre: 'Coca Cola Editado',
-      descripcion: null,
-      precio_venta: 15,
-      precio_costo: 8,
-      stock_almacen: 100,
-      stock_shop: 0,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-07-23T19:00:00Z',
-    };
-    mockProductoService.listar.mockReturnValue(of(productos));
-    mockProductoService.actualizar.mockReturnValue(of(productoActualizado));
+  it('22. calls registrarEditar on inline editar form submit', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
     component = fixture.componentInstance;
@@ -617,25 +620,57 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    component.abrirEditarProducto(productos[0]);
+    await component.onSelectAction(1, 'editar');
     fixture.detectChanges();
 
-    component.formNombre.set('Coca Cola Editado');
-    component.formPrecioVenta.set(15);
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
     fixture.detectChanges();
 
-    await component.guardarProducto();
+    await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockProductoService.actualizar).toHaveBeenCalledWith(1, {
-      nombre: 'Coca Cola Editado',
-      precio_costo: 8,
-      precio_venta: 15,
-    });
-    expect(component.showProductoModal()).toBe(false);
+    expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
+      1, 42, 15, 10, 80, 'Actualización de precios', 'almacen',
+    );
   });
 
-  it('23. delete confirmation flow — confirm', async () => {
+  it('23. editar form updates placeholders when lot changes', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 50, precio_costo: 10, fecha_ingreso: '2026-02-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-02-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    // Initially first lot selected
+    expect(component.selectedLoteIndex()).toBe(1);
+    expect(component.editarPrecioCosto()).toBe(8);
+    expect(component.movimientoCantidad()).toBe(100);
+
+    // Switch to second lot
+    component.selectedLoteIndex.set(2);
+    component.actualizarPlaceholdersEditar();
+    fixture.detectChanges();
+
+    expect(component.editarPrecioCosto()).toBe(10);
+    expect(component.movimientoCantidad()).toBe(50);
+    // Precio Venta should remain unchanged (product-level)
+    expect(component.editarPrecioVenta()).toBe(productos[0].precio_venta);
+  });
+
+  it('24. delete confirmation flow — confirm', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
     mockProductoService.eliminar.mockReturnValue(of(undefined));
 
@@ -660,7 +695,7 @@ describe('InventarioPage', () => {
     expect(component.confirmandoEliminar()).toBeNull();
   });
 
-  it('24. delete confirmation flow — cancel', async () => {
+  it('25. delete confirmation flow — cancel', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -681,7 +716,7 @@ describe('InventarioPage', () => {
     expect(mockProductoService.eliminar).not.toHaveBeenCalled();
   });
 
-  it('25. cerrarModal hides modal and clears form', async () => {
+  it('26. cerrarModal hides modal and clears form', async () => {
     await setupLoaded();
 
     component.abrirNuevoProducto();

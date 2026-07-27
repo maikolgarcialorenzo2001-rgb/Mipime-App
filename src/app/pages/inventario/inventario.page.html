@@ -93,6 +93,15 @@
                         Ajustar
                       </span>
                     </button>
+                    <button
+                      class="bg-indigo-600 dark:bg-indigo-500 text-white rounded px-3 py-1 text-sm hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
+                      (click)="onSelectAction(producto.id, 'editar')"
+                    >
+                      <span class="inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined leading-none text-sm">edit</span>
+                        Editar
+                      </span>
+                    </button>
                   }
                   <button
                     class="bg-teal-600 dark:bg-teal-500 text-white rounded px-3 py-1 text-sm hover:bg-teal-700 dark:hover:bg-teal-600 transition-colors"
@@ -101,15 +110,6 @@
                     <span class="inline-flex items-center gap-1">
                       <span class="material-symbols-outlined leading-none text-sm">send</span>
                       A Tienda
-                    </span>
-                  </button>
-                  <button
-                    class="bg-indigo-600 dark:bg-indigo-500 text-white rounded px-3 py-1 text-sm hover:bg-indigo-700 dark:hover:bg-indigo-600 transition-colors"
-                    (click)="abrirEditarProducto(producto)"
-                  >
-                    <span class="inline-flex items-center gap-1">
-                      <span class="material-symbols-outlined leading-none text-sm">edit</span>
-                      Editar
                     </span>
                   </button>
                   <button
@@ -151,72 +151,141 @@
                     (ngSubmit)="onSubmitMovimiento()"
                     class="flex flex-wrap items-end gap-3"
                   >
-                    <div>
-                      <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad</label>
-                      <input
-                        type="number"
-                        [(ngModel)]="movimientoCantidad"
-                        name="movimientoCantidad"
-                        placeholder="Cantidad"
-                        required
-                        min="1"
-                        class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-                      />
-                    </div>
-                    @if (selectedAction()?.tipo === 'entrada') {
+                    @if (selectedAction()?.tipo === 'editar') {
+                      <!-- Editar: lot selector + precio_venta + precio_costo + unidades + motivo -->
+                      @if (productoLotes().length > 0) {
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Lote</label>
+                          <select
+                            class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                            [value]="selectedLoteIndex() ?? ''"
+                            (change)="selectedLoteIndex.set(toInt($any($event.target).value)); actualizarPlaceholdersEditar()"
+                          >
+                            @for (lote of productoLotes(); track lote.id; let i = $index) {
+                              <option [value]="i + 1">
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
+                              </option>
+                            }
+                          </select>
+                        </div>
+                      }
                       <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Costo unitario ($)</label>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Precio Venta ($)</label>
                         <input
                           type="number"
-                          [(ngModel)]="movimientoCosto"
-                          name="movimientoCosto"
-                          placeholder="Costo unitario"
+                          [(ngModel)]="editarPrecioVenta"
+                          name="editarPrecioVenta"
+                          [placeholder]="'$' + producto.precio_venta.toFixed(2)"
                           step="0.01"
                           min="0"
                           required
                           class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                       </div>
-                    }
-                    @if (selectedAction()?.tipo === 'ajuste' && productoLotes().length > 0) {
                       <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Lote a ajustar</label>
-                        <select
-                          class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
-                          [value]="selectedLoteIndex() ?? ''"
-                          (change)="selectedLoteIndex.set(toInt($any($event.target).value))"
-                        >
-                          @for (lote of productoLotes(); track lote.id; let i = $index) {
-                            <option [value]="i + 1">
-                              Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
-                              ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
-                            </option>
-                          }
-                        </select>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Precio Costo ($)</label>
+                        <input
+                          type="number"
+                          [(ngModel)]="editarPrecioCosto"
+                          name="editarPrecioCosto"
+                          [placeholder]="'$' + (loteActual?.precio_costo?.toFixed(2) ?? '0.00')"
+                          step="0.01"
+                          min="0"
+                          required
+                          class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
                       </div>
-                    }
-                    @if (selectedAction()?.tipo !== 'traslado') {
                       <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                          {{ selectedAction()?.tipo === 'ajuste' ? 'Motivo (obligatorio)' : 'Motivo' }}
-                        </label>
-                        @if (selectedAction()?.tipo === 'ajuste') {
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Unidades</label>
+                        <input
+                          type="number"
+                          [(ngModel)]="movimientoCantidad"
+                          name="movimientoCantidad"
+                          [placeholder]="(loteActual?.cantidad ?? 0) + 'u'"
+                          min="0"
+                          required
+                          class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Motivo (obligatorio)</label>
+                        <input
+                          [(ngModel)]="movimientoMotivo"
+                          name="movimientoMotivo"
+                          placeholder="Motivo (obligatorio)"
+                          required
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                      </div>
+                    } @else {
+                      <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad</label>
+                        <input
+                          type="number"
+                          [(ngModel)]="movimientoCantidad"
+                          name="movimientoCantidad"
+                          placeholder="Cantidad"
+                          required
+                          min="1"
+                          class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                      </div>
+                      @if (selectedAction()?.tipo === 'entrada') {
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Costo unitario ($)</label>
                           <input
-                            [(ngModel)]="movimientoMotivo"
-                            name="movimientoMotivo"
-                            placeholder="Motivo (obligatorio)"
+                            type="number"
+                            [(ngModel)]="movimientoCosto"
+                            name="movimientoCosto"
+                            placeholder="Costo unitario"
+                            step="0.01"
+                            min="0"
                             required
-                            class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                            class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                           />
-                        } @else {
-                          <input
-                            [(ngModel)]="movimientoMotivo"
-                            name="movimientoMotivo"
-                            placeholder="Motivo (opcional)"
-                            class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-                          />
-                        }
-                      </div>
+                        </div>
+                      }
+                      @if (selectedAction()?.tipo === 'ajuste' && productoLotes().length > 0) {
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Lote a ajustar</label>
+                          <select
+                            class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                            [value]="selectedLoteIndex() ?? ''"
+                            (change)="selectedLoteIndex.set(toInt($any($event.target).value))"
+                          >
+                            @for (lote of productoLotes(); track lote.id; let i = $index) {
+                              <option [value]="i + 1">
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
+                              </option>
+                            }
+                          </select>
+                        </div>
+                      }
+                      @if (selectedAction()?.tipo !== 'traslado') {
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            {{ selectedAction()?.tipo === 'ajuste' ? 'Motivo (obligatorio)' : 'Motivo' }}
+                          </label>
+                          @if (selectedAction()?.tipo === 'ajuste') {
+                            <input
+                              [(ngModel)]="movimientoMotivo"
+                              name="movimientoMotivo"
+                              placeholder="Motivo (obligatorio)"
+                              required
+                              class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          } @else {
+                            <input
+                              [(ngModel)]="movimientoMotivo"
+                              name="movimientoMotivo"
+                              placeholder="Motivo (opcional)"
+                              class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          }
+                        </div>
+                      }
                     }
                     <div class="flex gap-2">
                       <button
@@ -346,7 +415,7 @@
     <div class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50" (click)="cerrarModal()">
       <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6" (click)="$event.stopPropagation()">
         <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">
-          {{ editandoProductoId() ? 'Editar Producto' : 'Nuevo Producto' }}
+          Nuevo Producto
         </h2>
 
         @if (formError(); as err) {
