@@ -27,7 +27,7 @@ export class JornadaService {
 
   /**
    * Registra un movimiento (gasto o ingreso_extra) en la jornada abierta.
-   * Inserta en `movimientos` y actualiza `total_gastos` + `saldo_esperado`.
+   * Inserta en `movimientos` y actualiza `total_movimientos` + `saldo_esperado`.
    */
   registrarMovimiento(
     jornadaId: number,
@@ -59,11 +59,11 @@ export class JornadaService {
     const ajuste = tipo === 'gasto' ? -monto : monto;
     await this._db.sql(
       `UPDATE jornadas
-       SET total_gastos = total_gastos + ?,
+       SET total_movimientos = total_movimientos + ?,
            saldo_esperado = saldo_esperado + ?,
            updated_at = ?
        WHERE id = ?`,
-      [monto, ajuste, ahora, jornadaId],
+      [ajuste, ajuste, ahora, jornadaId],
     );
 
     return movs[0];
@@ -126,12 +126,20 @@ export class JornadaService {
     const hora = ahora.toLocaleTimeString();
     const iso = ahora.toISOString();
 
+    // Calcular saldo_real = monto_inicial + total_ventas_efectivo - total_movimientos
+    const ventasJornada = await this._db.sql<{ total: number }>(
+      `SELECT COALESCE(SUM(total), 0) as total FROM ventas WHERE jornada_id = ? AND forma_pago = 'efectivo'`,
+      [jornada.id],
+    );
+    const totalVentasEfectivo = ventasJornada[0]?.total ?? 0;
+    const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo - jornada.total_movimientos;
+
     await this._db.sql(
       `UPDATE jornadas
-       SET estado = 'cerrada', hora_cierre = ?, saldo_real = saldo_esperado,
+       SET estado = 'cerrada', hora_cierre = ?, saldo_real = ?,
            user_cierre_id = ?, updated_at = ?
        WHERE id = ?`,
-      [hora, usuario.id, iso, jornada.id],
+      [hora, saldoRealCalculado, usuario.id, iso, jornada.id],
     );
 
     this.jornadaAbierta.set(null);
@@ -147,7 +155,7 @@ export class JornadaService {
 
     return from(
       this._db.sql<Jornada>(
-        `INSERT INTO jornadas (fecha, hora_apertura, monto_inicial, total_ventas, total_gastos, saldo_esperado, user_apertura_id, estado, created_at, updated_at)
+        `INSERT INTO jornadas (fecha, hora_apertura, monto_inicial, total_ventas, total_movimientos, saldo_esperado, user_apertura_id, estado, created_at, updated_at)
          VALUES (?, ?, ?, 0, 0, ?, ?, 'abierta', ?, ?)
          RETURNING *`,
         [fecha, hora, montoInicial, montoInicial, userId ?? null, iso, iso],
@@ -215,13 +223,25 @@ export class JornadaService {
       [id],
     );
 
-    // 3. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
+    // 3. Calcular saldo_real = monto_inicial + total_ventas_efectivo - total_movimientos
+    const jornadaRow = await this._db.sql<{ monto_inicial: number; total_movimientos: number }>(
+      'SELECT monto_inicial, total_movimientos FROM jornadas WHERE id = ?',
+      [id],
+    );
+    const montoInicial = jornadaRow[0]?.monto_inicial ?? 0;
+    const totalMovimientos = jornadaRow[0]?.total_movimientos ?? 0;
+    const totalVentasEfectivo = ventas
+      .filter((v) => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const saldoRealCalculado = montoInicial + totalVentasEfectivo - totalMovimientos;
+
+    // 4. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
     const result = await this._db.sql<Jornada>(
       `UPDATE jornadas
        SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada', updated_at = ?
        WHERE id = ?
        RETURNING *`,
-      [hora, saldoReal, userId, iso, id],
+      [hora, saldoRealCalculado, userId, iso, id],
     );
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];

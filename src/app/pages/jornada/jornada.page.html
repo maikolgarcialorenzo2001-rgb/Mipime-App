@@ -96,18 +96,21 @@
                   @for (m of movimientosDelDia(); track m.id) {
                     <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <td class="px-3 py-2">
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                          [class]="{
-                            'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400': m.tipo === 'gasto',
-                            'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400': m.tipo === 'ingreso_extra',
-                          }"
-                        >
-                          {{ m.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra' }}
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
+                          @if (m.tipo === 'gasto') {
+                            <span class="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 px-2 py-0.5 rounded-full">Gasto</span>
+                          } @else {
+                            <span class="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 px-2 py-0.5 rounded-full">Ingreso extra</span>
+                          }
                         </span>
                       </td>
                       <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ m.descripcion }}</td>
-                      <td class="px-3 py-2 font-medium" [class.text-red-600]="m.tipo === 'gasto'" [class.text-green-600]="m.tipo === 'ingreso_extra'">
-                        {{ m.tipo === 'gasto' ? '-' : '+' }}${{ m.monto.toLocaleString() }}
+                      <td class="px-3 py-2 font-medium">
+                        @if (m.tipo === 'gasto') {
+                          <span class="text-red-600 dark:text-red-400">-${{ m.monto.toLocaleString() }}</span>
+                        } @else {
+                          <span class="text-green-600 dark:text-green-400">+${{ m.monto.toLocaleString() }}</span>
+                        }
                       </td>
                     </tr>
                   }

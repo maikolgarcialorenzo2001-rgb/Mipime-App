@@ -204,13 +204,13 @@ describe('VentaService', () => {
       expect(beginCalls.length).toBe(0);
     });
 
-    // ─── 2.8 RED: divisas total = monto * tasa + UPDATE jornadas ─────
+    // ─── 2.8 RED: divisas total = billete * tasa + UPDATE jornadas ─────
 
-    it('2.8 RED: debería calcular total = montoDivisa * tasaCambio cuando formaPago=divisas', async () => {
+    it('2.8 RED: debería calcular total = billeteRecibido * tasaCambio cuando formaPago=divisas', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock item 1
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
-        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1950, divisa_tipo: 'USD', monto_divisa: 3, tasa_cambio: 650, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 3500, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
         .mockResolvedValueOnce([])                       // 3: INSERT detalle_ventas
         .mockResolvedValueOnce([])                       // 4: UPDATE jornada
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
@@ -222,14 +222,14 @@ describe('VentaService', () => {
         usuarioId: 1,
         formaPago: 'divisas',
         divisaTipo: 'USD',
-        montoDivisa: 3,
-        tasaCambio: 650,
+        billeteRecibido: 5,
+        tasaCambio: 700,
       }));
 
-      expect(venta.total).toBe(1950);
+      expect(venta.total).toBe(3500);
       expect(venta.divisa_tipo).toBe('USD');
-      expect(venta.monto_divisa).toBe(3);
-      expect(venta.tasa_cambio).toBe(650);
+      expect(venta.monto_divisa).toBe(5);
+      expect(venta.tasa_cambio).toBe(700);
 
       const allCalls = vi.mocked(mockDb.sql).mock.calls;
 
@@ -237,15 +237,15 @@ describe('VentaService', () => {
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
       );
       expect(updateJornada).toBeDefined();
-      expect(updateJornada![1]).toContain(1950);
-      expect(updateJornada![1]).toContain(1950);
+      expect(updateJornada![1]).toContain(3500);
+      expect(updateJornada![1]).toContain(3500);
     });
 
     it('2.8 RED: debería incluir divisa_tipo, monto_divisa, tasa_cambio en el INSERT', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
-        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1300, divisa_tipo: 'EUR', monto_divisa: 2, tasa_cambio: 650, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1400, divisa_tipo: 'EUR', monto_divisa: 2, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
         .mockResolvedValueOnce([])                       // 3: INSERT detalle
         .mockResolvedValueOnce([])                       // 4: UPDATE jornada
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
@@ -257,19 +257,19 @@ describe('VentaService', () => {
         usuarioId: 1,
         formaPago: 'divisas',
         divisaTipo: 'EUR',
-        montoDivisa: 2,
-        tasaCambio: 650,
+        billeteRecibido: 2,
+        tasaCambio: 700,
       }));
 
-      expect(venta.total).toBe(1300);
+      expect(venta.total).toBe(1400);
       expect(venta.divisa_tipo).toBe('EUR');
       expect(venta.monto_divisa).toBe(2);
-      expect(venta.tasa_cambio).toBe(650);
+      expect(venta.tasa_cambio).toBe(700);
     });
 
-    // ─── 2.9 RED: pendiente INSERT + stock pero NO UPDATE jornadas ──
+    // ─── 2.9: pendiente INSERT + stock + UPDATE jornadas (incluye pendientes en saldo_esperado) ──
 
-    it('2.9 RED: debería INSERT venta y descontar stock cuando formaPago=pendiente', async () => {
+    it('2.9: debería INSERT venta, descontar stock Y actualizar jornada cuando formaPago=pendiente', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock item 1
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 1: _validarStock item 2
@@ -278,7 +278,8 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 4: INSERT detalle
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes item 1
         .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 2
-        .mockResolvedValueOnce([]);                      // 7: COMMIT
+        .mockResolvedValueOnce([])                       // 7: UPDATE jornadas (pendiente ahora actualiza saldo_esperado)
+        .mockResolvedValueOnce([]);                      // 8: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -297,10 +298,10 @@ describe('VentaService', () => {
       const jornadaUpdates = allCalls.filter(
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
       );
-      expect(jornadaUpdates.length).toBe(0);
+      expect(jornadaUpdates.length).toBe(1);
     });
 
-    it('2.9 RED: debería incluir comprador_nombre, autorizado_por, descripcion en el INSERT', async () => {
+    it('2.9: debería incluir comprador_nombre, autorizado_por, descripcion en el INSERT', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock item 1
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 1: _validarStock item 2
@@ -309,7 +310,8 @@ describe('VentaService', () => {
         .mockResolvedValueOnce([])                       // 4: INSERT detalle
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes item 1
         .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes item 2
-        .mockResolvedValueOnce([]);                      // 7: COMMIT
+        .mockResolvedValueOnce([])                       // 7: UPDATE jornadas (pendiente ahora actualiza saldo_esperado)
+        .mockResolvedValueOnce([]);                      // 8: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -327,7 +329,7 @@ describe('VentaService', () => {
       const jornadaUpdates = allCalls.filter(
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
       );
-      expect(jornadaUpdates.length).toBe(0);
+      expect(jornadaUpdates.length).toBe(1);
     });
   });
 });

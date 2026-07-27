@@ -17,7 +17,7 @@ describe('ExcelService', () => {
     hora_cierre: '18:30:00',
     monto_inicial: 5000,
     total_ventas: 15000,
-    total_gastos: 2000,
+    total_movimientos: 2000,
     saldo_esperado: 18000,
     saldo_real: 17800,
     estado: 'cerrada',
@@ -126,10 +126,10 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f[0] === 3)).toBe(false);
     });
 
-    it('2.2 RED: debería mostrar fila "Total gastos" incluso cuando es 0', () => {
+    it('2.2 RED: debería mostrar fila "Total movimientos" incluso cuando es 0', () => {
       const jornadaSinGastos: Jornada = {
         ...jornada,
-        total_gastos: 0,
+        total_movimientos: 0,
       };
       const dataSinGastos: JornadaReportData = {
         jornada: jornadaSinGastos,
@@ -144,7 +144,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Total gastos', 0]);
+      expect(json).toContainEqual(['Total movimientos', 0]);
     });
 
     it('debería tener la data correcta en la hoja Resumen', () => {
@@ -160,7 +160,7 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Estado', 'Cerrada']);
       expect(json).toContainEqual(['Monto inicial', 5000]);
       expect(json).toContainEqual(['Total ventas', 15000]);
-      expect(json).toContainEqual(['Total gastos', 2000]);
+      expect(json).toContainEqual(['Total movimientos', 2000]);
       expect(json).toContainEqual(['Saldo esperado', 18000]);
       expect(json).toContainEqual(['Saldo real', 17800]);
     });
@@ -172,8 +172,8 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Header row + 4 detail rows + empty row + 3 footer rows (Total ingresos, Pendientes del día, Total esperado)
-      expect(json.length).toBe(9);
+      // Header row + 4 detail rows + empty row + 5 footer rows (caja/divisas/pendientes/transferencia/esperado)
+      expect(json.length).toBe(11);
 
       // Primera fila de detalle: [producto_id, cantidad, precio_unitario, subtotal, forma_pago]
       expect(json[1]).toContainEqual(850);
@@ -182,13 +182,13 @@ describe('ExcelService', () => {
       expect(json[3]).toContainEqual(1100);
       expect(json[4]).toContainEqual(150);
 
-      // Footer rows: index 5 = empty row, 6 = Total ingresos, 7 = Pendientes del día, 8 = Total esperado
-      const footerRow = json[6] as unknown[];
-      expect(footerRow[0]).toBe('Total ingresos');
-      expect(footerRow[4]).toBe(3800);
-      expect(json[7][0]).toBe('Pendientes del día');
-      expect(json[8][0]).toBe('Total esperado');
-      expect(json[8][4]).toBe(3800);
+      // Footer rows: Total caja, Total divisas, Total pendientes, Total transferencia, Total esperado
+      const cajaRow = json.find((f) => f[0] === 'Total caja') as unknown[];
+      expect(cajaRow).toBeTruthy();
+      expect(cajaRow[3]).toBe(3800);
+      const esperadoRow = json.find((f) => f[0] === 'Total esperado') as unknown[];
+      expect(esperadoRow).toBeTruthy();
+      expect(esperadoRow[3]).toBe(3800);
     });
 
     it('debería listar los movimientos', () => {
@@ -221,12 +221,12 @@ describe('ExcelService', () => {
 
       const ventasSheet = workbook.Sheets['Ventas'];
       const ventasJson = XLSX.utils.sheet_to_json(ventasSheet, { header: 1 }) as unknown[][];
-      expect(ventasJson.length).toBe(5); // header + empty row + 3 footer rows
+      expect(ventasJson.length).toBe(7); // header + empty row + 5 footer rows
     });
   });
 
   describe('Ventas restructuring', () => {
-    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Precio base, Total, Forma de pago', () => {
+    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Total, Forma de pago', () => {
       const result = service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
@@ -236,10 +236,9 @@ describe('ExcelService', () => {
       expect(header[0]).toBe('Producto');
       expect(header[1]).toBe('Cantidad');
       expect(header[2]).toBe('Precio unitario');
-      expect(header[3]).toBe('Precio base');
-      expect(header[4]).toBe('Total');
-      expect(header[5]).toBe('Forma de pago');
-      expect(header).toHaveLength(6);
+      expect(header[3]).toBe('Total');
+      expect(header[4]).toBe('Forma de pago');
+      expect(header).toHaveLength(5);
     });
 
     it('3.1 RED: una fila por detalle con nombre de producto resuelto', () => {
@@ -280,11 +279,11 @@ describe('ExcelService', () => {
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      // Find footer row - should contain 'Total ingresos' and the grand total
-      const footerRow = filas.find((f) => f[0] === 'Total ingresos');
+      // Find footer row - should contain 'Total caja' and the grand total
+      const footerRow = filas.find((f) => f[0] === 'Total caja');
       expect(footerRow).toBeTruthy();
-      // Total = 850 + 1700 + 1100 + 150 = 3800 (index 4 = columna Total)
-      expect(footerRow![4]).toBe(3800);
+      // Total = 850 + 1700 + 1100 + 150 = 3800 (index 3 = columna Total)
+      expect(footerRow![3]).toBe(3800);
     });
 
     it('3.1 RED: footer suma debe ser 0 cuando no hay ventas', () => {
@@ -302,14 +301,14 @@ describe('ExcelService', () => {
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      const footerRow = filas.find((f) => f[0] === 'Total ingresos');
+      const footerRow = filas.find((f) => f[0] === 'Total caja');
       expect(footerRow).toBeTruthy();
-      expect(footerRow![4]).toBe(0);
+      expect(footerRow![3]).toBe(0);
     });
   });
 
   describe('Ganancia bruta y Firmado por en Resumen', () => {
-    it('3.3 RED: Resumen debe incluir Ganancia bruta = total_ventas - total_costo', () => {
+    it('3.3 RED: Resumen debe incluir Ganancia bruta = total_ventas - total_costo - gastos - merma', () => {
       const dataConGanancia: JornadaReportData = {
         jornada,
         ventas: ventaConDetalles,
@@ -323,10 +322,10 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Ganancia bruta', 14960]); // 15000 - 40
+      expect(json).toContainEqual(['Ganancia bruta', 12960]); // 15000 - 40 - 2000 - 0
     });
 
-    it('3.3 RED: Ganancia bruta debe ser total_ventas cuando total_costo = 0', () => {
+    it('3.3 RED: Ganancia bruta = total_ventas - gastos cuando total_costo y merma = 0', () => {
       const dataSinCosto: JornadaReportData = {
         ...data,
         totalCosto: 0,
@@ -338,7 +337,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Ganancia bruta', 15000]);
+      expect(json).toContainEqual(['Ganancia bruta', 13000]); // 15000 - 0 - 2000 - 0
     });
 
     it('3.3 RED: Resumen debe incluir Firmado por cuando userCierreNombre no es null', () => {
@@ -467,7 +466,7 @@ describe('ExcelService', () => {
       hora_cierre: '18:00:00',
       monto_inicial: 5000,
       total_ventas: 15000,
-      total_gastos: 2000,
+      total_movimientos: 2000,
       saldo_esperado: 18000,
       saldo_real: 17800,
       estado: 'cerrada',
@@ -483,7 +482,7 @@ describe('ExcelService', () => {
       hora_cierre: '17:30:00',
       monto_inicial: 3000,
       total_ventas: 25000,
-      total_gastos: 5000,
+      total_movimientos: 5000,
       saldo_esperado: 23000,
       saldo_real: 23000,
       estado: 'cerrada',
@@ -535,7 +534,7 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Mes', 'marzo de 2026']);
       expect(json).toContainEqual(['Cantidad de jornadas', 2]);
       expect(json).toContainEqual(['Total ventas', 40000]); // 15000 + 25000
-      expect(json).toContainEqual(['Total gastos', 7000]);  // 2000 + 5000
+      expect(json).toContainEqual(['Total movimientos', 7000]);  // 2000 + 5000
     });
 
     it('C9 RED: hoja por jornada debería tener resumen header + ventas + movimientos', () => {
@@ -549,7 +548,7 @@ describe('ExcelService', () => {
       expect(json.some((r) => r[0] === 'Total ventas' && r[1] === 15000)).toBe(true);
       // Should have ventas table header
       expect(json.some((r) => r[0] === 'Producto')).toBe(true);
-      expect(json.some((r) => r[0] === 'Total ingresos')).toBe(true);
+      expect(json.some((r) => r[0] === 'Total caja')).toBe(true);
       // Should have movimientos table header
       expect(json.some((r) => r[0] === 'Tipo')).toBe(true);
     });
@@ -632,25 +631,30 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       { id: 2, jornada_id: 1, producto_id: 3, cantidad: 2, descripcion: 'Papas', autorizado_por: 'Admin', created_at: '' },
     ];
 
-    it('3.3 RED: Resumen debe mostrar "Total divisas" cuando hay ventas en divisas', () => {
+    it('3.3 RED: Resumen debe mostrar desglose de divisas por tipo con tasa de cambio', () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConDivisas };
       const result = service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      expect(json).toContainEqual(['Total divisas', 200]);
+      // Debe mostrar fila "Divisas" con total de unidades
+      expect(json).toContainEqual(['Divisas', 20]);
+      // Debe mostrar desglose por tipo: USD, monto, tasa, total en pesos
+      expect(json).toContainEqual(['USD', 20, 10, 200]);
+      // Debe mostrar total en pesos
+      expect(json).toContainEqual(['Total divisas en pesos cubanos', 200]);
     });
 
-    it('3.3 RED: Resumen debe mostrar "Pendientes del día" con paréntesis', () => {
+    it('3.3 RED: Resumen debe mostrar "Pendientes del día" sin paréntesis', () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
       const result = service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      expect(json).toContainEqual(['Pendientes del día', '(1500)']);
+      expect(json).toContainEqual(['Pendientes del día', 1500]);
     });
 
-    it('3.3 RED: Resumen debe mostrar tabla Cuenta Cosas con valores negativos', () => {
+    it('3.3 RED: Resumen debe mostrar tabla Cuenta Casas con valores negativos', () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
@@ -660,8 +664,8 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      // Debería tener encabezado 'Cuenta Cosas'
-      expect(json.some((r) => r[0] === 'Cuenta Cosas')).toBe(true);
+      // Debería tener encabezado 'Cuenta Casas'
+      expect(json.some((r) => r[0] === 'Cuenta Casas')).toBe(true);
       // Debería tener header de columnas: Producto, Cantidad, Descripción, Autorizado por, Total
       expect(json.some((r) => r[0] === 'Producto' && r[4] === 'Total')).toBe(true);
       // Los valores deben ser negativos
@@ -682,9 +686,9 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       expect(header).toContain('Monto en divisa');
       expect(header).toContain('Tasa de cambio');
       // Filas no-divisa deben tener campos vacíos
-      const filaEfectivo = json.find((r) => r[5] === 'efectivo') as unknown[];
+      const filaEfectivo = json.find((r) => r[4] === 'efectivo') as unknown[];
+      expect(filaEfectivo[5]).toBe('');
       expect(filaEfectivo[6]).toBe('');
-      expect(filaEfectivo[7]).toBe('');
     });
 
     it('3.4 RED: Ventas debe mostrar columna "Comprador" cuando hay pendientes', () => {
@@ -696,12 +700,12 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const header = json[0] as string[];
       expect(header).toContain('Comprador');
       // Fila pendiente debe tener el nombre del comprador
-      const filaPendiente = json.find((r) => r[5] === 'pendiente') as unknown[];
-      expect(filaPendiente[6]).toBe('Juan Pérez');
+      const filaPendiente = json.find((r) => r[4] === 'pendiente') as unknown[];
+      expect(filaPendiente[5]).toBe('Juan Pérez');
     });
 
     // ─── Bug 2: CuentaCosas debe usar precio_costo ───────────
-    it('5.1 RED: Cuenta Cosas debe usar cantidad * precio_costo para calcular valores', () => {
+    it('5.1 RED: Cuenta Casas debe usar cantidad * precio_costo para calcular valores', () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
@@ -724,24 +728,24 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       expect(totalFila![4]).toBe(-400); // -(300 + 100)
     });
 
-    // ─── Bug 3: Pendientes separados en 3 filas de footer ───
-    it('5.2 RED: Ventas sheet debe separar pendientes en 3 filas de footer', () => {
+    // ─── Bug 3: Pendientes separados en filas de footer ───
+    it('5.2 RED: Ventas sheet debe separar formas de pago en 5 filas de footer', () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
       const result = service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
       const filas = json as unknown[][];
-      const ingresosRow = filas.find((f) => f[0] === 'Total ingresos');
-      const pendientesRow = filas.find((f) => f[0] === 'Pendientes del día');
+      const cajaRow = filas.find((f) => f[0] === 'Total caja');
+      const pendientesRow = filas.find((f) => f[0] === 'Total pendientes');
       const esperadoRow = filas.find((f) => f[0] === 'Total esperado');
-      expect(ingresosRow).toBeTruthy();
+      expect(cajaRow).toBeTruthy();
       expect(pendientesRow).toBeTruthy();
       expect(esperadoRow).toBeTruthy();
       // efectivo: 850, pendiente: 1500
-      expect(ingresosRow![4]).toBe(850);
-      expect(pendientesRow![4]).toBe(1500);
-      expect(esperadoRow![4]).toBe(2350); // 850 + 1500
+      expect(cajaRow![3]).toBe(850);
+      expect(pendientesRow![3]).toBe(1500);
+      expect(esperadoRow![3]).toBe(2350); // 850 + 1500
     });
 
   describe('C3 — Stock Movements en Excel', () => {
@@ -840,7 +844,7 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
     });
   });
 
-    it('3.5 GREEN: Cuenta Cosas en hoja por jornada del Excel mensual', () => {
+    it('3.5 GREEN: Cuenta Casas en hoja por jornada del Excel mensual', () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
@@ -848,10 +852,10 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
       const result = service.generarExcelMensual([dataTest]);
       const workbook = XLSX.read(result, { type: 'base64' });
-      // La hoja por jornada debería tener la sección Cuenta Cosas
+      // La hoja por jornada debería tener la sección Cuenta Casas
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      expect(json.some((r) => r[0] === 'Cuenta Cosas')).toBe(true);
+      expect(json.some((r) => r[0] === 'Cuenta Casas')).toBe(true);
       const filas = json as unknown[][];
       const totalFila = filas.find((r) => r[0] === 'Total C.C.');
       expect(totalFila).toBeDefined();

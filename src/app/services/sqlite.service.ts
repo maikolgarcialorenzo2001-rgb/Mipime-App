@@ -114,6 +114,10 @@ export class SqliteService implements Database {
       await this._migrationV11(client);
     }
 
+    if (currentVersion < 12) {
+      await this._migrationV12(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -489,6 +493,14 @@ export class SqliteService implements Database {
     await client.sql('ALTER TABLE stock_movimientos_v11 RENAME TO stock_movimientos');
 
     await client.sql('INSERT INTO schema_version (version) VALUES (11)');
+    await client.sql('COMMIT');
+  }
+
+  private async _migrationV12(client: SQLocal): Promise<void> {
+    // v12: rename total_gastos → total_movimientos in jornadas
+    await client.sql('BEGIN TRANSACTION');
+    await client.sql('ALTER TABLE jornadas RENAME COLUMN total_gastos TO total_movimientos');
+    await client.sql('INSERT INTO schema_version (version) VALUES (12)');
     await client.sql('COMMIT');
   }
 

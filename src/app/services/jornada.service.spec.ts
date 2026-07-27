@@ -17,7 +17,7 @@ const mockJornada: Jornada = {
   hora_cierre: null,
   monto_inicial: 5000,
   total_ventas: 0,
-  total_gastos: 0,
+  total_movimientos: 0,
   saldo_esperado: 5000,
   saldo_real: null,
   estado: 'abierta',
@@ -127,6 +127,8 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([])
         // movimientos
         .mockResolvedValueOnce([])
+        // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
         // UPDATE jornada (antes que Excel)
         .mockResolvedValueOnce([mockJornadaCerrada])
         // SELECT productos
@@ -140,7 +142,6 @@ describe('JornadaService', () => {
       const resultado = await firstValueFrom(service.cerrar(1, 7200, 1));
 
       expect(resultado.estado).toBe('cerrada');
-      expect(resultado.saldo_real).toBe(7200);
       expect(resultado.user_cierre_id).toBe(1);
     });
 
@@ -149,6 +150,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([]) // ventas
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
         .mockResolvedValueOnce([]) // SELECT productos
         .mockResolvedValueOnce([]) // SELECT cuenta_cosas
@@ -180,6 +182,8 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce(mockDetalles)
         // movimientos
         .mockResolvedValueOnce(mockMovimientos)
+        // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
         // UPDATE jornada (antes que Excel)
         .mockResolvedValueOnce([mockJornadaCerrada])
         // SELECT productos
@@ -214,6 +218,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([]) // ventas
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 0, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([]); // UPDATE -> empty -> throw
 
       const service = TestBed.inject(JornadaService);
@@ -281,6 +286,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce(mockVentasConDetalles) // ventas
         .mockResolvedValueOnce(mockDetalles) // detalles
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
         .mockResolvedValueOnce(mockProductos) // SELECT productos
         .mockResolvedValueOnce([{ total_costo: 35 }]) // total_costo = 10*2 + 5*3 = 35
@@ -314,6 +320,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce(mockVentasConDetalles) // ventas
         .mockResolvedValueOnce(mockDetalles) // detalles
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
         .mockResolvedValueOnce(mockProductos) // SELECT productos
         .mockResolvedValueOnce([{ total_costo: 0 }]) // total_costo = NULL * 2 = 0
@@ -333,6 +340,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([]) // ventas (empty)
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
         .mockResolvedValueOnce([]) // SELECT productos
         .mockResolvedValueOnce([]) // user nombre -> empty
@@ -368,6 +376,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([]) // ventas
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
         .mockResolvedValueOnce([]) // SELECT productos
         .mockResolvedValueOnce([]) // user name
@@ -441,7 +450,7 @@ describe('JornadaService', () => {
         id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'Luz', monto: 500, created_at: '2026-06-05T12:00:00Z',
       };
       const mockJornadaActualizada: Jornada = {
-        ...mockJornada, total_gastos: 500, saldo_esperado: 4500,
+        ...mockJornada, total_movimientos: 500, saldo_esperado: 4500,
       };
 
       vi.mocked(mockDb.sql)
@@ -466,8 +475,8 @@ describe('JornadaService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
       );
       expect(updateCall).toBeTruthy();
-      // total_gastos += 500, saldo_esperado += -500 (ajuste = -monto para gasto)
-      expect(updateCall![1]).toEqual([500, -500, expect.any(String), 1]);
+      // total_movimientos += -500, saldo_esperado += -500 (ajuste = -monto para gasto)
+      expect(updateCall![1]).toEqual([-500, -500, expect.any(String), 1]);
     });
 
     it('1.1 RED: debería insertar movimiento y actualizar jornada para ingreso_extra', async () => {
@@ -475,7 +484,7 @@ describe('JornadaService', () => {
         id: 2, jornada_id: 1, tipo: 'ingreso_extra', descripcion: 'Venta envases', monto: 300, created_at: '2026-06-05T12:00:00Z',
       };
       const mockJornadaActualizada: Jornada = {
-        ...mockJornada, total_gastos: 300, saldo_esperado: 5300,
+        ...mockJornada, total_movimientos: 300, saldo_esperado: 5300,
       };
 
       vi.mocked(mockDb.sql)
@@ -494,7 +503,7 @@ describe('JornadaService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
       );
       expect(updateCall).toBeTruthy();
-      // total_gastos += 300, saldo_esperado += 300 (ajuste = +monto para ingreso_extra)
+      // total_movimientos += 300, saldo_esperado += 300 (ajuste = +monto para ingreso_extra)
       expect(updateCall![1]).toEqual([300, 300, expect.any(String), 1]);
     });
   });
@@ -520,6 +529,8 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce(mockDetalles)
         // movimientos
         .mockResolvedValueOnce([])
+        // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
         // UPDATE jornada (cerrada) — ANTES de la generación de Excel
         .mockResolvedValueOnce([mockJornadaCerrada])
         // SELECT productos
@@ -562,6 +573,8 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce(mockDetalles)
         // movimientos
         .mockResolvedValueOnce([])
+        // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
         // UPDATE jornada
         .mockResolvedValueOnce([mockJornadaCerrada])
         // SELECT productos
@@ -838,6 +851,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([]) // ventas
         .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
         .mockResolvedValueOnce([mockJornadaConMerma]) // UPDATE jornada
         .mockResolvedValueOnce([]) // SELECT productos
         .mockResolvedValueOnce([]) // SELECT cuenta_cosas
@@ -920,19 +934,22 @@ describe('JornadaService', () => {
       expect(updateCall![1]).toContain(mockUser2.id); // user_cierre_id = usuario.id
     });
 
-    it('debería usar saldo_esperado como saldo_real al auto-cerrar', async () => {
+    it('debería calcular saldo_real = monto_inicial + efectivo - gastos al auto-cerrar', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
         .mockResolvedValueOnce([]); // UPDATE
 
       const service = TestBed.inject(JornadaService);
       await service.autoCerrarSiOtroUsuario(mockUser2);
 
       const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
-        (call) => typeof call[0] === 'string' && call[0].includes('saldo_real = saldo_esperado'),
+        (call) => typeof call[0] === 'string' && call[0].includes("estado = 'cerrada'"),
       );
       expect(updateCall).toBeTruthy();
+      // saldo_real = 5000 (monto_inicial) + 3000 (efectivo) - 0 (gastos) = 8000
+      expect(updateCall![1]).toContain(8000); // saldo_real calculado
     });
   });
 

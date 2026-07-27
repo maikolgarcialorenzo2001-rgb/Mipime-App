@@ -112,15 +112,17 @@
                       A Tienda
                     </span>
                   </button>
-                  <button
-                    class="bg-red-600 dark:bg-red-500 text-white rounded px-3 py-1 text-sm hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
-                    (click)="confirmarEliminar(producto.id)"
-                  >
-                    <span class="inline-flex items-center gap-1">
-                      <span class="material-symbols-outlined leading-none text-sm">delete</span>
-                      Eliminar
-                    </span>
-                  </button>
+                  @if (esAdmin()) {
+                    <button
+                      class="bg-red-600 dark:bg-red-500 text-white rounded px-3 py-1 text-sm hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
+                      (click)="confirmarEliminar(producto.id)"
+                    >
+                      <span class="inline-flex items-center gap-1">
+                        <span class="material-symbols-outlined leading-none text-sm">delete</span>
+                        Eliminar
+                      </span>
+                    </button>
+                  }
                   <button
                     class="text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     (click)="toggleHistory(producto.id)"
@@ -151,8 +153,8 @@
                     (ngSubmit)="onSubmitMovimiento()"
                     class="flex flex-wrap items-end gap-3"
                   >
-                    @if (selectedAction()?.tipo === 'editar') {
-                      <!-- Editar: lot selector + precio_venta + precio_costo + unidades + motivo -->
+                      @if (selectedAction()?.tipo === 'editar') {
+                      <!-- Editar: lot selector + nombre + precio_venta + precio_costo + unidades + motivo -->
                       @if (productoLotes().length > 0) {
                         <div>
                           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Lote</label>
@@ -170,6 +172,17 @@
                           </select>
                         </div>
                       }
+                      <div>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nombre</label>
+                        <input
+                          type="text"
+                          [(ngModel)]="editarNombre"
+                          name="editarNombre"
+                          [placeholder]="producto.nombre"
+                          required
+                          class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                      </div>
                       <div>
                         <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Precio Venta ($)</label>
                         <input
@@ -339,17 +352,19 @@
                               <td class="px-3 py-2">
                                 <span
                                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                  [class]="{
-                                    'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400': m.tipo === 'entrada',
-                                    'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400': m.tipo === 'salida',
-                                    'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400': m.tipo === 'ajuste',
-                                    'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400': m.tipo === 'merma',
-                                  }"
                                 >
-                                  {{ m.tipo === 'entrada' ? 'Entrada' : m.tipo === 'salida' ? 'Salida' : m.tipo === 'ajuste' ? 'Ajuste' : 'Merma' }}
+                                  @if (m.tipo === 'entrada') {
+                                    <span class="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 px-2 py-0.5 rounded-full">Entrada</span>
+                                  } @else if (m.tipo === 'salida') {
+                                    <span class="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 px-2 py-0.5 rounded-full">Salida</span>
+                                  } @else if (m.tipo === 'ajuste') {
+                                    <span class="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded-full">Ajuste</span>
+                                  } @else {
+                                    <span class="bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400 px-2 py-0.5 rounded-full">Merma</span>
+                                  }
                                 </span>
                               </td>
-                              <td class="px-3 py-2 font-medium">{{ m.cantidad }}</td>
+                              <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ m.cantidad }}</td>
                               <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.motivo }}</td>
                             </tr>
                           }
@@ -386,14 +401,14 @@
                             <tbody>
                               @for (lote of lotes(); track lote.id) {
                                   <tr class="border-t dark:border-gray-700 hover:bg-blue-100/50 dark:hover:bg-blue-800/20 transition-colors">
-                                    <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">#{{ lote.id }}</td>
-                                    <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                      {{ lote.fecha_ingreso | date:'short' }}
-                                    </td>
-                                    <td class="px-3 py-2 font-medium">{{ lote.cantidad }}</td>
-                                    <td class="px-3 py-2">${{ lote.precio_costo.toFixed(2) }}</td>
-                                    <td class="px-3 py-2 font-medium">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
-                                    <td class="px-3 py-2">{{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }}</td>
+                                     <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">#{{ lote.id }}</td>
+                                     <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                       {{ lote.fecha_ingreso | date:'short' }}
+                                     </td>
+                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ lote.cantidad }}</td>
+                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">${{ lote.precio_costo.toFixed(2) }}</td>
+                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
+                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }}</td>
                                   </tr>
                               }
                           </tbody>

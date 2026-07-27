@@ -52,6 +52,7 @@ export class InventarioPage implements OnInit {
   readonly lotesLoading = signal(false);
   readonly selectedLoteIndex = signal<number | null>(null);
   readonly productoLotes = signal<LoteStock[]>([]);
+  readonly editarNombre = signal('');
   readonly editarPrecioVenta = signal<number | null>(null);
   readonly editarPrecioCosto = signal<number | null>(null);
 
@@ -162,6 +163,7 @@ export class InventarioPage implements OnInit {
           await this.stockService.registrarEditar(
             action.productoId,
             loteSel.id,
+            this.editarNombre(),
             pv,
             pc,
             this.movimientoCantidad() ?? 0,
@@ -182,6 +184,7 @@ export class InventarioPage implements OnInit {
       this.movimientoMotivo.set('');
       this.selectedLoteIndex.set(null);
       this.productoLotes.set([]);
+      this.editarNombre.set('');
       this.editarPrecioVenta.set(null);
       this.editarPrecioCosto.set(null);
       await this.loadProductos();
@@ -251,6 +254,7 @@ export class InventarioPage implements OnInit {
     this.movimientoCantidad.set(null);
     this.movimientoCosto.set(null);
     this.movimientoMotivo.set('');
+    this.editarNombre.set('');
     this.editarPrecioVenta.set(null);
     this.editarPrecioCosto.set(null);
 
@@ -262,6 +266,7 @@ export class InventarioPage implements OnInit {
           this.selectedLoteIndex.set(1);
           const firstLote = lotes[0];
           const prod = this.productos().find((p) => p.id === productoId);
+          this.editarNombre.set(prod?.nombre ?? '');
           this.editarPrecioVenta.set(prod?.precio_venta ?? 0);
           this.editarPrecioCosto.set(firstLote.precio_costo);
           this.movimientoCantidad.set(firstLote.cantidad);

@@ -5,5 +5,5 @@ export const environment = {
   adminPassword: 'admin123',
   testMode: false,
   ttlDays: 7,
-  seedEnabled: true,
+  seedEnabled: false,
 };

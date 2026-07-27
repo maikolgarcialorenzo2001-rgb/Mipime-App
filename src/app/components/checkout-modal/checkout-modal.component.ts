@@ -6,7 +6,7 @@ import type { CartItem } from '../../services/cart.service';
 export interface CheckoutPayload {
   formaPago: string;
   divisaTipo?: 'EUR' | 'USD';
-  montoDivisa?: number;
+  billeteRecibido?: number;
   tasaCambio?: number;
   compradorNombre?: string;
   autorizadoPor?: string;
@@ -30,22 +30,17 @@ export class CheckoutModalComponent {
 
   // Divisas sub-form
   readonly divisaTipo = signal<'EUR' | 'USD'>('USD');
-  readonly montoDivisa = computed<number | null>(() => {
-    const tasa = this.tasaCambio();
-    const t = this.total();
-    if (tasa == null || tasa <= 0 || t <= 0) return null;
-    return Math.ceil(t / tasa);
-  });
+  readonly billeteRecibido = signal<number | null>(null);
   readonly tasaCambio = signal<number | null>(null);
   readonly vuelto = computed<number | null>(() => {
-    const md = this.montoDivisa();
+    const billete = this.billeteRecibido();
     const tasa = this.tasaCambio();
     const t = this.total();
-    if (md == null || tasa == null || tasa <= 0) return null;
-    return md * tasa - t;
+    if (billete == null || tasa == null || tasa <= 0 || billete <= 0) return null;
+    return billete * tasa - t;
   });
 
-  // Pendiente / Cuenta Cosas sub-form
+  // Pendiente / Cuenta Casas sub-form
   readonly compradorNombre = signal<string>('');
   readonly autorizadoPor = signal<string>('');
   readonly descripcion = signal<string>('');
@@ -67,7 +62,7 @@ export class CheckoutModalComponent {
 
     if (this.formaPago() === 'divisas') {
       payload.divisaTipo = this.divisaTipo();
-      payload.montoDivisa = this.montoDivisa() ?? undefined;
+      payload.billeteRecibido = this.billeteRecibido() ?? undefined;
       payload.tasaCambio = this.tasaCambio() ?? undefined;
     } else if (this.formaPago() === 'pendiente') {
       payload.compradorNombre = this.compradorNombre();

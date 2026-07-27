@@ -84,7 +84,7 @@ describe('CheckoutModalComponent', () => {
     expect(textos.find((t) => t.includes('Transferencia'))).toBeTruthy();
     expect(textos.find((t) => t.includes('Divisas'))).toBeTruthy();
     expect(textos.find((t) => t.includes('Pendiente'))).toBeTruthy();
-    expect(textos.find((t) => t.includes('Cuenta Cosas'))).toBeTruthy();
+    expect(textos.find((t) => t.includes('Cuenta Casas'))).toBeTruthy();
   });
 
   it('2.1 RED: debería mostrar sub-formulario de divisas al seleccionar Divisas', () => {
@@ -92,16 +92,14 @@ describe('CheckoutModalComponent', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Divisas sub-form: select para tipo, inputs numéricos para monto y tasa
+    // Divisas sub-form: select para tipo, inputs numéricos para tasa y billete
     const selects = el.querySelectorAll('select');
     const numberInputs = el.querySelectorAll('input[type="number"]');
-    const textInputs = el.querySelectorAll('input[type="text"]');
-    const allInputs = el.querySelectorAll('input');
 
     expect(selects.length).toBeGreaterThanOrEqual(1);
     expect(numberInputs.length).toBeGreaterThanOrEqual(2);
-    // divisa_tipo (select) + montoDivisa (number) + tasaCambio (number)
-    expect(selects.length + numberInputs.length + textInputs.length).toBeGreaterThanOrEqual(3);
+    // divisa_tipo (select) + tasaCambio (number) + billeteRecibido (number)
+    expect(selects.length + numberInputs.length).toBeGreaterThanOrEqual(3);
   });
 
   it('2.1 RED: debería mostrar sub-formulario de pendiente al seleccionar Pendiente', () => {
@@ -117,7 +115,7 @@ describe('CheckoutModalComponent', () => {
     expect(textareas.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('2.1 RED: debería mostrar sub-formulario de cuenta_cosas al seleccionar Cuenta Cosas', () => {
+  it('2.1 RED: debería mostrar sub-formulario de cuenta_cosas al seleccionar Cuenta Casas', () => {
     component.seleccionarFormaPago('cuenta_cosas');
     fixture.detectChanges();
 
@@ -142,21 +140,21 @@ describe('CheckoutModalComponent', () => {
 
   // ─── 2.4 RED: CheckoutPayload emitido con campos correctos ─────────
 
-  it('2.4 RED: debería emitir payload con divisaTipo, montoDivisa y tasaCambio cuando formaPago=divisas', () => {
+  it('2.4 RED: debería emitir payload con divisaTipo, billeteRecibido y tasaCambio cuando formaPago=divisas', () => {
     const spy = vi.fn();
     component.confirmar.subscribe(spy);
 
     component.seleccionarFormaPago('divisas');
     component.divisaTipo.set('USD');
-    component.tasaCambio.set(650);
-    // montoDivisa is now computed: Math.ceil(1700 / 650) = 3
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(5);
     component['onConfirmar']();
 
     expect(spy).toHaveBeenCalledWith({
       formaPago: 'divisas',
       divisaTipo: 'USD',
-      montoDivisa: 3,
-      tasaCambio: 650,
+      billeteRecibido: 5,
+      tasaCambio: 700,
     });
   });
 
@@ -214,48 +212,38 @@ describe('CheckoutModalComponent', () => {
     expect(spy).toHaveBeenCalledWith({ formaPago: 'transferencia' });
   });
 
-  // ─── Bug 4: Divisas — montoDivisa computed y vuelto ───────────────
+  // ─── Divisas — billeteRecibido y vuelto ──────────────────────────
 
-  it('5.4 RED: montoDivisa debe ser computed como Math.ceil(total / tasaCambio)', () => {
-    component.tasaCambio.set(1000);
+  it('5.4 RED: vuelto debe ser computed como billete * tasa - total', () => {
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(5);
     // total is 1700 (set in beforeEach)
-    expect(component.montoDivisa()).toBe(2); // Math.ceil(1700 / 1000) = 2
+    // vuelto = 5 * 700 - 1700 = 1800
+    expect(component.vuelto()).toBe(1800);
   });
 
-  it('5.4 RED: montoDivisa debe ser null cuando total <= 0', () => {
-    fixture.componentRef.setInput('total', 0);
-    fixture.detectChanges();
-    component.tasaCambio.set(1000);
-    expect(component.montoDivisa()).toBeNull();
+  it('5.4 RED: vuelto debe ser negativo cuando el billete no alcanza', () => {
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(2);
+    // vuelto = 2 * 700 - 1700 = -300
+    expect(component.vuelto()).toBe(-300);
   });
 
-  it('5.4 RED: montoDivisa debe ser null cuando tasaCambio es null o <= 0', () => {
-    expect(component.montoDivisa()).toBeNull(); // tasaCambio is null
+  it('5.4 RED: vuelto debe ser null cuando billeteRecibido es null', () => {
+    component.tasaCambio.set(700);
+    expect(component.vuelto()).toBeNull();
+  });
+
+  it('5.4 RED: vuelto debe ser null cuando tasaCambio es null o <= 0', () => {
+    component.billeteRecibido.set(5);
+    expect(component.vuelto()).toBeNull();
     component.tasaCambio.set(0);
-    expect(component.montoDivisa()).toBeNull();
+    expect(component.vuelto()).toBeNull();
   });
 
-  it('5.4 RED: vuelto debe ser computed como md * tasa - total', () => {
-    component.tasaCambio.set(1000);
-    // montoDivisa = Math.ceil(1700 / 1000) = 2
-    // vuelto = 2 * 1000 - 1700 = 300
-    expect(component.vuelto()).toBe(300);
-  });
-
-  it('5.4 RED: vuelto debe ser null cuando montoDivisa es null', () => {
-    expect(component.vuelto()).toBeNull(); // no tasaCambio set
-  });
-
-  it('5.4 RED: input montoDivisa debe ser readonly', () => {
-    component.seleccionarFormaPago('divisas');
-    component.tasaCambio.set(1000);
-    fixture.detectChanges();
-
-    const el = fixture.nativeElement as HTMLElement;
-    const numberInputs = el.querySelectorAll('input[type="number"]');
-    // Find the montoDivisa input (first number input in divisas sub-form)
-    const montoInput = numberInputs[0];
-    expect(montoInput).toBeTruthy();
-    expect(montoInput.hasAttribute('readonly')).toBe(true);
+  it('5.4 RED: vuelto debe ser null cuando billeteRecibido <= 0', () => {
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(0);
+    expect(component.vuelto()).toBeNull();
   });
 });

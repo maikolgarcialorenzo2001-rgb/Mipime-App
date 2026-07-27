@@ -579,7 +579,7 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce([{ total: 8 }])   // SELECT SUM for shop
         .mockResolvedValueOnce([]);              // UPDATE stock_shop
 
-      await service.registrarEditar(1, 3, 15, 10, 8, 'Actualización de precios', 'shop');
+      await service.registrarEditar(1, 3, 'Café Premium', 15, 10, 8, 'Actualización de precios', 'shop');
 
       // 1. Register movement
       expect(mockDb.sql).toHaveBeenNthCalledWith(
@@ -588,11 +588,11 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([1, 8, 'ajuste']),
       );
 
-      // 2. Update product precio_venta
+      // 2. Update product nombre + precio_venta
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         2,
-        expect.stringContaining('UPDATE productos SET precio_venta = ?'),
-        [15, expect.any(String), 1],
+        expect.stringContaining('UPDATE productos SET nombre'),
+        ['Café Premium', 15, expect.any(String), 1],
       );
 
       // 3. Update lotes_stock cantidad + precio_costo
@@ -612,15 +612,21 @@ describe('StockMovimientoService', () => {
 
     it('debería rechazar motivo vacío', async () => {
       await expect(
-        service.registrarEditar(1, 1, 10, 5, 10, '', 'shop'),
+        service.registrarEditar(1, 1, 'Café', 10, 5, 10, '', 'shop'),
       ).rejects.toThrow('El motivo es obligatorio');
+    });
+
+    it('debería rechazar nombre vacío', async () => {
+      await expect(
+        service.registrarEditar(1, 1, '', 10, 5, 10, 'Motivo', 'shop'),
+      ).rejects.toThrow('El nombre del producto es obligatorio');
     });
 
     it('debería rechazar si el usuario no es admin', async () => {
       mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
 
       await expect(
-        service.registrarEditar(1, 1, 10, 5, 10, 'Motivo', 'shop'),
+        service.registrarEditar(1, 1, 'Café', 10, 5, 10, 'Motivo', 'shop'),
       ).rejects.toThrow('Solo administradores');
     });
 
@@ -632,7 +638,7 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce([{ total: 20 }])
         .mockResolvedValueOnce([]);
 
-      await service.registrarEditar(1, 1, 12, 6, 20, 'Edit almacen', 'almacen');
+      await service.registrarEditar(1, 1, 'Café', 12, 6, 20, 'Edit almacen', 'almacen');
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         5,

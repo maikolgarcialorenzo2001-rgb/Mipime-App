@@ -19,7 +19,7 @@ const mockJornada: Jornada = {
   hora_cierre: null,
   monto_inicial: 5000,
   total_ventas: 0,
-  total_gastos: 0,
+  total_movimientos: 0,
   saldo_esperado: 5000,
   saldo_real: null,
   estado: 'abierta',
@@ -183,13 +183,13 @@ describe('PosPage — toast de éxito', () => {
     const cart = TestBed.inject(CartService);
     cart.agregar(producto);
 
-    mockVentaService.registrar.mockReturnValue(of({ id: 1, total: 1950 } as never));
+    mockVentaService.registrar.mockReturnValue(of({ id: 1, total: 3500 } as never));
 
     const payload: CheckoutPayload = {
       formaPago: 'divisas',
       divisaTipo: 'USD',
-      montoDivisa: 3,
-      tasaCambio: 650,
+      billeteRecibido: 5,
+      tasaCambio: 700,
     };
 
     component.confirmarVenta(payload);
@@ -198,8 +198,8 @@ describe('PosPage — toast de éxito', () => {
       expect.objectContaining({
         formaPago: 'divisas',
         divisaTipo: 'USD',
-        montoDivisa: 3,
-        tasaCambio: 650,
+        billeteRecibido: 5,
+        tasaCambio: 700,
       }),
     );
     expect(mockCuentaCosasService.registrar).not.toHaveBeenCalled();

@@ -181,7 +181,7 @@ export class PosPage {
     let obs: Observable<unknown>;
 
     if (payload.formaPago === 'cuenta_cosas') {
-      // Cuenta Cosas usa su propio servicio (no toca jornadas)
+      // Cuenta Casas usa su propio servicio (no toca jornadas)
       const productoId = items[0]?.producto.id;
       const cantidad = items.reduce((sum, item) => sum + item.cantidad, 0);
       obs = from(
@@ -201,7 +201,7 @@ export class PosPage {
         usuarioId,
         formaPago: payload.formaPago,
         divisaTipo: payload.divisaTipo,
-        montoDivisa: payload.montoDivisa,
+        billeteRecibido: payload.billeteRecibido,
         tasaCambio: payload.tasaCambio,
         compradorNombre: payload.compradorNombre,
         autorizadoPor: payload.autorizadoPor,

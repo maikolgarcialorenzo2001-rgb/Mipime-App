@@ -392,6 +392,7 @@ export class StockMovimientoService {
   async registrarEditar(
     productoId: number,
     loteId: number,
+    nombre: string,
     precioVenta: number,
     precioCosto: number,
     nuevaCantidad: number,
@@ -401,6 +402,9 @@ export class StockMovimientoService {
     this._checkAdmin();
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
+    }
+    if (!nombre || nombre.trim().length === 0) {
+      throw new Error('El nombre del producto es obligatorio');
     }
 
     const ahora = new Date().toISOString();
@@ -412,10 +416,10 @@ export class StockMovimientoService {
       [productoId, nuevaCantidad, 'ajuste', motivo, ahora],
     );
 
-    // 2. Update product precio_venta
+    // 2. Update product (nombre + precio_venta)
     await this._db.sql(
-      'UPDATE productos SET precio_venta = ?, updated_at = ? WHERE id = ?',
-      [precioVenta, ahora, productoId],
+      'UPDATE productos SET nombre = ?, precio_venta = ?, updated_at = ? WHERE id = ?',
+      [nombre.trim(), precioVenta, ahora, productoId],
     );
 
     // 3. Update the specific lot (cantidad and precio_costo)

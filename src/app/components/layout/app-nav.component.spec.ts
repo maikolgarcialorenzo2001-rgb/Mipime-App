@@ -16,7 +16,7 @@ const mockJornadaAbierta: Jornada = {
   hora_cierre: null,
   monto_inicial: 5000,
   total_ventas: 15000,
-  total_gastos: 2000,
+  total_movimientos: 2000,
   saldo_esperado: 18000,
   saldo_real: null,
   estado: 'abierta',

@@ -633,7 +633,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
-      1, 42, 15, 10, 80, 'Actualización de precios', 'almacen',
+      1, 42, 'Coca Cola', 15, 10, 80, 'Actualización de precios', 'almacen',
     );
   });
 

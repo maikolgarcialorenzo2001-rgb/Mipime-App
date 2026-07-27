@@ -11,7 +11,7 @@ export interface VentaPayload {
   usuarioId: number;
   formaPago: string;
   divisaTipo?: 'EUR' | 'USD';
-  montoDivisa?: number;
+  billeteRecibido?: number;
   tasaCambio?: number;
   compradorNombre?: string;
   autorizadoPor?: string;
@@ -30,7 +30,7 @@ export class VentaService {
    * 1. INSERT en ventas (con campos opcionales según formaPago)
    * 2. INSERT en detalle_ventas por cada item
    * 3. UPDATE stock en productos
-   * 4. UPDATE total_ventas / saldo_esperado en la jornada (excepto pendiente)
+   * 4. UPDATE total_ventas / saldo_esperado en la jornada (incluye pendientes)
    * 5. Registrar salida de stock vía StockMovimientoService por cada item
    */
   registrar(payload: VentaPayload): Observable<Venta> {
@@ -42,11 +42,11 @@ export class VentaService {
 
     const ahora = new Date().toISOString();
 
-    // Para divisas: total = montoDivisa * tasaCambio
+    // Para divisas: total = billeteRecibido * tasaCambio
     // Para otros: total = suma del carrito
     let total: number;
-    if (payload.formaPago === 'divisas' && payload.montoDivisa != null && payload.tasaCambio != null) {
-      total = payload.montoDivisa * payload.tasaCambio;
+    if (payload.formaPago === 'divisas' && payload.billeteRecibido != null && payload.tasaCambio != null) {
+      total = payload.billeteRecibido * payload.tasaCambio;
     } else {
       total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
     }
@@ -107,10 +107,10 @@ export class VentaService {
           placeholdersExtra.push('?');
           valoresExtra.push(payload.divisaTipo);
         }
-        if (payload.montoDivisa != null) {
+        if (payload.billeteRecibido != null) {
           columnasExtra.push('monto_divisa');
           placeholdersExtra.push('?');
-          valoresExtra.push(payload.montoDivisa);
+          valoresExtra.push(payload.billeteRecibido);
         }
         if (payload.tasaCambio != null) {
           columnasExtra.push('tasa_cambio');
@@ -172,17 +172,15 @@ export class VentaService {
         );
       }
 
-      // 3. Actualizar jornada SOLO si NO es pendiente
-      if (formaPago !== 'pendiente') {
-        await this._db.sql(
-          `UPDATE jornadas
-           SET total_ventas = total_ventas + ?,
-                saldo_esperado = saldo_esperado + ?,
-                updated_at = ?
-           WHERE id = ?`,
-          [total, total, ahora, jornadaId],
-        );
-      }
+      // 3. Actualizar jornada (incluye pendientes en saldo_esperado)
+      await this._db.sql(
+        `UPDATE jornadas
+         SET total_ventas = total_ventas + ?,
+              saldo_esperado = saldo_esperado + ?,
+              updated_at = ?
+         WHERE id = ?`,
+        [total, total, ahora, jornadaId],
+      );
 
       // 4. Consumir stock vía FIFO y registrar venta_lotes
       for (const item of items) {

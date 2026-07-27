@@ -5,7 +5,7 @@ export interface Jornada {
   hora_cierre: string | null;
   monto_inicial: number;
   total_ventas: number;
-  total_gastos: number;
+  total_movimientos: number;
   saldo_esperado: number;
   saldo_real: number | null;
   estado: 'abierta' | 'cerrada';
