@@ -25,7 +25,7 @@ export class ProductosPage implements OnInit {
 
   // ── Merma ──────────────────────────────────────────────────
   readonly selectedProductoId = signal<number | null>(null);
-  readonly mermaCantidad = signal<number>(0);
+  readonly mermaCantidad = signal<number | null>(null);
   readonly mermaMotivo = signal('');
   readonly mermaError = signal<string | null>(null);
   readonly mermaProcesando = signal(false);
@@ -84,14 +84,14 @@ export class ProductosPage implements OnInit {
 
   abrirMerma(productoId: number): void {
     this.selectedProductoId.set(productoId);
-    this.mermaCantidad.set(0);
+    this.mermaCantidad.set(null);
     this.mermaMotivo.set('');
     this.mermaError.set(null);
   }
 
   cancelarMerma(): void {
     this.selectedProductoId.set(null);
-    this.mermaCantidad.set(0);
+    this.mermaCantidad.set(null);
     this.mermaMotivo.set('');
     this.mermaError.set(null);
   }
@@ -100,7 +100,7 @@ export class ProductosPage implements OnInit {
     const productoId = this.selectedProductoId();
     if (!productoId) return;
 
-    if (this.mermaCantidad() <= 0) {
+    if (!this.mermaCantidad() || this.mermaCantidad()! <= 0) {
       this.mermaError.set('La cantidad debe ser mayor a 0');
       return;
     }
@@ -110,7 +110,7 @@ export class ProductosPage implements OnInit {
     try {
       await this._stockService.registrarMerma(
         productoId,
-        this.mermaCantidad(),
+        this.mermaCantidad()!,
         this.mermaMotivo() || undefined,
         this._jornadaService.jornadaAbierta()?.id,
       );
