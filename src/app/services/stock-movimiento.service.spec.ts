@@ -510,11 +510,11 @@ describe('StockMovimientoService', () => {
 
       await service.registrarAjusteLote(1, 3, 2, 'Corrección de lote', 'shop');
 
-      // Should update the specific lot
+      // Should update the specific lot (no updated_at — lotes_stock lacks that column)
       expect(mockDb.sql).toHaveBeenNthCalledWith(
         2,
         expect.stringContaining('UPDATE lotes_stock SET cantidad = ?'),
-        [2, expect.any(String), 3],
+        [2, 3],
       );
 
       // Should recalc stock_shop
@@ -566,6 +566,78 @@ describe('StockMovimientoService', () => {
         1,
         expect.stringContaining('INSERT INTO stock_movimientos'),
         expect.arrayContaining([1, 5, 'ajuste']),
+      );
+    });
+  });
+
+  describe('registrarEditar', () => {
+    it('debería actualizar producto precio_venta y lote precio_costo/cantidad', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])               // INSERT stock_movimientos
+        .mockResolvedValueOnce([])               // UPDATE productos precio_venta
+        .mockResolvedValueOnce([])               // UPDATE lotes_stock cantidad + precio_costo
+        .mockResolvedValueOnce([{ total: 8 }])   // SELECT SUM for shop
+        .mockResolvedValueOnce([]);              // UPDATE stock_shop
+
+      await service.registrarEditar(1, 3, 15, 10, 8, 'Actualización de precios', 'shop');
+
+      // 1. Register movement
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('INSERT INTO stock_movimientos'),
+        expect.arrayContaining([1, 8, 'ajuste']),
+      );
+
+      // 2. Update product precio_venta
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('UPDATE productos SET precio_venta = ?'),
+        [15, expect.any(String), 1],
+      );
+
+      // 3. Update lotes_stock cantidad + precio_costo
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('UPDATE lotes_stock SET cantidad = ?, precio_costo = ?'),
+        [8, 10, 3],
+      );
+
+      // 4. Recalc stock_shop
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('stock_shop'),
+        expect.arrayContaining([8, expect.any(String), 1]),
+      );
+    });
+
+    it('debería rechazar motivo vacío', async () => {
+      await expect(
+        service.registrarEditar(1, 1, 10, 5, 10, '', 'shop'),
+      ).rejects.toThrow('El motivo es obligatorio');
+    });
+
+    it('debería rechazar si el usuario no es admin', async () => {
+      mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
+
+      await expect(
+        service.registrarEditar(1, 1, 10, 5, 10, 'Motivo', 'shop'),
+      ).rejects.toThrow('Solo administradores');
+    });
+
+    it('debería recalcular stock_almacen cuando ubicacion=almacen', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 20 }])
+        .mockResolvedValueOnce([]);
+
+      await service.registrarEditar(1, 1, 12, 6, 20, 'Edit almacen', 'almacen');
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('stock_almacen'),
+        expect.arrayContaining([20, expect.any(String), 1]),
       );
     });
   });

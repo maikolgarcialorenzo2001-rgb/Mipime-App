@@ -366,11 +366,65 @@ export class StockMovimientoService {
 
     // 2. Update the specific lot
     await this._db.sql(
-      'UPDATE lotes_stock SET cantidad = ?, updated_at = ? WHERE id = ?',
-      [nuevaCantidad, ahora, loteId],
+      'UPDATE lotes_stock SET cantidad = ? WHERE id = ?',
+      [nuevaCantidad, loteId],
     );
 
     // 3. Recalculate stock for this ubicacion
+    const [{ total }] = await this._db.sql<{ total: number }>(
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
+      [productoId, ubicacion],
+    );
+
+    await this._db.sql(
+      `UPDATE productos
+       SET ${this._stockCol(ubicacion)} = ?,
+            updated_at = ?
+       WHERE id = ?`,
+      [total, ahora, productoId],
+    );
+  }
+
+  /**
+   * Edita precio_venta del producto y precio_costo/cantidad de un lote específico.
+   * Admin-only.
+   */
+  async registrarEditar(
+    productoId: number,
+    loteId: number,
+    precioVenta: number,
+    precioCosto: number,
+    nuevaCantidad: number,
+    motivo: string,
+    ubicacion: 'almacen' | 'shop',
+  ): Promise<void> {
+    this._checkAdmin();
+    if (!motivo || motivo.trim().length === 0) {
+      throw new Error('El motivo es obligatorio');
+    }
+
+    const ahora = new Date().toISOString();
+
+    // 1. Register movement
+    await this._db.sql(
+      `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [productoId, nuevaCantidad, 'ajuste', motivo, ahora],
+    );
+
+    // 2. Update product precio_venta
+    await this._db.sql(
+      'UPDATE productos SET precio_venta = ?, updated_at = ? WHERE id = ?',
+      [precioVenta, ahora, productoId],
+    );
+
+    // 3. Update the specific lot (cantidad and precio_costo)
+    await this._db.sql(
+      'UPDATE lotes_stock SET cantidad = ?, precio_costo = ? WHERE id = ?',
+      [nuevaCantidad, precioCosto, loteId],
+    );
+
+    // 4. Recalculate stock for this ubicacion
     const [{ total }] = await this._db.sql<{ total: number }>(
       'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
       [productoId, ubicacion],
