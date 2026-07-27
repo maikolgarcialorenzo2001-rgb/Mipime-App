@@ -51,8 +51,8 @@ export class ProductoService {
     return from(
       this._db.sql<Producto>(
         `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_actual, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-        [data.nombre, null, data.precio_costo, data.precio_venta, data.stock_actual, ahora, ahora],
+         VALUES (?, ?, ?, ?, 0, ?, ?) RETURNING *`,
+        [data.nombre, null, data.precio_costo, data.precio_venta, ahora, ahora],
       ),
     ).pipe(
       map((rows) => rows[0]),

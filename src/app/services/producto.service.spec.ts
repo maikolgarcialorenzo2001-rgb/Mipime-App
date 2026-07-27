@@ -162,7 +162,6 @@ describe('ProductoService', () => {
           null,
           1000,
           1500,
-          20,
         ]),
       );
     });
