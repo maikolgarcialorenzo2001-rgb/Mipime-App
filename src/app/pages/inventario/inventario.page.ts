@@ -4,6 +4,7 @@ import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
+import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
@@ -28,6 +29,9 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
 export class InventarioPage implements OnInit {
   private readonly productoService = inject(ProductoService);
   private readonly stockService = inject(StockMovimientoService);
+  private readonly authService = inject(AuthService);
+
+  readonly esAdmin = computed(() => this.authService.usuario()?.rol === 'admin');
 
   readonly productos = signal<Producto[]>([]);
   readonly movimientos = signal<StockMovimiento[]>([]);
@@ -37,7 +41,7 @@ export class InventarioPage implements OnInit {
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
     productoId: number;
-    tipo: 'entrada' | 'salida' | 'ajuste';
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'merma' | 'traslado';
   } | null>(null);
   readonly showHistoryId = signal<number | null>(null);
   readonly movimientoCantidad = signal<number | null>(null);
@@ -46,6 +50,15 @@ export class InventarioPage implements OnInit {
   readonly showLotesId = signal<number | null>(null);
   readonly lotes = signal<LoteStock[]>([]);
   readonly lotesLoading = signal(false);
+  readonly selectedLoteIndex = signal<number | null>(null);
+  readonly productoLotes = signal<LoteStock[]>([]);
+
+  /** Helper para convertir string a número en templates. */
+  toInt(value: string | number | null): number | null {
+    if (value === null || value === '') return null;
+    const n = typeof value === 'number' ? value : Number(value);
+    return Number.isNaN(n) ? null : n;
+  }
 
   readonly filteredProductos = computed(() => {
     const q = this.searchQuery().toLowerCase().trim();
@@ -99,17 +112,48 @@ export class InventarioPage implements OnInit {
             this.movimientoMotivo() || undefined,
           );
           break;
-        case 'ajuste':
-          await this.stockService.registrarAjuste(
+        case 'ajuste': {
+          const loteIndex = this.selectedLoteIndex();
+          if (loteIndex !== null) {
+            const lotes = this.productoLotes();
+            const lote = lotes[loteIndex - 1];
+            if (lote) {
+              await this.stockService.registrarAjusteLote(
+                action.productoId,
+                lote.id,
+                this.movimientoCantidad() ?? 0,
+                this.movimientoMotivo(),
+                lote.ubicacion,
+              );
+            }
+          } else {
+            await this.stockService.registrarAjuste(
+              action.productoId,
+              this.movimientoCantidad() ?? 0,
+              this.movimientoMotivo(),
+            );
+          }
+          break;
+        }
+        case 'merma':
+          await this.stockService.registrarMerma(
             action.productoId,
             this.movimientoCantidad() ?? 0,
-            this.movimientoMotivo(),
+            this.movimientoMotivo() || undefined,
+          );
+          break;
+        case 'traslado':
+          await this.stockService.registrarTraslado(
+            action.productoId,
+            this.movimientoCantidad() ?? 0,
           );
           break;
       }
       this.selectedAction.set(null);
       this.movimientoCantidad.set(null);
       this.movimientoMotivo.set('');
+      this.selectedLoteIndex.set(null);
+      this.productoLotes.set([]);
       await this.loadProductos();
     } catch (e) {
       this.error.set(
@@ -165,6 +209,28 @@ export class InventarioPage implements OnInit {
       );
     } finally {
       this.lotesLoading.set(false);
+    }
+  }
+
+  async onSelectAction(
+    productoId: number,
+    tipo: 'entrada' | 'salida' | 'ajuste' | 'merma' | 'traslado',
+  ): Promise<void> {
+    this.selectedAction.set({ productoId, tipo });
+    this.selectedLoteIndex.set(null);
+    this.movimientoCantidad.set(null);
+    this.movimientoCosto.set(null);
+    this.movimientoMotivo.set('');
+
+    if (tipo === 'ajuste') {
+      try {
+        const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
+        this.productoLotes.set(lotes);
+      } catch {
+        this.productoLotes.set([]);
+      }
+    } else {
+      this.productoLotes.set([]);
     }
   }
 

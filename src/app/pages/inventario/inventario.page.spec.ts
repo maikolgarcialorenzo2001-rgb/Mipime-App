@@ -3,6 +3,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { InventarioPage } from './inventario.page';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
+import { AuthService } from '../../services/auth.service';
 import type { Producto, StockMovimiento } from '../../models';
 
 describe('InventarioPage', () => {
@@ -12,6 +13,8 @@ describe('InventarioPage', () => {
   let mockProductoService: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockStockService: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockAuthService: any;
 
   const productos: Producto[] = [
     {
@@ -21,7 +24,7 @@ describe('InventarioPage', () => {
       precio_venta: 12,
       precio_costo: 8,
       stock_almacen: 100,
-      stock_shop: 0,
+      stock_shop: 10,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -32,7 +35,7 @@ describe('InventarioPage', () => {
       precio_venta: 10,
       precio_costo: 7,
       stock_almacen: 50,
-      stock_shop: 0,
+      stock_shop: 5,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -43,7 +46,7 @@ describe('InventarioPage', () => {
       precio_venta: 5,
       precio_costo: 2,
       stock_almacen: 200,
-      stock_shop: 0,
+      stock_shop: 20,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -71,6 +74,10 @@ describe('InventarioPage', () => {
   ];
 
   beforeEach(() => {
+    mockAuthService = {
+      usuario: vi.fn().mockReturnValue({ id: 1, nombre: 'Admin', rol: 'admin' }),
+    };
+
     mockProductoService = {
       listar: vi.fn(),
       buscar: vi.fn(),
@@ -84,13 +91,18 @@ describe('InventarioPage', () => {
       registrarEntrada: vi.fn().mockResolvedValue(undefined),
       registrarSalida: vi.fn().mockResolvedValue(undefined),
       registrarAjuste: vi.fn().mockResolvedValue(undefined),
+      registrarAjusteLote: vi.fn().mockResolvedValue(undefined),
+      registrarMerma: vi.fn().mockResolvedValue({ consumos: [], costoTotal: 0 }),
+      registrarTraslado: vi.fn().mockResolvedValue([]),
       obtenerMovimientos: vi.fn().mockResolvedValue([]),
       obtenerHistorial: vi.fn().mockResolvedValue([]),
+      obtenerLotesPorProducto: vi.fn().mockResolvedValue([]),
     };
 
     TestBed.configureTestingModule({
       imports: [InventarioPage],
       providers: [
+        { provide: AuthService, useValue: mockAuthService },
         { provide: ProductoService, useValue: mockProductoService },
         { provide: StockMovimientoService, useValue: mockStockService },
       ],
@@ -193,7 +205,7 @@ describe('InventarioPage', () => {
     expect(texto).not.toContain('Agua Mineral');
   });
 
-  it('6. shows inline form when action is selected', async () => {
+  it('6. shows Stock Almacén and Stock Tienda columns', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -202,31 +214,17 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(
-      fixture.nativeElement.querySelector('form'),
-    ).toBeFalsy();
+    const headerText = fixture.nativeElement.textContent;
+    expect(headerText).toContain('Stock Almacén');
+    expect(headerText).toContain('Stock Tienda');
 
-    const entradaBtn = fixture.nativeElement.querySelector(
-      'tbody tr button',
-    ) as HTMLButtonElement;
-    entradaBtn.click();
-    fixture.detectChanges();
-
-    const form = fixture.nativeElement.querySelector('form');
-    expect(form).toBeTruthy();
-    expect(
-      form.querySelector('input[name="movimientoCantidad"]'),
-    ).toBeTruthy();
-
-    const buttons = form.querySelectorAll('button');
-    const buttonTexts = Array.from(buttons).map((b) =>
-      (b as HTMLButtonElement).textContent?.trim() ?? '',
-    );
-    expect(buttonTexts.some((t) => t.includes('Guardar'))).toBe(true);
-    expect(buttonTexts.some((t) => t.includes('Cancelar'))).toBe(true);
+    const tbody = fixture.nativeElement.querySelector('tbody');
+    const stockBadges = tbody.querySelectorAll('app-stock-badge');
+    // First badge = stock_almacen (100), second = stock_shop (10)
+    expect(stockBadges.length).toBe(2);
   });
 
-  it('7. calls registrarEntrada on form submit', async () => {
+  it('7. shows admin buttons when esAdmin is true', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -235,10 +233,115 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const entradaBtn = fixture.nativeElement.querySelector(
-      'tbody tr button',
+    expect(component.esAdmin()).toBe(true);
+
+    const buttonArea = fixture.nativeElement.querySelector('tbody tr td:last-child');
+    const buttonText = buttonArea.textContent;
+    expect(buttonText).toContain('Entrada');
+    expect(buttonText).toContain('Salida');
+    expect(buttonText).toContain('Ajustar');
+    expect(buttonText).toContain('Merma');
+    expect(buttonText).toContain('A Tienda');
+  });
+
+  it('8. hides admin buttons when esAdmin is false', async () => {
+    mockAuthService.usuario.mockReturnValue({ id: 2, nombre: 'User', rol: 'trabajador' });
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.esAdmin()).toBe(false);
+
+    const buttonArea = fixture.nativeElement.querySelector('tbody tr td:last-child');
+    const buttonText = buttonArea.textContent;
+    expect(buttonText).not.toContain('Entrada');
+    expect(buttonText).not.toContain('Salida');
+    expect(buttonText).not.toContain('Ajustar');
+    expect(buttonText).not.toContain('Merma');
+    expect(buttonText).toContain('A Tienda');
+  });
+
+  it('9. shows inline form when "A Tienda" is clicked', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('form')).toBeFalsy();
+
+    // Click "A Tienda" button (last button in the admin group)
+    const allBtns = fixture.nativeElement.querySelectorAll('tbody tr button');
+    const aTiendaBtn = Array.from(allBtns).find(
+      (b) => (b as HTMLButtonElement).textContent?.includes('A Tienda'),
     ) as HTMLButtonElement;
-    entradaBtn.click();
+    expect(aTiendaBtn).toBeTruthy();
+    aTiendaBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
+    expect(component.selectedAction()?.tipo).toBe('traslado');
+  });
+
+  it('10. calls registrarTraslado on form submit', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'traslado');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(5);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarTraslado).toHaveBeenCalledWith(1, 5);
+  });
+
+  it('11. calls registrarMerma on form submit', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'merma');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    component.movimientoMotivo.set('Roto');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarMerma).toHaveBeenCalledWith(1, 3, 'Roto');
+  });
+
+  it('12. calls registrarEntrada on form submit', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'entrada');
     fixture.detectChanges();
 
     component.movimientoCantidad.set(5);
@@ -250,14 +353,11 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(mockStockService.registrarEntrada).toHaveBeenCalledWith(
-      1,
-      5,
-      500,
-      'Repo',
+      1, 5, 500, 'Repo',
     );
   });
 
-  it('8. calls registrarSalida on form submit', async () => {
+  it('13. calls registrarSalida on form submit', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -266,11 +366,7 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const buttons = fixture.nativeElement.querySelectorAll(
-      'tbody tr button',
-    );
-    // Second button is "Salida"
-    (buttons[1] as HTMLButtonElement).click();
+    await component.onSelectAction(1, 'salida');
     fixture.detectChanges();
 
     component.movimientoCantidad.set(3);
@@ -279,14 +375,10 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
-      1,
-      3,
-      undefined,
-    );
+    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 3, undefined);
   });
 
-  it('9. calls registrarAjuste on form submit', async () => {
+  it('14. calls registrarAjuste on form submit (no lot selected)', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -295,11 +387,7 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const buttons = fixture.nativeElement.querySelectorAll(
-      'tbody tr button',
-    );
-    // Third button is "Ajustar"
-    (buttons[2] as HTMLButtonElement).click();
+    await component.onSelectAction(1, 'ajuste');
     fixture.detectChanges();
 
     component.movimientoCantidad.set(150);
@@ -310,13 +398,11 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(mockStockService.registrarAjuste).toHaveBeenCalledWith(
-      1,
-      150,
-      'Inventario físico',
+      1, 150, 'Inventario físico',
     );
   });
 
-  it('10. shows history on toggle', async () => {
+  it('15. shows history on toggle', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
     mockStockService.obtenerMovimientos.mockResolvedValue(movimientos);
 
@@ -345,7 +431,7 @@ describe('InventarioPage', () => {
     expect(mockStockService.obtenerMovimientos).toHaveBeenCalledWith(1);
   });
 
-  it('11. hides form on cancel', async () => {
+  it('16. hides form on cancel', async () => {
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -354,12 +440,8 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const entradaBtn = fixture.nativeElement.querySelector(
-      'tbody tr button',
-    ) as HTMLButtonElement;
-    entradaBtn.click();
+    await component.onSelectAction(1, 'traslado');
     fixture.detectChanges();
-
     expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
 
     const cancelBtn = fixture.nativeElement.querySelector(
@@ -370,6 +452,32 @@ describe('InventarioPage', () => {
 
     expect(fixture.nativeElement.querySelector('form')).toBeFalsy();
     expect(component.selectedAction()).toBeNull();
+  });
+
+  it('17. shows ID Lote column in lot details', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 5, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const lotesBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('tbody tr button'),
+    ).find((b) => (b as HTMLButtonElement).textContent?.includes('Lotes')) as HTMLButtonElement;
+    lotesBtn.click();
+    fixture.detectChanges();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const lotesText = fixture.nativeElement.textContent;
+    expect(lotesText).toContain('ID Lote');
+    expect(lotesText).toContain('#5');
   });
 
   // ── CRUD Modal Tests ──────────────────────────────────────────
@@ -388,7 +496,7 @@ describe('InventarioPage', () => {
     vi.clearAllMocks();
   }
 
-  it('12. shows Precio Costo column in table', async () => {
+  it('18. shows Precio Costo column in table', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -404,7 +512,7 @@ describe('InventarioPage', () => {
     expect(precioCell).toBeTruthy();
   });
 
-  it('13. "Nuevo producto" button exists and opens modal', async () => {
+  it('19. "Nuevo producto" button exists and opens modal', async () => {
     await setupLoaded();
 
     const allBtns = fixture.nativeElement.querySelectorAll('button');
@@ -426,7 +534,7 @@ describe('InventarioPage', () => {
     expect(overlay.textContent).toContain('Nuevo Producto');
   });
 
-  it('14. opens modal pre-filled for editing', async () => {
+  it('20. opens modal pre-filled for editing', async () => {
     await setupLoaded();
 
     const allEditBtns = fixture.nativeElement.querySelectorAll('button');
@@ -449,7 +557,7 @@ describe('InventarioPage', () => {
     expect(overlay.textContent).toContain('Editar Producto');
   });
 
-  it('15. validation rejects empty fields', async () => {
+  it('21. validation rejects empty fields', async () => {
     await setupLoaded();
 
     component.abrirNuevoProducto();
@@ -465,7 +573,7 @@ describe('InventarioPage', () => {
     expect(mockProductoService.crear).not.toHaveBeenCalled();
   });
 
-  it('16. save calls ProductoService.crear for new product', async () => {
+  it('22. save calls ProductoService.crear for new product', async () => {
     const productoCreado: Producto = {
       id: 99,
       nombre: 'Test Producto',
@@ -502,7 +610,7 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
-  it('17. save calls ProductoService.actualizar for editing', async () => {
+  it('23. save calls ProductoService.actualizar for editing', async () => {
     const productoActualizado: Producto = {
       id: 1,
       nombre: 'Coca Cola Editado',
@@ -541,7 +649,7 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
-  it('18. delete confirmation flow — confirm', async () => {
+  it('24. delete confirmation flow — confirm', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
     mockProductoService.eliminar.mockReturnValue(of(undefined));
 
@@ -566,7 +674,7 @@ describe('InventarioPage', () => {
     expect(component.confirmandoEliminar()).toBeNull();
   });
 
-  it('19. delete confirmation flow — cancel', async () => {
+  it('25. delete confirmation flow — cancel', async () => {
     mockProductoService.listar.mockReturnValue(of(productos));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -587,7 +695,7 @@ describe('InventarioPage', () => {
     expect(mockProductoService.eliminar).not.toHaveBeenCalled();
   });
 
-  it('20. cerrarModal hides modal and clears form', async () => {
+  it('26. cerrarModal hides modal and clears form', async () => {
     await setupLoaded();
 
     component.abrirNuevoProducto();
