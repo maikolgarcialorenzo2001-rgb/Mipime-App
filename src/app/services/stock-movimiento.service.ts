@@ -17,12 +17,43 @@ export class StockMovimientoService {
     productoId: number,
     cantidadRequerida: number,
   ): Promise<ConsumoRecord[]> {
-    const lotes = await this._db.sql<LoteStock>(
+    let lotes = await this._db.sql<LoteStock>(
       `SELECT * FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
        ORDER BY fecha_ingreso ASC, id ASC`,
       [productoId],
     );
+
+    // Safety net: if no lotes exist but stock_actual > 0, create a default lote
+    if (lotes.length === 0) {
+      const [{ stock_actual, precio_costo }] = await this._db.sql<{
+        stock_actual: number;
+        precio_costo: number | null;
+      }>(
+        'SELECT stock_actual, precio_costo FROM productos WHERE id = ?',
+        [productoId],
+      );
+
+      if (stock_actual > 0) {
+        const ahora = new Date().toISOString();
+        const insertResult = await this._db.sql<{ id: number }>(
+          `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           RETURNING id`,
+          [productoId, stock_actual, precio_costo ?? 0, ahora, ahora],
+        );
+        lotes = [
+          {
+            id: insertResult[0].id,
+            producto_id: productoId,
+            cantidad: stock_actual,
+            precio_costo: precio_costo ?? 0,
+            fecha_ingreso: ahora,
+            created_at: ahora,
+          },
+        ];
+      }
+    }
 
     let restante = cantidadRequerida;
     const consumos: ConsumoRecord[] = [];
@@ -262,6 +293,17 @@ export class StockMovimientoService {
   ): Promise<StockMovimiento[]> {
     return this._db.sql<StockMovimiento>(
       `SELECT * FROM stock_movimientos WHERE producto_id = ? ORDER BY created_at DESC`,
+      [productoId],
+    );
+  }
+
+  async obtenerLotesPorProducto(
+    productoId: number,
+  ): Promise<LoteStock[]> {
+    return this._db.sql<LoteStock>(
+      `SELECT * FROM lotes_stock
+       WHERE producto_id = ? AND cantidad > 0
+       ORDER BY fecha_ingreso ASC, id ASC`,
       [productoId],
     );
   }

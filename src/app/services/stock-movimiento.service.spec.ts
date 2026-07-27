@@ -367,12 +367,29 @@ describe('StockMovimientoService', () => {
       expect(jornadaUpdate![1]).toContain(58); // saldo_esperado -= 58
     });
 
-    it('debería retornar costoTotal 0 si consumo es 0 (sin lotes)', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // SELECT lotes_stock -> empty
+    it('debería lanzar "Stock insuficiente" cuando no hay lotes ni stock', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])  // SELECT lotes_stock -> empty
+        .mockResolvedValueOnce([{ stock_actual: 0, precio_costo: null }]); // SELECT productos -> no stock
 
       await expect(
         service.registrarMerma(1, 1),
       ).rejects.toThrow('Stock insuficiente');
+    });
+
+    it('debería crear lote default cuando no hay lotes pero stock_actual > 0', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])  // SELECT lotes_stock -> empty
+        .mockResolvedValueOnce([{ stock_actual: 10, precio_costo: 5 }]) // SELECT productos -> has stock
+        .mockResolvedValueOnce([{ id: 99 }]) // INSERT default lote -> RETURNING id
+        .mockResolvedValueOnce([])  // UPDATE lote (consume)
+        .mockResolvedValueOnce([])  // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 9 }]) // SELECT SUM
+        .mockResolvedValueOnce([]); // UPDATE productos
+
+      const result = await service.registrarMerma(1, 1, 'Test');
+      expect(result.consumos.length).toBe(1);
+      expect(result.consumos[0].cantidad).toBe(1);
     });
 
     it('debería insertar jornada_id cuando se proporciona', async () => {

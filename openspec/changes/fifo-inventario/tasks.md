@@ -10,25 +10,25 @@
 
 *No dependencies. All tasks in this phase can run in parallel.*
 
-- [ ] **Task 1.1** — Create `src/app/models/lote-stock.ts`
+- [x] **Task 1.1** — Create `src/app/models/lote-stock.ts`
   - `LoteStock` interface: `id`, `producto_id`, `cantidad`, `precio_costo`, `fecha_ingreso`, `created_at`
   - `ConsumoRecord` interface: `lote_id`, `cantidad`, `precio_costo_real`
   - ~15 lines
 
-- [ ] **Task 1.2** — Create `src/app/models/venta-lote.ts`
+- [x] **Task 1.2** — Create `src/app/models/venta-lote.ts`
   - `VentaLote` interface: `id`, `venta_id`, `lote_id`, `producto_id`, `cantidad`, `precio_costo_real`, `created_at`
   - ~12 lines
 
-- [ ] **Task 1.3** — Update `src/app/models/index.ts`
+- [x] **Task 1.3** — Update `src/app/models/index.ts`
   - Export `LoteStock`, `ConsumoRecord`, `VentaLote`
   - ~3 lines
 
-- [ ] **Task 1.4** — Migration v8 in `src/app/services/sqlite.service.ts`
+- [x] **Task 1.4** — Migration v8 in `src/app/services/sqlite.service.ts`
   - Wire into `initialize()` after v7: `if (currentVersion < 8)`
   - Add `_migrationV8()` with:
-    - `CREATE TABLE lotes_stock` with columns + CHECK(cantidad >= 0)
+    - `CREATE TABLE lotes_stock` with columns
     - `CREATE TABLE venta_lotes` with FK references
-    - Indexes: `idx_lotes_producto`, `idx_venta_lotes_venta`, `idx_venta_lotes_producto`
+    - Indexes: `idx_lotes_stock_producto_fecha`, `idx_venta_lotes_venta`
     - Backfill INSERT: one lot per existing product with `stock_actual > 0`
     - `INSERT INTO schema_version (version) VALUES (8)`
   - ~35 lines
@@ -37,27 +37,29 @@
 
 *Depends on Phase 1 (lotes_stock table, ConsumoRecord interface).*
 
-- [ ] **Task 2.1** — Add `_consumirFIFO()` private method
+- [x] **Task 2.1** — Add `_consumirFIFO()` private method
   - `SELECT * FROM lotes_stock WHERE producto_id = ? AND cantidad > 0 ORDER BY fecha_ingreso ASC, id ASC`
   - Iterate lots, consume `Math.min(restante, lote.cantidad)`, UPDATE each lot
   - Throw `'Stock insuficiente'` if `restante > 0` after all lots consumed
   - Recalculate `productos.stock_actual = SUM(lotes_stock.cantidad)` from lot source of truth
   - Return `ConsumoRecord[]`
-  - ~45 lines
+  - Safety net: auto-create default lote if no lots exist but stock_actual > 0
+  - ~65 lines
 
-- [ ] **Task 2.2** — Modify `registrarEntrada` signature and body
+- [x] **Task 2.2** — Modify `registrarEntrada` signature and body
   - **Signature change**: add `precioCosto: number` as 3rd param (before `motivo`)
   - INSERT into `lotes_stock` (new lot) + UPDATE `productos.stock_actual += cantidad` + INSERT `stock_movimientos`
   - ~20 lines changed
 
-- [ ] **Task 2.3** — Modify `registrarSalida` signature and body
+- [x] **Task 2.3** — Modify `registrarSalida` signature and body
   - **Return type change**: from `Promise<void>` to `Promise<ConsumoRecord[]>`
   - Remove manual `SELECT stock_actual` validation (FIFO throws on insufficient)
   - Remove direct `UPDATE productos SET stock_actual -= cantidad`
   - Call `_consumirFIFO()` instead
+  - Derive stock_actual from SUM(lotes_stock.cantidad)
   - ~25 lines changed
 
-- [ ] **Task 2.4** — Modify `registrarAjuste` body
+- [x] **Task 2.4** — Modify `registrarAjuste` body
   - SELECT all current lots for the product
   - Calculate weighted average `precio_costo`
   - DELETE all existing lots
@@ -69,9 +71,9 @@
 
 *Depends on Phase 2 (registrarSalida returns ConsumoRecord[]).*
 
-- [ ] **Task 3.1** — Update `VentaService._ejecutar()`
-  - **Remove** the batch `UPDATE productos SET stock_actual = CASE ... END` (lines 174-194 in current file) — this eliminates the double-decrement bug
-  - **Add** capture of `ConsumoRecord[]` from `registrarSalida` calls
+- [x] **Task 3.1** — Update `VentaService._ejecutar()`
+  - **Removed** the batch `UPDATE productos SET stock_actual = CASE ... END` — eliminates the double-decrement bug
+  - **Added** capture of `ConsumoRecord[]` from `registrarSalida` calls
   - For each `ConsumoRecord`, INSERT into `venta_lotes` (inside the same transaction)
   - Keep stock validation before transaction
   - ~35 lines changed
@@ -80,23 +82,23 @@
 
 *Depends on Phase 2 (registrarEntrada with precioCosto param).*
 
-- [ ] **Task 4.1** — Inject `StockMovimientoService` into `ProductoService`
+- [x] **Task 4.1** — Inject `StockMovimientoService` into `ProductoService`
   - In `crear()`, after the product INSERT, if `data.stock_actual > 0`:
   - Call `this._stockMovimiento.registrarEntrada(producto.id, data.stock_actual, data.precio_costo)`
   - No circular dependency (StockMovimientoService does not depend on ProductoService)
-  - ~15 lines
+  - ~15 lines + 2 new tests
 
 ## Phase 5: JornadaService — Total Cost from VentaLotes
 
 *Depends on Phase 3 (venta_lotes populated by sales).*
 
-- [ ] **Task 5.1** — Update `_recolectarDatosJornada()` totalCosto query
+- [x] **Task 5.1** — Update `_recolectarDatosJornada()` totalCosto query
   - Replace the current `SELECT SUM(dv.cantidad * COALESCE(p.precio_costo, 0))` with a COALESCE query:
     - Try `SUM(vl.cantidad * vl.precio_costo_real) FROM venta_lotes` first
     - Fallback to old method for pre-migration sales
   - ~15 lines changed
 
-- [ ] **Task 5.2** — Update `_ejecutarCierre()` totalCosto query (same change)
+- [x] **Task 5.2** — Update `_ejecutarCierre()` totalCosto query (same change)
   - Same change as Task 5.1, identical query pattern in the close-rollup path
   - ~15 lines changed
 
@@ -104,22 +106,24 @@
 
 *Depends on Phase 1 (lot display), Phase 2 (registrarEntrada needs precioCosto).*
 
-- [ ] **Task 6.1** — Add `movimientoCosto` signal and entry form field
+- [x] **Task 6.1** — Add `movimientoCosto` signal and entry form field
   - Add `movimientoCosto = signal<number>(0)` to TypeScript
   - In `onSubmitMovimiento()`, pass `this.movimientoCosto()` to `registrarEntrada` for `'entrada'` type
   - In HTML, add cost input field visible only when `tipo === 'entrada'`
   - ~20 lines TS + ~15 lines HTML
 
-- [ ] **Task 6.2** — Add lot details display (expandable per product)
-  - Add `lotesPorProducto` signal/derived state for fetching lot data
-  - In HTML expandable row (below history), show sub-table with columns: Cantidad, Costo unit., Fecha ingreso
-  - ~10 lines TS + ~25 lines HTML
+- [x] **Task 6.2** — Add lot details display (expandable per product)
+  - Add `obtenerLotesPorProducto()` method to StockMovimientoService
+  - Add `showLotesId`, `lotes`, `lotesLoading` signals to InventarioPage
+  - Add `toggleLotes()` method
+  - In HTML: "Lotes" button per product + expandable sub-table with columns: Fecha Ingreso, Cantidad, Costo Unit., Valor Total
+  - ~30 lines TS + ~45 lines HTML
 
 ## Phase 7: CuentaCosasService
 
 *Depends on Phase 2 (auto-benefits from FIFO).*
 
-- [ ] **Task 7.1** — No code changes needed
+- [x] **Task 7.1** — No code changes needed
   - Already calls `registrarSalida(productoId, cantidad)` — the FIFO consumption happens inside
   - Return value (`ConsumoRecord[]`) is ignored — TS allows this
   - Verify test file expectations match new `registrarSalida` signature (mock return type)
@@ -169,36 +173,36 @@ Phase 7 (CuentaCosasService)
 ## Testing Backlog
 
 ### StockMovimientoService (existing spec + new tests)
-- [ ] **T1** — Update existing `registrarEntrada` tests: add `precioCosto` param to all calls, verify INSERT into `lotes_stock`
-- [ ] **T2** — `_consumirFIFO`: single lot covers full quantity
-- [ ] **T3** — `_consumirFIFO`: spans multiple lots (oldest consumed first)
-- [ ] **T4** — `_consumirFIFO`: insufficient stock throws `'Stock insuficiente'` (remove old SELECT-based test)
-- [ ] **T5** — `_consumirFIFO`: recalculates `stock_actual` from lots after consumption
-- [ ] **T6** — Update `registrarSalida` tests: expects `ConsumoRecord[]` return, verify lot UPDATE calls, remove stock_actual UPDATE assertion
-- [ ] **T7** — Update `registrarAjuste` tests: verify lot DELETE + weighted avg INSERT, verify new stock_actual SET
+- [x] **T1** — Update existing `registrarEntrada` tests: add `precioCosto` param to all calls, verify INSERT into `lotes_stock`
+- [x] **T2** — `_consumirFIFO`: single lot covers full quantity
+- [x] **T3** — `_consumirFIFO`: spans multiple lots (oldest consumed first)
+- [x] **T4** — `_consumirFIFO`: insufficient stock throws `'Stock insuficiente'` (remove old SELECT-based test)
+- [x] **T5** — `_consumirFIFO`: recalculates `stock_actual` from lots after consumption
+- [x] **T6** — Update `registrarSalida` tests: expects `ConsumoRecord[]` return, verify lot UPDATE calls, remove stock_actual UPDATE assertion
+- [x] **T7** — Update `registrarAjuste` tests: verify lot DELETE + weighted avg INSERT, verify new stock_actual SET
 
 ### VentaService (existing spec)
-- [ ] **T8** — Update existing `registrar` tests: remove batch stock_UPDATE mocks, add `venta_lotes` INSERT expectations
-- [ ] **T9** — New test: verify `venta_lotes` records match `ConsumoRecord[]` returned from `registrarSalida`
+- [x] **T8** — Update existing `registrar` tests: remove batch stock_UPDATE mocks, add `venta_lotes` INSERT expectations
+- [x] **T9** — New test: verify `venta_lotes` records match `ConsumoRecord[]` returned from `registrarSalida`
 
 ### JornadaService (existing spec)
-- [ ] **T10** — Update `totalCosto` expectations: mock `venta_lotes` return
-- [ ] **T11** — New test: fallback query runs when `venta_lotes` is empty (pre-migration sales)
+- [x] **T10** — Update `totalCosto` expectations: mock `venta_lotes` return
+- [x] **T11** — New test: fallback query runs when `venta_lotes` is empty (pre-migration sales)
 
 ### ProductoService (existing spec)
-- [ ] **T12** — New test: `crear()` with `stock_actual > 0` calls `registrarEntrada`
-- [ ] **T13** — New test: `crear()` with `stock_actual === 0` does NOT call `registrarEntrada`
+- [x] **T12** — New test: `crear()` with `stock_actual > 0` calls `registrarEntrada`
+- [x] **T13** — New test: `crear()` with `stock_actual === 0` does NOT call `registrarEntrada`
 
 ### InventarioPage (existing spec)
-- [ ] **T14** — Update test 7: `registrarEntrada` now expects 4 args (with `precioCosto`), wire `movimientoCosto` signal
-- [ ] **T15** — New test: entry form shows costo input field
-- [ ] **T16** — New test: lot details section renders correctly
+- [x] **T14** — Update test 7: `registrarEntrada` now expects 4 args (with `precioCosto`), wire `movimientoCosto` signal
+- [x] **T15** — New test: entry form shows costo input field
+- [x] **T16** — New test: lot details section renders correctly
 
 ### SQLiteService (existing spec)
-- [ ] **T17** — New test: migration v8 creates tables and backfills lots
+- [x] **T17** — New test: migration v8 creates tables and backfills lots
 
 ### CuentaCosasService (existing spec)
-- [ ] **T18** — Verify mock return type matches new `registrarSalida` signature
+- [x] **T18** — Verify mock return type matches new `registrarSalida` signature
 
 ## PR Strategy
 

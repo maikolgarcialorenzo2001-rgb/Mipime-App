@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { ProductoService } from './producto.service';
+import { StockMovimientoService } from './stock-movimiento.service';
 import { DATABASE, type Database } from './database';
 import type { Producto } from '../models';
 
@@ -46,14 +47,17 @@ function createMockDb(): Database {
 
 describe('ProductoService', () => {
   let mockDb: Database;
+  let mockStockMovimiento: { registrarEntrada: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockDb = createMockDb();
+    mockStockMovimiento = { registrarEntrada: vi.fn().mockResolvedValue(undefined) };
 
     TestBed.configureTestingModule({
       providers: [
         ProductoService,
         { provide: DATABASE, useValue: mockDb },
+        { provide: StockMovimientoService, useValue: mockStockMovimiento },
       ],
     });
   });
@@ -161,6 +165,61 @@ describe('ProductoService', () => {
           20,
         ]),
       );
+    });
+
+    it('debería crear un lote FIFO cuando stock_actual > 0', async () => {
+      const nuevoProducto: Producto = {
+        id: 5,
+        nombre: 'Con Stock',
+        descripcion: null,
+        precio_venta: 500,
+        precio_costo: 300,
+        stock_actual: 10,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.crear({
+          nombre: 'Con Stock',
+          precio_costo: 300,
+          precio_venta: 500,
+          stock_actual: 10,
+        }),
+      );
+
+      expect(resultado.id).toBe(5);
+      expect(mockStockMovimiento.registrarEntrada).toHaveBeenCalledWith(5, 10, 300);
+    });
+
+    it('no debería crear lote cuando stock_actual es 0', async () => {
+      const nuevoProducto: Producto = {
+        id: 6,
+        nombre: 'Sin Stock',
+        descripcion: null,
+        precio_venta: 500,
+        precio_costo: 300,
+        stock_actual: 0,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      await firstValueFrom(
+        service.crear({
+          nombre: 'Sin Stock',
+          precio_costo: 300,
+          precio_venta: 500,
+          stock_actual: 0,
+        }),
+      );
+
+      expect(mockStockMovimiento.registrarEntrada).not.toHaveBeenCalled();
     });
   });
 

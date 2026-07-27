@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { from, map, Observable } from 'rxjs';
+import { from, map, Observable, switchMap, of } from 'rxjs';
 import { DATABASE } from './database';
+import { StockMovimientoService } from './stock-movimiento.service';
 import type { Producto } from '../models';
 
 @Injectable({
@@ -8,6 +9,7 @@ import type { Producto } from '../models';
 })
 export class ProductoService {
   private readonly _db = inject(DATABASE);
+  private readonly _stockMovimiento = inject(StockMovimientoService);
 
   /** Lista todos los productos ordenados por nombre. */
   listar(): Observable<Producto[]> {
@@ -38,7 +40,7 @@ export class ProductoService {
     ).pipe(map((rows) => rows[0] ?? null));
   }
 
-  /** Crea un nuevo producto y lo retorna. */
+  /** Crea un nuevo producto y lo retorna. Si tiene stock inicial, crea un lote FIFO. */
   crear(data: {
     nombre: string;
     precio_costo: number;
@@ -52,7 +54,21 @@ export class ProductoService {
          VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         [data.nombre, null, data.precio_costo, data.precio_venta, data.stock_actual, ahora, ahora],
       ),
-    ).pipe(map((rows) => rows[0]));
+    ).pipe(
+      map((rows) => rows[0]),
+      switchMap((producto) => {
+        if (data.stock_actual > 0) {
+          return from(
+            this._stockMovimiento.registrarEntrada(
+              producto.id,
+              data.stock_actual,
+              data.precio_costo,
+            ),
+          ).pipe(map(() => producto));
+        }
+        return of(producto);
+      }),
+    );
   }
 
   /** Actualiza un producto existente y lo retorna. */
