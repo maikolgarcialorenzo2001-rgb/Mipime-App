@@ -306,7 +306,7 @@ describe('JornadaPage', () => {
 
       component.registrarMovimiento();
 
-      expect(registrarSpy).toHaveBeenCalledWith(1, 'gasto', 'Luz', 500);
+      expect(registrarSpy).toHaveBeenCalledWith(1, 'gasto', 'Luz', 500, undefined);
     });
 
     it('4.1 RED: debería limpiar form y refrescar jornada tras registro exitoso', () => {
@@ -368,7 +368,7 @@ describe('JornadaPage', () => {
 
       component.registrarMovimiento();
 
-      expect(registrarSpy).toHaveBeenCalledWith(1, 'ingreso_extra', 'Venta de envases', 300);
+      expect(registrarSpy).toHaveBeenCalledWith(1, 'ingreso_extra', 'Venta de envases', 300, undefined);
     });
   });
 

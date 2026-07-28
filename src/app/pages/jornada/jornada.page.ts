@@ -33,9 +33,13 @@ export class JornadaPage {
   readonly detallesPorVenta = signal<Map<number, DetalleVenta[]>>(new Map());
 
   /** Movimiento form */
-  readonly tipo = signal<'gasto' | 'ingreso_extra'>('gasto');
+  readonly tipo = signal<'gasto' | 'ingreso_extra' | 'compra_divisa'>('gasto');
   readonly descripcion = signal('');
   readonly monto = signal(0);
+  readonly divisaTipo = signal<'USD' | 'EUR'>('USD');
+  readonly montoDivisa = signal(0);
+  readonly tasaCambio = signal(0);
+  readonly totalCup = computed(() => this.montoDivisa() * this.tasaCambio());
   readonly registrando = signal(false);
   readonly formError = signal<string | null>(null);
 
@@ -165,15 +169,31 @@ export class JornadaPage {
   }
 
   registrarMovimiento(): void {
-    const desc = this.descripcion().trim();
-    const monto = this.monto();
+    const tipo = this.tipo();
+    const desc = tipo === 'compra_divisa'
+      ? `Compra ${this.divisaTipo()} ${this.montoDivisa()} @ ${this.tasaCambio()}`
+      : this.descripcion().trim();
 
-    if (!desc) {
+    if (tipo !== 'compra_divisa' && !desc) {
       this.formError.set('La descripción es requerida');
       return;
     }
 
-    if (monto <= 0) {
+    let monto = this.monto();
+    let divisa: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number } | undefined;
+
+    if (tipo === 'compra_divisa') {
+      if (this.montoDivisa() <= 0) {
+        this.formError.set('El monto en divisa debe ser mayor a 0');
+        return;
+      }
+      if (this.tasaCambio() <= 0) {
+        this.formError.set('La tasa de cambio debe ser mayor a 0');
+        return;
+      }
+      monto = this.totalCup();
+      divisa = { divisaTipo: this.divisaTipo(), montoDivisa: this.montoDivisa(), tasaCambio: this.tasaCambio() };
+    } else if (monto <= 0) {
       this.formError.set('El monto debe ser mayor a 0');
       return;
     }
@@ -184,17 +204,20 @@ export class JornadaPage {
     this.formError.set(null);
     this.registrando.set(true);
 
-    this.jornadaService.registrarMovimiento(j.id, this.tipo(), desc, monto).subscribe({
+    this.jornadaService.registrarMovimiento(j.id, tipo, desc, monto, divisa).subscribe({
       next: () => {
         this.registrando.set(false);
         this.descripcion.set('');
         this.monto.set(0);
+        this.divisaTipo.set('USD');
+        this.montoDivisa.set(0);
+        this.tasaCambio.set(0);
         this.tipo.set('gasto');
         this.jornadaService.refreshJornadaAbierta();
       },
       error: (err: unknown) => {
         this.registrando.set(false);
-        this.formError.set(err instanceof Error ? err.message : 'Error al registrar movimiento');
+        this.formError.set(err instanceof Error ? err.message : 'Error al registro');
       },
     });
   }

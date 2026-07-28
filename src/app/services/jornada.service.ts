@@ -34,32 +34,50 @@ export class JornadaService {
    */
   registrarMovimiento(
     jornadaId: number,
-    tipo: 'gasto' | 'ingreso_extra',
+    tipo: 'gasto' | 'ingreso_extra' | 'compra_divisa',
     descripcion: string,
     monto: number,
+    divisa?: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number },
   ): Observable<Movimiento> {
-    return from(this._registrarMovimientoAsync(jornadaId, tipo, descripcion, monto));
+    return from(this._registrarMovimientoAsync(jornadaId, tipo, descripcion, monto, divisa));
   }
 
   private async _registrarMovimientoAsync(
     jornadaId: number,
-    tipo: 'gasto' | 'ingreso_extra',
+    tipo: 'gasto' | 'ingreso_extra' | 'compra_divisa',
     descripcion: string,
     monto: number,
+    divisa?: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number },
   ): Promise<Movimiento> {
-    if (!['gasto', 'ingreso_extra'].includes(tipo)) throw new Error('Tipo inválido');
+    if (!['gasto', 'ingreso_extra', 'compra_divisa'].includes(tipo)) throw new Error('Tipo inválido');
     if (!descripcion || descripcion.trim().length === 0) throw new Error('Descripción requerida');
     if (!monto || monto <= 0) throw new Error('Monto debe ser mayor a 0');
 
+    if (tipo === 'compra_divisa') {
+      if (!divisa || divisa.montoDivisa <= 0 || divisa.tasaCambio <= 0) {
+        throw new Error('Datos de divisa inválidos');
+      }
+    }
+
     const ahora = new Date().toISOString();
 
-    const movs = await this._db.sql<Movimiento>(
-      `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
-       VALUES (?, ?, ?, ?, ?) RETURNING *`,
-      [jornadaId, tipo, descripcion, monto, ahora],
-    );
+    let movs: Movimiento[];
+    if (tipo === 'compra_divisa' && divisa) {
+      movs = await this._db.sql<Movimiento>(
+        `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, divisa_tipo, monto_divisa, tasa_cambio, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        [jornadaId, tipo, descripcion, monto, divisa.divisaTipo, divisa.montoDivisa, divisa.tasaCambio, ahora],
+      );
+    } else {
+      movs = await this._db.sql<Movimiento>(
+        `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
+         VALUES (?, ?, ?, ?, ?) RETURNING *`,
+        [jornadaId, tipo, descripcion, monto, ahora],
+      );
+    }
 
-    const ajuste = tipo === 'gasto' ? -monto : monto;
+    // compra_divisa reduces cash like a gasto
+    const ajuste = (tipo === 'gasto' || tipo === 'compra_divisa') ? -monto : monto;
     await this._db.sql(
       `UPDATE jornadas
        SET total_movimientos = total_movimientos + ?,

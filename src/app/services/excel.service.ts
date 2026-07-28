@@ -155,6 +155,21 @@ export class ExcelService {
         filas.push([tipo, datos.monto, datos.tasa, datos.monto * datos.tasa]);
       }
       filas.push(['Total divisas en pesos cubanos', totalDivisas]);
+
+      // Breakdown: sales vs compra_divisa
+      filas.push([]);
+      filas.push(['Origen de divisas']);
+      for (const [tipo] of divisaPorTipo) {
+        const deVentas = ventas
+          .filter(v => (v as any).divisa_tipo === tipo)
+          .reduce((s, v) => s + ((v as any).monto_divisa ?? 0), 0);
+        const deCompra = data.movimientos
+          .filter(m => m.tipo === 'compra_divisa' && m.divisa_tipo === tipo)
+          .reduce((s, m) => s + (m.monto_divisa ?? 0), 0);
+        filas.push([`${tipo} de ventas`, deVentas]);
+        filas.push([`${tipo} de compra`, deCompra]);
+        filas.push([`Total ${tipo}`, deVentas + deCompra]);
+      }
     }
 
     // Tabla Cuenta Casas
@@ -560,16 +575,28 @@ export class ExcelService {
   }
 
   private _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): void {
-    const filas: unknown[][] = [
-      ['Tipo', 'Descripción', 'Monto'],
-    ];
+    const tieneCompraDivisa = data.movimientos.some(m => m.tipo === 'compra_divisa');
+    const filas: unknown[][] = tieneCompraDivisa
+      ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total CUP']]
+      : [['Tipo', 'Descripción', 'Monto']];
 
     for (const mov of data.movimientos) {
-      filas.push([
-        mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra',
-        mov.descripcion,
-        mov.monto,
-      ]);
+      if (mov.tipo === 'compra_divisa') {
+        filas.push([
+          'Compra divisa',
+          mov.descripcion,
+          mov.divisa_tipo ?? '—',
+          mov.monto_divisa ?? '—',
+          mov.tasa_cambio ?? '—',
+          mov.monto,
+        ]);
+      } else {
+        filas.push([
+          mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra',
+          mov.descripcion,
+          mov.monto,
+        ]);
+      }
     }
 
     // Stock operations summary (if stockMovimientos exist)
@@ -593,11 +620,9 @@ export class ExcelService {
     }
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = [
-      { wch: 28 },
-      { wch: 14 },
-      { wch: 14 },
-    ];
+    ws['!cols'] = tieneCompraDivisa
+      ? [{ wch: 22 }, { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 16 }]
+      : [{ wch: 22 }, { wch: 30 }, { wch: 16 }];
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
