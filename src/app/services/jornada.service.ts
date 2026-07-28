@@ -264,13 +264,13 @@ export class JornadaService {
       }
     }
 
-    // 5. Obtener productos para el mapa de nombres + precio_costo
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
-      'SELECT id, nombre, precio_costo FROM productos',
+    // 5. Obtener productos para el mapa de nombres + precio_costo + stock
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop });
     }
 
     // 5. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
@@ -478,13 +478,13 @@ export class JornadaService {
       );
     }
 
-    // 3. Obtener productos para el mapa de nombres + precio_costo
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
-      'SELECT id, nombre, precio_costo FROM productos',
+    // 3. Obtener productos para el mapa de nombres + precio_costo + stock
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop });
     }
 
     // 4. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)

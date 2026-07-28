@@ -1137,10 +1137,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
   // ─── Step 4: IPVE sheet (inversión por producto) ───
 
   describe('IPVE sheet', () => {
-    const ipveProductosMap = new Map<number, { nombre: string; precio_costo: number | null }>([
-      [1, { nombre: 'Harina 0000 1kg', precio_costo: 550 }],
-      [2, { nombre: 'Azúcar 1kg', precio_costo: 600 }],
-      [3, { nombre: 'Leche Entera 1L', precio_costo: 750 }],
+    const ipveProductosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>([
+      [1, { nombre: 'Harina 0000 1kg', precio_costo: 550, stock_almacen: 80, stock_shop: 20 }],
+      [2, { nombre: 'Azúcar 1kg', precio_costo: 600, stock_almacen: 25, stock_shop: 5 }],
+      [3, { nombre: 'Leche Entera 1L', precio_costo: 750, stock_almacen: 50, stock_shop: 10 }],
     ]);
     const ipveInversion = new Map<number, number>([
       [1, 55000],
@@ -1174,21 +1174,25 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(header[3]).toBe('Total Invertido');
     });
 
-    it('4.1 RED: hoja ipve debe mostrar cada producto con su inversión', () => {
+    it('4.1 RED: hoja ipve debe mostrar cada producto con stock e inversión', () => {
       const result = service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      // Harina 0000 1kg tiene inversión 55000
+      // Harina 0000 1kg: stock_almacen=80, stock_shop=20, inversión 55000
       const harinaRow = filas.find((r) => r[0] === 'Harina 0000 1kg');
       expect(harinaRow).toBeTruthy();
+      expect(harinaRow![1]).toBe(80);
+      expect(harinaRow![2]).toBe(20);
       expect(harinaRow![3]).toBe(55000);
 
-      // Azúcar 1kg tiene inversión 18000
+      // Azúcar 1kg: stock_almacen=25, stock_shop=5, inversión 18000
       const azucarRow = filas.find((r) => r[0] === 'Azúcar 1kg');
       expect(azucarRow).toBeTruthy();
+      expect(azucarRow![1]).toBe(25);
+      expect(azucarRow![2]).toBe(5);
       expect(azucarRow![3]).toBe(18000);
     });
 
