@@ -1236,6 +1236,98 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
   });
 
+  // ─── Step 5: Movimientos stock operations summary ───
+
+  describe('Movimientos summary', () => {
+    const stockConResumen: StockMovimiento[] = [
+      { id: 1, producto_id: 1, cantidad: 100, tipo: 'entrada', motivo: 'Compra', costo_total: 0, created_at: '' },
+      { id: 2, producto_id: 2, cantidad: 50, tipo: 'entrada', motivo: 'Compra 2', costo_total: 0, created_at: '' },
+      { id: 3, producto_id: 1, cantidad: 10, tipo: 'salida', motivo: 'Venta', costo_total: 0, created_at: '' },
+      { id: 4, producto_id: 2, cantidad: 5, tipo: 'merma', motivo: 'Vencido', costo_total: 0, created_at: '' },
+      { id: 5, producto_id: 3, cantidad: 3, tipo: 'ajuste', motivo: 'Inventario', costo_total: 0, created_at: '' },
+    ];
+
+    const dataConResumen = (): JornadaReportData => ({
+      ...data,
+      stockMovimientos: stockConResumen,
+    });
+
+    it('5.1 RED: Movimientos sheet debe incluir resumen de operaciones stock después de movimientos', () => {
+      const result = service.generarExcelJornada(dataConResumen());
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // Después de header + 2 movimientos + blank row → debe aparecer "Resumen Operaciones Stock"
+      const resumenRow = (json as unknown[][]).find((r) => r[0] === 'Resumen Operaciones Stock');
+      expect(resumenRow).toBeTruthy();
+    });
+
+    it('5.1 RED: resumen debe agrupar por tipo con cantidades correctas', () => {
+      const result = service.generarExcelJornada(dataConResumen());
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      // entrada: 2, salida: 1, merma: 1, ajuste: 1
+      const entradaRow = filas.find((r) => r[0] === 'entrada');
+      expect(entradaRow).toBeTruthy();
+      expect(entradaRow![1]).toBe(2);
+
+      const salidaRow = filas.find((r) => r[0] === 'salida');
+      expect(salidaRow).toBeTruthy();
+      expect(salidaRow![1]).toBe(1);
+
+      const mermaRow = filas.find((r) => r[0] === 'merma');
+      expect(mermaRow).toBeTruthy();
+      expect(mermaRow![1]).toBe(1);
+
+      const ajusteRow = filas.find((r) => r[0] === 'ajuste');
+      expect(ajusteRow).toBeTruthy();
+      expect(ajusteRow![1]).toBe(1);
+    });
+
+    it('5.1 RED: resumen debe tener fila de totales con suma correcta', () => {
+      const result = service.generarExcelJornada(dataConResumen());
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      const totalRow = filas.find((r) => r[0] === 'Total');
+      expect(totalRow).toBeTruthy();
+      expect(totalRow![1]).toBe(5); // 2+1+1+1
+    });
+
+    it('5.1 RED: si no hay stockMovimientos, no debe mostrar resumen', () => {
+      const dataSinStock: JornadaReportData = { ...data, stockMovimientos: undefined };
+      const result = service.generarExcelJornada(dataSinStock);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // Solo debe tener header + 2 movimientos (sin resumen)
+      expect(json.length).toBe(3);
+      expect((json as unknown[][]).some((r) => r[0] === 'Resumen Operaciones Stock')).toBe(false);
+    });
+
+    it('5.1 RED: summary debe aparecer aunque no haya movimientos tradicionales', () => {
+      const dataSoloStock: JornadaReportData = {
+        ...data,
+        movimientos: [],
+        stockMovimientos: stockConResumen,
+      };
+      const result = service.generarExcelJornada(dataSoloStock);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // header + blank row + resumen header + 4 tipo rows + total row = 7
+      expect((json as unknown[][]).some((r) => r[0] === 'Resumen Operaciones Stock')).toBe(true);
+    });
+  });
+
   // ─── fix-cierre-jornada-calculos: Task 1.6 — Resumen del Mes ───
 
   describe('fix-cierre-jornada-calculos — Resumen del Mes', () => {

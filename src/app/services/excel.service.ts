@@ -544,10 +544,30 @@ export class ExcelService {
       ]);
     }
 
+    // Stock operations summary (if stockMovimientos exist)
+    const stock = data.stockMovimientos;
+    if (stock && stock.length > 0) {
+      filas.push([]);
+      filas.push(['Resumen Operaciones Stock', 'Cantidad']);
+
+      const conteo: Record<string, number> = {};
+      for (const mov of stock) {
+        const tipo = mov.tipo;
+        conteo[tipo] = (conteo[tipo] ?? 0) + 1;
+      }
+
+      let total = 0;
+      for (const [tipo, cantidad] of Object.entries(conteo)) {
+        filas.push([tipo, cantidad]);
+        total += cantidad;
+      }
+      filas.push(['Total', total]);
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(filas);
     ws['!cols'] = [
-      { wch: 16 },
-      { wch: 40 },
+      { wch: 28 },
+      { wch: 14 },
       { wch: 14 },
     ];
     ws['!protect'] = {};
