@@ -187,11 +187,12 @@ export class ExcelService {
     const tieneDivisas = data.ventas.some((v) => v.forma_pago === 'divisas');
     const tienePendientes = data.ventas.some((v) => v.forma_pago === 'pendiente');
 
-    const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Total', 'Forma de pago'];
+    const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Precio venta', 'Total', 'Forma de pago'];
     const headerExtra: string[] = [];
     if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos');
     if (tienePendientes) headerExtra.push('Comprador');
 
+    const footerLen = headerBase.length + headerExtra.length;
     const filas: unknown[][] = [[...headerBase, ...headerExtra]];
 
     const pmap = data.productosMap;
@@ -201,13 +202,17 @@ export class ExcelService {
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
+      const detalleRows: unknown[][] = [];
+
       for (const detalle of venta.detalles) {
         const info = pmap?.get(detalle.producto_id);
         const nombreProducto = info?.nombre ?? detalle.producto_id;
+        const precioVenta = info?.precio_venta ?? '—';
         const fila: unknown[] = [
           nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
+          precioVenta,
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
         ];
@@ -229,21 +234,28 @@ export class ExcelService {
             fila.push('');
           }
         }
-        filas.push(fila);
+        detalleRows.push(fila);
 
         // Desglose de lotes para este detalle
         const lotesDelDetalle = vlotes.filter(
           (vl) => vl.venta_id === venta.id && vl.producto_id === detalle.producto_id,
         );
         if (lotesDelDetalle.length > 1) {
+          let sumLotSubtotals = 0;
           for (const vl of lotesDelDetalle) {
-            const loteFila: unknown[] = Array(headerBase.length + headerExtra.length).fill('');
+            const loteFila: unknown[] = Array(footerLen).fill('');
             loteFila[0] = `  └ Lote #${vl.lote_id}`;
             loteFila[1] = vl.cantidad;
             loteFila[2] = detalle.precio_unitario;
-            loteFila[3] = vl.cantidad * detalle.precio_unitario;
-            filas.push(loteFila);
+            loteFila[4] = vl.cantidad * detalle.precio_unitario;
+            detalleRows.push(loteFila);
+            sumLotSubtotals += vl.cantidad * detalle.precio_unitario;
           }
+          // Subtotal row after multi-lot group
+          const subLotRow: unknown[] = Array(footerLen).fill('');
+          subLotRow[0] = `  Subtotal ${nombreProducto}`;
+          subLotRow[4] = sumLotSubtotals;
+          detalleRows.push(subLotRow);
         }
 
         if (venta.forma_pago === 'pendiente') {
@@ -256,27 +268,39 @@ export class ExcelService {
           totalCaja += detalle.subtotal;
         }
       }
+
+      // Push all detail rows (and lote/sublot rows) for this venta
+      for (const row of detalleRows) {
+        filas.push(row);
+      }
+
+      // Multi-item sale subtotal
+      if (venta.detalles.length >= 2) {
+        const ventaSubRow: unknown[] = Array(footerLen).fill('');
+        ventaSubRow[0] = `Total venta #${venta.id}`;
+        ventaSubRow[4] = venta.total;
+        filas.push(ventaSubRow);
+      }
     }
 
     const totalDivisas = data.ventas
       .filter((v) => v.forma_pago === 'divisas')
       .reduce((sum, v) => sum + v.total, 0);
-    const footerLen = headerBase.length + headerExtra.length;
     const cajaFooter = Array(footerLen).fill('');
     cajaFooter[0] = 'Total de ingresos en ventas';
-    cajaFooter[3] = totalCaja;
+    cajaFooter[4] = totalCaja;
     const divisasFooter = Array(footerLen).fill('');
     divisasFooter[0] = 'Total divisas';
-    divisasFooter[3] = totalDivisas;
+    divisasFooter[4] = totalDivisas;
     const pendientesFooter = Array(footerLen).fill('');
     pendientesFooter[0] = 'Total pendientes';
-    pendientesFooter[3] = totalPendientes;
+    pendientesFooter[4] = totalPendientes;
     const transferenciaFooter = Array(footerLen).fill('');
     transferenciaFooter[0] = 'Total transferencia';
-    transferenciaFooter[3] = totalTransferencia;
+    transferenciaFooter[4] = totalTransferencia;
     const esperadoFooter = Array(footerLen).fill('');
     esperadoFooter[0] = 'Total esperado';
-    esperadoFooter[3] = totalCaja + totalDivisas + totalPendientes + totalTransferencia;
+    esperadoFooter[4] = totalCaja + totalDivisas + totalPendientes + totalTransferencia;
     filas.push([], cajaFooter, divisasFooter, pendientesFooter, transferenciaFooter, esperadoFooter);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -284,6 +308,7 @@ export class ExcelService {
       { wch: 20 },
       { wch: 10 },
       { wch: 16 },
+      { wch: 12 },
       { wch: 14 },
       { wch: 16 },
       ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }] : []),
