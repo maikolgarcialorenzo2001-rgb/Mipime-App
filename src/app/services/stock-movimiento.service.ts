@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { DATABASE } from './database';
 import { AuthService } from './auth.service';
-import type { StockMovimiento, LoteStock, ConsumoRecord } from '../models';
+import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -167,7 +167,6 @@ export class StockMovimientoService {
     jornadaId?: number,
     ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<ConsumoRecord[]> {
-    this._checkAdmin();
     const ahora = new Date().toISOString();
 
     // 1. Consume from oldest lots (FIFO) at the given location
@@ -527,6 +526,27 @@ export class StockMovimientoService {
       `SELECT * FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
        ORDER BY fecha_ingreso ASC, id ASC`,
+      [productoId],
+    );
+  }
+
+  async obtenerLotesAgrupados(
+    productoId: number,
+  ): Promise<LoteDetalle[]> {
+    return this._db.sql<LoteDetalle>(
+      `SELECT
+         MIN(id) as id,
+         producto_id,
+         SUM(cantidad) as cantidad,
+         precio_costo,
+         MIN(fecha_ingreso) as fecha_ingreso,
+         COALESCE(SUM(CASE WHEN ubicacion = 'almacen' THEN cantidad ELSE 0 END), 0) as stock_almacen,
+         COALESCE(SUM(CASE WHEN ubicacion = 'shop' THEN cantidad ELSE 0 END), 0) as stock_shop,
+         MIN(created_at) as created_at
+       FROM lotes_stock
+       WHERE producto_id = ? AND cantidad > 0
+       GROUP BY producto_id, precio_costo
+       ORDER BY MIN(fecha_ingreso) ASC`,
       [productoId],
     );
   }
