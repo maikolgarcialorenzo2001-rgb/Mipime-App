@@ -1551,4 +1551,77 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filas.some((f) => f[0] === 'Total venta #1')).toBe(false);
     });
   });
+
+  describe('Compra divisa en Excel', () => {
+    const ventaDivisaUSD = {
+      id: 1, jornada_id: 1, fecha_hora: '2026-07-28T10:00:00Z',
+      total: 12000, usuario_id: 1, forma_pago: 'divisas',
+      divisa_tipo: 'USD', monto_divisa: 20, tasa_cambio: 600,
+      created_at: '',
+      detalles: [{ id: 1, venta_id: 1, producto_id: 1, cantidad: 10, precio_unitario: 1200, subtotal: 12000 }],
+    };
+
+    const movCompraUSD = {
+      id: 1, jornada_id: 1, tipo: 'compra_divisa' as const,
+      descripcion: 'Compra USD 100 @ 120',
+      monto: 12000, divisa_tipo: 'USD' as const, monto_divisa: 100, tasa_cambio: 120,
+      created_at: '',
+    };
+
+    const movCompraEUR = {
+      id: 2, jornada_id: 1, tipo: 'compra_divisa' as const,
+      descripcion: 'Compra EUR 50 @ 130',
+      monto: 6500, divisa_tipo: 'EUR' as const, monto_divisa: 50, tasa_cambio: 130,
+      created_at: '',
+    };
+
+    it('Resumen debe mostrar USD/EUR de ventas y de compra separados', () => {
+      const dataDivisa: JornadaReportData = {
+        ...data,
+        ventas: [ventaDivisaUSD as any],
+        movimientos: [movCompraUSD, movCompraEUR],
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+      const result = service.generarExcelJornada(dataDivisa);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      const filas = json as string[][];
+
+      // Should show USD de ventas: 20 (from ventaDivisaUSD)
+      expect(filas.some(r => r[0] === 'USD de ventas' && r[1] === 20)).toBe(true);
+      // USD de compra: 100
+      expect(filas.some(r => r[0] === 'USD de compra' && r[1] === 100)).toBe(true);
+      // Total USD: 120
+      expect(filas.some(r => r[0] === 'Total USD' && r[1] === 120)).toBe(true);
+      // EUR de compra: 50
+      expect(filas.some(r => r[0] === 'EUR de compra' && r[1] === 50)).toBe(true);
+    });
+
+    it('Movimientos sheet debe mostrar compra_divisa con detalles de divisa', () => {
+      const dataMov: JornadaReportData = {
+        ...data,
+        movimientos: [movCompraUSD, movCompraEUR],
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+      const result = service.generarExcelJornada(dataMov);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Movimientos'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      const filas = json as string[][];
+
+      // Header should have Divisa, Monto en divisa, Tasa de cambio, Total CUP columns
+      const header = filas[0];
+      expect(header).toContain('Divisa');
+      expect(header).toContain('Monto en divisa');
+      expect(header).toContain('Tasa de cambio');
+      expect(header).toContain('Total CUP');
+
+      // Rows should show compra_divisa details
+      expect(filas.some(r => r[0] === 'Compra divisa' && r[1] === 'Compra USD 100 @ 120' && r[2] === 'USD' && r[3] === 100 && r[4] === 120 && r[5] === 12000)).toBe(true);
+      expect(filas.some(r => r[0] === 'Compra divisa' && r[1] === 'Compra EUR 50 @ 130' && r[2] === 'EUR' && r[3] === 50 && r[4] === 130 && r[5] === 6500)).toBe(true);
+    });
+  });
 });

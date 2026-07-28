@@ -370,6 +370,79 @@ describe('JornadaPage', () => {
 
       expect(registrarSpy).toHaveBeenCalledWith(1, 'ingreso_extra', 'Venta de envases', 300, undefined);
     });
+
+    it('compra_divisa: opción existe en el selector', () => {
+      fixture.detectChanges();
+      const select = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+      const options = Array.from(select.options).map(o => o.value);
+      expect(options).toContain('compra_divisa');
+    });
+
+    it('compra_divisa: seleccionar muestra campos de divisa y oculta descripcion/monto', () => {
+      component.tipo.set('compra_divisa');
+      fixture.detectChanges();
+
+      // Should show a second select for divisa type
+      const selects = fixture.nativeElement.querySelectorAll('select');
+      // Find the divisa select (not the tipo select)
+      const divisaSelect = Array.from(selects).find(
+        (s: Element) => (s as HTMLSelectElement).querySelector('option[value="USD"]')
+      );
+      expect(divisaSelect).toBeTruthy();
+
+      // Should show divisa inputs
+      const montoDivisaInput = fixture.nativeElement.querySelector('input[placeholder="Monto en divisa"]');
+      expect(montoDivisaInput).toBeTruthy();
+      const tasaInput = fixture.nativeElement.querySelector('input[placeholder="Tasa de cambio (cup)"]');
+      expect(tasaInput).toBeTruthy();
+
+      // Should hide regular description input
+      const descInput = fixture.nativeElement.querySelector('input[placeholder="Descripción"]');
+      expect(descInput).toBeFalsy();
+    });
+
+    it('compra_divisa: llama registrarMovimiento con datos de divisa calculados', () => {
+      component.tipo.set('compra_divisa');
+      component.montoDivisa.set(100);
+      component.tasaCambio.set(120);
+      component.divisaTipo.set('USD');
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      // monto = 100 * 120 = 12000, descripción auto-generada
+      expect(registrarSpy).toHaveBeenCalledWith(
+        1,
+        'compra_divisa',
+        'Compra USD 100 @ 120',
+        12000,
+        { divisaTipo: 'USD', montoDivisa: 100, tasaCambio: 120 },
+      );
+    });
+
+    it('compra_divisa: rechaza montoDivisa = 0', () => {
+      component.tipo.set('compra_divisa');
+      component.montoDivisa.set(0);
+      component.tasaCambio.set(120);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      expect(component.formError()).toBe('El monto en divisa debe ser mayor a 0');
+      expect(registrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('compra_divisa: rechaza tasaCambio = 0', () => {
+      component.tipo.set('compra_divisa');
+      component.montoDivisa.set(100);
+      component.tasaCambio.set(0);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+
+      expect(component.formError()).toBe('La tasa de cambio debe ser mayor a 0');
+      expect(registrarSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('movimiento form - worker', () => {

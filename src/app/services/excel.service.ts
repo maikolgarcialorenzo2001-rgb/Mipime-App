@@ -148,7 +148,7 @@ export class ExcelService {
     }
 
     // Desglose de divisas por tipo
-    if (divisaPorTipo.size > 0) {
+    if (divisaPorTipo.size > 0 || data.movimientos.some(m => m.tipo === 'compra_divisa')) {
       filas.push([]);
       filas.push(['Divisas', totalUnidadesDivisas]);
       for (const [tipo, datos] of divisaPorTipo) {
@@ -156,10 +156,16 @@ export class ExcelService {
       }
       filas.push(['Total divisas en pesos cubanos', totalDivisas]);
 
-      // Breakdown: sales vs compra_divisa
+      // Breakdown: ventas vs compra_divisa — collect types from BOTH sources
+      const tiposDivisa = new Set(divisaPorTipo.keys());
+      for (const m of data.movimientos) {
+        if (m.tipo === 'compra_divisa' && m.divisa_tipo) {
+          tiposDivisa.add(m.divisa_tipo);
+        }
+      }
       filas.push([]);
       filas.push(['Origen de divisas']);
-      for (const [tipo] of divisaPorTipo) {
+      for (const tipo of tiposDivisa) {
         const deVentas = ventas
           .filter(v => (v as any).divisa_tipo === tipo)
           .reduce((s, v) => s + ((v as any).monto_divisa ?? 0), 0);
