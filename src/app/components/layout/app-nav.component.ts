@@ -21,7 +21,7 @@ export class AppNavComponent {
 
   /** Modal de apertura */
   readonly showOpenModal = signal(false);
-  readonly montoInicial = signal(0);
+  readonly montoInicial = signal(500);
   readonly abriendo = signal(false);
   readonly abrirError = signal<string | null>(null);
 
@@ -70,7 +70,6 @@ export class AppNavComponent {
 
   abrirModalApertura(): void {
     this.abrirError.set(null);
-    this.montoInicial.set(0);
     this.showOpenModal.set(true);
   }
 

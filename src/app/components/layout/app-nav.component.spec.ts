@@ -101,6 +101,16 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     fixture.detectChanges();
   });
 
+  it('debería tener montoInicial default de 500', () => {
+    expect(component.montoInicial()).toBe(500);
+  });
+
+  it('debería mantener montoInicial en 500 al abrir el modal de apertura', () => {
+    component.abrirModalApertura();
+    expect(component.montoInicial()).toBe(500);
+    expect(component.showOpenModal()).toBe(true);
+  });
+
   it('5.1 RED: modal de cierre debería mostrar saldo_esperado como read-only sin input de saldoReal', () => {
     // Abrir modal de cierre
     component.abrirModalCierre();
