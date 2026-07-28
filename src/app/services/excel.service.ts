@@ -32,6 +32,8 @@ export interface JornadaReportData {
   ventaLotes?: VentaLote[];
   arqueo?: ArqueoCajaEntry[];
   inversionPorProducto?: Map<number, number>;
+  total_usd?: number;
+  total_eur?: number;
 }
 
 @Injectable({

@@ -1243,5 +1243,201 @@ describe('JornadaService', () => {
       expect(sqlCall![1]).toEqual(['2026-12-01', '2026-12-31', 'cerrada']);
     });
   });
+
+  describe('divisas en cierre', () => {
+    const mockVentaUSD: Venta = {
+      id: 10, jornada_id: 1, fecha_hora: '2026-07-28T10:00:00', total: 65000,
+      usuario_id: 1, forma_pago: 'divisas', divisa_tipo: 'USD', monto_divisa: 100,
+      created_at: '',
+    };
+    const mockVentaEUR: Venta = {
+      id: 11, jornada_id: 1, fecha_hora: '2026-07-28T11:00:00', total: 85000,
+      usuario_id: 1, forma_pago: 'divisas', divisa_tipo: 'EUR', monto_divisa: 200,
+      created_at: '',
+    };
+    const mockDetalleUSD: DetalleVenta = {
+      id: 1, venta_id: 10, producto_id: 1, cantidad: 1, precio_unitario: 65000, subtotal: 65000,
+    };
+    const mockDetalleEUR: DetalleVenta = {
+      id: 2, venta_id: 11, producto_id: 2, cantidad: 1, precio_unitario: 85000, subtotal: 85000,
+    };
+    const mockCompraUSD: Movimiento = {
+      id: 1, jornada_id: 1, tipo: 'compra_divisa', descripcion: 'Compra USD',
+      monto: 1000, divisa_tipo: 'USD', monto_divisa: 50, created_at: '',
+    };
+    const mockCompraEUR: Movimiento = {
+      id: 2, jornada_id: 1, tipo: 'compra_divisa', descripcion: 'Compra EUR',
+      monto: 2000, divisa_tipo: 'EUR', monto_divisa: 30, created_at: '',
+    };
+
+    it('3.1 RED: debería calcular total_usd desde ventas USD + compra_divisa USD', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockVentaUSD]) // ventas
+        .mockResolvedValueOnce([mockDetalleUSD]) // detalles
+        .mockResolvedValueOnce([mockCompraUSD]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 0 }]) // FIFO venta_lotes
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte (rest use default)
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      // Verificar que el UPDATE incluyó total_usd = 150 (100 venta + 50 compra)
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('total_usd'),
+      );
+      expect(updateCall).toBeTruthy();
+      expect(updateCall![0]).toContain('total_usd = ?');
+      const params = updateCall![1] as unknown[];
+      const totalUsdIdx = params.findIndex((p, i) => i >= 2 && typeof p === 'number' && p === 150);
+      expect(totalUsdIdx).toBeGreaterThanOrEqual(0);
+    });
+
+    it('3.1 RED: debería calcular total_eur desde ventas EUR + compra_divisa EUR', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockVentaEUR]) // ventas
+        .mockResolvedValueOnce([mockDetalleEUR]) // detalles
+        .mockResolvedValueOnce([mockCompraEUR]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 0 }]) // FIFO
+        .mockResolvedValueOnce([{ nombre: 'Admin' }])
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('total_eur'),
+      );
+      expect(updateCall).toBeTruthy();
+      expect(updateCall![0]).toContain('total_eur = ?');
+    });
+
+    it('3.1 RED: debería tener total_usd=0 y total_eur=0 sin actividad de divisas', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas (sin divisas)
+        .mockResolvedValueOnce([]) // movimientos (sin compra_divisa)
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Admin' }])
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('total_usd'),
+      );
+      expect(updateCall).toBeTruthy();
+      const params = updateCall![1] as unknown[];
+      // total_usd and total_eur should be 0 when no divisa activity
+      const usdIdx = params.findIndex((p, i) => i >= 2 && p === 0);
+      expect(usdIdx).toBeGreaterThanOrEqual(0);
+    });
+
+    it('3.2 RED: JornadaReportData debe contener total_usd y total_eur', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockVentaUSD, mockVentaEUR]) // ventas
+        .mockResolvedValueOnce([mockDetalleUSD, mockDetalleEUR]) // detalles
+        .mockResolvedValueOnce([mockCompraUSD, mockCompraEUR]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 0 }]) // FIFO
+        .mockResolvedValueOnce([{ nombre: 'Admin' }])
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte (rest default)
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg).toHaveProperty('total_usd');
+      expect(callArg).toHaveProperty('total_eur');
+      expect(callArg.total_usd).toBe(150); // 100 USD venta + 50 USD compra
+      expect(callArg.total_eur).toBe(230); // 200 EUR venta + 30 EUR compra
+    });
+
+    it('3.2 RED: obtenerDatosJornada debe incluir total_usd y total_eur', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockVentaUSD]) // ventas
+        .mockResolvedValueOnce([mockDetalleUSD]) // detalles
+        .mockResolvedValueOnce([mockCompraUSD]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre (userId=1, mock returns [])
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerDatosJornada(1, 1));
+
+      expect(resultado).toHaveProperty('total_usd');
+      expect(resultado.total_usd).toBe(150); // 100 venta + 50 compra
+    });
+
+    it('3.2 RED: generarExportacionMensual debe incluir total_usd y total_eur', async () => {
+      const junJornada: Jornada = { ...mockJornadaCerrada, id: 10, fecha: '2026-07-28' };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada]) // jornadasDelMes
+        .mockResolvedValueOnce([mockVentaUSD]) // ventas
+        .mockResolvedValueOnce([mockDetalleUSD]) // detalles
+        .mockResolvedValueOnce([mockCompraUSD]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionMensual(2026, 6));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg[0]).toHaveProperty('total_usd');
+      expect(callArg[0].total_usd).toBe(150);
+    });
+
+    it('3.2 RED: generarExportacionPorRango debe incluir total_usd y total_eur', async () => {
+      const mockJornada: Jornada = { ...mockJornadaCerrada, id: 10, fecha: '2026-07-28' };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornada]) // jornadasDelRango
+        .mockResolvedValueOnce([mockVentaUSD]) // ventas
+        .mockResolvedValueOnce([mockDetalleUSD]) // detalles
+        .mockResolvedValueOnce([mockCompraUSD]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionPorRango('2026-07-01', '2026-07-31'));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg[0]).toHaveProperty('total_usd');
+      expect(callArg[0].total_usd).toBe(150);
+    });
+  });
 });
 });

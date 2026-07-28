@@ -240,13 +240,30 @@ export class JornadaService {
       .reduce((sum, v) => sum + v.total, 0);
     const saldoRealCalculado = montoInicial + totalVentasEfectivo + totalMovimientos;
 
+    // 3b. Calcular totales de divisas desde ventas y compra_divisa
+    const totalUsdVentas = ventas
+      .filter((v) => v.divisa_tipo === 'USD')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0);
+    const totalEurVentas = ventas
+      .filter((v) => v.divisa_tipo === 'EUR')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0);
+    const totalUsdCompras = movimientos
+      .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'USD')
+      .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalEurCompras = movimientos
+      .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'EUR')
+      .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalUsd = totalUsdVentas + totalUsdCompras;
+    const totalEur = totalEurVentas + totalEurCompras;
+
     // 4. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
     const result = await this._db.sql<Jornada>(
       `UPDATE jornadas
-       SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada', updated_at = ?
+       SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada',
+           total_usd = ?, total_eur = ?, updated_at = ?
        WHERE id = ?
        RETURNING *`,
-      [hora, saldoRealCalculado, userId, iso, id],
+      [hora, saldoRealCalculado, userId, totalUsd, totalEur, iso, id],
     );
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];
@@ -353,6 +370,8 @@ export class JornadaService {
       cuentaCosas,
       arqueo,
       inversionPorProducto,
+      total_usd: totalUsd,
+      total_eur: totalEur,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
@@ -391,6 +410,8 @@ export class JornadaService {
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
               inversionPorProducto: datos.inversionPorProducto,
+              total_usd: datos.totalUsd,
+              total_eur: datos.totalEur,
             }),
           ),
         );
@@ -420,6 +441,8 @@ export class JornadaService {
         cuentaCosas: datos.cuentaCosas,
         arqueo: datos.arqueo,
         inversionPorProducto: datos.inversionPorProducto,
+        total_usd: datos.totalUsd,
+        total_eur: datos.totalEur,
       })),
     );
   }
@@ -439,6 +462,8 @@ export class JornadaService {
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
     arqueo: ArqueoCajaEntry[];
     inversionPorProducto: Map<number, number>;
+    totalUsd: number;
+    totalEur: number;
   }> {
     // 1. Obtener ventas con detalles de esta jornada
     const ventas = await this._db.sql<Venta>(
@@ -552,6 +577,20 @@ export class JornadaService {
       inversionPorProducto.set(item.producto_id, item.total_invertido);
     }
 
+    // 10. Calcular totales de divisas
+    const totalUsd = ventas
+      .filter((v) => v.divisa_tipo === 'USD')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0)
+      + movimientos
+        .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'USD')
+        .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalEur = ventas
+      .filter((v) => v.divisa_tipo === 'EUR')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0)
+      + movimientos
+        .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'EUR')
+        .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+
     return {
       ventas: ventasConDetalles,
       movimientos,
@@ -563,6 +602,8 @@ export class JornadaService {
       cuentaCosas,
       arqueo,
       inversionPorProducto,
+      totalUsd,
+      totalEur,
     };
   }
 
@@ -644,6 +685,8 @@ export class JornadaService {
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
               inversionPorProducto: datos.inversionPorProducto,
+              total_usd: datos.totalUsd,
+              total_eur: datos.totalEur,
             }),
           ),
         );
