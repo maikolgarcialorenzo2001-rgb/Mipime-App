@@ -133,8 +133,9 @@ export class ExcelService {
       ['Total en caja', totalEnCaja],
       ['Total después de retirar monto inicial', totalEnCaja - j.monto_inicial],
       ['Transferencias', totalTransferencia],
+      ['Divisas', totalDivisas],
       ['Pendientes del día', totalPendientes],
-      ['Total del día', totalEnCaja + totalTransferencia],
+      ['Total del día', totalEnCaja + totalTransferencia + totalDivisas],
       [],
     ];
 
@@ -376,7 +377,9 @@ export class ExcelService {
     const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
 
     // Pre-compute payment totals for Efectivo del Día table
-    let totalCaja = 0;
+    const totalEfectivo = data.ventas
+      .filter((v) => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
@@ -385,8 +388,6 @@ export class ExcelService {
           totalPendientes += detalle.subtotal;
         } else if (venta.forma_pago === 'transferencia') {
           totalTransferencia += detalle.subtotal;
-        } else if (venta.forma_pago !== 'divisas') {
-          totalCaja += detalle.subtotal;
         }
       }
     }
@@ -394,7 +395,7 @@ export class ExcelService {
       .filter((v) => v.forma_pago === 'divisas')
       .reduce((sum, v) => sum + v.total, 0);
 
-    const totalEnCajaJ = j.monto_inicial + totalCaja + totalIngresosExtra - totalGastos;
+    const totalEnCajaJ = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -419,8 +420,9 @@ export class ExcelService {
       ['Total en caja', totalEnCajaJ],
       ['Total después de retirar monto inicial', totalEnCajaJ - j.monto_inicial],
       ['Transferencias', totalTransferencia],
+      ['Divisas', totalDivisas],
       ['Pendientes del día', totalPendientes],
-      ['Total del día', totalEnCajaJ + totalTransferencia],
+      ['Total del día', totalEnCajaJ + totalTransferencia + totalDivisas],
     ];
 
     if (data.userCierreNombre) {

@@ -19,6 +19,9 @@ export class JornadaService {
   /** Señal compartida de la jornada abierta actual (null si no hay). */
   readonly jornadaAbierta = signal<Jornada | null>(null);
 
+  /** Total en caja calculado: monto_inicial + efectivo + ingresos_extra - gastos. */
+  readonly totalEnCaja = signal(0);
+
   /** `true` mientras se carga la jornada por primera vez o se refresca. */
   readonly jornadaCargando = signal(true);
 
@@ -82,19 +85,46 @@ export class JornadaService {
     return result[0]?.total ?? 0;
   }
 
-  /** Recarga la jornada abierta desde la DB y actualiza `jornadaAbierta`. */
+  /** Recarga la jornada abierta desde la DB y actualiza `jornadaAbierta` + `totalEnCaja`. */
   refreshJornadaAbierta(): void {
     this.jornadaCargando.set(true);
     this.obtenerAbierta().subscribe({
-      next: (j) => {
+      next: async (j) => {
         this.jornadaAbierta.set(j);
+        if (j) {
+          this.totalEnCaja.set(await this._calcularTotalEnCaja(j));
+        } else {
+          this.totalEnCaja.set(0);
+        }
         this.jornadaCargando.set(false);
       },
       error: () => {
         this.jornadaAbierta.set(null);
+        this.totalEnCaja.set(0);
         this.jornadaCargando.set(false);
       },
     });
+  }
+
+  private async _calcularTotalEnCaja(j: Jornada): Promise<number> {
+    const ventas = await this._db.sql<{ total: number; forma_pago: string }>(
+      'SELECT total, forma_pago FROM ventas WHERE jornada_id = ?',
+      [j.id],
+    );
+    const totalEfectivo = ventas
+      .filter((v) => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const movimientos = await this._db.sql<{ tipo: string; monto: number }>(
+      'SELECT tipo, monto FROM movimientos WHERE jornada_id = ?',
+      [j.id],
+    );
+    const totalIngresosExtra = movimientos
+      .filter((m) => m.tipo === 'ingreso_extra')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalGastos = movimientos
+      .filter((m) => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0);
+    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
   }
 
   /**

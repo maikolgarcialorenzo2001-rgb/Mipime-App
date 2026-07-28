@@ -62,6 +62,7 @@ function createMockAuth(user: UsuarioPublico | null): MockAuthService {
 interface MockJornadaService {
   jornadaAbierta: WritableSignal<Jornada | null>;
   jornadaCargando: WritableSignal<boolean>;
+  totalEnCaja: WritableSignal<number>;
   cerrar: ReturnType<typeof vi.fn>;
   obtenerReporte: ReturnType<typeof vi.fn>;
 }
@@ -70,6 +71,7 @@ function createMockJornadaService(): MockJornadaService {
   return {
     jornadaAbierta: signal<Jornada | null>(mockJornadaAbierta),
     jornadaCargando: signal(false),
+    totalEnCaja: signal(18000),
     cerrar: vi.fn().mockReturnValue(of(mockJornadaCerrada)),
     obtenerReporte: vi.fn().mockReturnValue(of(null)),
   };
@@ -99,7 +101,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     fixture.detectChanges();
   });
 
-  it('5.1 RED: modal de cierre debería mostrar saldo_esperado como read-only sin input de saldoReal', () => {
+  it('5.1 RED: modal de cierre debería mostrar totalEnCaja como read-only sin input de saldoReal', () => {
     // Abrir modal de cierre
     component.abrirModalCierre();
     fixture.detectChanges();
@@ -110,10 +112,10 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     const input = modalEl.querySelector('#saldo-real-nav');
     expect(input).toBeNull();
 
-    // Debe mostrar el saldo_esperado en el modal
+    // Debe mostrar el totalEnCaja en el modal
     const modalText = modalEl.querySelector('[role="dialog"]')?.textContent ?? '';
-    expect(modalText).toContain('18,000'); // saldo_esperado del mock
-    expect(modalText).toContain('Saldo esperado');
+    expect(modalText).toContain('18,000'); // totalEnCaja del mock
+    expect(modalText).toContain('Total en caja');
   });
 
   it('debería renderizar el botón de cambio de tema y alternar clase dark', () => {

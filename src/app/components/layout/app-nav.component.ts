@@ -49,8 +49,7 @@ export class AppNavComponent {
   });
 
   readonly diferencia = computed(() => {
-    const esperado = this.jornadaService.jornadaAbierta()?.saldo_esperado ?? 0;
-    return esperado - this.arqueoTotal();
+    return this.jornadaService.totalEnCaja() - this.arqueoTotal();
   });
 
   get puedeAbrir(): boolean {
