@@ -8,3 +8,4 @@ export type { Usuario, UsuarioPublico } from './usuario';
 export type { LoteStock, ConsumoRecord } from './lote-stock';
 export type { VentaLote } from './venta-lote';
 export type { ArqueoDbRow, ArqueoCajaEntry } from './arqueo-caja';
+export type { GlobalInvestment, PerProductInvestment } from './investment-stats';

@@ -7,6 +7,7 @@ import { AuthService } from '../../services/auth.service';
 import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { Producto } from '../../models';
+import type { GlobalInvestment, PerProductInvestment } from '../../models';
 
 function createMockDb(): Database {
   return {
@@ -175,7 +176,7 @@ describe('ProductosPage', () => {
     fixture.detectChanges();
 
     const buttons = fixture.nativeElement.querySelectorAll('button');
-    const retryBtn = Array.from(buttons).find((b) => b.textContent?.includes('Reintentar'));
+    const retryBtn = (Array.from(buttons) as Element[]).find((b) => b.textContent?.includes('Reintentar'));
     expect(retryBtn).toBeTruthy();
   });
 
@@ -275,5 +276,84 @@ describe('ProductosPage', () => {
     component.cancelarMerma();
     fixture.detectChanges();
     expect(component.selectedProductoId()).toBeNull();
+  });
+
+  // ── Investment Stats Tests ─────────────────────────────────────
+
+  describe('investment stats', () => {
+    const mockGlobalStats: GlobalInvestment = {
+      total_global: 150000,
+      total_almacen: 100000,
+      total_shop: 50000,
+    };
+
+    const mockPerProduct: PerProductInvestment[] = [
+      { producto_id: 1, total_invertido: 60000 },
+      { producto_id: 2, total_invertido: 90000 },
+    ];
+
+    beforeEach(() => {
+      vi.spyOn(productoService, 'obtenerInversionGlobal').mockReturnValue(of(mockGlobalStats));
+      vi.spyOn(productoService, 'obtenerInversionPorProducto').mockReturnValue(of(mockPerProduct));
+
+      component.recargar();
+      fixture.detectChanges();
+    });
+
+    it('3.1 RED: debería mostrar la barra de stats con total_global, total_almacen y total_shop', () => {
+      const el = fixture.nativeElement as HTMLElement;
+
+      // The stats bar should show the three formatted values
+      expect(el.textContent).toContain('Total invertido');
+      expect(el.textContent).toContain('Almacén');
+      expect(el.textContent).toContain('Tienda');
+      // Formatted values from CurrencyPipe: ARS 150,000 etc.
+      expect(el.textContent).toContain('150,000');
+      expect(el.textContent).toContain('100,000');
+      expect(el.textContent).toContain('50,000');
+    });
+
+    it('3.1 RED: debería mostrar columna "Total invertido" en la tabla', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const headers = el.querySelectorAll('th');
+      const totalInvertidoHeader = Array.from(headers).find(
+        (h) => h.textContent?.includes('Total invertido'),
+      );
+      expect(totalInvertidoHeader).toBeTruthy();
+    });
+
+    it('3.1 RED: debería mostrar el valor formateado para cada producto', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      // Product 1 has 60000, product 2 has 90000
+      expect(el.textContent).toContain('60,000');
+      expect(el.textContent).toContain('90,000');
+    });
+
+    it('3.1 RED: debería esconder stats bar si no hay productos cargados', () => {
+      vi.spyOn(productoService, 'listar').mockReturnValue(of([]));
+      component.recargar();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      // Stats bar lives inside a div with these classes when visible
+      const statsDiv = el.querySelector('div.mb-4.flex.flex-wrap');
+      expect(statsDiv).toBeFalsy();
+    });
+
+    it('debería esconder stats bar cuando la inversión falla', () => {
+      vi.spyOn(productoService, 'obtenerInversionGlobal').mockReturnValue(
+        throwError(() => new Error('Error de carga')),
+      );
+      component.recargar();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      // Products still render
+      expect(el.textContent).toContain('Café');
+      expect(el.textContent).toContain('Té');
+      // Stats bar hidden
+      const statsDiv = el.querySelector('div.mb-4.flex.flex-wrap');
+      expect(statsDiv).toBeFalsy();
+    });
   });
 });

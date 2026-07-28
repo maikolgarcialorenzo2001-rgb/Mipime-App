@@ -678,9 +678,10 @@ describe('StockMovimientoService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos'),
       );
       expect(stockUpdates.length).toBe(2); // precio_costo + stock_shop
-      const stockUpdate = stockUpdates[1]; // The second UPDATE is the stock column
+      const stockUpdate = stockUpdates[1]!; // The second UPDATE is the stock column
       expect(stockUpdate[0]).toContain('stock_shop');
-      expect(stockUpdate[1][0]).toBe(1); // shop stock after consumption
+      const params = stockUpdate[1] as number[];
+      expect(params[0]).toBe(1); // shop stock after consumption
     });
 
     it('debería lanzar "Stock insuficiente" si no hay suficientes lotes en shop', async () => {
@@ -707,9 +708,10 @@ describe('StockMovimientoService', () => {
       const stockUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos'),
       );
-      const stockUpdate = stockUpdates[stockUpdates.length - 1];
+      const stockUpdate = stockUpdates[stockUpdates.length - 1]!;
       expect(stockUpdate[0]).toContain('stock_shop');
-      expect(stockUpdate[1][0]).toBe(3);
+      const params = stockUpdate[1] as number[];
+      expect(params[0]).toBe(3);
     });
 
     it('debería actualizar jornada total_merma y saldo_esperado cuando se proporciona jornadaId', async () => {

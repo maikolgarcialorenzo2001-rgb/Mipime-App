@@ -281,4 +281,81 @@ describe('ProductoService', () => {
       );
     });
   });
+
+  describe('obtenerInversionGlobal', () => {
+    beforeEach(() => {
+      vi.mocked(mockDb.sql).mockReset();
+    });
+
+    it('2.2 RED: debería retornar total_global, total_almacen y total_shop con datos seeded', async () => {
+      // Seed data: three lots across 2 products and both ubicaciones
+      // Product 1: almacen lot — cantidad=10, precio_costo=100 → 1000
+      // Product 1: shop lot — cantidad=5, precio_costo=200 → 1000
+      // Product 2: almacen lot — cantidad=20, precio_costo=50 → 1000
+      const mockRows = [
+        { total_global: 3000, total_almacen: 2000, total_shop: 1000 },
+      ];
+      vi.mocked(mockDb.sql).mockResolvedValue(mockRows);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(service.obtenerInversionGlobal());
+
+      expect(resultado.total_global).toBe(3000);
+      expect(resultado.total_almacen).toBe(2000);
+      expect(resultado.total_shop).toBe(1000);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('SUM(cantidad * precio_costo)'),
+      );
+    });
+
+    it('2.2 TRIANGULATE: debería retornar ceros si no hay lotes activos', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([
+        { total_global: 0, total_almacen: 0, total_shop: 0 },
+      ]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(service.obtenerInversionGlobal());
+
+      expect(resultado.total_global).toBe(0);
+      expect(resultado.total_almacen).toBe(0);
+      expect(resultado.total_shop).toBe(0);
+    });
+  });
+
+  describe('obtenerInversionPorProducto', () => {
+    beforeEach(() => {
+      vi.mocked(mockDb.sql).mockReset();
+    });
+
+    it('2.3 RED: debería retornar inversión agrupada por producto', async () => {
+      // Product 1: total_invertido = 2000
+      // Product 2: total_invertido = 1000
+      const mockRows = [
+        { producto_id: 1, total_invertido: 2000 },
+        { producto_id: 2, total_invertido: 1000 },
+      ];
+      vi.mocked(mockDb.sql).mockResolvedValue(mockRows);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(service.obtenerInversionPorProducto());
+
+      expect(resultado).toHaveLength(2);
+      expect(resultado[0].producto_id).toBe(1);
+      expect(resultado[0].total_invertido).toBe(2000);
+      expect(resultado[1].producto_id).toBe(2);
+      expect(resultado[1].total_invertido).toBe(1000);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('GROUP BY producto_id'),
+      );
+    });
+
+    it('2.3 TRIANGULATE: debería retornar array vacío si no hay lotes', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(service.obtenerInversionPorProducto());
+
+      expect(resultado).toEqual([]);
+    });
+  });
 });

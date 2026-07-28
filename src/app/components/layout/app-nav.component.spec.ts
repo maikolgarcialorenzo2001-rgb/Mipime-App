@@ -21,6 +21,8 @@ const mockJornadaAbierta: Jornada = {
   saldo_real: null,
   estado: 'abierta',
   user_cierre_id: null,
+  user_apertura_id: null,
+  total_merma: 0,
   created_at: '2026-06-05T09:00:00Z',
   updated_at: '2026-06-05T09:00:00Z',
 };
@@ -147,5 +149,50 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 5000, 1, [
       { denominacion: 5000, cantidad: 1, subtotal: 5000 },
     ]);
+  });
+
+  it('1.3 RED: checkbox toggle shows/hides $1 and $3 denomination rows in nav modal', () => {
+    component.abrirModalCierre();
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+
+    // By default, $1 and $3 should NOT be visible
+    expect(component.denominacionesVisibles()).not.toContain(1);
+    expect(component.denominacionesVisibles()).not.toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(10);
+
+    // Click checkbox to show optional denominations
+    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    checkbox.click();
+    fixture.detectChanges();
+
+    // After clicking, $1 and $3 should be visible
+    expect(component.denominacionesVisibles()).toContain(1);
+    expect(component.denominacionesVisibles()).toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(12);
+
+    // DOM should have $1 and $3
+    expect(dialog.textContent).toContain('$1');
+    expect(dialog.textContent).toContain('$3');
+  });
+
+  it('1.3 TRIANGULATE: unchecking hides $1 and $3 again in nav modal', () => {
+    component.abrirModalCierre();
+    component.showOptionalDenoms.set(true);
+    fixture.detectChanges();
+
+    expect(component.denominacionesVisibles().length).toBe(12);
+
+    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    checkbox.click(); // toggles off
+    fixture.detectChanges();
+
+    expect(component.denominacionesVisibles()).not.toContain(1);
+    expect(component.denominacionesVisibles()).not.toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(10);
   });
 });

@@ -23,6 +23,8 @@ describe('ExcelService', () => {
     saldo_real: 17800,
     estado: 'cerrada',
     user_cierre_id: 1,
+    user_apertura_id: null,
+    total_merma: 0,
     created_at: '2026-06-04T09:00:00Z',
     updated_at: '2026-06-04T18:30:00Z',
   };
@@ -486,6 +488,8 @@ describe('ExcelService', () => {
       saldo_real: 17800,
       estado: 'cerrada',
       user_cierre_id: 1,
+      user_apertura_id: null,
+      total_merma: 0,
       created_at: '',
       updated_at: '',
     };
@@ -502,6 +506,8 @@ describe('ExcelService', () => {
       saldo_real: 23000,
       estado: 'cerrada',
       user_cierre_id: 2,
+      user_apertura_id: null,
+      total_merma: 0,
       created_at: '',
       updated_at: '',
     };
@@ -769,9 +775,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
 
   describe('C3 — Stock Movements en Excel', () => {
     const stockMovimientos: StockMovimiento[] = [
-      { id: 1, producto_id: 1, cantidad: 100, tipo: 'entrada', motivo: 'Compra a proveedor', created_at: '2026-06-04T08:00:00Z' },
-      { id: 2, producto_id: 2, cantidad: 10, tipo: 'salida', motivo: 'Venta al público', created_at: '2026-06-04T10:30:00Z' },
-      { id: 3, producto_id: 3, cantidad: 25, tipo: 'ajuste', motivo: 'Inventario físico', created_at: '2026-06-04T15:00:00Z' },
+      { id: 1, producto_id: 1, cantidad: 100, tipo: 'entrada', motivo: 'Compra a proveedor', costo_total: 55000, created_at: '2026-06-04T08:00:00Z' },
+      { id: 2, producto_id: 2, cantidad: 10, tipo: 'salida', motivo: 'Venta al público', costo_total: 3500, created_at: '2026-06-04T10:30:00Z' },
+      { id: 3, producto_id: 3, cantidad: 25, tipo: 'ajuste', motivo: 'Inventario físico', costo_total: 12500, created_at: '2026-06-04T15:00:00Z' },
     ];
 
     const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>([

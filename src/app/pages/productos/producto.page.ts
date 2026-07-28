@@ -7,6 +7,7 @@ import { StockMovimientoService } from '../../services/stock-movimiento.service'
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
+import type { GlobalInvestment, PerProductInvestment } from '../../models';
 
 @Component({
   selector: 'app-productos-page',
@@ -26,6 +27,14 @@ export class ProductosPage implements OnInit {
   readonly buscando = signal(false);
   readonly error = signal<string | undefined>(undefined);
   readonly query = signal('');
+
+  // ── Investment Stats ──────────────────────────────────────────
+  readonly inversionGlobal = signal<GlobalInvestment | null>(null);
+  readonly inversionPorProducto = signal<Map<number, number>>(new Map());
+
+  getTotalInvertido(productoId: number): number {
+    return this.inversionPorProducto().get(productoId) ?? 0;
+  }
 
   // ── Merma ──────────────────────────────────────────────────
   readonly selectedProductoId = signal<number | null>(null);
@@ -76,12 +85,30 @@ export class ProductosPage implements OnInit {
       next: (productos) => {
         this.productos.set(productos);
         this.buscando.set(false);
+        this._cargarInversion();
       },
       error: (err: unknown) => {
         this.error.set(err instanceof Error ? err.message : 'Error al cargar productos');
         this.buscando.set(false);
         console.error('[ProductosPage] Error al cargar:', err);
       },
+    });
+  }
+
+  private _cargarInversion(): void {
+    this._productoService.obtenerInversionGlobal().subscribe({
+      next: (stats) => this.inversionGlobal.set(stats),
+      error: () => this.inversionGlobal.set(null),
+    });
+    this._productoService.obtenerInversionPorProducto().subscribe({
+      next: (rows) => {
+        const map = new Map<number, number>();
+        for (const r of rows) {
+          map.set(r.producto_id, r.total_invertido);
+        }
+        this.inversionPorProducto.set(map);
+      },
+      error: () => this.inversionPorProducto.set(new Map()),
     });
   }
 

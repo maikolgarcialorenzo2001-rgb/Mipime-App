@@ -824,7 +824,8 @@ describe('JornadaService', () => {
       );
       expect(updateCall).toBeTruthy();
       // saldo_real uses saldoRealCalculado = monto_inicial(5000) + ventas_efectivo(0) + total_movimientos(0) = 5000
-      expect(updateCall![1][1]).toBe(5000);
+      const params = updateCall![1] as number[];
+      expect(params[1]).toBe(5000);
     });
 
     it('2.2 RED: debería insertar arqueo entries en arqueo_caja cuando se proporcionan', async () => {

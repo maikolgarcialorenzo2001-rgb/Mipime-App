@@ -18,7 +18,7 @@ const mockUser: UsuarioPublico = {
   id: 1,
   nombre: 'admin',
   rol: 'admin',
-  activo: true,
+  activo: 1,
   created_at: '',
   updated_at: '',
 };

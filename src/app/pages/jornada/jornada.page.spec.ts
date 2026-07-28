@@ -544,6 +544,52 @@ describe('JornadaPage', () => {
       expect(component.denominacionesVisibles().length).toBe(12);
     });
 
+    it('1.1 RED: DOM checkbox toggle shows/hides $1 and $3 denomination rows', () => {
+      component.abrirModalCierre();
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+      expect(dialog).toBeTruthy();
+
+      // By default, $1 and $3 should NOT be in the DOM text
+      expect(component.denominacionesVisibles()).not.toContain(1);
+      expect(component.denominacionesVisibles()).not.toContain(3);
+
+      // Click the checkbox to show optional denominations
+      const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms') as HTMLInputElement;
+      expect(checkbox).toBeTruthy();
+      checkbox.click();
+      fixture.detectChanges();
+
+      // After clicking, $1 and $3 should be visible in the computed
+      expect(component.denominacionesVisibles()).toContain(1);
+      expect(component.denominacionesVisibles()).toContain(3);
+      expect(component.denominacionesVisibles().length).toBe(12);
+
+      // The DOM should now contain denomination labels for $1 and $3
+      expect(dialog.textContent).toContain('$1');
+      expect(dialog.textContent).toContain('$3');
+    });
+
+    it('1.1 TRIANGULATE: unchecking hides $1 and $3 again', () => {
+      component.abrirModalCierre();
+      // First enable optional denoms
+      component.showOptionalDenoms.set(true);
+      fixture.detectChanges();
+
+      expect(component.denominacionesVisibles().length).toBe(12);
+
+      // Then uncheck
+      const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms') as HTMLInputElement;
+      expect(checkbox).toBeTruthy();
+      checkbox.click(); // toggles from checked to unchecked
+      fixture.detectChanges();
+
+      expect(component.denominacionesVisibles()).not.toContain(1);
+      expect(component.denominacionesVisibles()).not.toContain(3);
+      expect(component.denominacionesVisibles().length).toBe(10);
+    });
+
     it('arqueo: total is computed correctly from entered quantities', () => {
       component.abrirModalCierre();
 
