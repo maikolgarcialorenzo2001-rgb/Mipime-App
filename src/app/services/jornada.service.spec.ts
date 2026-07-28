@@ -10,6 +10,9 @@ import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
+import { ProductoService } from './producto.service';
+import type { PerProductInvestment } from '../models';
+import { of } from 'rxjs';
 
 const mockJornada: Jornada = {
   id: 1,
@@ -61,6 +64,12 @@ describe('JornadaService', () => {
           useValue: {
             generarExcelJornada: vi.fn().mockReturnValue(mockExcelBase64),
             generarExcelMensual: vi.fn().mockReturnValue(mockExcelBase64),
+          },
+        },
+        {
+          provide: ProductoService,
+          useValue: {
+            obtenerInversionPorProducto: vi.fn().mockReturnValue(of([])),
           },
         },
       ],
@@ -798,6 +807,94 @@ describe('JornadaService', () => {
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
       expect(callArg).toHaveLength(2);
+    });
+  });
+
+  describe('inversionPorProducto en JornadaReportData', () => {
+    const mockPerProduct: PerProductInvestment[] = [
+      { producto_id: 1, total_invertido: 55000 },
+      { producto_id: 2, total_invertido: 18000 },
+    ];
+
+    it('4.2 RED: _ejecutarCierre debe pasar inversionPorProducto a ExcelService', async () => {
+      const mockVentas: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, usuario_id: 1, forma_pago: 'efectivo', created_at: '' },
+      ];
+      const mockDetalles: DetalleVenta[] = [
+        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
+      ];
+      const productoService = TestBed.inject(ProductoService);
+      vi.mocked(productoService.obtenerInversionPorProducto).mockReturnValue(of(mockPerProduct));
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce(mockVentas) // ventas
+        .mockResolvedValueOnce(mockDetalles) // detalles
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ total_costo: 0 }]) // total_costo
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.inversionPorProducto).toBeDefined();
+      expect(callArg.inversionPorProducto instanceof Map).toBe(true);
+      expect(callArg.inversionPorProducto.get(1)).toBe(55000);
+      expect(callArg.inversionPorProducto.get(2)).toBe(18000);
+    });
+
+    it('4.2 RED: obtenerDatosJornada debe incluir inversionPorProducto', async () => {
+      const productoService = TestBed.inject(ProductoService);
+      vi.mocked(productoService.obtenerInversionPorProducto).mockReturnValue(of(mockPerProduct));
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerDatosJornada(1, 1));
+
+      expect(resultado.inversionPorProducto).toBeDefined();
+      expect(resultado.inversionPorProducto instanceof Map).toBe(true);
+      expect(resultado.inversionPorProducto.get(1)).toBe(55000);
+    });
+
+    it('4.2 RED: generarExportacionMensual debe incluir inversionPorProducto en cada jornada', async () => {
+      const junJornada: Jornada = { ...mockJornadaCerrada, id: 10, fecha: '2026-06-05' };
+      const productoService = TestBed.inject(ProductoService);
+      vi.mocked(productoService.obtenerInversionPorProducto).mockReturnValue(of(mockPerProduct));
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada]) // jornadasDelMes
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg[0].inversionPorProducto).toBeDefined();
+      expect(callArg[0].inversionPorProducto.get(1)).toBe(55000);
     });
   });
 

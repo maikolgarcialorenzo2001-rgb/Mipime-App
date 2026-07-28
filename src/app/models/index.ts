@@ -5,7 +5,7 @@ export type { Movimiento } from './movimiento';
 export type { CuentaCosa } from './cuenta-cosa';
 export type { StockMovimiento } from './stock-movimiento';
 export type { Usuario, UsuarioPublico } from './usuario';
-export type { LoteStock, ConsumoRecord } from './lote-stock';
+export type { LoteStock, LoteDetalle, ConsumoRecord } from './lote-stock';
 export type { VentaLote } from './venta-lote';
 export type { ArqueoDbRow, ArqueoCajaEntry } from './arqueo-caja';
 export type { GlobalInvestment, PerProductInvestment } from './investment-stats';

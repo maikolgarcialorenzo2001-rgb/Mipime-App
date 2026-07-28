@@ -30,6 +30,7 @@ export interface JornadaReportData {
   stockMovimientos?: StockMovimiento[];
   ventaLotes?: VentaLote[];
   arqueo?: ArqueoCajaEntry[];
+  inversionPorProducto?: Map<number, number>;
 }
 
 @Injectable({
@@ -52,6 +53,7 @@ export class ExcelService {
     this._agregarMovimientos(wb, data);
     this._agregarMovimientosStock(wb, data);
     this._agregarArqueo(wb, data);
+    this._agregarIpve(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
@@ -689,5 +691,41 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos de Stock');
+  }
+
+  private _agregarIpve(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const inv = data.inversionPorProducto;
+    const pmap = data.productosMap;
+    if (!inv || !pmap) return;
+
+    // Left table: product stock + investment
+    const filas: unknown[][] = [
+      ['Nombre', 'Stock Almacén', 'Stock Tienda', 'Total Invertido'],
+    ];
+
+    for (const [productoId, info] of pmap) {
+      filas.push([
+        info.nombre,
+        info.stock_almacen ?? '—',
+        info.stock_shop ?? '—',
+        inv.get(productoId) ?? 0,
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+
+    // Merma table to the RIGHT (offset 2 blank columns = starting at col G)
+    const mermaVal = data.jornada.total_merma ?? 0;
+    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 6 } });
+
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 18 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'ipve');
   }
 }

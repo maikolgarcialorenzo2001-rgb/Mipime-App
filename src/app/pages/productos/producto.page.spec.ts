@@ -8,6 +8,7 @@ import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { Producto } from '../../models';
 import type { GlobalInvestment, PerProductInvestment } from '../../models';
+import type { LoteDetalle } from '../../models';
 
 function createMockDb(): Database {
   return {
@@ -19,6 +20,11 @@ function createMockDb(): Database {
 const mockProductos: Producto[] = [
   { id: 1, nombre: 'Café', descripcion: null, precio_costo: 300, precio_venta: 500, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
   { id: 2, nombre: 'Té', descripcion: 'Té negro', precio_costo: 200, precio_venta: 350, stock_almacen: 25, stock_shop: 0, created_at: '', updated_at: '' },
+];
+
+const mockLotes: LoteDetalle[] = [
+  { id: 1, producto_id: 1, cantidad: 10, precio_costo: 300, fecha_ingreso: '2024-01-15T00:00:00.000Z', stock_almacen: 8, stock_shop: 2, created_at: '' },
+  { id: 2, producto_id: 1, cantidad: 5, precio_costo: 350, fecha_ingreso: '2024-06-01T00:00:00.000Z', stock_almacen: 0, stock_shop: 5, created_at: '' },
 ];
 
 describe('ProductosPage', () => {
@@ -38,6 +44,7 @@ describe('ProductosPage', () => {
     };
     mockStockService = {
       registrarMerma: vi.fn().mockResolvedValue({ consumos: [], costoTotal: 0 }),
+      obtenerLotesAgrupados: vi.fn().mockResolvedValue([]),
     };
     mockJornadaService = {
       jornadaAbierta: vi.fn().mockReturnValue(null),
@@ -354,6 +361,201 @@ describe('ProductosPage', () => {
       // Stats bar hidden
       const statsDiv = el.querySelector('div.mb-4.flex.flex-wrap');
       expect(statsDiv).toBeFalsy();
+    });
+  });
+
+  // ── Precio costo column tests ──────────────────────────────────
+
+  describe('precio costo column', () => {
+    it('4.1 RED: muestra columna "Precio costo" en el encabezado de la tabla', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const headers = el.querySelectorAll('th');
+      const precioCostoHeader = Array.from(headers).find(
+        (h) => h.textContent?.includes('Precio costo'),
+      );
+      expect(precioCostoHeader).toBeTruthy();
+    });
+
+    it('4.1 RED: renderiza precio_costo formateado en cada fila', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      // Product 1 has precio_costo = 300
+      expect(el.textContent).toContain('300');
+    });
+
+    it('4.1 RED: muestra "--" cuando precio_costo es null', () => {
+      // Add a product with null precio_costo
+      const productoConNull: Producto = {
+        ...mockProductos[0],
+        id: 3,
+        nombre: 'Azúcar',
+        precio_costo: null,
+      };
+      vi.spyOn(productoService, 'listar').mockReturnValue(
+        of([...mockProductos, productoConNull]),
+      );
+      component.recargar();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Azúcar');
+      expect(fixture.nativeElement.textContent).toContain('--');
+    });
+  });
+
+  // ── Lotes button tests ─────────────────────────────────────────
+
+  describe('lotes button', () => {
+    function getLotesButtons(): HTMLButtonElement[] {
+      const allBtns = fixture.nativeElement.querySelectorAll('button');
+      return Array.from(allBtns).filter(
+        (b) => (b as HTMLButtonElement).textContent?.includes('Lotes'),
+      ) as HTMLButtonElement[];
+    }
+
+    it('4.2 RED: muestra botón Lotes por cada fila de producto', () => {
+      const lotesBtns = getLotesButtons();
+      expect(lotesBtns.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('4.2 RED: el botón Lotes es distinto del botón Merma (no usa bg-red)', () => {
+      const lotesBtns = getLotesButtons();
+      expect(lotesBtns.length).toBeGreaterThanOrEqual(1);
+      for (const btn of lotesBtns) {
+        expect(btn.className).not.toContain('bg-red');
+      }
+    });
+
+    it('4.2 RED: cada fila tiene al menos 2 botones de acción (Merma + Lotes)', () => {
+      const allBtns = fixture.nativeElement.querySelectorAll('button');
+      expect(allBtns.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // ── Lotes expand/collapse tests ────────────────────────────────
+
+  describe('lotes expand/collapse', () => {
+    beforeEach(() => {
+      mockStockService.obtenerLotesAgrupados.mockResolvedValue(mockLotes);
+    });
+
+    it('4.3 RED: toggleLotes expande el detalle inline con tabla de lotes', async () => {
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      expect(component.lotesProductoId()).toBe(1);
+      const el = fixture.nativeElement as HTMLElement;
+      // Should show lotes detail table
+      const tables = el.querySelectorAll('table');
+      // There should be at least the main table + the lotes detail table
+      expect(tables.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('4.3 RED: toggleLotes con el mismo id cierra el detalle', async () => {
+      // Expand first
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      expect(component.lotesProductoId()).toBe(1);
+
+      // Collapse
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      expect(component.lotesProductoId()).toBeNull();
+    });
+
+    it('4.3 RED: muestra fecha formateada, cantidad, precio_costo, stock x ubicación y total invertido', async () => {
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      // Lote 1: 10 x 300 = 3000 total, 8 en almacén, 2 en tienda
+      expect(el.textContent).toContain('10');
+      expect(el.textContent).toContain('3,000');
+      expect(el.textContent).toContain('8');
+      expect(el.textContent).toContain('2');
+    });
+  });
+
+  // ── Lotes cache tests ──────────────────────────────────────────
+
+  describe('lotes cache', () => {
+    it('4.4 RED: obtiene lotes una sola vez por producto aunque se abra/cierre varias veces', async () => {
+      mockStockService.obtenerLotesAgrupados.mockResolvedValue(mockLotes);
+
+      // First toggle
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      expect(mockStockService.obtenerLotesAgrupados).toHaveBeenCalledTimes(1);
+      expect(mockStockService.obtenerLotesAgrupados).toHaveBeenCalledWith(1);
+
+      // Collapse (does NOT call service again — sets null)
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      // Re-expand — should NOT call again (cached)
+      await component.toggleLotes(1);
+      fixture.detectChanges();
+
+      // Still only 1 call
+      expect(mockStockService.obtenerLotesAgrupados).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Lotes empty state ─────────────────────────────────────────
+
+  describe('lotes empty state', () => {
+    it('4.5 RED: muestra "Sin lotes activos" cuando no hay lotes', async () => {
+      mockStockService.obtenerLotesAgrupados.mockResolvedValue([]);
+
+      await component.toggleLotes(2);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.textContent).toContain('Sin lotes activos');
+    });
+  });
+
+  // ── Lotes loading state ───────────────────────────────────────
+
+  describe('lotes loading state', () => {
+    it('4.6 RED: muestra indicador de carga mientras se obtienen los lotes', async () => {
+      // Create a promise that doesn't resolve immediately
+      let resolveLotes!: (v: LoteStock[]) => void;
+      mockStockService.obtenerLotesAgrupados.mockReturnValue(
+        new Promise<LoteDetalle[]>((resolve) => {
+          resolveLotes = resolve;
+        }),
+      );
+
+      // Start toggle but don't await — we want to catch loading state
+      const togglePromise = component.toggleLotes(1);
+      fixture.detectChanges();
+
+      // Loading should be true since promise hasn't resolved
+      expect(component.lotesLoading()).toBe(true);
+
+      // Now resolve the promise
+      resolveLotes(mockLotes);
+      await togglePromise;
+      fixture.detectChanges();
+
+      expect(component.lotesLoading()).toBe(false);
+    });
+  });
+
+  // ── Merma colspan regression ───────────────────────────────────
+
+  describe('merma colspan regression', () => {
+    it('4.7 RED: el formulario de merma usa colspan="7"', () => {
+      component.abrirMerma(1);
+      fixture.detectChanges();
+
+      const expandedTd = fixture.nativeElement.querySelector(
+        'td[colspan="7"]',
+      ) as HTMLElement;
+      expect(expandedTd).toBeTruthy();
+      expect(expandedTd.getAttribute('colspan')).toBe('7');
     });
   });
 });

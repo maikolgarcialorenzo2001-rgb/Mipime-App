@@ -1,17 +1,18 @@
 import { Component, inject, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
-import type { GlobalInvestment, PerProductInvestment } from '../../models';
+import type { GlobalInvestment } from '../../models';
+import type { LoteDetalle } from '../../models';
 
 @Component({
   selector: 'app-productos-page',
-  imports: [FormsModule, CurrencyPipe, StockBadgeComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, StockBadgeComponent],
   templateUrl: './producto.page.html',
   styleUrl: './producto.page.css',
 })
@@ -43,6 +44,41 @@ export class ProductosPage implements OnInit {
   readonly mermaUbicacion = signal<'almacen' | 'shop'>('shop');
   readonly mermaError = signal<string | null>(null);
   readonly mermaProcesando = signal(false);
+
+  // ── Lotes ──────────────────────────────────────────────────
+  readonly lotesProductoId = signal<number | null>(null);
+  readonly lotesPorProducto = signal<Map<number, LoteDetalle[]>>(new Map());
+  readonly lotesLoading = signal(false);
+  readonly lotesError = signal<string | undefined>(undefined);
+
+  async toggleLotes(productoId: number): Promise<void> {
+    if (this.lotesProductoId() === productoId) {
+      this.lotesProductoId.set(null);
+      return;
+    }
+
+    this.lotesProductoId.set(productoId);
+
+    // Check cache
+    const cache = this.lotesPorProducto();
+    if (cache.has(productoId)) {
+      return;
+    }
+
+    this.lotesLoading.set(true);
+    this.lotesError.set(undefined);
+
+    try {
+      const lotes = await this._stockService.obtenerLotesAgrupados(productoId);
+      const updated = new Map(cache);
+      updated.set(productoId, lotes);
+      this.lotesPorProducto.set(updated);
+    } catch (e) {
+      this.lotesError.set(e instanceof Error ? e.message : 'Error al cargar lotes');
+    } finally {
+      this.lotesLoading.set(false);
+    }
+  }
 
   private _timeoutId?: ReturnType<typeof setTimeout>;
 

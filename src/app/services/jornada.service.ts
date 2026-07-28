@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { from, map, Observable, switchMap, tap } from 'rxjs';
+import { from, firstValueFrom, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
 import type { Jornada, JornadaReporte } from '../models';
@@ -8,6 +8,7 @@ import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
+import { ProductoService } from './producto.service';
 
 @Injectable({
   providedIn: 'root',
@@ -15,6 +16,7 @@ import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 export class JornadaService {
   private readonly _db = inject(DATABASE);
   private readonly _excelService = inject(ExcelService);
+  private readonly _productoService = inject(ProductoService);
 
   /** Señal compartida de la jornada abierta actual (null si no hay). */
   readonly jornadaAbierta = signal<Jornada | null>(null);
@@ -331,7 +333,14 @@ export class JornadaService {
       );
     }
 
-    // 11. Generar Excel con estado fresco y nombres de producto
+    // 11. Obtener inversión por producto
+    const perProductData = await firstValueFrom(this._productoService.obtenerInversionPorProducto());
+    const inversionPorProducto = new Map<number, number>();
+    for (const item of perProductData) {
+      inversionPorProducto.set(item.producto_id, item.total_invertido);
+    }
+
+    // 12. Generar Excel con estado fresco y nombres de producto
     const base64 = this._excelService.generarExcelJornada({
       jornada,
       ventas: ventasConDetalles,
@@ -343,6 +352,7 @@ export class JornadaService {
       userCierreNombre,
       cuentaCosas,
       arqueo,
+      inversionPorProducto,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
@@ -380,6 +390,7 @@ export class JornadaService {
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
+              inversionPorProducto: datos.inversionPorProducto,
             }),
           ),
         );
@@ -408,6 +419,7 @@ export class JornadaService {
         userCierreNombre: datos.userCierreNombre,
         cuentaCosas: datos.cuentaCosas,
         arqueo: datos.arqueo,
+        inversionPorProducto: datos.inversionPorProducto,
       })),
     );
   }
@@ -426,6 +438,7 @@ export class JornadaService {
     userCierreNombre: string | null;
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
     arqueo: ArqueoCajaEntry[];
+    inversionPorProducto: Map<number, number>;
   }> {
     // 1. Obtener ventas con detalles de esta jornada
     const ventas = await this._db.sql<Venta>(
@@ -532,6 +545,13 @@ export class JornadaService {
       detalles: detalles.filter((d) => d.venta_id === v.id),
     }));
 
+    // 9. Obtener inversión por producto
+    const perProductData = await firstValueFrom(this._productoService.obtenerInversionPorProducto());
+    const inversionPorProducto = new Map<number, number>();
+    for (const item of perProductData) {
+      inversionPorProducto.set(item.producto_id, item.total_invertido);
+    }
+
     return {
       ventas: ventasConDetalles,
       movimientos,
@@ -542,6 +562,7 @@ export class JornadaService {
       userCierreNombre,
       cuentaCosas,
       arqueo,
+      inversionPorProducto,
     };
   }
 
@@ -622,6 +643,7 @@ export class JornadaService {
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
+              inversionPorProducto: datos.inversionPorProducto,
             }),
           ),
         );
