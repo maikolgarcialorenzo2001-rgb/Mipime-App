@@ -13,6 +13,7 @@ export interface ProductoInfo {
   precio_costo: number | null;
   stock_almacen?: number;
   stock_shop?: number;
+  precio_venta?: number;
 }
 
 export interface VentaConDetalles extends Venta {
@@ -718,30 +719,51 @@ export class ExcelService {
     const pmap = data.productosMap;
     if (!inv || !pmap) return;
 
-    // Left table: product stock + investment
+    // Left table: product stock + investment + expected revenue + potential profit
     const filas: unknown[][] = [
-      ['Nombre', 'Stock Almacén', 'Stock Tienda', 'Total Invertido'],
+      ['Nombre', 'Stock Almacén', 'Stock Tienda', 'Precio Venta', 'Ingreso Esperado', 'Total Invertido', 'Ganancia Potencial'],
     ];
 
+    let sumIngreso = 0;
+    let sumInversion = 0;
+    let sumGanancia = 0;
+
     for (const [productoId, info] of pmap) {
-      filas.push([
-        info.nombre,
-        info.stock_almacen ?? '—',
-        info.stock_shop ?? '—',
-        inv.get(productoId) ?? 0,
-      ]);
+      const inversion = inv.get(productoId) ?? 0;
+      const pv = info.precio_venta;
+      const stockAlmacen = info.stock_almacen;
+      const stockShop = info.stock_shop;
+
+      if (pv != null && stockAlmacen != null && stockShop != null) {
+        const totalStock = stockAlmacen + stockShop;
+        const ingreso = totalStock * pv;
+        const ganancia = ingreso - inversion;
+        sumIngreso += ingreso;
+        sumInversion += inversion;
+        sumGanancia += ganancia;
+        filas.push([info.nombre, stockAlmacen, stockShop, pv, ingreso, inversion, ganancia]);
+      } else {
+        sumInversion += inversion;
+        filas.push([info.nombre, stockAlmacen ?? '—', stockShop ?? '—', '—', '—', inversion, '—']);
+      }
     }
+
+    // Totals row
+    filas.push(['TOTALES', '', '', '', sumIngreso, sumInversion, sumGanancia]);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
 
-    // Merma table to the RIGHT (offset 2 blank columns = starting at col G)
+    // Merma table to the RIGHT (offset after 7 data columns + 1 blank = starting at col I)
     const mermaVal = data.jornada.total_merma ?? 0;
-    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 6 } });
+    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 8 } });
 
     ws['!cols'] = [
       { wch: 20 },
       { wch: 16 },
       { wch: 14 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 18 },
       { wch: 18 },
     ];
     ws['!protect'] = {};

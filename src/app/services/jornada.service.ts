@@ -264,13 +264,13 @@ export class JornadaService {
       }
     }
 
-    // 5. Obtener productos para el mapa de nombres + precio_costo + stock
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number }>(
-      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop FROM productos',
+    // 5. Obtener productos para el mapa de nombres + precio_costo + stock + precio_venta
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number; precio_venta: number | null }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop, precio_venta FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop, precio_venta: p.precio_venta ?? undefined });
     }
 
     // 5. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
@@ -433,7 +433,7 @@ export class JornadaService {
     movimientos: Movimiento[];
     stockMovimientos: StockMovimiento[];
     ventaLotes: import('../models/venta-lote').VentaLote[];
-    productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
+    productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
     totalCosto: number;
     userCierreNombre: string | null;
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
@@ -478,13 +478,13 @@ export class JornadaService {
       );
     }
 
-    // 3. Obtener productos para el mapa de nombres + precio_costo + stock
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number }>(
-      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop FROM productos',
+    // 3. Obtener productos para el mapa de nombres + precio_costo + stock + precio_venta
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number; precio_venta: number | null }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop, precio_venta FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop, precio_venta: p.precio_venta ?? undefined });
     }
 
     // 4. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)

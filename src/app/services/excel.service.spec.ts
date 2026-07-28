@@ -1137,10 +1137,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
   // ─── Step 4: IPVE sheet (inversión por producto) ───
 
   describe('IPVE sheet', () => {
-    const ipveProductosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number }>([
-      [1, { nombre: 'Harina 0000 1kg', precio_costo: 550, stock_almacen: 80, stock_shop: 20 }],
-      [2, { nombre: 'Azúcar 1kg', precio_costo: 600, stock_almacen: 25, stock_shop: 5 }],
-      [3, { nombre: 'Leche Entera 1L', precio_costo: 750, stock_almacen: 50, stock_shop: 10 }],
+    const ipveProductosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>([
+      [1, { nombre: 'Harina 0000 1kg', precio_costo: 550, precio_venta: 850, stock_almacen: 80, stock_shop: 20 }],
+      [2, { nombre: 'Azúcar 1kg', precio_costo: 600, precio_venta: 900, stock_almacen: 25, stock_shop: 5 }],
+      [3, { nombre: 'Leche Entera 1L', precio_costo: 750, precio_venta: 1100, stock_almacen: 50, stock_shop: 10 }],
     ]);
     const ipveInversion = new Map<number, number>([
       [1, 55000],
@@ -1161,7 +1161,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(workbook.SheetNames).toContain('ipve');
     });
 
-    it('4.1 RED: hoja ipve debe tener columnas Nombre, Stock Almacén, Stock Tienda, Total Invertido', () => {
+    it('4.2 RED: hoja ipve debe tener 7 columnas con precio_venta, ingreso y ganancia', () => {
       const result = service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
@@ -1171,32 +1171,41 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(header[0]).toBe('Nombre');
       expect(header[1]).toBe('Stock Almacén');
       expect(header[2]).toBe('Stock Tienda');
-      expect(header[3]).toBe('Total Invertido');
+      expect(header[3]).toBe('Precio Venta');
+      expect(header[4]).toBe('Ingreso Esperado');
+      expect(header[5]).toBe('Total Invertido');
+      expect(header[6]).toBe('Ganancia Potencial');
     });
 
-    it('4.1 RED: hoja ipve debe mostrar cada producto con stock e inversión', () => {
+    it('4.3 RED: hoja ipve debe calcular ingreso y ganancia por producto', () => {
       const result = service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      // Harina 0000 1kg: stock_almacen=80, stock_shop=20, inversión 55000
+      // Harina: precio_venta=850, ingreso=(80+20)*850=85000, inversion=55000, ganancia=85000-55000=30000
       const harinaRow = filas.find((r) => r[0] === 'Harina 0000 1kg');
       expect(harinaRow).toBeTruthy();
       expect(harinaRow![1]).toBe(80);
       expect(harinaRow![2]).toBe(20);
-      expect(harinaRow![3]).toBe(55000);
+      expect(harinaRow![3]).toBe(850);
+      expect(harinaRow![4]).toBe(85000);
+      expect(harinaRow![5]).toBe(55000);
+      expect(harinaRow![6]).toBe(30000);
 
-      // Azúcar 1kg: stock_almacen=25, stock_shop=5, inversión 18000
+      // Azúcar: precio_venta=900, ingreso=(25+5)*900=27000, inversion=18000, ganancia=27000-18000=9000
       const azucarRow = filas.find((r) => r[0] === 'Azúcar 1kg');
       expect(azucarRow).toBeTruthy();
       expect(azucarRow![1]).toBe(25);
       expect(azucarRow![2]).toBe(5);
-      expect(azucarRow![3]).toBe(18000);
+      expect(azucarRow![3]).toBe(900);
+      expect(azucarRow![4]).toBe(27000);
+      expect(azucarRow![5]).toBe(18000);
+      expect(azucarRow![6]).toBe(9000);
     });
 
-    it('4.1 RED: hoja ipve debe tener sección "Merma del día" con el valor de total_merma', () => {
+    it('4.6 RED: merma debe estar en columna 8 (después de 7 columnas + blank)', () => {
       const jornadaConMerma: Jornada = { ...jornada, total_merma: 2500 };
       const dataConMerma: JornadaReportData = { ...ipveData(), jornada: jornadaConMerma };
       const result = service.generarExcelJornada(dataConMerma);
@@ -1204,10 +1213,43 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Merma is placed at column offset 6 (0-indexed)
-      const mermaRow = (json as unknown[][]).find((r) => r[6] === 'Merma del día');
+      // Merma is placed at column offset 8 (0-indexed) — after 7 data cols + 1 blank
+      const mermaRow = (json as unknown[][]).find((r) => r[8] === 'Merma del día');
       expect(mermaRow).toBeTruthy();
-      expect(mermaRow![7]).toBe(2500);
+      expect(mermaRow![9]).toBe(2500);
+    });
+
+    it('4.4 RED: hoja ipve debe tener fila de totales con suma correcta', () => {
+      const result = service.generarExcelJornada(ipveData());
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['ipve'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      const totalRow = filas.find((r) => r[0] === 'TOTALES');
+      expect(totalRow).toBeTruthy();
+      // Totales esperados: ingreso=178000, inversion=110500, ganancia=67500
+      expect(totalRow![4]).toBe(178000);
+      expect(totalRow![5]).toBe(110500);
+      expect(totalRow![6]).toBe(67500);
+    });
+
+    it('4.5 RED: producto con precio_venta null debe renderizar "—" en precio, ingreso y ganancia', () => {
+      const pmapSinPrecio = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>([
+        [1, { nombre: 'Producto Sin Precio', precio_costo: 500, precio_venta: undefined, stock_almacen: 10, stock_shop: 5 }],
+      ]);
+      const invSinPrecio = new Map<number, number>([[1, 7500]]);
+      const dataSinPrecio: JornadaReportData = { ...data, productosMap: pmapSinPrecio, inversionPorProducto: invSinPrecio };
+      const result = service.generarExcelJornada(dataSinPrecio);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['ipve'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filas = json as unknown[][];
+      const row = filas.find((r) => r[0] === 'Producto Sin Precio');
+      expect(row![3]).toBe('—');
+      expect(row![4]).toBe('—');
+      expect(row![6]).toBe('—');
     });
 
     it('4.1 RED: cuando inversionPorProducto es undefined, no debe incluir hoja ipve', () => {
@@ -1218,7 +1260,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(workbook.SheetNames).not.toContain('ipve');
     });
 
-    it('4.1 RED: producto sin inversión debe mostrar 0', () => {
+    it('4.1 RED: producto sin inversión debe mostrar 0 en Total Invertido', () => {
       const inversionParcial = new Map<number, number>([
         [1, 55000],
         // producto 2 no tiene inversión
@@ -1236,7 +1278,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
 
       const azucarRow = (json as unknown[][]).find((r) => r[0] === 'Azúcar 1kg');
       expect(azucarRow).toBeTruthy();
-      expect(azucarRow![3]).toBe(0);
+      // Azúcar has precio_venta, so Total Invertido is at column 5
+      expect(azucarRow![5]).toBe(0);
     });
   });
 
