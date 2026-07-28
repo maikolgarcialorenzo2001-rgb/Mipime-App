@@ -6,6 +6,7 @@ import type { VentaConDetalles } from './excel.service';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { ArqueoCajaEntry } from '../models/arqueo-caja';
 
 describe('ExcelService', () => {
   let service: ExcelService;
@@ -126,7 +127,7 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f[0] === 3)).toBe(false);
     });
 
-    it('2.2 RED: debería mostrar fila "Total movimientos" incluso cuando es 0', () => {
+    it('2.2 RED: debería mostrar fila "Total gastos" incluso cuando es 0', () => {
       const jornadaSinGastos: Jornada = {
         ...jornada,
         total_movimientos: 0,
@@ -144,7 +145,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Total movimientos', 0]);
+      expect(json).toContainEqual(['Total gastos', 0]);
     });
 
     it('debería tener la data correcta en la hoja Resumen', () => {
@@ -158,11 +159,20 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Apertura', '09:00:00']);
       expect(json).toContainEqual(['Cierre', '18:30:00']);
       expect(json).toContainEqual(['Estado', 'Cerrada']);
+      // Ganancia Bruta table — totalVentasSinPendientes from ventas array (3800)
+      expect(json).toContainEqual(['Total ventas + ingresos extra', 3800]);
+      expect(json).toContainEqual(['Total gastos', -2000]);
+      expect(json).toContainEqual(['Ganancia bruta', 1800]);
+      // Efectivo del Día table
       expect(json).toContainEqual(['Monto inicial', 5000]);
-      expect(json).toContainEqual(['Total ventas', 15000]);
-      expect(json).toContainEqual(['Total movimientos', 2000]);
-      expect(json).toContainEqual(['Saldo esperado', 18000]);
-      expect(json).toContainEqual(['Saldo real', 17800]);
+      // totalEfectivo=3800, ingresosExtra=0, gastos=2000 -> totalEnCaja = 5000+3800+0-2000 = 6800
+      expect(json).toContainEqual(['Total en caja', 6800]);
+      expect(json).toContainEqual(['Transferencias', 0]);
+      expect(json).toContainEqual(['Total del día', 6800]);
+      // Removed fields — Saldo esperado, Saldo real, Diferencia must NOT appear
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Saldo esperado')).toBe(false);
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Saldo real')).toBe(false);
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Diferencia')).toBe(false);
     });
 
     it('debería listar todas las ventas con sus detalles', () => {
@@ -182,8 +192,8 @@ describe('ExcelService', () => {
       expect(json[3]).toContainEqual(1100);
       expect(json[4]).toContainEqual(150);
 
-      // Footer rows: Total caja, Total divisas, Total pendientes, Total transferencia, Total esperado
-      const cajaRow = json.find((f) => f[0] === 'Total caja') as unknown[];
+      // Footer rows: Total de ingresos en ventas, Total divisas, Total pendientes, Total transferencia, Total esperado
+      const cajaRow = json.find((f) => f[0] === 'Total de ingresos en ventas') as unknown[];
       expect(cajaRow).toBeTruthy();
       expect(cajaRow[3]).toBe(3800);
       const esperadoRow = json.find((f) => f[0] === 'Total esperado') as unknown[];
@@ -279,8 +289,8 @@ describe('ExcelService', () => {
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      // Find footer row - should contain 'Total caja' and the grand total
-      const footerRow = filas.find((f) => f[0] === 'Total caja');
+      // Find footer row - should contain 'Total de ingresos en ventas' and the grand total
+      const footerRow = filas.find((f) => f[0] === 'Total de ingresos en ventas');
       expect(footerRow).toBeTruthy();
       // Total = 850 + 1700 + 1100 + 150 = 3800 (index 3 = columna Total)
       expect(footerRow![3]).toBe(3800);
@@ -301,7 +311,7 @@ describe('ExcelService', () => {
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      const footerRow = filas.find((f) => f[0] === 'Total caja');
+      const footerRow = filas.find((f) => f[0] === 'Total de ingresos en ventas');
       expect(footerRow).toBeTruthy();
       expect(footerRow![3]).toBe(0);
     });
@@ -322,7 +332,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Ganancia bruta', 12960]); // 15000 - 40 - 2000 - 0
+      expect(json).toContainEqual(['Ganancia bruta', 1760]); // 3800 (ventas array) - 40 - 2000 - 0
     });
 
     it('3.3 RED: Ganancia bruta = total_ventas - gastos cuando total_costo y merma = 0', () => {
@@ -337,7 +347,7 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Ganancia bruta', 13000]); // 15000 - 0 - 2000 - 0
+      expect(json).toContainEqual(['Ganancia bruta', 1800]); // 3800 (ventas array) - 0 - 2000 - 0
     });
 
     it('3.3 RED: Resumen debe incluir Firmado por cuando userCierreNombre no es null', () => {
@@ -440,7 +450,7 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f.includes('transferencia'))).toBe(true);
     });
 
-    it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia', () => {
+    it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia en Efectivo del Día', () => {
       const dataConForma: JornadaReportData = {
         ...data,
         ventas: ventasConFormaPago,
@@ -454,7 +464,12 @@ describe('ExcelService', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      expect(json).toContainEqual(['Total transferencia', 2500]);
+      // Efectivo: 1000 (from ventasConFormaPago), Transferencia: 2500
+      expect(json).toContainEqual(['Transferencias', 2500]);
+      // Total en caja = 5000 + 1000 + 0 - 2000 = 4000
+      expect(json).toContainEqual(['Total en caja', 4000]);
+      // Total del día = 4000 + 2500 = 6500
+      expect(json).toContainEqual(['Total del día', 6500]);
     });
   });
 
@@ -533,8 +548,8 @@ describe('ExcelService', () => {
 
       expect(json).toContainEqual(['Mes', 'marzo de 2026']);
       expect(json).toContainEqual(['Cantidad de jornadas', 2]);
-      expect(json).toContainEqual(['Total ventas', 40000]); // 15000 + 25000
-      expect(json).toContainEqual(['Total movimientos', 7000]);  // 2000 + 5000
+      expect(json).toContainEqual(['Total ventas + ingresos extra', 5000]); // 5000 (solo efectivo, sin pendientes)
+      expect(json).toContainEqual(['Total gastos', 1500]);  // gastos from movimientos array
     });
 
     it('C9 RED: hoja por jornada debería tener resumen header + ventas + movimientos', () => {
@@ -545,12 +560,16 @@ describe('ExcelService', () => {
 
       // Should have resumen header fields
       expect(json.some((r) => r[0] === 'Fecha' && r[1] === '2026-03-15')).toBe(true);
-      expect(json.some((r) => r[0] === 'Total ventas' && r[1] === 15000)).toBe(true);
+      expect(json.some((r) => r[0] === 'Total ventas + ingresos extra' && r[1] === 5000)).toBe(true);
+      // Should have Efectivo del Día table
+      expect(json.some((r) => r[0] === 'Efectivo del día')).toBe(true);
+      expect(json.some((r) => r[0] === 'Monto inicial' && r[1] === 5000)).toBe(true);
       // Should have ventas table header
       expect(json.some((r) => r[0] === 'Producto')).toBe(true);
-      expect(json.some((r) => r[0] === 'Total caja')).toBe(true);
       // Should have movimientos table header
       expect(json.some((r) => r[0] === 'Tipo')).toBe(true);
+      // Footer rows were removed (Total caja, Total divisas, etc.)
+      expect(json.some((r) => r[0] === 'Total caja')).toBe(false);
     });
 
     it('C9 RED: debería manejar una sola jornada', () => {
@@ -582,14 +601,14 @@ describe('ExcelService', () => {
       expect(uniqueNames.size).toBe(workbook.SheetNames.length);
     });
 
-it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () => {
+it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const result = service.generarExcelMensual(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen del Mes'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // saldo_esperado: 18000 + 23000 = 41000; saldo_real: 17800 + 23000 = 40800; diff = 200
-      expect(json).toContainEqual(['Diferencia consolidada', 200]);
+      // Diferencia consolidada was removed per restructure
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Diferencia consolidada')).toBe(false);
     });
   });
 
@@ -736,7 +755,7 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
       const filas = json as unknown[][];
-      const cajaRow = filas.find((f) => f[0] === 'Total caja');
+      const cajaRow = filas.find((f) => f[0] === 'Total de ingresos en ventas');
       const pendientesRow = filas.find((f) => f[0] === 'Total pendientes');
       const esperadoRow = filas.find((f) => f[0] === 'Total esperado');
       expect(cajaRow).toBeTruthy();
@@ -860,6 +879,285 @@ it('C9 RED: diferencia consolidada = sum(saldo_esperado) - sum(saldo_real)', () 
       const totalFila = filas.find((r) => r[0] === 'Total C.C.');
       expect(totalFila).toBeDefined();
       expect(totalFila![4]).toBe(-400); // -(3*100 + 2*50)
+    });
+  });
+
+  describe('Fase 3 — Arqueo de Caja en Excel', () => {
+    const arqueoFaltante: ArqueoCajaEntry[] = [
+      { denominacion: 500, cantidad: 10, subtotal: 5000 },
+      { denominacion: 100, cantidad: 20, subtotal: 2000 },
+      { denominacion: 50, cantidad: 100, subtotal: 5000 },
+    ];
+    // total = 12000, saldo_esperado = 18000 → diferencia = 6000 → FALTANTE
+
+    const arqueoSobrante: ArqueoCajaEntry[] = [
+      { denominacion: 1000, cantidad: 5, subtotal: 5000 },
+      { denominacion: 500, cantidad: 10, subtotal: 5000 },
+      { denominacion: 100, cantidad: 30, subtotal: 3000 },
+    ];
+    // total = 13000, saldo_esperado = 10000 → diferencia = -3000 → SOBRANTE
+
+    it('6.1 RED: generarExcelJornada incluye hoja "Arqueo" cuando hay arqueo entries', () => {
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelJornada(dataConArqueo);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).toContain('Arqueo');
+    });
+
+    it('6.2 RED: hoja Arqueo contiene filas de denominación con valores correctos', () => {
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelJornada(dataConArqueo);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json.some((r) => r[0] === '$500' && r[1] === 10 && r[2] === 5000)).toBe(true);
+      expect(json.some((r) => r[0] === '$100' && r[1] === 20 && r[2] === 2000)).toBe(true);
+      expect(json.some((r) => r[0] === '$50' && r[1] === 100 && r[2] === 5000)).toBe(true);
+      expect(json).toContainEqual(['Total contado', '', 12000]);
+    });
+
+    it('6.3 RED: cuando totalEnCaja < totalArqueo, muestra SOBRANTE', () => {
+      // totalEnCaja = 5000+3800+0-2000 = 6800 → diff = 6800-12000 = -5200
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelJornada(dataConArqueo);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['SOBRANTE', 5200]);
+    });
+
+    it('6.4 RED: cuando totalEnCaja < totalArqueo con otro monto, muestra SOBRANTE', () => {
+      // totalEnCaja = 5000+3800+0-2000 = 6800, arqueoTotal=13000 → diff = -6200
+      const dataConSobrante: JornadaReportData = { ...data, arqueo: arqueoSobrante };
+      const result = service.generarExcelJornada(dataConSobrante);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['SOBRANTE', 6200]);
+    });
+
+    it('6.5 RED: cuando data.arqueo es undefined, no hay hoja "Arqueo"', () => {
+      const dataSinArqueo: JornadaReportData = { ...data, arqueo: undefined };
+      const result = service.generarExcelJornada(dataSinArqueo);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).not.toContain('Arqueo');
+    });
+
+    it('6.6 RED: hoja por jornada del Excel mensual incluye sección Arqueo', () => {
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelMensual([dataConArqueo]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json.some((r) => r[0] === 'Arqueo de Caja')).toBe(true);
+      expect(json.some((r) => r[0] === '$500' && r[1] === 10 && r[2] === 5000)).toBe(true);
+      expect(json).toContainEqual(['Total contado', '', 12000]);
+      // totalEnCaja = 5000+3800+0-2000 = 6800, arqueo=12000 → diff = -5200 → SOBRANTE
+      expect(json).toContainEqual(['SOBRANTE', 5200]);
+    });
+
+    it('6.7 RED: cuando totalEnCaja === totalArqueo, muestra CUADRADO', () => {
+      const arqueoCuadrado: ArqueoCajaEntry[] = [
+        { denominacion: 5000, cantidad: 1, subtotal: 5000 },
+        { denominacion: 200, cantidad: 4, subtotal: 800 },
+        { denominacion: 100, cantidad: 10, subtotal: 1000 },
+      ];
+      // arqueoTotal = 5000+800+1000 = 6800 matches totalEnCaja
+      const dataCuadrado: JornadaReportData = { ...data, arqueo: arqueoCuadrado };
+      const result = service.generarExcelJornada(dataCuadrado);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['CUADRADO', 0]);
+    });
+  });
+
+  // ─── fix-cierre-jornada-calculos: Task 1.3 — pendientes exclusion + net cash row ───
+
+  describe('fix-cierre-jornada-calculos — Resumen pendientes y net cash', () => {
+    const ventasConPendientes: VentaConDetalles[] = [
+      {
+        id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00',
+        total: 850, usuario_id: 1, forma_pago: 'efectivo',
+        created_at: '2026-06-04T10:00:00Z',
+        detalles: [{ id: 1, venta_id: 1, producto_id: 1, cantidad: 1, precio_unitario: 850, subtotal: 850 }],
+      },
+      {
+        id: 2, jornada_id: 1, fecha_hora: '2026-06-04T11:00:00',
+        total: 1500, usuario_id: 1, forma_pago: 'pendiente',
+        comprador_nombre: 'Juan Pérez',
+        created_at: '2026-06-04T11:00:00Z',
+        detalles: [{ id: 2, venta_id: 2, producto_id: 1, cantidad: 1, precio_unitario: 1500, subtotal: 1500 }],
+      },
+    ];
+
+    it('1.3 RED: Resumen "Total ventas + ingresos extra" excluye pendientes', () => {
+      const dataConPendientes: JornadaReportData = {
+        ...data,
+        ventas: ventasConPendientes,
+        movimientos: [],
+        totalCosto: 0,
+      };
+      const result = service.generarExcelJornada(dataConPendientes);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // totalVentasSinPendientes = 850 (efectivo), totalIngresosExtra = 0
+      expect(json).toContainEqual(['Total ventas + ingresos extra', 850]);
+    });
+
+    it('1.3 RED: Resumen tiene fila "Total después de retirar monto inicial"', () => {
+      // totalEnCaja = 5000+3800+0-2000 = 6800, net cash = 6800-5000 = 1800
+      const result = service.generarExcelJornada(data);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Total después de retirar monto inicial', 1800]);
+    });
+  });
+
+  // ─── fix-cierre-jornada-calculos: Task 1.4 — Arqueo usa totalEnCaja ───
+
+  describe('fix-cierre-jornada-calculos — Arqueo sheet', () => {
+    const arqueoFaltante: ArqueoCajaEntry[] = [
+      { denominacion: 500, cantidad: 10, subtotal: 5000 },
+      { denominacion: 100, cantidad: 20, subtotal: 2000 },
+      { denominacion: 50, cantidad: 100, subtotal: 5000 },
+    ];
+
+    it('1.4 RED: Arqueo sheet faltante/sobrante usa totalEnCaja, no saldo_esperado', () => {
+      // totalEnCaja = 5000+3800+0-2000 = 6800, arqueo=12000 → SOBRANTE 5200
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelJornada(dataConArqueo);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // If using saldo_esperado (18000) → FALTANTE 6000
+      // If using totalEnCaja (6800) → SOBRANTE 5200
+      expect(json).toContainEqual(['SOBRANTE', 5200]);
+    });
+
+    it('1.4 RED: Arqueo sheet no usa saldo_esperado (incluso si saldo_esperado difiere)', () => {
+      const jornadaConSaldoAlto: Jornada = { ...jornada, saldo_esperado: 99999 };
+      const dataConSaldoAlto: JornadaReportData = {
+        ...data,
+        jornada: jornadaConSaldoAlto,
+        arqueo: arqueoFaltante,
+      };
+      const result = service.generarExcelJornada(dataConSaldoAlto);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // SOBRANTE 5200 (from totalEnCaja), NOT FALTANTE 87999 (from saldo_esperado)
+      expect(json).toContainEqual(['SOBRANTE', 5200]);
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'FALTANTE')).toBe(false);
+    });
+  });
+
+  // ─── fix-cierre-jornada-calculos: Task 1.5 — Jornada sheet ───
+
+  describe('fix-cierre-jornada-calculos — Jornada sheet (Excel mensual)', () => {
+    const arqueoFaltante: ArqueoCajaEntry[] = [
+      { denominacion: 500, cantidad: 10, subtotal: 5000 },
+      { denominacion: 100, cantidad: 20, subtotal: 2000 },
+      { denominacion: 50, cantidad: 100, subtotal: 5000 },
+    ];
+
+    const ventasConPendientes: VentaConDetalles[] = [
+      {
+        id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00',
+        total: 1000, usuario_id: 1, forma_pago: 'efectivo',
+        created_at: '2026-06-04T10:00:00Z',
+        detalles: [{ id: 1, venta_id: 1, producto_id: 1, cantidad: 1, precio_unitario: 1000, subtotal: 1000 }],
+      },
+      {
+        id: 2, jornada_id: 1, fecha_hora: '2026-06-04T11:00:00',
+        total: 2000, usuario_id: 1, forma_pago: 'pendiente',
+        created_at: '2026-06-04T11:00:00Z',
+        detalles: [{ id: 2, venta_id: 2, producto_id: 1, cantidad: 2, precio_unitario: 1000, subtotal: 2000 }],
+      },
+    ];
+
+    it('1.5 RED: Jornada sheet "Total ventas + ingresos extra" excluye pendientes', () => {
+      const dataConPendientes: JornadaReportData = {
+        ...data,
+        ventas: ventasConPendientes,
+        movimientos: [],
+        totalCosto: 0,
+      };
+      const result = service.generarExcelMensual([dataConPendientes]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // totalVentasSinPendientes = 1000, totalIngresosExtra = 0 → 1000
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Total ventas + ingresos extra' && (r as unknown[])[1] === 1000)).toBe(true);
+    });
+
+    it('1.5 RED: Jornada sheet tiene fila "Total después de retirar monto inicial"', () => {
+      // totalEnCajaJ = 5000+3800+0-2000 = 6800, net = 6800-5000 = 1800
+      const result = service.generarExcelMensual([data]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json.some((r: unknown) => (r as unknown[])[0] === 'Total después de retirar monto inicial' && (r as unknown[])[1] === 1800)).toBe(true);
+    });
+
+    it('1.5 RED: Jornada sheet arqueo usa totalEnCaja no saldo_esperado', () => {
+      // totalEnCaja = 5000+3800+0-2000 = 6800, arqueo=12000 → SOBRANTE 5200
+      const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
+      const result = service.generarExcelMensual([dataConArqueo]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['SOBRANTE', 5200]);
+    });
+  });
+
+  // ─── fix-cierre-jornada-calculos: Task 1.6 — Resumen del Mes ───
+
+  describe('fix-cierre-jornada-calculos — Resumen del Mes', () => {
+    it('1.6 RED: Resumen del Mes "Total ventas + ingresos extra" excluye pendientes', () => {
+      const dataConPendientes: JornadaReportData = {
+        ...data,
+        ventas: [
+          {
+            id: 1, jornada_id: 1, fecha_hora: '',
+            total: 3000, usuario_id: 1, forma_pago: 'efectivo',
+            created_at: '',
+            detalles: [{ id: 1, venta_id: 1, producto_id: 1, cantidad: 1, precio_unitario: 3000, subtotal: 3000 }],
+          },
+          {
+            id: 2, jornada_id: 1, fecha_hora: '',
+            total: 1000, usuario_id: 1, forma_pago: 'pendiente',
+            created_at: '',
+            detalles: [{ id: 2, venta_id: 2, producto_id: 1, cantidad: 1, precio_unitario: 1000, subtotal: 1000 }],
+          },
+        ],
+        movimientos: [],
+        totalCosto: 0,
+      };
+      const result = service.generarExcelMensual([dataConPendientes]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen del Mes'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // totalVentasSinPendientes = 3000, totalIngresosExtra = 0 → 3000
+      expect(json).toContainEqual(['Total ventas + ingresos extra', 3000]);
     });
   });
 });

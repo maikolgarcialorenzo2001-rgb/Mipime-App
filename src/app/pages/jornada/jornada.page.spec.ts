@@ -475,22 +475,24 @@ describe('JornadaPage', () => {
       fixture.detectChanges();
     });
 
-    it('5.3 RED: modal de cierre debería pasar saldo_esperado como saldoReal sin input manual', () => {
+    it('should compute saldoReal from arqueo form and pass arqueo entries to cerrar()', () => {
       component.abrirModalCierre();
       fixture.detectChanges();
 
-      // NO debe haber input de saldoReal
-      const input = fixture.nativeElement.querySelector('#saldo-real');
-      expect(input).toBeNull();
-
-      // Debe mostrar el saldo_esperado como read-only
+      // Must show totalEnCaja as read-only (monto_inicial=5000, no ventas/mov)
       const modalText = fixture.nativeElement.querySelector('[role="dialog"]')?.textContent ?? '';
-      expect(modalText).toContain('Saldo esperado');
-      expect(modalText).toContain('18,000');
+      expect(modalText).toContain('Total en caja');
+      expect(modalText).toContain('5,000');
 
-      // confirmarCierre debe usar saldo_esperado automáticamente
+      // Set denomination values: 2 × $5.000 + 5 × $1.000 = $15.000
+      component.arqueoForm.update(f => ({ ...f, 5000: 2, 1000: 5 }));
+      fixture.detectChanges();
+
       component.confirmarCierre();
-      expect(cerrarSpy).toHaveBeenCalledWith(1, 18000, 1);
+      expect(cerrarSpy).toHaveBeenCalledWith(1, 15000, 1, [
+        { denominacion: 5000, cantidad: 2, subtotal: 10000 },
+        { denominacion: 1000, cantidad: 5, subtotal: 5000 },
+      ]);
     });
 
     it('debería mostrar error si confirmarCierre falla', () => {
@@ -500,6 +502,100 @@ describe('JornadaPage', () => {
 
       const errorEl: HTMLElement | null = fixture.nativeElement.querySelector('.bg-red-50');
       expect(errorEl?.textContent).toContain('Error de DB');
+    });
+
+    it('arqueo: modal renders denomination inputs for visible denominations', () => {
+      component.abrirModalCierre();
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+      const visible = component.denominacionesVisibles();
+
+      // 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5 — but NOT 3 or 1
+      expect(visible).not.toContain(1);
+      expect(visible).not.toContain(3);
+      expect(visible.length).toBe(10);
+
+      // Each visible denomination has an input in the dialog
+      for (const d of visible) {
+        const label = dialog.querySelector(`span`) as HTMLElement;
+        // At least the denomination label should be rendered
+        expect(dialog.textContent).toContain(d.toLocaleString());
+      }
+    });
+
+    it('arqueo: $1 and $3 inputs are NOT visible by default', () => {
+      component.abrirModalCierre();
+      fixture.detectChanges();
+
+      expect(component.denominacionesVisibles()).not.toContain(1);
+      expect(component.denominacionesVisibles()).not.toContain(3);
+    });
+
+    it('arqueo: checking optional checkbox shows $1 and $3 inputs', () => {
+      component.abrirModalCierre();
+      fixture.detectChanges();
+
+      component.showOptionalDenoms.set(true);
+      fixture.detectChanges();
+
+      expect(component.denominacionesVisibles()).toContain(1);
+      expect(component.denominacionesVisibles()).toContain(3);
+      expect(component.denominacionesVisibles().length).toBe(12);
+    });
+
+    it('arqueo: total is computed correctly from entered quantities', () => {
+      component.abrirModalCierre();
+
+      component.arqueoForm.update(f => ({ ...f, 5000: 3, 200: 4, 50: 2 }));
+      fixture.detectChanges();
+
+      // 3×5000 + 4×200 + 2×50 = 15000 + 800 + 100 = 15900
+      expect(component.arqueoTotal()).toBe(15900);
+    });
+
+    it('arqueo: confirmarCierre shows error when all quantities are 0', () => {
+      component.abrirModalCierre();
+      fixture.detectChanges();
+
+      component.confirmarCierre();
+
+      expect(component.cerrarError()).toBe('Ingresa la cantidad de al menos una denominación');
+      expect(cerrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('arqueo: shows faltante label when totalEnCaja > arqueoTotal', () => {
+      component.abrirModalCierre();
+      // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
+      // arqueoTotal = 3000 → diff = 2000 → faltante
+      component.arqueoForm.update(f => ({ ...f, 2000: 1, 1000: 1 }));
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+      expect(dialog.textContent).toContain('Faltante');
+      expect(dialog.textContent).toContain('2,000');
+    });
+
+    it('arqueo: shows sobrante label when totalEnCaja < arqueoTotal', () => {
+      component.abrirModalCierre();
+      // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
+      // arqueoTotal = 10000 → diff = -5000 → sobrante
+      component.arqueoForm.update(f => ({ ...f, 5000: 2 }));
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+      expect(dialog.textContent).toContain('Sobrante');
+      expect(dialog.textContent).toContain('5,000');
+    });
+
+    it('arqueo: shows cuadrado when totalEnCaja === arqueoTotal', () => {
+      component.abrirModalCierre();
+      // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
+      component.arqueoForm.update(f => ({ ...f, 5000: 1 }));
+      fixture.detectChanges();
+
+      const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+      expect(dialog.textContent).toContain('Cuadrado');
     });
   });
 
@@ -574,5 +670,119 @@ describe('JornadaPage', () => {
       );
       expect(mermaRowText.some((t) => t?.includes('Rotura'))).toBe(false);
     });
+  });
+});
+
+describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
+  let fixture: ComponentFixture<JornadaPage>;
+  let component: JornadaPage;
+
+  beforeEach(() => {
+    const mockDb = createMockDb();
+    TestBed.configureTestingModule({
+      imports: [JornadaPage],
+      providers: [
+        {
+          provide: JornadaService,
+          useValue: createMockJornadaService({
+            jornadaAbierta: mockJornadaAbierta,
+            jornadaCargando: false,
+            obtenerAbierta: () => of(mockJornadaAbierta),
+            cerrar: vi.fn().mockReturnValue(of(mockJornadaCerrada)),
+          }),
+        },
+        { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+        { provide: DATABASE, useValue: mockDb },
+      ],
+    });
+
+    fixture = TestBed.createComponent(JornadaPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  // ─── Task 1.1: totalEnCaja computed ───
+
+  it('1.1 RED: totalEnCaja = monto_inicial + efectivo + ingresosExtra - gastos', () => {
+    component.ventasDelDia.set([
+      { id: 1, jornada_id: 1, fecha_hora: '', total: 2000, usuario_id: 1, forma_pago: 'efectivo', created_at: '' },
+      { id: 2, jornada_id: 1, fecha_hora: '', total: 1000, usuario_id: 1, forma_pago: 'transferencia', created_at: '' },
+    ] as Venta[]);
+    component.movimientosDelDia.set([
+      { id: 1, jornada_id: 1, tipo: 'ingreso_extra', descripcion: '', monto: 400, created_at: '' },
+      { id: 2, jornada_id: 1, tipo: 'gasto', descripcion: '', monto: 300, created_at: '' },
+    ] as Movimiento[]);
+
+    // 5000 + 2000(efectivo) + 400(ingreso) - 300(gasto) = 7100
+    expect(component.totalEnCaja()).toBe(7100);
+  });
+
+  it('1.1 RED: totalEnCaja = monto_inicial cuando no hay ventas ni movimientos', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+
+    expect(component.totalEnCaja()).toBe(5000); // solo monto_inicial
+  });
+
+  // ─── Task 1.2: diferencia usa totalEnCaja ───
+
+  it('1.2 RED: diferencia = totalEnCaja - arqueoTotal (faltante: totalEnCaja > arqueo)', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+    // totalEnCaja = 5000
+    component.arqueoForm.update(f => ({ ...f, 5000: 1 })); // 5000
+    // diferencia = 5000 - 5000 = 0 → cuadrado
+    expect(component.diferencia()).toBe(0);
+
+    component.arqueoForm.update(f => ({ ...f, 5000: 0, 2000: 2 })); // 4000
+    // diferencia = 5000 - 4000 = 1000 → faltante
+    expect(component.diferencia()).toBe(1000);
+  });
+
+  it('1.2 RED: diferencia = totalEnCaja - arqueoTotal (sobrante: totalEnCaja < arqueo)', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+    // totalEnCaja = 5000
+    component.arqueoForm.update(f => ({ ...f, 5000: 2 })); // 10000
+    // diferencia = 5000 - 10000 = -5000 → sobrante
+    expect(component.diferencia()).toBe(-5000);
+  });
+
+  it('1.2 RED: faltante label en modal cuando totalEnCaja > arqueoTotal', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+    // totalEnCaja = 5000
+    component.abrirModalCierre();
+    component.arqueoForm.update(f => ({ ...f, 2000: 2 })); // 4000
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Faltante');
+    expect(dialog?.textContent).toContain('1,000'); // 5000 - 4000 = 1000
+  });
+
+  it('1.2 RED: sobrante label en modal cuando totalEnCaja < arqueoTotal', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+    // totalEnCaja = 5000
+    component.abrirModalCierre();
+    component.arqueoForm.update(f => ({ ...f, 5000: 2 })); // 10000
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Sobrante');
+    expect(dialog?.textContent).toContain('5,000'); // 5000 - 10000 = -5000 → sobrante 5000
+  });
+
+  it('1.2 RED: cuadrado label en modal cuando totalEnCaja === arqueoTotal', () => {
+    component.ventasDelDia.set([]);
+    component.movimientosDelDia.set([]);
+    // totalEnCaja = 5000
+    component.abrirModalCierre();
+    component.arqueoForm.update(f => ({ ...f, 5000: 1 })); // 5000
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Cuadrado');
   });
 });

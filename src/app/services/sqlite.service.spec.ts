@@ -686,3 +686,94 @@ describe('SqliteService migration v11', () => {
     expect(v11Insert).toBeDefined();
   });
 });
+
+describe('SqliteService migration v13', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('T1 RED: v13 debería crear tabla arqueo_caja con estructura correcta', async () => {
+    mockSchemaVersion = 12;
+    await service.initialize();
+
+    const createTable = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('arqueo_caja'),
+    );
+    expect(createTable).toBeDefined();
+    expect(createTable!.query).toContain('id INTEGER PRIMARY KEY AUTOINCREMENT');
+    expect(createTable!.query).toContain('jornada_id INTEGER NOT NULL REFERENCES jornadas(id)');
+    expect(createTable!.query).toContain('denominacion INTEGER NOT NULL');
+    expect(createTable!.query).toContain('cantidad INTEGER NOT NULL DEFAULT 0');
+    expect(createTable!.query).toContain('created_at TEXT NOT NULL');
+  });
+
+  it('T1 RED: v13 debería crear índice idx_arqueo_jornada', async () => {
+    mockSchemaVersion = 12;
+    await service.initialize();
+
+    const createIndex = sqlCalls.find(
+      (c) =>
+        c.query.includes('CREATE INDEX') && c.query.includes('idx_arqueo_jornada'),
+    );
+    expect(createIndex).toBeDefined();
+    expect(createIndex!.query).toContain('arqueo_caja(jornada_id)');
+  });
+
+  it('T1 RED: v13 debería registrar versión 13 en schema_version', async () => {
+    mockSchemaVersion = 12;
+    await service.initialize();
+
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (13)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('T1 RED: v13 no debería ejecutarse si schema_version >= 13', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const createTable = sqlCalls.filter(
+      (c) =>
+        c.query.includes('CREATE TABLE') && c.query.includes('arqueo_caja'),
+    );
+    expect(createTable.length).toBe(0);
+  });
+});

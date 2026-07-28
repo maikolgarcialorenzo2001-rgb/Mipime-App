@@ -118,6 +118,10 @@ export class SqliteService implements Database {
       await this._migrationV12(client);
     }
 
+    if (currentVersion < 13) {
+      await this._migrationV13(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -502,6 +506,21 @@ export class SqliteService implements Database {
     await client.sql('ALTER TABLE jornadas RENAME COLUMN total_gastos TO total_movimientos');
     await client.sql('INSERT INTO schema_version (version) VALUES (12)');
     await client.sql('COMMIT');
+  }
+
+  private async _migrationV13(client: SQLocal): Promise<void> {
+    // v13: crear tabla arqueo_caja para conteo de billetes/monedas
+    await client.sql(`CREATE TABLE IF NOT EXISTS arqueo_caja (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      denominacion INTEGER NOT NULL,
+      cantidad INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )`);
+    await client.sql(
+      'CREATE INDEX IF NOT EXISTS idx_arqueo_jornada ON arqueo_caja(jornada_id)',
+    );
+    await client.sql('INSERT INTO schema_version (version) VALUES (13)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

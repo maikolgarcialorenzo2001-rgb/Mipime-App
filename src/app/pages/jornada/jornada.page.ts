@@ -1,4 +1,4 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
@@ -9,6 +9,7 @@ import { JornadaSummaryCardComponent } from '../../components/jornada-summary-ca
 import type { Venta, DetalleVenta } from '../../models/venta';
 import type { Movimiento } from '../../models/movimiento';
 import type { StockMovimiento } from '../../models/stock-movimiento';
+import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
 
 @Component({
   selector: 'app-jornada-page',
@@ -42,6 +43,43 @@ export class JornadaPage {
   readonly showCloseModal = signal(false);
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
+
+  /** Denomination form */
+  readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
+  readonly arqueoForm = signal<Record<number, number>>({
+    5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
+  });
+  readonly showOptionalDenoms = signal(false);
+
+  readonly denominacionesVisibles = computed(() =>
+    this.showOptionalDenoms()
+      ? [...this.DENOMINACIONES]
+      : this.DENOMINACIONES.filter(d => d !== 1 && d !== 3),
+  );
+
+  readonly arqueoTotal = computed(() => {
+    const f = this.arqueoForm();
+    return this.denominacionesVisibles().reduce((sum, d) => sum + d * (f[d] ?? 0), 0);
+  });
+
+  readonly totalEnCaja = computed(() => {
+    const j = this.jornadaService.jornadaAbierta();
+    if (!j) return 0;
+    const totalEfectivo = this.ventasDelDia()
+      .filter(v => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalIngresosExtra = this.movimientosDelDia()
+      .filter(m => m.tipo === 'ingreso_extra')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalGastos = this.movimientosDelDia()
+      .filter(m => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0);
+    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+  });
+
+  readonly diferencia = computed(() => {
+    return this.totalEnCaja() - this.arqueoTotal();
+  });
 
   readonly usuario = this._authService.usuario;
 
@@ -161,8 +199,16 @@ export class JornadaPage {
     });
   }
 
+  actualizarCantidad(denominacion: number, cantidad: number): void {
+    this.arqueoForm.update(f => ({ ...f, [denominacion]: cantidad }));
+  }
+
   abrirModalCierre(): void {
     this.cerrarError.set(null);
+    this.arqueoForm.set({
+      5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
+    });
+    this.showOptionalDenoms.set(false);
     this.showCloseModal.set(true);
   }
 
@@ -175,12 +221,26 @@ export class JornadaPage {
     const uid = this.usuario()?.id;
 
     if (!j || uid === undefined) return;
-    const sr = j.saldo_esperado;
 
+    // Build arqueo entries from form (only entries with cantidad > 0)
+    const entries: ArqueoCajaEntry[] = [];
+    for (const d of this.denominacionesVisibles()) {
+      const cantidad = this.arqueoForm()[d] ?? 0;
+      if (cantidad > 0) {
+        entries.push({ denominacion: d, cantidad, subtotal: d * cantidad });
+      }
+    }
+
+    if (entries.length === 0) {
+      this.cerrarError.set('Ingresa la cantidad de al menos una denominación');
+      return;
+    }
+
+    const saldoReal = this.arqueoTotal();
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, sr, uid).subscribe({
+    this.jornadaService.cerrar(j.id, saldoReal, uid, entries).subscribe({
       next: () => {
         this.showCloseModal.set(false);
         this.cerrando.set(false);

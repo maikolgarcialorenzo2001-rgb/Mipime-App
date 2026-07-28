@@ -6,6 +6,7 @@ import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { StockMovimiento } from '../models/stock-movimiento';
 import type { VentaLote } from '../models/venta-lote';
+import type { ArqueoCajaEntry } from '../models/arqueo-caja';
 
 export interface ProductoInfo {
   nombre: string;
@@ -28,6 +29,7 @@ export interface JornadaReportData {
   cuentaCosas?: CuentaCosa[];
   stockMovimientos?: StockMovimiento[];
   ventaLotes?: VentaLote[];
+  arqueo?: ArqueoCajaEntry[];
 }
 
 @Injectable({
@@ -49,6 +51,7 @@ export class ExcelService {
     this._agregarVentas(wb, data);
     this._agregarMovimientos(wb, data);
     this._agregarMovimientosStock(wb, data);
+    this._agregarArqueo(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
@@ -57,13 +60,19 @@ export class ExcelService {
     const j = data.jornada;
     const ventas = data.ventas;
 
-    // Total ventas + ingresos extra
+    // Total ventas + ingresos extra (excluye pendientes)
     const totalIngresosExtra = data.movimientos
       .filter((m) => m.tipo === 'ingreso_extra')
       .reduce((sum, m) => sum + m.monto, 0);
-    const totalVentasConExtra = j.total_ventas + totalIngresosExtra;
+    const totalVentasSinPendientes = ventas
+      .filter((v) => v.forma_pago !== 'pendiente')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalVentasConExtra = totalVentasSinPendientes + totalIngresosExtra;
 
-    const gananciaBruta = totalVentasConExtra - data.totalCosto - j.total_movimientos - (j.total_merma ?? 0);
+    const totalGastos = data.movimientos
+      .filter((m) => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0);
     const gananciaPct = totalVentasConExtra > 0 ? ((gananciaBruta / totalVentasConExtra) * 100).toFixed(1) : '0.0';
 
     // Calcular desglose por forma de pago
@@ -99,6 +108,8 @@ export class ExcelService {
     }
     const totalUnidadesDivisas = Array.from(divisaPorTipo.values()).reduce((sum, d) => sum + d.monto, 0);
 
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
       [],
@@ -107,22 +118,25 @@ export class ExcelService {
       ['Cierre', j.hora_cierre ?? '—'],
       ['Estado', j.estado === 'abierta' ? 'Abierta' : 'Cerrada'],
       [],
-      ['Monto inicial', j.monto_inicial],
-      ['Total ventas', totalVentasConExtra],
-      ['Total efectivo', totalEfectivo],
-      ['Total transferencia', totalTransferencia],
-      ['Pendientes del día', totalPendientes],
-      ['Total movimientos', j.total_movimientos],
-      ['Total merma', j.total_merma ?? 0],
+      // --- Tabla Ganancia Bruta ---
+      ['Cálculo de ganancia bruta'],
+      ['Total ventas + ingresos extra', totalVentasConExtra],
+      ['Total costo productos', -data.totalCosto],
+      ['Total gastos', -totalGastos],
+      ['Total merma', -(j.total_merma ?? 0)],
       ['Ganancia bruta', gananciaBruta],
       ['Ganancia %', `${gananciaPct}%`],
-      ['Saldo esperado', j.saldo_esperado],
+      [],
+      // --- Tabla Efectivo del Día ---
+      ['Efectivo del día'],
+      ['Monto inicial', j.monto_inicial],
+      ['Total en caja', totalEnCaja],
+      ['Total después de retirar monto inicial', totalEnCaja - j.monto_inicial],
+      ['Transferencias', totalTransferencia],
+      ['Pendientes del día', totalPendientes],
+      ['Total del día', totalEnCaja + totalTransferencia],
+      [],
     ];
-
-    if (j.saldo_real !== null) {
-      filas.push(['Saldo real', j.saldo_real]);
-      filas.push(['Diferencia', j.saldo_esperado - j.saldo_real]);
-    }
 
     if (data.userCierreNombre) {
       filas.push(['Firmado por', data.userCierreNombre]);
@@ -246,7 +260,7 @@ export class ExcelService {
       .reduce((sum, v) => sum + v.total, 0);
     const footerLen = headerBase.length + headerExtra.length;
     const cajaFooter = Array(footerLen).fill('');
-    cajaFooter[0] = 'Total caja';
+    cajaFooter[0] = 'Total de ingresos en ventas';
     cajaFooter[3] = totalCaja;
     const divisasFooter = Array(footerLen).fill('');
     divisasFooter[0] = 'Total divisas';
@@ -296,13 +310,19 @@ export class ExcelService {
   }
 
   private _agregarResumenDelMes(wb: XLSX.WorkBook, data: JornadaReportData[]): void {
-    const totalVentas = data.reduce((s, d) => s + d.jornada.total_ventas, 0);
+    const totalVentasSinPendientes = data.reduce(
+      (s, d) => s + d.ventas.filter((v) => v.forma_pago !== 'pendiente').reduce((ss, v) => ss + v.total, 0),
+      0,
+    );
     const totalIngresosExtra = data.reduce(
       (s, d) => s + d.movimientos.filter((m) => m.tipo === 'ingreso_extra').reduce((ss, m) => ss + m.monto, 0),
       0,
     );
-    const totalVentasConExtra = totalVentas + totalIngresosExtra;
-    const totalMovimientos = data.reduce((s, d) => s + d.jornada.total_movimientos, 0);
+    const totalVentasConExtra = totalVentasSinPendientes + totalIngresosExtra;
+    const totalGastos = data.reduce(
+      (s, d) => s + d.movimientos.filter((m) => m.tipo === 'gasto').reduce((ss, m) => ss + m.monto, 0),
+      0,
+    );
     const totalCosto = data.reduce((s, d) => s + (d.totalCosto ?? 0), 0);
     const totalEfectivo = data.reduce(
       (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'efectivo').reduce((ss, v) => ss + v.total, 0),
@@ -312,12 +332,6 @@ export class ExcelService {
       (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'transferencia').reduce((ss, v) => ss + v.total, 0),
       0,
     );
-    const sumSaldoEsperado = data.reduce((s, d) => s + d.jornada.saldo_esperado, 0);
-    const sumSaldoReal = data.reduce(
-      (s, d) => s + (d.jornada.saldo_real ?? 0),
-      0,
-    );
-
     // Obtener mes/año de la primera jornada
     const primera = data[0]?.jornada;
     const fecha = primera ? new Date(primera.fecha + 'T12:00:00') : new Date();
@@ -329,13 +343,11 @@ export class ExcelService {
       ['Mes', mesLabel],
       ['Cantidad de jornadas', data.length],
       [],
-      ['Total ventas', totalVentasConExtra],
+      ['Total ventas + ingresos extra', totalVentasConExtra],
       ['Total efectivo', totalEfectivo],
       ['Total transferencia', totalTransferencia],
-      ['Total movimientos', totalMovimientos],
-      ['Ganancia bruta', totalVentasConExtra - totalCosto],
-      [],
-      ['Diferencia consolidada', sumSaldoEsperado - sumSaldoReal],
+      ['Total gastos', totalGastos],
+      ['Ganancia bruta', totalVentasConExtra - totalCosto - totalGastos],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -348,11 +360,41 @@ export class ExcelService {
   private _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const j = data.jornada;
 
-    // Total ventas + ingresos extra
+    // Total ventas + ingresos extra (excluye pendientes)
     const totalIngresosExtra = data.movimientos
       .filter((m) => m.tipo === 'ingreso_extra')
       .reduce((sum, m) => sum + m.monto, 0);
-    const totalVentasConExtra = j.total_ventas + totalIngresosExtra;
+    const totalVentasSinPendientes = data.ventas
+      .filter((v) => v.forma_pago !== 'pendiente')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalVentasConExtra = totalVentasSinPendientes + totalIngresosExtra;
+    const totalGastos = data.movimientos
+      .filter((m) => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0);
+
+    const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0);
+    const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
+
+    // Pre-compute payment totals for Efectivo del Día table
+    let totalCaja = 0;
+    let totalPendientes = 0;
+    let totalTransferencia = 0;
+    for (const venta of data.ventas) {
+      for (const detalle of venta.detalles) {
+        if (venta.forma_pago === 'pendiente') {
+          totalPendientes += detalle.subtotal;
+        } else if (venta.forma_pago === 'transferencia') {
+          totalTransferencia += detalle.subtotal;
+        } else if (venta.forma_pago !== 'divisas') {
+          totalCaja += detalle.subtotal;
+        }
+      }
+    }
+    const totalDivisas = data.ventas
+      .filter((v) => v.forma_pago === 'divisas')
+      .reduce((sum, v) => sum + v.total, 0);
+
+    const totalEnCajaJ = j.monto_inicial + totalCaja + totalIngresosExtra - totalGastos;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -362,18 +404,24 @@ export class ExcelService {
       ['Cierre', j.hora_cierre ?? '—'],
       ['Estado', 'Cerrada'],
       [],
+      // --- TABLA GANANCIA BRUTA ---
+      ['Cálculo de ganancia bruta'],
+      ['Total ventas + ingresos extra', totalVentasConExtra],
+      ['Total costo productos', -(data.totalCosto ?? 0)],
+      ['Total gastos', -totalGastos],
+      ['Total merma', -(j.total_merma ?? 0)],
+      ['Ganancia bruta', gananciaBruta],
+      ['Ganancia %', gananciaPct],
+      [],
+      // --- TABLA EFECTIVO DEL DÍA ---
+      ['Efectivo del día'],
       ['Monto inicial', j.monto_inicial],
-      ['Total ventas', totalVentasConExtra],
-      ['Total movimientos', j.total_movimientos],
-      ['Ganancia bruta', totalVentasConExtra - (data.totalCosto ?? 0)],
-      ['Ganancia %', totalVentasConExtra > 0 ? `${(((totalVentasConExtra - (data.totalCosto ?? 0)) / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%'],
+      ['Total en caja', totalEnCajaJ],
+      ['Total después de retirar monto inicial', totalEnCajaJ - j.monto_inicial],
+      ['Transferencias', totalTransferencia],
+      ['Pendientes del día', totalPendientes],
+      ['Total del día', totalEnCajaJ + totalTransferencia],
     ];
-
-    if (j.saldo_real !== null) {
-      filas.push(['Saldo esperado', j.saldo_esperado]);
-      filas.push(['Saldo real', j.saldo_real]);
-      filas.push(['Diferencia', j.saldo_esperado - j.saldo_real]);
-    }
 
     if (data.userCierreNombre) {
       filas.push(['Firmado por', data.userCierreNombre]);
@@ -385,9 +433,6 @@ export class ExcelService {
 
     const pmap = data.productosMap;
     const vlotes = data.ventaLotes ?? [];
-    let totalCaja = 0;
-    let totalPendientes = 0;
-    let totalTransferencia = 0;
     for (const venta of data.ventas) {
       for (const detalle of venta.detalles) {
         const info = pmap?.get(detalle.producto_id);
@@ -415,27 +460,8 @@ export class ExcelService {
             ]);
           }
         }
-
-        if (venta.forma_pago === 'pendiente') {
-          totalPendientes += detalle.subtotal;
-        } else if (venta.forma_pago === 'divisas') {
-          // divisas tracked by venta total below
-        } else if (venta.forma_pago === 'transferencia') {
-          totalTransferencia += detalle.subtotal;
-        } else {
-          totalCaja += detalle.subtotal;
-        }
       }
     }
-
-    const totalDivisas = data.ventas
-      .filter((v) => v.forma_pago === 'divisas')
-      .reduce((sum, v) => sum + v.total, 0);
-    filas.push([], ['Total caja', '', '', totalCaja, '']);
-    filas.push(['Total divisas', '', '', totalDivisas, '']);
-    filas.push(['Total pendientes', '', '', totalPendientes, '']);
-    filas.push(['Total transferencia', '', '', totalTransferencia, '']);
-    filas.push(['Total esperado', '', '', totalCaja + totalDivisas + totalPendientes + totalTransferencia, '']);
 
     // Blank row before Movimientos table
     filas.push([]);
@@ -465,6 +491,28 @@ export class ExcelService {
         filas.push([nombre, item.cantidad, item.descripcion ?? '', item.autorizado_por, -(item.cantidad * costo)]);
       }
       filas.push(['Total C.C.', '', '', '', -totalCc]);
+    }
+
+    // Arqueo de Caja section
+    const arqueo = data.arqueo;
+    if (arqueo && arqueo.length > 0) {
+      const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
+      const diferencia = totalEnCajaJ - totalArqueo;
+      filas.push([]);
+      filas.push(['Arqueo de Caja']);
+      filas.push(['Denominación', 'Cantidad', 'Subtotal']);
+      for (const entry of arqueo) {
+        filas.push([`$${entry.denominacion.toLocaleString()}`, entry.cantidad, entry.subtotal]);
+      }
+      filas.push(['Total contado', '', totalArqueo]);
+      filas.push([]);
+      if (diferencia < 0) {
+        filas.push(['SOBRANTE', Math.abs(diferencia)]);
+      } else if (diferencia > 0) {
+        filas.push(['FALTANTE', diferencia]);
+      } else {
+        filas.push(['CUADRADO', 0]);
+      }
     }
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -539,6 +587,54 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+  }
+
+  private _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const arqueo = data.arqueo;
+    if (!arqueo || arqueo.length === 0) return;
+
+    const j = data.jornada;
+    const ventas = data.ventas;
+    const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
+    const totalEfectivo = ventas
+      .filter((v) => v.forma_pago === 'efectivo')
+      .reduce((sum, v) => sum + v.total, 0);
+    const totalIngresosExtra = data.movimientos
+      .filter((m) => m.tipo === 'ingreso_extra')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalGastos = data.movimientos
+      .filter((m) => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const diferencia = totalEnCaja - totalArqueo;
+
+    const filas: unknown[][] = [
+      ['Arqueo de Caja'],
+      [],
+      ['Denominación', 'Cantidad', 'Subtotal'],
+    ];
+
+    for (const entry of arqueo) {
+      filas.push([`$${entry.denominacion.toLocaleString()}`, entry.cantidad, entry.subtotal]);
+    }
+
+    filas.push([]);
+    filas.push(['Total contado', '', totalArqueo]);
+    filas.push([]);
+
+    if (diferencia < 0) {
+      filas.push(['SOBRANTE', Math.abs(diferencia)]);
+    } else if (diferencia > 0) {
+      filas.push(['FALTANTE', diferencia]);
+    } else {
+      filas.push(['CUADRADO', 0]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 14 }];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Arqueo');
   }
 
   private _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): void {

@@ -133,13 +133,19 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(iconDark?.textContent?.trim()).toBe('light_mode');
   });
 
-  it('5.2 RED: confirmarCierre debería pasar saldo_esperado como saldoReal a cerrar()', () => {
+  it('5.2 RED: confirmarCierre debería pasar arqueoTotal como saldoReal con entries a cerrar()', () => {
     component.abrirModalCierre();
     fixture.detectChanges();
 
-    // No hay input de saldoReal, así que se usa saldo_esperado automáticamente
+    // Set at least one denomination so entries are non-empty
+    component.actualizarCantidad(5000, 1);
+    fixture.detectChanges();
+
     component.confirmarCierre();
 
-    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 18000, 1);
+    // saldoReal = 5000 * 1 = 5000
+    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 5000, 1, [
+      { denominacion: 5000, cantidad: 1, subtotal: 5000 },
+    ]);
   });
 });

@@ -9,6 +9,7 @@ import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
+import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 
 const mockJornada: Jornada = {
   id: 1,
@@ -800,6 +801,138 @@ describe('JornadaService', () => {
     });
   });
 
+  describe('arqueo-caja', () => {
+    it('2.1 RED: debería usar saldoRealCalculado en UPDATE (monto_inicial + ventas_efectivo + total_movimientos)', async () => {
+      // monto_inicial=5000, ventas=[], total_movimientos=0 → saldoRealCalculado = 5000
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas') && call[0].includes('saldo_real'),
+      );
+      expect(updateCall).toBeTruthy();
+      // saldo_real uses saldoRealCalculado = monto_inicial(5000) + ventas_efectivo(0) + total_movimientos(0) = 5000
+      expect(updateCall![1][1]).toBe(5000);
+    });
+
+    it('2.2 RED: debería insertar arqueo entries en arqueo_caja cuando se proporcionan', async () => {
+      const arqueoEntries: ArqueoCajaEntry[] = [
+        { denominacion: 1000, cantidad: 5, subtotal: 5000 },
+        { denominacion: 500, cantidad: 3, subtotal: 1500 },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        // INSERT arqueo entry 1
+        .mockResolvedValueOnce([])
+        // INSERT arqueo entry 2
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1, arqueoEntries));
+
+      const arqueoInserts = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO arqueo_caja'),
+      );
+      expect(arqueoInserts).toHaveLength(2);
+      expect(arqueoInserts[0][1]).toEqual([1, 1000, 5, expect.any(String)]);
+      expect(arqueoInserts[1][1]).toEqual([1, 500, 3, expect.any(String)]);
+    });
+
+    it('2.2 RED: no debería insertar arqueo entries con cantidad 0', async () => {
+      const arqueoEntries: ArqueoCajaEntry[] = [
+        { denominacion: 1000, cantidad: 5, subtotal: 5000 },
+        { denominacion: 200, cantidad: 0, subtotal: 0 },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE
+        .mockResolvedValueOnce([]) // INSERT arqueo 1 (solo cantidad > 0)
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1, arqueoEntries));
+
+      const arqueoInserts = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO arqueo_caja'),
+      );
+      expect(arqueoInserts).toHaveLength(1);
+      expect(arqueoInserts[0][1]).toEqual([1, 1000, 5, expect.any(String)]);
+    });
+
+    it('2.3 RED: debería incluir arqueo entries en JornadaReportData cuando existen en DB', async () => {
+      const mockArqueoRows: ArqueoDbRow[] = [
+        { id: 1, jornada_id: 1, denominacion: 1000, cantidad: 5, created_at: '' },
+        { id: 2, jornada_id: 1, denominacion: 500, cantidad: 3, created_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre (userId=1, but mock returns [])
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce(mockArqueoRows); // arqueo_caja query (NEW)
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerDatosJornada(1, 1));
+
+      expect(resultado.arqueo).toBeDefined();
+      expect(resultado.arqueo).toHaveLength(2);
+      expect(resultado.arqueo![0]).toEqual({ denominacion: 1000, cantidad: 5, subtotal: 5000 });
+      expect(resultado.arqueo![1]).toEqual({ denominacion: 500, cantidad: 3, subtotal: 1500 });
+    });
+
+    it('2.3 RED: arqueo debería ser array vacío si no hay entries en DB', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja query -> empty
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerDatosJornada(1, 1));
+
+      expect(resultado.arqueo).toBeDefined();
+      expect(resultado.arqueo).toHaveLength(0);
+    });
+  });
+
   describe('calcularTotalMerma', () => {
     it('debería retornar 0 cuando no hay mermas', async () => {
       vi.mocked(mockDb.sql)
@@ -934,10 +1067,11 @@ describe('JornadaService', () => {
       expect(updateCall![1]).toContain(mockUser2.id); // user_cierre_id = usuario.id
     });
 
-    it('debería calcular saldo_real = monto_inicial + efectivo - gastos al auto-cerrar', async () => {
+    it('debería calcular saldo_real = monto_inicial + efectivo + total_movimientos al auto-cerrar', async () => {
+      const mockJornadaConMovs: Jornada = { ...mockJornadaUser1, total_movimientos: 500 };
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([mockJornadaConMovs]) // SELECT open jornada
         .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
         .mockResolvedValueOnce([]); // UPDATE
 
@@ -948,8 +1082,8 @@ describe('JornadaService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes("estado = 'cerrada'"),
       );
       expect(updateCall).toBeTruthy();
-      // saldo_real = 5000 (monto_inicial) + 3000 (efectivo) - 0 (gastos) = 8000
-      expect(updateCall![1]).toContain(8000); // saldo_real calculado
+      // saldo_real = 5000 (monto_inicial) + 3000 (efectivo) + 500 (total_movimientos) = 8500
+      expect(updateCall![1]).toContain(8500); // saldo_real calculado
     });
   });
 

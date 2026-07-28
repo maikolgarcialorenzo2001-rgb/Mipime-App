@@ -7,6 +7,7 @@ import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -126,13 +127,13 @@ export class JornadaService {
     const hora = ahora.toLocaleTimeString();
     const iso = ahora.toISOString();
 
-    // Calcular saldo_real = monto_inicial + total_ventas_efectivo - total_movimientos
+    // Calcular saldo_real = monto_inicial + total_ventas_efectivo + total_movimientos
     const ventasJornada = await this._db.sql<{ total: number }>(
       `SELECT COALESCE(SUM(total), 0) as total FROM ventas WHERE jornada_id = ? AND forma_pago = 'efectivo'`,
       [jornada.id],
     );
     const totalVentasEfectivo = ventasJornada[0]?.total ?? 0;
-    const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo - jornada.total_movimientos;
+    const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo + jornada.total_movimientos;
 
     await this._db.sql(
       `UPDATE jornadas
@@ -168,10 +169,10 @@ export class JornadaService {
 
   /** Cierra la jornada:
    * 1. Verifica que el usuario sea admin
-   * 2. Ejecuta el cierre (UPDATE → SELECT → Excel → reporte)
+   * 2. Ejecuta el cierre (UPDATE → arqueo → SELECT → Excel → reporte)
    */
-  cerrar(id: number, saldoReal: number, userId: number): Observable<Jornada> {
-    return from(this._cerrarAsync(id, saldoReal, userId)).pipe(
+  cerrar(id: number, saldoReal: number, userId: number, arqueo?: ArqueoCajaEntry[]): Observable<Jornada> {
+    return from(this._cerrarAsync(id, saldoReal, userId, arqueo)).pipe(
       tap(() => this.jornadaAbierta.set(null)),
     );
   }
@@ -180,8 +181,9 @@ export class JornadaService {
     id: number,
     saldoReal: number,
     userId: number,
+    arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
-    return this._ejecutarCierre(id, saldoReal, userId);
+    return this._ejecutarCierre(id, saldoReal, userId, arqueo);
   }
 
   /**
@@ -196,6 +198,7 @@ export class JornadaService {
     id: number,
     saldoReal: number,
     userId: number,
+    arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
     const ahora = new Date();
     const hora = ahora.toLocaleTimeString();
@@ -223,7 +226,7 @@ export class JornadaService {
       [id],
     );
 
-    // 3. Calcular saldo_real = monto_inicial + total_ventas_efectivo - total_movimientos
+    // 3. Calcular saldo_real = monto_inicial + total_ventas_efectivo + total_movimientos
     const jornadaRow = await this._db.sql<{ monto_inicial: number; total_movimientos: number }>(
       'SELECT monto_inicial, total_movimientos FROM jornadas WHERE id = ?',
       [id],
@@ -233,7 +236,7 @@ export class JornadaService {
     const totalVentasEfectivo = ventas
       .filter((v) => v.forma_pago === 'efectivo')
       .reduce((sum, v) => sum + v.total, 0);
-    const saldoRealCalculado = montoInicial + totalVentasEfectivo - totalMovimientos;
+    const saldoRealCalculado = montoInicial + totalVentasEfectivo + totalMovimientos;
 
     // 4. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
     const result = await this._db.sql<Jornada>(
@@ -246,7 +249,20 @@ export class JornadaService {
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];
 
-    // 4. Obtener productos para el mapa de nombres + precio_costo
+    // 4b. Insertar arqueo entries si se proporcionaron (antes de generar Excel)
+    if (arqueo && arqueo.length > 0) {
+      const ahora = new Date().toISOString();
+      for (const entry of arqueo) {
+        if (entry.cantidad > 0) {
+          await this._db.sql(
+            'INSERT INTO arqueo_caja (jornada_id, denominacion, cantidad, created_at) VALUES (?, ?, ?, ?)',
+            [id, entry.denominacion, entry.cantidad, ahora],
+          );
+        }
+      }
+    }
+
+    // 5. Obtener productos para el mapa de nombres + precio_costo
     const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
       'SELECT id, nombre, precio_costo FROM productos',
     );
@@ -326,6 +342,7 @@ export class JornadaService {
       totalCosto,
       userCierreNombre,
       cuentaCosas,
+      arqueo,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
@@ -362,6 +379,7 @@ export class JornadaService {
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
+              arqueo: datos.arqueo,
             }),
           ),
         );
@@ -389,6 +407,7 @@ export class JornadaService {
         totalCosto: datos.totalCosto,
         userCierreNombre: datos.userCierreNombre,
         cuentaCosas: datos.cuentaCosas,
+        arqueo: datos.arqueo,
       })),
     );
   }
@@ -406,6 +425,7 @@ export class JornadaService {
     totalCosto: number;
     userCierreNombre: string | null;
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
+    arqueo: ArqueoCajaEntry[];
   }> {
     // 1. Obtener ventas con detalles de esta jornada
     const ventas = await this._db.sql<Venta>(
@@ -495,7 +515,18 @@ export class JornadaService {
       [jornadaId],
     );
 
-    // 7. Agrupar detalles por venta
+    // 7. Obtener arqueo de caja entries
+    const arqueoRows = await this._db.sql<ArqueoDbRow>(
+      'SELECT * FROM arqueo_caja WHERE jornada_id = ? ORDER BY denominacion DESC',
+      [jornadaId],
+    );
+    const arqueo = arqueoRows.map((row) => ({
+      denominacion: row.denominacion,
+      cantidad: row.cantidad,
+      subtotal: row.denominacion * row.cantidad,
+    }));
+
+    // 8. Agrupar detalles por venta
     const ventasConDetalles = ventas.map((v) => ({
       ...v,
       detalles: detalles.filter((d) => d.venta_id === v.id),
@@ -510,6 +541,7 @@ export class JornadaService {
       totalCosto,
       userCierreNombre,
       cuentaCosas,
+      arqueo,
     };
   }
 
@@ -579,7 +611,7 @@ export class JornadaService {
         }
         const dataPromises = jornadas.map((j) =>
           this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
-            (datos): JornadaReportData => ({
+             (datos): JornadaReportData => ({
               jornada: j,
               ventas: datos.ventas,
               movimientos: datos.movimientos,
@@ -589,6 +621,7 @@ export class JornadaService {
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
+              arqueo: datos.arqueo,
             }),
           ),
         );
