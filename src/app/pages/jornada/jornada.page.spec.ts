@@ -831,4 +831,12 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
     expect(dialog?.textContent).toContain('Cuadrado');
   });
+
+  describe('responsive layout', () => {
+    it('debería tener container con max-w-7xl', () => {
+      fixture.detectChanges();
+      const container = fixture.nativeElement.querySelector('.max-w-7xl');
+      expect(container).toBeTruthy();
+    });
+  });
 });

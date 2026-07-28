@@ -361,6 +361,21 @@ describe('StockMovimientoService', () => {
       expect(insertCall![0]).toContain('jornada_id');
       expect(insertCall![1]).toContain(42);
     });
+
+    it('debería permitir a trabajadores (no lanza error de permisos)', async () => {
+      mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockShopLotes)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ precio_costo: 8 }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ total: 1 }])
+        .mockResolvedValueOnce([]);
+      const consumos = await service.registrarSalida(1, 7, 'Venta');
+      expect(consumos).toHaveLength(2);
+    });
   });
 
   describe('registrarAjuste', () => {
