@@ -122,6 +122,10 @@ export class SqliteService implements Database {
       await this._migrationV13(client);
     }
 
+    if (currentVersion < 14) {
+      await this._migrationV14(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -521,6 +525,21 @@ export class SqliteService implements Database {
       'CREATE INDEX IF NOT EXISTS idx_arqueo_jornada ON arqueo_caja(jornada_id)',
     );
     await client.sql('INSERT INTO schema_version (version) VALUES (13)');
+  }
+
+  private async _migrationV14(client: SQLocal): Promise<void> {
+    // v14: agregar columnas de divisa a movimientos y jornadas
+    for (const q of [
+      'ALTER TABLE movimientos ADD COLUMN divisa_tipo TEXT',
+      'ALTER TABLE movimientos ADD COLUMN monto_divisa REAL',
+      'ALTER TABLE movimientos ADD COLUMN tasa_cambio REAL',
+      'ALTER TABLE jornadas ADD COLUMN total_usd REAL DEFAULT 0',
+      'ALTER TABLE jornadas ADD COLUMN total_eur REAL DEFAULT 0',
+    ]) {
+      try { await client.sql(q); } catch { /* columna ya existe */ }
+    }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (14)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

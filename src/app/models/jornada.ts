@@ -12,6 +12,8 @@ export interface Jornada {
   user_cierre_id: number | null;
   user_apertura_id: number | null;
   total_merma: number;
+  total_usd?: number;
+  total_eur?: number;
   created_at: string;
   updated_at: string;
 }
