@@ -83,6 +83,7 @@ describe('LoginPage', () => {
           useValue: {
             isElectronPackaged: false,
             saveIndividual: vi.fn().mockResolvedValue(undefined),
+            downloadBlob: vi.fn(),
           },
         },
       ],
@@ -273,14 +274,13 @@ describe('LoginPage', () => {
     });
 
     describe('Electron auto-save', () => {
-      let electronService: { isElectronPackaged: boolean; saveIndividual: ReturnType<typeof vi.fn> };
+      let electronService: { isElectronPackaged: boolean; saveIndividual: ReturnType<typeof vi.fn>; downloadBlob: ReturnType<typeof vi.fn> };
 
       beforeEach(() => {
         electronService = TestBed.inject(ElectronFileService) as unknown as typeof electronService;
       });
 
-      it('debería llamar ElectronFileService.saveIndividual en auto-cierre cuando isElectronPackaged=true', async () => {
-        electronService.isElectronPackaged = true;
+      it('debería llamar ElectronFileService.downloadBlob en auto-cierre (sin importar isElectronPackaged)', async () => {
         jornadaService.obtenerReporte.mockReturnValue(of({
           id: 1,
           jornada_id: 1,
@@ -296,26 +296,13 @@ describe('LoginPage', () => {
 
         await component.onSubmit();
 
-        expect(electronService.saveIndividual).toHaveBeenCalledWith(
+        expect(electronService.downloadBlob).toHaveBeenCalledWith(
           'SGVsbG8=',
-          mockJornada,
+          'jornada_test.xlsx',
         );
       });
 
-      it('NO debería llamar ElectronFileService en auto-cierre cuando isElectronPackaged=false', async () => {
-        electronService.isElectronPackaged = false;
-
-        authService.login.mockReturnValue(of(mockUser));
-        jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-        jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(null);
-
-        await component.onSubmit();
-
-        expect(electronService.saveIndividual).not.toHaveBeenCalled();
-      });
-
-      it('debería llamar ElectronFileService.saveIndividual en cerrarYGuardar cuando isElectronPackaged=true', async () => {
-        electronService.isElectronPackaged = true;
+      it('debería llamar ElectronFileService.downloadBlob en cerrarYGuardar', async () => {
         jornadaService.obtenerReporte.mockReturnValue(of({
           id: 1,
           jornada_id: 1,
@@ -332,9 +319,9 @@ describe('LoginPage', () => {
         await component.onSubmit();
         component.cerrarYGuardar();
 
-        expect(electronService.saveIndividual).toHaveBeenCalledWith(
+        expect(electronService.downloadBlob).toHaveBeenCalledWith(
           'dGVzdA==',
-          mockJornada,
+          'jornada_test.xlsx',
         );
       });
     });

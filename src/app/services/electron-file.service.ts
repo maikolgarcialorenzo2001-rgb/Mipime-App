@@ -67,6 +67,14 @@ export class ElectronFileService {
     }
   }
 
+  /**
+   * Descarga un Blob en el navegador. Útil para el fallback cuando
+   * el save ya fue manejado por la capa de servicio (login, app-nav).
+   */
+  downloadBlob(base64: string, fileName: string): void {
+    this._blobFallback(base64, fileName);
+  }
+
   /** Fallback para navegador: descarga el archivo via Blob. */
   private _blobFallback(base64: string, fileName: string): void {
     const byteChars = atob(base64);

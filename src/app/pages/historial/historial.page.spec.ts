@@ -239,15 +239,13 @@ describe('HistorialPage', () => {
     });
 
     it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', () => {
-      const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+      const electronService = TestBed.inject(ElectronFileService) as any;
 
       component.exportarMes();
 
-      expect(createUrlSpy).toHaveBeenCalled();
+      expect(electronService.saveMonthly).toHaveBeenCalled();
       expect(component.exportando()).toBe(false);
       expect(component.errorExport()).toBeNull();
-
-      createUrlSpy.mockRestore();
     });
 
     it('C9 RED: botón "Exportar mes" debería estar visible cuando hay cerradas', () => {
@@ -305,6 +303,7 @@ describe('HistorialPage', () => {
 
     it('debería descargar el archivo cuando existe el reporte', () => {
       const service = TestBed.inject(JornadaService);
+      const electronService = TestBed.inject(ElectronFileService) as any;
       const mockReporte: JornadaReporte = {
         id: 1,
         jornada_id: 3,
@@ -315,24 +314,22 @@ describe('HistorialPage', () => {
       };
       vi.mocked(service.obtenerReporte).mockReturnValue(of(mockReporte));
 
-      const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
       component.descargarExcel(mockJornadas[0]);
 
-      expect(createUrlSpy).toHaveBeenCalled();
-
-      createUrlSpy.mockRestore();
+      expect(electronService.saveIndividual).toHaveBeenCalledWith(
+        mockExcelBase64,
+        mockJornadas[0],
+      );
     });
 
     it('debería no hacer nada cuando el reporte es null', () => {
       const service = TestBed.inject(JornadaService);
+      const electronService = TestBed.inject(ElectronFileService) as any;
       vi.mocked(service.obtenerReporte).mockReturnValue(of(null));
 
-      const createUrlSpy = vi.spyOn(URL, 'createObjectURL');
       component.descargarExcel(mockJornadas[0]);
 
-      expect(createUrlSpy).not.toHaveBeenCalled();
-
-      createUrlSpy.mockRestore();
+      expect(electronService.saveIndividual).not.toHaveBeenCalled();
     });
 
     describe('Electron auto-save', () => {
@@ -393,12 +390,21 @@ describe('HistorialPage', () => {
         );
       });
 
-      it('descargarExcel NO debería llamar saveIndividual cuando isElectronPackaged=false', () => {
+      it('descargarExcel debería llamar saveIndividual incluso cuando isElectronPackaged=false (service internamente hace Blob)', () => {
         electronService.isElectronPackaged = false;
+        const service = TestBed.inject(JornadaService);
+        vi.mocked(service.obtenerReporte).mockReturnValue(of({
+          id: 1,
+          jornada_id: 3,
+          content_type: 'excel',
+          content_base64: mockExcelBase64,
+          filename: 'jornada_test.xlsx',
+          created_at: '',
+        }));
 
         component.descargarExcel(mockJornadas[0]);
 
-        expect(electronService.saveIndividual).not.toHaveBeenCalled();
+        expect(electronService.saveIndividual).toHaveBeenCalled();
       });
     });
   });

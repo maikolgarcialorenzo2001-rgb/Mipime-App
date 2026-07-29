@@ -88,6 +88,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
   let mockElectronFileSvc: {
     isElectronPackaged: boolean;
     saveIndividual: ReturnType<typeof vi.fn>;
+    downloadBlob: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -96,6 +97,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     mockElectronFileSvc = {
       isElectronPackaged: false,
       saveIndividual: vi.fn().mockResolvedValue(undefined),
+      downloadBlob: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -173,7 +175,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     ]);
   });
 
-  it('should call ElectronFileService.saveIndividual after confirmarCierre when isElectronPackaged=true', () => {
+  it('should call ElectronFileService.downloadBlob after confirmarCierre (Blob only, service ya guardó)', () => {
     mockJornadaSvc.obtenerReporte.mockReturnValue(of({
       id: 1,
       jornada_id: 1,
@@ -189,9 +191,9 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     component.actualizarCantidad(5000, 1);
     component.confirmarCierre();
 
-    expect(mockElectronFileSvc.saveIndividual).toHaveBeenCalledWith(
+    expect(mockElectronFileSvc.downloadBlob).toHaveBeenCalledWith(
       'dGVzdEJhc2U2NA==',
-      mockJornadaAbierta,
+      'jornada_2026-06-05_1.xlsx',
     );
   });
 

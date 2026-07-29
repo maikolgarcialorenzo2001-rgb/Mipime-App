@@ -111,32 +111,12 @@ export class LoginPage {
     }
   }
 
-  private _descargarExcel(jornadaId: number, jornada: { fecha: string; id: number }): void {
+  private _descargarExcel(jornadaId: number, _jornada: { fecha: string; id: number }): void {
     this.jornadaService.obtenerReporte(jornadaId).subscribe({
-      next: async (reporte) => {
+      next: (reporte) => {
         if (!reporte) return;
-
-        if (this._electronFileService.isElectronPackaged) {
-          await this._electronFileService.saveIndividual(reporte.content_base64, jornada);
-          return;
-        }
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Solo Blob download: ElectronFileService ya guardó en JornadaService
+        this._electronFileService.downloadBlob(reporte.content_base64, reporte.filename);
       },
     });
   }
