@@ -48,11 +48,13 @@ export class JornadaPage {
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
 
-  /** Denomination form */
+  /** Denomination form — signal puro, como quantity-input de POS */
   readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
-  readonly arqueoForm = signal<Record<number, number>>({
-    5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-  });
+  readonly arqueoForm = signal<Record<number, number>>(
+    Object.fromEntries(this.DENOMINACIONES.map(d => [d, 0])) as Record<number, number>,
+  );
+  readonly soloNumeros = signal(false);
+
   readonly showOptionalDenoms = signal(false);
 
   readonly denominacionesVisibles = computed(() =>
@@ -76,7 +78,7 @@ export class JornadaPage {
       .filter(m => m.tipo === 'ingreso_extra')
       .reduce((sum, m) => sum + m.monto, 0);
     const totalGastos = this.movimientosDelDia()
-      .filter(m => m.tipo === 'gasto')
+      .filter(m => m.tipo === 'gasto' || m.tipo === 'compra_divisa')
       .reduce((sum, m) => sum + m.monto, 0);
     return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
   });
@@ -222,16 +224,41 @@ export class JornadaPage {
     });
   }
 
-  actualizarCantidad(denominacion: number, cantidad: number): void {
-    this.arqueoForm.update(f => ({ ...f, [denominacion]: cantidad }));
+  /** Maneja input del usuario: solo dígitos, actualiza signal (como quantity-input de POS) */
+  onDenomInput(denom: number, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const soloDigitos = input.value.replace(/[^0-9]/g, '');
+    const cantidad = soloDigitos === '' ? 0 : parseInt(soloDigitos, 10);
+
+    // Forzar DOM al valor limpio
+    input.value = String(cantidad);
+
+    // Actualizar signal (única fuente de verdad)
+    this.arqueoForm.update(b => ({ ...b, [denom]: cantidad }));
+  }
+
+  filtrarTecla(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab',
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'Home', 'End',
+      'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
   }
 
   abrirModalCierre(): void {
     this.cerrarError.set(null);
-    this.arqueoForm.set({
-      5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-    });
     this.showOptionalDenoms.set(false);
+    this.soloNumeros.set(false);
+    this.arqueoForm.set(
+      Object.fromEntries(this.DENOMINACIONES.map(d => [d, 0])) as Record<number, number>,
+    );
     this.showCloseModal.set(true);
   }
 
@@ -245,10 +272,11 @@ export class JornadaPage {
 
     if (!j || uid === undefined) return;
 
-    // Build arqueo entries from form (only entries with cantidad > 0)
+    // Build arqueo entries from signal (only entries with cantidad > 0)
+    const raw = this.arqueoForm();
     const entries: ArqueoCajaEntry[] = [];
     for (const d of this.denominacionesVisibles()) {
-      const cantidad = this.arqueoForm()[d] ?? 0;
+      const cantidad = raw[d] ?? 0;
       if (cantidad > 0) {
         entries.push({ denominacion: d, cantidad, subtotal: d * cantidad });
       }

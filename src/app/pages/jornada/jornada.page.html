@@ -99,6 +99,8 @@
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">
                           @if (m.tipo === 'gasto') {
                             <span class="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 px-2 py-0.5 rounded-full">Gasto</span>
+                          } @else if (m.tipo === 'compra_divisa') {
+                            <span class="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 px-2 py-0.5 rounded-full">Compra divisa</span>
                           } @else {
                             <span class="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 px-2 py-0.5 rounded-full">Ingreso extra</span>
                           }
@@ -106,7 +108,7 @@
                       </td>
                       <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ m.descripcion }}</td>
                       <td class="px-3 py-2 font-medium">
-                        @if (m.tipo === 'gasto') {
+                        @if (m.tipo === 'gasto' || m.tipo === 'compra_divisa') {
                           <span class="text-red-600 dark:text-red-400">-${{ m.monto.toLocaleString() }}</span>
                         } @else {
                           <span class="text-green-600 dark:text-green-400">+${{ m.monto.toLocaleString() }}</span>
@@ -153,8 +155,7 @@
       </div>
     }
 
-    @if (isAdmin) {
-      <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
+    <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Registrar movimiento</h3>
 
         @if (formError(); as err) {
@@ -200,7 +201,6 @@
           </span>
         </button>
       </div>
-    }
   } @else if (!error()) {
     <app-empty-state message="No hay jornada abierta. Inicia el día para comenzar." />
   }
@@ -246,17 +246,23 @@
                 ${{ denom.toLocaleString() }}
               </span>
               <input
-                type="number"
-                min="0"
+                type="text"
                 inputmode="numeric"
+                autocomplete="off"
                 [value]="arqueoForm()[denom]"
-                (input)="actualizarCantidad(denom, +$any($event.target).value)"
+                (input)="onDenomInput(denom, $event)"
+                (keydown)="filtrarTecla($event)"
                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
               />
               <span class="w-20 text-right text-sm text-gray-500 dark:text-gray-400">
                 ${{ ((denom * arqueoForm()[denom]).toLocaleString()) }}
               </span>
             </div>
+          }
+          @if (soloNumeros()) {
+            <p class="text-xs text-red-500 dark:text-red-400 text-center animate-pulse">
+              Solo se permiten números
+            </p>
           }
         </div>
       </div>

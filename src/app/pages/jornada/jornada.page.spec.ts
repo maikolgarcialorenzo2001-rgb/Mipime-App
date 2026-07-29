@@ -470,11 +470,11 @@ describe('JornadaPage', () => {
       fixture.detectChanges();
     });
 
-    it('4.1 RED: NO debería mostrar formulario de movimiento para worker', () => {
+    it('4.1 GREEN: worker debería ver formulario de movimiento (Opción B)', () => {
       const select = fixture.nativeElement.querySelector('select');
-      expect(select).toBeFalsy();
+      expect(select).toBeTruthy();
       const descInput = fixture.nativeElement.querySelector('input[placeholder="Descripción"]');
-      expect(descInput).toBeFalsy();
+      expect(descInput).toBeTruthy();
     });
   });
 
@@ -558,7 +558,7 @@ describe('JornadaPage', () => {
       expect(modalText).toContain('5,000');
 
       // Set denomination values: 2 × $5.000 + 5 × $1.000 = $15.000
-      component.arqueoForm.update(f => ({ ...f, 5000: 2, 1000: 5 }));
+      component.arqueoForm.update(b => ({ ...b, [5000]: 2, [1000]: 5 }));
       fixture.detectChanges();
 
       component.confirmarCierre();
@@ -666,7 +666,7 @@ describe('JornadaPage', () => {
     it('arqueo: total is computed correctly from entered quantities', () => {
       component.abrirModalCierre();
 
-      component.arqueoForm.update(f => ({ ...f, 5000: 3, 200: 4, 50: 2 }));
+      component.arqueoForm.update(b => ({ ...b, [5000]: 3, [200]: 4, [50]: 2 }));
       fixture.detectChanges();
 
       // 3×5000 + 4×200 + 2×50 = 15000 + 800 + 100 = 15900
@@ -687,7 +687,7 @@ describe('JornadaPage', () => {
       component.abrirModalCierre();
       // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
       // arqueoTotal = 3000 → diff = 2000 → faltante
-      component.arqueoForm.update(f => ({ ...f, 2000: 1, 1000: 1 }));
+      component.arqueoForm.update(b => ({ ...b, [2000]: 1, [1000]: 1 }));
       fixture.detectChanges();
 
       const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
@@ -699,7 +699,7 @@ describe('JornadaPage', () => {
       component.abrirModalCierre();
       // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
       // arqueoTotal = 10000 → diff = -5000 → sobrante
-      component.arqueoForm.update(f => ({ ...f, 5000: 2 }));
+      component.arqueoForm.update(b => ({ ...b, [5000]: 2 }));
       fixture.detectChanges();
 
       const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
@@ -710,7 +710,7 @@ describe('JornadaPage', () => {
     it('arqueo: shows cuadrado when totalEnCaja === arqueoTotal', () => {
       component.abrirModalCierre();
       // totalEnCaja starts at 5000 (monto_inicial, no ventas/mov loaded)
-      component.arqueoForm.update(f => ({ ...f, 5000: 1 }));
+      component.arqueoForm.update(b => ({ ...b, [5000]: 1 }));
       fixture.detectChanges();
 
       const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
@@ -849,11 +849,11 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     component.ventasDelDia.set([]);
     component.movimientosDelDia.set([]);
     // totalEnCaja = 5000
-    component.arqueoForm.update(f => ({ ...f, 5000: 1 })); // 5000
+    component.arqueoForm.update(b => ({ ...b, [5000]: 1 })); // 5000
     // diferencia = 5000 - 5000 = 0 → cuadrado
     expect(component.diferencia()).toBe(0);
 
-    component.arqueoForm.update(f => ({ ...f, 5000: 0, 2000: 2 })); // 4000
+    component.arqueoForm.update(b => ({ ...b, [5000]: 0, [2000]: 2 })); // 4000
     // diferencia = 5000 - 4000 = 1000 → faltante
     expect(component.diferencia()).toBe(1000);
   });
@@ -862,7 +862,7 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     component.ventasDelDia.set([]);
     component.movimientosDelDia.set([]);
     // totalEnCaja = 5000
-    component.arqueoForm.update(f => ({ ...f, 5000: 2 })); // 10000
+    component.arqueoForm.update(b => ({ ...b, [5000]: 2 })); // 10000
     // diferencia = 5000 - 10000 = -5000 → sobrante
     expect(component.diferencia()).toBe(-5000);
   });
@@ -872,7 +872,7 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     component.movimientosDelDia.set([]);
     // totalEnCaja = 5000
     component.abrirModalCierre();
-    component.arqueoForm.update(f => ({ ...f, 2000: 2 })); // 4000
+    component.arqueoForm.update(b => ({ ...b, [2000]: 2 })); // 4000
     fixture.detectChanges();
 
     const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
@@ -885,7 +885,7 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     component.movimientosDelDia.set([]);
     // totalEnCaja = 5000
     component.abrirModalCierre();
-    component.arqueoForm.update(f => ({ ...f, 5000: 2 })); // 10000
+    component.arqueoForm.update(b => ({ ...b, [5000]: 2 })); // 10000
     fixture.detectChanges();
 
     const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
@@ -898,11 +898,62 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
     component.movimientosDelDia.set([]);
     // totalEnCaja = 5000
     component.abrirModalCierre();
-    component.arqueoForm.update(f => ({ ...f, 5000: 1 })); // 5000
+    component.arqueoForm.update(b => ({ ...b, [5000]: 1 })); // 5000
     fixture.detectChanges();
 
     const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
     expect(dialog?.textContent).toContain('Cuadrado');
+  });
+
+  it('onDenomInput actualiza arqueoForm conservando solo dígitos', () => {
+    component.abrirModalCierre();
+    const input = document.createElement('input');
+    input.value = 'abc123def';
+    component.onDenomInput(5000, { target: input } as unknown as Event);
+    // Signal debe tener solo los dígitos
+    expect(component.arqueoForm()[5000]).toBe(123);
+    // La señal es la única fuente de verdad ahora
+  });
+
+  it('onDenomInput setea 0 si solo hay letras', () => {
+    component.abrirModalCierre();
+    const input = document.createElement('input');
+    input.value = 'abc';
+    component.onDenomInput(1000, { target: input } as unknown as Event);
+    expect(component.arqueoForm()[1000]).toBe(0);
+  });
+
+  it('onDenomInput actualiza arqueoForm con valores mixtos', () => {
+    component.abrirModalCierre();
+    const input = document.createElement('input');
+    input.value = 'xyz42pq';
+    component.onDenomInput(200, { target: input } as unknown as Event);
+    expect(component.arqueoForm()[200]).toBe(42);
+  });
+
+  it('filtrarTecla bloquea teclas no numéricas', () => {
+    const event = new KeyboardEvent('keydown', { key: 'a', cancelable: true });
+    component.filtrarTecla(event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('filtrarTecla permite teclas numéricas', () => {
+    const event = new KeyboardEvent('keydown', { key: '5', cancelable: true });
+    component.filtrarTecla(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('filtrarTecla permite teclas de navegación', () => {
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true });
+    component.filtrarTecla(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('arqueoForm es signal puro — set directo con valor numérico funciona', () => {
+    component.abrirModalCierre();
+    component.arqueoForm.set({ ...component.arqueoForm(), [5000]: 15 });
+    fixture.detectChanges();
+    expect(component.arqueoForm()[5000]).toBe(15);
   });
 
   describe('responsive layout', () => {
