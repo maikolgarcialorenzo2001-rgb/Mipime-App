@@ -131,13 +131,15 @@ export class JornadaService {
   }
 
   private async _calcularTotalEnCaja(j: Jornada): Promise<number> {
-    const ventas = await this._db.sql<{ total: number; forma_pago: string }>(
-      'SELECT total, forma_pago FROM ventas WHERE jornada_id = ?',
+    const ventas = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null }>(
+      'SELECT total, forma_pago, completacion_efectivo FROM ventas WHERE jornada_id = ?',
       [j.id],
     );
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') return sum + (v.completacion_efectivo ?? 0);
+      return sum;
+    }, 0);
     const movimientos = await this._db.sql<{ tipo: string; monto: number }>(
       'SELECT tipo, monto FROM movimientos WHERE jornada_id = ?',
       [j.id],
@@ -184,9 +186,13 @@ export class JornadaService {
     const hora = ahora.toLocaleTimeString();
     const iso = ahora.toISOString();
 
-    // Calcular saldo_real = monto_inicial + total_ventas_efectivo + total_movimientos
+    // Calcular saldo_real = monto_inicial + efectivo_en_caja + total_movimientos
     const ventasJornada = await this._db.sql<{ total: number }>(
-      `SELECT COALESCE(SUM(total), 0) as total FROM ventas WHERE jornada_id = ? AND forma_pago = 'efectivo'`,
+      `SELECT COALESCE(SUM(
+         CASE WHEN forma_pago = 'efectivo' THEN total
+              WHEN forma_pago = 'divisas' THEN COALESCE(completacion_efectivo, 0)
+              ELSE 0
+         END), 0) as total FROM ventas WHERE jornada_id = ?`,
       [jornada.id],
     );
     const totalVentasEfectivo = ventasJornada[0]?.total ?? 0;
@@ -363,9 +369,11 @@ export class JornadaService {
     );
     const montoInicial = jornadaRow[0]?.monto_inicial ?? 0;
     const totalMovimientos = jornadaRow[0]?.total_movimientos ?? 0;
-    const totalVentasEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalVentasEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') return sum + (v.completacion_efectivo ?? 0);
+      return sum;
+    }, 0);
     const saldoRealCalculado = montoInicial + totalVentasEfectivo + totalMovimientos;
 
     // 3b. Calcular totales de divisas desde ventas y compra_divisa

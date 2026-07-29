@@ -86,10 +86,12 @@ export class ExcelService {
     const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? ((gananciaBruta / totalVentasConExtra) * 100).toFixed(1) : '0.0';
 
-    // Calcular desglose por forma de pago
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    // Calcular desglose por forma de pago (efectivo que entra a caja)
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      return sum;
+    }, 0);
     const totalTransferencia = ventas
       .filter((v) => v.forma_pago === 'transferencia')
       .reduce((sum, v) => sum + v.total, 0);
@@ -220,7 +222,7 @@ export class ExcelService {
 
     const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Precio venta', 'Total', 'Forma de pago'];
     const headerExtra: string[] = [];
-    if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos');
+    if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos', 'Completación efectivo');
     if (tienePendientes) headerExtra.push('Comprador');
 
     const footerLen = headerBase.length + headerExtra.length;
@@ -254,8 +256,9 @@ export class ExcelService {
             fila.push((venta as any).monto_divisa ?? '—');
             fila.push((venta as any).tasa_cambio ?? '—');
             fila.push(venta.total);
+            fila.push((venta as any).completacion_efectivo ?? '—');
           } else {
-            fila.push('', '', '', '');
+            fila.push('', '', '', '', '');
           }
         }
         if (tienePendientes) {
@@ -342,7 +345,7 @@ export class ExcelService {
       { wch: 12 },
       { wch: 14 },
       { wch: 16 },
-      ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }] : []),
+      ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 14 }] : []),
       ...(tienePendientes ? [{ wch: 16 }] : []),
     ];
     ws['!protect'] = {};
@@ -383,9 +386,13 @@ export class ExcelService {
       0,
     );
     const totalCosto = data.reduce((s, d) => s + (d.totalCosto ?? 0), 0);
-    const totalEfectivo = data.reduce(
-      (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'efectivo').reduce((ss, v) => ss + v.total, 0),
-      0,
+    const totalEfectivo = data.reduce((s, d) =>
+      s + d.ventas.reduce((ss, v) => {
+        if (v.forma_pago === 'efectivo') return ss + v.total;
+        if (v.forma_pago === 'divisas') return ss + ((v as any).completacion_efectivo ?? 0);
+        return ss;
+      }, 0),
+    0,
     );
     const totalTransferencia = data.reduce(
       (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'transferencia').reduce((ss, v) => ss + v.total, 0),
@@ -441,10 +448,12 @@ export class ExcelService {
     const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
 
-    // Pre-compute payment totals for Efectivo del Día table
-    const totalEfectivo = data.ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    // Pre-compute payment totals for Efectivo del Día table (solo efectivo que entra a caja)
+    const totalEfectivo = data.ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      return sum;
+    }, 0);
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
@@ -660,9 +669,11 @@ export class ExcelService {
     const j = data.jornada;
     const ventas = data.ventas;
     const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      return sum;
+    }, 0);
     const totalIngresosExtra = data.movimientos
       .filter((m) => m.tipo === 'ingreso_extra')
       .reduce((sum, m) => sum + m.monto, 0);

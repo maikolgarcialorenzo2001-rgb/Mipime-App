@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal, effect } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { CartItem } from '../../services/cart.service';
@@ -8,6 +8,7 @@ export interface CheckoutPayload {
   divisaTipo?: 'EUR' | 'USD';
   billeteRecibido?: number;
   tasaCambio?: number;
+  completacionEfectivo?: number;
   compradorNombre?: string;
   autorizadoPor?: string;
   descripcion?: string;
@@ -32,12 +33,44 @@ export class CheckoutModalComponent {
   readonly divisaTipo = signal<'EUR' | 'USD'>('USD');
   readonly billeteRecibido = signal<number | null>(null);
   readonly tasaCambio = signal<number | null>(null);
+  readonly completacionEfectivo = signal<number | null>(null);
+
+  /** Cuando el pago en divisa se vuelve suficiente, limpia la completación */
+  private readonly _cleanupEffect = effect(() => {
+    if (this.pagoSuficiente()) {
+      this.completacionEfectivo.set(null);
+    }
+  });
   readonly vuelto = computed<number | null>(() => {
     const billete = this.billeteRecibido();
     const tasa = this.tasaCambio();
     const t = this.total();
     if (billete == null || tasa == null || tasa <= 0 || billete <= 0) return null;
     return billete * tasa - t;
+  });
+
+  /** Cuánto falta para cubrir el total (solo si vuelto < 0) */
+  readonly falta = computed<number | null>(() => {
+    const v = this.vuelto();
+    if (v == null || v >= 0) return null;
+    return v * -1;
+  });
+
+  /** True si el pago en divisa es suficiente (billete × tasa >= total) */
+  readonly pagoSuficiente = computed<boolean>(() => {
+    const v = this.vuelto();
+    return v != null && v >= 0;
+  });
+
+  /** Error si completacionEfectivo < falta */
+  readonly errorCompletacion = computed<string | null>(() => {
+    const falta = this.falta();
+    const completacion = this.completacionEfectivo();
+    if (falta == null) return null;
+    if (completacion == null || completacion < falta) {
+      return `Debe ingresar al menos $${falta.toLocaleString('es-AR')} para completar el pago`;
+    }
+    return null;
   });
 
   /** Estimado de divisa a pagar: total / tasa → feedback visual */
@@ -72,6 +105,7 @@ export class CheckoutModalComponent {
       payload.divisaTipo = this.divisaTipo();
       payload.billeteRecibido = this.billeteRecibido() ?? undefined;
       payload.tasaCambio = this.tasaCambio() ?? undefined;
+      payload.completacionEfectivo = this.completacionEfectivo() ?? undefined;
     } else if (this.formaPago() === 'pendiente') {
       payload.compradorNombre = this.compradorNombre();
       payload.autorizadoPor = this.autorizadoPor();
@@ -86,5 +120,8 @@ export class CheckoutModalComponent {
 
   seleccionarFormaPago(valor: string): void {
     this.formaPago.set(valor);
+    if (valor !== 'divisas') {
+      this.completacionEfectivo.set(null);
+    }
   }
 }

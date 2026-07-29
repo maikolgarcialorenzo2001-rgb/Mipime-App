@@ -13,6 +13,7 @@ export interface VentaPayload {
   divisaTipo?: 'EUR' | 'USD';
   billeteRecibido?: number;
   tasaCambio?: number;
+  completacionEfectivo?: number;
   compradorNombre?: string;
   autorizadoPor?: string;
   descripcion?: string;
@@ -42,14 +43,9 @@ export class VentaService {
 
     const ahora = new Date().toISOString();
 
-    // Para divisas: total = billeteRecibido * tasaCambio
-    // Para otros: total = suma del carrito
-    let total: number;
-    if (payload.formaPago === 'divisas' && payload.billeteRecibido != null && payload.tasaCambio != null) {
-      total = payload.billeteRecibido * payload.tasaCambio;
-    } else {
-      total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
-    }
+    // Total siempre es la suma del carrito
+    // Para divisas, billete * tasa (+ completación) se validan en UI como >= total
+    const total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
 
     return from(
       this._ejecutar(
@@ -132,6 +128,11 @@ export class VentaService {
           placeholdersExtra.push('?');
           valoresExtra.push(payload.descripcion);
         }
+        if (payload.completacionEfectivo != null) {
+          columnasExtra.push('completacion_efectivo');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.completacionEfectivo);
+        }
       }
 
       const todasColumnas = [...columnasBase, ...columnasExtra].join(', ');
@@ -172,14 +173,21 @@ export class VentaService {
         );
       }
 
-      // 3. Actualizar jornada (incluye pendientes en saldo_esperado)
+      // 3. Solo lo que realmente entra a la caja física
+      let efectivoEnCaja = 0;
+      if (payload.formaPago === 'efectivo') {
+        efectivoEnCaja = total;
+      } else if (payload.formaPago === 'divisas') {
+        efectivoEnCaja = payload.completacionEfectivo ?? 0;
+      }
+
       await this._db.sql(
         `UPDATE jornadas
          SET total_ventas = total_ventas + ?,
               saldo_esperado = saldo_esperado + ?,
               updated_at = ?
          WHERE id = ?`,
-        [total, total, ahora, jornadaId],
+        [total, efectivoEnCaja, ahora, jornadaId],
       );
 
       // 4. Consumir stock vía FIFO y registrar venta_lotes

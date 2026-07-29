@@ -203,6 +203,7 @@ export class PosPage {
         divisaTipo: payload.divisaTipo,
         billeteRecibido: payload.billeteRecibido,
         tasaCambio: payload.tasaCambio,
+        completacionEfectivo: payload.completacionEfectivo,
         compradorNombre: payload.compradorNombre,
         autorizadoPor: payload.autorizadoPor,
         descripcion: payload.descripcion,

@@ -130,6 +130,10 @@ export class SqliteService implements Database {
       await this._migrationV15(client);
     }
 
+    if (currentVersion < 16) {
+      await this._migrationV16(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -572,6 +576,17 @@ export class SqliteService implements Database {
     await client.sql('PRAGMA foreign_keys = ON');
     await client.sql('INSERT INTO schema_version (version) VALUES (15)');
     await client.sql('COMMIT');
+  }
+
+  private async _migrationV16(client: SQLocal): Promise<void> {
+    // v16: agregar columna completacion_efectivo a ventas para pago mixto divisas+efectivo
+    try {
+      await client.sql(
+        'ALTER TABLE ventas ADD COLUMN completacion_efectivo REAL',
+      );
+    } catch { /* columna ya existe */ }
+
+    await client.sql('INSERT INTO schema_version (version) VALUES (16)');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

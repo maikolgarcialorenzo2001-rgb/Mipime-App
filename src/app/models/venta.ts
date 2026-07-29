@@ -8,6 +8,7 @@ export interface Venta {
   divisa_tipo?: 'EUR' | 'USD';
   monto_divisa?: number;
   tasa_cambio?: number;
+  completacion_efectivo?: number;
   comprador_nombre?: string;
   autorizado_por?: string;
   descripcion?: string;
