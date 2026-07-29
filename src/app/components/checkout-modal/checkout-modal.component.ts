@@ -40,6 +40,14 @@ export class CheckoutModalComponent {
     return billete * tasa - t;
   });
 
+  /** Estimado de divisa a pagar: total / tasa → feedback visual */
+  readonly estimadoDivisa = computed<number | null>(() => {
+    const tasa = this.tasaCambio();
+    const t = this.total();
+    if (tasa == null || tasa <= 0 || t <= 0) return null;
+    return t / tasa;
+  });
+
   // Pendiente / Cuenta Casas sub-form
   readonly compradorNombre = signal<string>('');
   readonly autorizadoPor = signal<string>('');

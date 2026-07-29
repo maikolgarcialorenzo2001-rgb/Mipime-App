@@ -159,7 +159,7 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X ARS)</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
           <input
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
@@ -180,6 +180,17 @@
             (ngModelChange)="billeteRecibido.set($event)"
           />
         </div>
+        @if (estimadoDivisa(); as est) {
+          <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Estimado a pagar:</span>
+            <strong class="text-blue-700 dark:text-blue-300 ml-1">
+              {{ est | currency: divisaTipo() === 'USD' ? 'USD' : 'EUR': 'symbol': '1.2-2' }}
+            </strong>
+            <span class="text-gray-500 dark:text-gray-400 text-xs ml-1">
+              ({{ total() | currency: 'ARS': 'symbol-narrow': '1.0-0' }} ÷ tasa {{ tasaCambio() }})
+            </span>
+          </div>
+        }
       </div>
     }
 
