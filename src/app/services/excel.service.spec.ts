@@ -1587,7 +1587,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      const filas = json as string[][];
+      const filas = json as unknown[][];
 
       // Should show USD de ventas: 20 (from ventaDivisaUSD)
       expect(filas.some(r => r[0] === 'USD de ventas' && r[1] === 20)).toBe(true);
@@ -1610,7 +1610,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-      const filas = json as string[][];
+      const filas = json as unknown[][];
 
       // Header should have Divisa, Monto en divisa, Tasa de cambio, Total CUP columns
       const header = filas[0];

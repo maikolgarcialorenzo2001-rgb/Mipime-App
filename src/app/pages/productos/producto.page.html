@@ -36,6 +36,7 @@
     </div>
   } @else {
     <!-- Investment stats bar -->
+    @if (esAdmin()) {
     @if (inversionGlobal(); as inv) {
       <div class="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-white dark:bg-gray-900 px-6 py-4 shadow-lg dark:shadow-gray-950/50 text-sm">
         <span class="font-semibold text-gray-900 dark:text-gray-100">Total invertido:</span>
@@ -48,6 +49,7 @@
         <span class="font-medium text-gray-700 dark:text-gray-300">{{ inv.total_shop | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
       </div>
     }
+    }
 
     <div class="overflow-hidden rounded-xl bg-white dark:bg-gray-900 shadow-lg dark:shadow-gray-950/50">
       <table class="w-full text-sm">
@@ -55,10 +57,15 @@
           <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <th class="px-6 py-3">Nombre</th>
             <th class="px-6 py-3">Precio venta</th>
-            <th class="px-6 py-3">Precio costo</th>
+            @if (esAdmin()) {
+              <th class="px-6 py-3">Precio costo</th>
+            }
             <th class="px-6 py-3">Stock Almacén</th>
             <th class="px-6 py-3">Stock Tienda</th>
-            <th class="px-6 py-3">Total invertido</th>
+            @if (esAdmin()) {
+              <th class="px-6 py-3">Total invertido</th>
+              <th class="px-6 py-3">Total esperado</th>
+            }
             <th class="px-6 py-3">Acciones</th>
           </tr>
         </thead>
@@ -74,9 +81,11 @@
               <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                 {{ p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}
               </td>
-              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                {{ p.precio_costo != null ? (p.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0') : '--' }}
-              </td>
+              @if (esAdmin()) {
+                <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+                  {{ p.precio_costo != null ? (p.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0') : '--' }}
+                </td>
+              }
               <td class="px-6 py-4">
                 <app-stock-badge [stock]="p.stock_almacen" />
                 <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_almacen }}</span>
@@ -85,9 +94,14 @@
                 <app-stock-badge [stock]="p.stock_shop" />
                 <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_shop }}</span>
               </td>
-              <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                {{ getTotalInvertido(p.id) | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              </td>
+              @if (esAdmin()) {
+                <td class="px-6 py-4 font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                  {{ getTotalInvertido(p.id) | currency:'ARS':'symbol-narrow':'1.0-0' }}
+                </td>
+                <td class="px-6 py-4 font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
+                  {{ ((p.stock_almacen + p.stock_shop) * p.precio_venta) | currency:'ARS':'symbol-narrow':'1.0-0' }}
+                </td>
+              }
               <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
                   <button
@@ -202,10 +216,15 @@
                           <tr class="border-b border-gray-200 dark:border-gray-700 text-left font-semibold text-gray-500 dark:text-gray-400">
                             <th class="px-3 py-2">Fecha ingreso</th>
                             <th class="px-3 py-2">Cantidad</th>
-                            <th class="px-3 py-2">Precio costo</th>
+                            @if (esAdmin()) {
+                              <th class="px-3 py-2">Precio costo</th>
+                            }
                             <th class="px-3 py-2">Almacén</th>
                             <th class="px-3 py-2">Tienda</th>
-                            <th class="px-3 py-2">Total invertido</th>
+                            @if (esAdmin()) {
+                              <th class="px-3 py-2">Total invertido</th>
+                              <th class="px-3 py-2">Total esperado</th>
+                            }
                           </tr>
                         </thead>
                         <tbody>
@@ -213,10 +232,15 @@
                             <tr class="border-b border-gray-100 dark:border-gray-700/50">
                               <td class="px-3 py-2 dark:text-gray-200">{{ lote.fecha_ingreso | date:'dd/MM/yyyy' }}</td>
                               <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.cantidad }}</td>
-                              <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                              @if (esAdmin()) {
+                                <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                              }
                               <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.stock_almacen }}</td>
                               <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.stock_shop }}</td>
-                              <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.cantidad * lote.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                              @if (esAdmin()) {
+                                <td class="px-3 py-2 tabular-nums dark:text-gray-200">{{ lote.cantidad * lote.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                                <td class="px-3 py-2 tabular-nums text-emerald-700 dark:text-emerald-400">{{ (lote.stock_almacen + lote.stock_shop) * p.precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                              }
                             </tr>
                           }
                         </tbody>

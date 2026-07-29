@@ -325,8 +325,8 @@
               </span>
               <input
                 type="number"
-                min="0"
                 inputmode="numeric"
+                min="0"
                 [value]="arqueoForm()[denom]"
                 (input)="actualizarCantidad(denom, +$any($event.target).value)"
                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"

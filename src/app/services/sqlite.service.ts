@@ -126,6 +126,10 @@ export class SqliteService implements Database {
       await this._migrationV14(client);
     }
 
+    if (currentVersion < 15) {
+      await this._migrationV15(client);
+    }
+
     if (environment.seedEnabled) {
       await this._seedIfEmpty(client);
     }
@@ -178,7 +182,7 @@ export class SqliteService implements Database {
     await client.sql(`CREATE TABLE IF NOT EXISTS movimientos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
-      tipo TEXT NOT NULL CHECK(tipo IN ('gasto', 'ingreso_extra')),
+      tipo TEXT NOT NULL CHECK(tipo IN ('gasto', 'ingreso_extra', 'compra_divisa')),
       descripcion TEXT NOT NULL,
       monto REAL NOT NULL,
       created_at TEXT NOT NULL
@@ -540,6 +544,34 @@ export class SqliteService implements Database {
     }
 
     await client.sql('INSERT INTO schema_version (version) VALUES (14)');
+  }
+
+  private async _migrationV15(client: SQLocal): Promise<void> {
+    // v15: agregar 'compra_divisa' al CHECK de movimientos.tipo
+    await client.sql('BEGIN TRANSACTION');
+    await client.sql('PRAGMA foreign_keys = OFF');
+
+    await client.sql(`CREATE TABLE movimientos_v15 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      jornada_id INTEGER NOT NULL REFERENCES jornadas(id),
+      tipo TEXT NOT NULL CHECK(tipo IN ('gasto', 'ingreso_extra', 'compra_divisa')),
+      descripcion TEXT NOT NULL,
+      monto REAL NOT NULL,
+      created_at TEXT NOT NULL,
+      divisa_tipo TEXT,
+      monto_divisa REAL,
+      tasa_cambio REAL
+    )`);
+    await client.sql(`INSERT INTO movimientos_v15
+      SELECT id, jornada_id, tipo, descripcion, monto, created_at,
+             divisa_tipo, monto_divisa, tasa_cambio
+      FROM movimientos`);
+    await client.sql('DROP TABLE movimientos');
+    await client.sql('ALTER TABLE movimientos_v15 RENAME TO movimientos');
+
+    await client.sql('PRAGMA foreign_keys = ON');
+    await client.sql('INSERT INTO schema_version (version) VALUES (15)');
+    await client.sql('COMMIT');
   }
 
   private async _seedIfEmpty(client: SQLocal): Promise<void> {

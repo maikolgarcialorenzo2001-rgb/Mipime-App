@@ -302,6 +302,7 @@ export class InventarioPage implements OnInit {
   readonly procesando = signal(false);
 
   abrirNuevoProducto(): void {
+    if (!this.esAdmin()) return;
     this.formNombre.set('');
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
@@ -322,6 +323,7 @@ export class InventarioPage implements OnInit {
   }
 
   async guardarProducto(): Promise<void> {
+    if (!this.esAdmin()) return;
     // Validate required fields
     if (!this.formNombre()?.trim()) {
       this.formError.set('El nombre es obligatorio');

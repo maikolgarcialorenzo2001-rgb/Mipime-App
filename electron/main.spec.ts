@@ -46,7 +46,6 @@ const mockDialogShowSaveDialog = vi.hoisted(() => vi.fn());
 const mockDialogShowMessageBox = vi.hoisted(() => vi.fn());
 const mockAppGetPath = vi.hoisted(() => vi.fn(() => '/fake/userData'));
 const mockAppGetName = vi.hoisted(() => vi.fn(() => 'MipimeCuentas'));
-const mockMenuBuildFromTemplate = vi.hoisted(() => vi.fn(() => ({})));
 const mockMenuSetApplicationMenu = vi.hoisted(() => vi.fn());
 
 vi.mock('electron', () => ({
@@ -74,7 +73,6 @@ vi.mock('electron', () => ({
     showMessageBox: mockDialogShowMessageBox,
   },
   Menu: {
-    buildFromTemplate: mockMenuBuildFromTemplate,
     setApplicationMenu: mockMenuSetApplicationMenu,
   },
 }));
@@ -540,101 +538,8 @@ describe('main process', () => {
     });
   });
 
-  describe('native menus (R3)', () => {
-    it('should build and set application menu on ready', async () => {
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      expect(mockMenuBuildFromTemplate).toHaveBeenCalledTimes(1);
-      expect(mockMenuSetApplicationMenu).toHaveBeenCalledTimes(1);
-    });
-
-    it('should build menu with File and Help submenus', async () => {
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      expect(template).toBeDefined();
-
-      const labels = template
-        .filter((item: any) => item && typeof item === 'object')
-        .map((item: any) => item.label);
-
-      // On non-macOS: File, Help with no macOS app menu
-      expect(labels).toContain('File');
-      expect(labels).toContain('Help');
-    });
-
-    it('should include macOS app menu when platform is darwin', async () => {
-      // Override process.platform for this test
-      const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-
-      mockLoadWindowState.mockReturnValue(null);
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      // First item should be macOS app menu (has role 'appMenu' not label)
-      expect(template[0]).toEqual(
-        expect.objectContaining({ role: 'appMenu' }),
-      );
-
-      // Restore platform
-      if (originalPlatform) {
-        Object.defineProperty(process, 'platform', originalPlatform);
-      } else {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-      }
-    });
-
-    it('should include Exit item in File submenu', async () => {
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      const fileMenu = template.find((item: any) => item.label === 'File');
-      expect(fileMenu).toBeDefined();
-
-      const exitItem = fileMenu.submenu.find(
-        (item: any) => item.label === 'Salir' || item.label === 'Exit',
-      );
-      expect(exitItem).toBeDefined();
-      expect(typeof exitItem.click).toBe('function');
-
-      // Invoking click should call app.quit
-      exitItem.click();
-      expect(mockAppQuit).toHaveBeenCalled();
-    });
-
-    it('should include About item in Help submenu with version dialog', async () => {
-      mockDialogShowMessageBox.mockReset();
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      const helpMenu = template.find((item: any) => item.label === 'Help');
-      expect(helpMenu).toBeDefined();
-
-      const aboutItem = helpMenu.submenu.find(
-        (item: any) => item.label === 'About' || item.label === 'Acerca de',
-      );
-      expect(aboutItem).toBeDefined();
-      expect(typeof aboutItem.click).toBe('function');
-
-      aboutItem.click();
-      expect(mockDialogShowMessageBox).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('MipimeCuentas'),
-        }),
-      );
-    });
-  });
+  // Native menus removed by design — setApplicationMenu(null)
+  // See main.ts line ~177
 
   describe('app lifecycle', () => {
     it('should call whenReady and create window', async () => {

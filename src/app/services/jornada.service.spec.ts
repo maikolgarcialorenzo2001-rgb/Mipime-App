@@ -846,8 +846,8 @@ describe('JornadaService', () => {
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
       expect(callArg.inversionPorProducto).toBeDefined();
       expect(callArg.inversionPorProducto instanceof Map).toBe(true);
-      expect(callArg.inversionPorProducto.get(1)).toBe(55000);
-      expect(callArg.inversionPorProducto.get(2)).toBe(18000);
+      expect(callArg.inversionPorProducto!.get(1)).toBe(55000);
+      expect(callArg.inversionPorProducto!.get(2)).toBe(18000);
     });
 
     it('4.2 RED: obtenerDatosJornada debe incluir inversionPorProducto', async () => {
@@ -869,7 +869,7 @@ describe('JornadaService', () => {
 
       expect(resultado.inversionPorProducto).toBeDefined();
       expect(resultado.inversionPorProducto instanceof Map).toBe(true);
-      expect(resultado.inversionPorProducto.get(1)).toBe(55000);
+      expect(resultado.inversionPorProducto!.get(1)).toBe(55000);
     });
 
     it('4.2 RED: generarExportacionMensual debe incluir inversionPorProducto en cada jornada', async () => {
@@ -894,7 +894,7 @@ describe('JornadaService', () => {
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
       expect(callArg[0].inversionPorProducto).toBeDefined();
-      expect(callArg[0].inversionPorProducto.get(1)).toBe(55000);
+      expect(callArg[0].inversionPorProducto!.get(1)).toBe(55000);
     });
   });
 
