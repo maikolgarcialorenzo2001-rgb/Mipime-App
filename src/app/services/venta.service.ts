@@ -173,12 +173,13 @@ export class VentaService {
         );
       }
 
-      // 3. Solo lo que realmente entra a la caja física
+      // 3. Solo lo que realmente entra (o sale) de la caja física
       let efectivoEnCaja = 0;
       if (payload.formaPago === 'efectivo') {
         efectivoEnCaja = total;
       } else if (payload.formaPago === 'divisas') {
-        efectivoEnCaja = payload.completacionEfectivo ?? 0;
+        const vuelto = (payload.billeteRecibido ?? 0) * (payload.tasaCambio ?? 0) - total;
+        efectivoEnCaja = (payload.completacionEfectivo ?? 0) - Math.max(0, vuelto);
       }
 
       await this._db.sql(

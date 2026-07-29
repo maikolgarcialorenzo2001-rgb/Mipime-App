@@ -131,13 +131,16 @@ export class JornadaService {
   }
 
   private async _calcularTotalEnCaja(j: Jornada): Promise<number> {
-    const ventas = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null }>(
-      'SELECT total, forma_pago, completacion_efectivo FROM ventas WHERE jornada_id = ?',
+    const ventas = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null; monto_divisa: number | null; tasa_cambio: number | null }>(
+      'SELECT total, forma_pago, completacion_efectivo, monto_divisa, tasa_cambio FROM ventas WHERE jornada_id = ?',
       [j.id],
     );
     const totalEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') return sum + (v.completacion_efectivo ?? 0);
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
       return sum;
     }, 0);
     const movimientos = await this._db.sql<{ tipo: string; monto: number }>(
@@ -187,15 +190,18 @@ export class JornadaService {
     const iso = ahora.toISOString();
 
     // Calcular saldo_real = monto_inicial + efectivo_en_caja + total_movimientos
-    const ventasJornada = await this._db.sql<{ total: number }>(
-      `SELECT COALESCE(SUM(
-         CASE WHEN forma_pago = 'efectivo' THEN total
-              WHEN forma_pago = 'divisas' THEN COALESCE(completacion_efectivo, 0)
-              ELSE 0
-         END), 0) as total FROM ventas WHERE jornada_id = ?`,
+    const ventasJornada = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null; monto_divisa: number | null; tasa_cambio: number | null }>(
+      'SELECT total, forma_pago, completacion_efectivo, monto_divisa, tasa_cambio FROM ventas WHERE jornada_id = ?',
       [jornada.id],
     );
-    const totalVentasEfectivo = ventasJornada[0]?.total ?? 0;
+    const totalVentasEfectivo = ventasJornada.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo + jornada.total_movimientos;
 
     await this._db.sql(
@@ -371,7 +377,10 @@ export class JornadaService {
     const totalMovimientos = jornadaRow[0]?.total_movimientos ?? 0;
     const totalVentasEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') return sum + (v.completacion_efectivo ?? 0);
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
       return sum;
     }, 0);
     const saldoRealCalculado = montoInicial + totalVentasEfectivo + totalMovimientos;

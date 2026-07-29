@@ -89,7 +89,10 @@ export class ExcelService {
     // Calcular desglose por forma de pago (efectivo que entra a caja)
     const totalEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
       return sum;
     }, 0);
     const totalTransferencia = ventas
@@ -389,7 +392,10 @@ export class ExcelService {
     const totalEfectivo = data.reduce((s, d) =>
       s + d.ventas.reduce((ss, v) => {
         if (v.forma_pago === 'efectivo') return ss + v.total;
-        if (v.forma_pago === 'divisas') return ss + ((v as any).completacion_efectivo ?? 0);
+        if (v.forma_pago === 'divisas') {
+          const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+          return ss + ((v as any).completacion_efectivo ?? 0) - vuelto;
+        }
         return ss;
       }, 0),
     0,
@@ -451,7 +457,10 @@ export class ExcelService {
     // Pre-compute payment totals for Efectivo del Día table (solo efectivo que entra a caja)
     const totalEfectivo = data.ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
       return sum;
     }, 0);
     let totalPendientes = 0;
@@ -671,7 +680,10 @@ export class ExcelService {
     const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
     const totalEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') return sum + ((v as any).completacion_efectivo ?? 0);
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
       return sum;
     }, 0);
     const totalIngresosExtra = data.movimientos

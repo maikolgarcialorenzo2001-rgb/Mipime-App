@@ -204,14 +204,17 @@ describe('VentaService', () => {
       expect(beginCalls.length).toBe(0);
     });
 
-    // ─── 2.8 RED: divisas total = billete * tasa + UPDATE jornadas ─────
+    // ─── 2.8 RED: divisas — INSERT + UPDATE jornadas con vuelto ────
 
-    it('2.8 RED: debería calcular total = billeteRecibido * tasaCambio cuando formaPago=divisas', async () => {
+    it('2.8 RED: debería incluir divisa_tipo, monto_divisa, tasa_cambio en el INSERT y descontar vuelto de saldo_esperado', async () => {
+      // items: subtotal 850 → total 850
+      // billete 5 USD @ 700 → 3500, vuelto = 2650
+      // efectivoEnCaja = 0 - 2650 = -2650 (sale de caja)
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock item 1
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
-        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 3500, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
-        .mockResolvedValueOnce([])                       // 3: INSERT detalle_ventas
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([])                       // 3: INSERT detalle
         .mockResolvedValueOnce([])                       // 4: UPDATE jornada
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
         .mockResolvedValueOnce([]);                      // 6: COMMIT
@@ -226,26 +229,30 @@ describe('VentaService', () => {
         tasaCambio: 700,
       }));
 
-      expect(venta.total).toBe(3500);
+      expect(venta.total).toBe(850);
       expect(venta.divisa_tipo).toBe('USD');
       expect(venta.monto_divisa).toBe(5);
       expect(venta.tasa_cambio).toBe(700);
 
       const allCalls = vi.mocked(mockDb.sql).mock.calls;
-
       const updateJornada = allCalls.find(
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
       );
       expect(updateJornada).toBeDefined();
-      expect(updateJornada![1]).toContain(3500);
-      expect(updateJornada![1]).toContain(3500);
+      // [total_ventas, efectivoEnCaja, updated_at, jornada_id]
+      expect(updateJornada![1][0]).toBe(850);         // total_ventas += total
+      expect(updateJornada![1][1]).toBe(-2650);        // saldo_esperado -= vuelto
     });
 
-    it('2.8 RED: debería incluir divisa_tipo, monto_divisa, tasa_cambio en el INSERT', async () => {
+    it('2.8 RED: debería sumar completacionEfectivo al saldo_esperado cuando falta', async () => {
+      // items: subtotal 850 → total 850
+      // billete 1 USD @ 700 = 700, falta = 150
+      // completacionEfectivo = 200, vuelto = 1*700-850 = -150 → no hay vuelto (Math.max(0, -150) = 0)
+      // efectivoEnCaja = 200 - 0 = 200
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
-        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1400, divisa_tipo: 'EUR', monto_divisa: 2, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 1, tasa_cambio: 700, completacion_efectivo: 200, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
         .mockResolvedValueOnce([])                       // 3: INSERT detalle
         .mockResolvedValueOnce([])                       // 4: UPDATE jornada
         .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
@@ -256,15 +263,22 @@ describe('VentaService', () => {
         items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
         usuarioId: 1,
         formaPago: 'divisas',
-        divisaTipo: 'EUR',
-        billeteRecibido: 2,
+        divisaTipo: 'USD',
+        billeteRecibido: 1,
         tasaCambio: 700,
+        completacionEfectivo: 200,
       }));
 
-      expect(venta.total).toBe(1400);
-      expect(venta.divisa_tipo).toBe('EUR');
-      expect(venta.monto_divisa).toBe(2);
-      expect(venta.tasa_cambio).toBe(700);
+      expect(venta.total).toBe(850);
+      expect(venta.completacion_efectivo).toBe(200);
+
+      const allCalls = vi.mocked(mockDb.sql).mock.calls;
+      const updateJornada = allCalls.find(
+        (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
+      );
+      expect(updateJornada).toBeDefined();
+      expect(updateJornada![1][0]).toBe(850);         // total_ventas += total
+      expect(updateJornada![1][1]).toBe(200);          // saldo_esperado += completacion
     });
 
     // ─── 2.9: pendiente INSERT + stock + UPDATE jornadas (incluye pendientes en saldo_esperado) ──
