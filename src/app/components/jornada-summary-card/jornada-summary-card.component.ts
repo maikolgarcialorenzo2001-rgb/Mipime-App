@@ -11,4 +11,5 @@ import type { Jornada } from '../../models';
 })
 export class JornadaSummaryCardComponent {
   readonly jornada = input.required<Jornada>();
+  readonly totalGastos = input<number>();
 }

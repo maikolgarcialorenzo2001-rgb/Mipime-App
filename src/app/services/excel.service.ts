@@ -54,7 +54,6 @@ export class ExcelService {
     this._agregarResumen(wb, data);
     this._agregarVentas(wb, data);
     this._agregarMovimientos(wb, data);
-    this._agregarMovimientosStock(wb, data);
     this._agregarArqueo(wb, data);
     this._agregarIpve(wb, data);
 
@@ -73,10 +72,13 @@ export class ExcelService {
       .filter((v) => v.forma_pago !== 'pendiente')
       .reduce((sum, v) => sum + v.total, 0);
     const totalVentasConExtra = totalVentasSinPendientes + totalIngresosExtra;
-
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+
     const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0);
     const gananciaPct = totalVentasConExtra > 0 ? ((gananciaBruta / totalVentasConExtra) * 100).toFixed(1) : '0.0';
 
@@ -113,7 +115,7 @@ export class ExcelService {
     }
     const totalUnidadesDivisas = Array.from(divisaPorTipo.values()).reduce((sum, d) => sum + d.monto, 0);
 
-    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -423,6 +425,9 @@ export class ExcelService {
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
 
     const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0);
     const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
@@ -446,7 +451,7 @@ export class ExcelService {
       .filter((v) => v.forma_pago === 'divisas')
       .reduce((sum, v) => sum + v.total, 0);
 
-    const totalEnCajaJ = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalEnCajaJ = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -607,24 +612,26 @@ export class ExcelService {
       }
     }
 
-    // Stock operations summary (if stockMovimientos exist)
+    // Stock operations detail (if stockMovimientos exist)
     const stock = data.stockMovimientos;
+    const pmap = data.productosMap;
     if (stock && stock.length > 0) {
       filas.push([]);
-      filas.push(['Resumen Operaciones Stock', 'Cantidad']);
+      filas.push(['Producto', 'Tipo', 'Cantidad', 'Costo', 'Motivo', 'Fecha']);
 
-      const conteo: Record<string, number> = {};
       for (const mov of stock) {
-        const tipo = mov.tipo;
-        conteo[tipo] = (conteo[tipo] ?? 0) + 1;
+        const info = pmap?.get(mov.producto_id);
+        const nombreProducto = info?.nombre ?? mov.producto_id;
+        const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
+        filas.push([
+          nombreProducto,
+          tipoLabel,
+          mov.cantidad,
+          mov.costo_total ?? 0,
+          mov.motivo ?? '',
+          mov.created_at,
+        ]);
       }
-
-      let total = 0;
-      for (const [tipo, cantidad] of Object.entries(conteo)) {
-        filas.push([tipo, cantidad]);
-        total += cantidad;
-      }
-      filas.push(['Total', total]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -634,42 +641,6 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
-  }
-
-  private _agregarMovimientosStock(wb: XLSX.WorkBook, data: JornadaReportData): void {
-    const stock = data.stockMovimientos;
-    if (!stock || stock.length === 0) return;
-
-    const pmap = data.productosMap;
-
-    const filas: unknown[][] = [
-      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha'],
-    ];
-
-    for (const mov of stock) {
-      const info = pmap?.get(mov.producto_id);
-      const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
-      filas.push([
-        nombreProducto,
-        tipoLabel,
-        mov.cantidad,
-        mov.motivo ?? '',
-        mov.created_at,
-      ]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = [
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 30 },
-      { wch: 20 },
-    ];
-    ws['!protect'] = {};
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
   }
 
   private _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): void {
@@ -688,7 +659,10 @@ export class ExcelService {
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
-    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
     const diferencia = totalEnCaja - totalArqueo;
 
     const filas: unknown[][] = [

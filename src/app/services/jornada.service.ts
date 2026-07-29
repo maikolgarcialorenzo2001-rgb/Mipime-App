@@ -148,7 +148,10 @@ export class JornadaService {
     const totalGastos = movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
-    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalCompraDivisa = movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
   }
 
   /**
@@ -381,14 +384,17 @@ export class JornadaService {
     const totalUsd = totalUsdVentas + totalUsdCompras;
     const totalEur = totalEurVentas + totalEurCompras;
 
+    // 3c. Recalcular total_merma desde los movimientos reales (cubre mermas de almacén que no actualizaron el campo incrementalmente)
+    const totalMermaRecalculado = await this.calcularTotalMerma(id);
+
     // 4. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
     const result = await this._db.sql<Jornada>(
       `UPDATE jornadas
        SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada',
-           total_usd = ?, total_eur = ?, updated_at = ?
+           total_usd = ?, total_eur = ?, total_merma = ?, updated_at = ?
        WHERE id = ?
        RETURNING *`,
-      [hora, saldoRealCalculado, userId, totalUsd, totalEur, iso, id],
+      [hora, saldoRealCalculado, userId, totalUsd, totalEur, totalMermaRecalculado, iso, id],
     );
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];
@@ -820,7 +826,14 @@ export class JornadaService {
   historial(limite = 30): Observable<Jornada[]> {
     return from(
       this._db.sql<Jornada>(
-        'SELECT * FROM jornadas ORDER BY fecha DESC, id DESC LIMIT ?',
+        `SELECT j.*, COALESCE(mg.total_gastos, 0) AS total_gastos
+         FROM jornadas j
+         LEFT JOIN (
+           SELECT jornada_id, SUM(monto) AS total_gastos
+           FROM movimientos WHERE tipo = 'gasto'
+           GROUP BY jornada_id
+         ) mg ON mg.jornada_id = j.id
+         ORDER BY j.fecha DESC, j.id DESC LIMIT ?`,
         [limite],
       ),
     );

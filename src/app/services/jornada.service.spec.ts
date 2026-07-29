@@ -148,6 +148,12 @@ describe('JornadaService', () => {
   });
 
   describe('cerrar', () => {
+    // Mock calcularTotalMerma at prototype level so all cerrar tests
+    // don't need an extra SQL mock for the recalculation query.
+    beforeEach(() => {
+      vi.spyOn(JornadaService.prototype, 'calcularTotalMerma').mockResolvedValue(0);
+    });
+
   describe('cerrar', () => {
     it('debería cerrar la jornada generando Excel (admin)', async () => {
       vi.mocked(mockDb.sql)
@@ -1086,6 +1092,11 @@ describe('JornadaService', () => {
   });
 
   describe('calcularTotalMerma', () => {
+    // Restore the calcularTotalMerma spy so these tests test the real method
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('debería retornar 0 cuando no hay mermas', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null

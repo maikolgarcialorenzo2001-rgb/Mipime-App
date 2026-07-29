@@ -6,6 +6,7 @@ export interface Jornada {
   monto_inicial: number;
   total_ventas: number;
   total_movimientos: number;
+  total_gastos?: number;
   saldo_esperado: number;
   saldo_real: number | null;
   estado: 'abierta' | 'cerrada';

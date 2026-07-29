@@ -495,8 +495,8 @@ export class StockMovimientoService {
       [total, ahora, productoId],
     );
 
-    // 5. Update jornada financials (only for shop merma — jornada tracks shop P&L)
-    if (jornadaId !== undefined && ubicacion === 'shop') {
+    // 5. Update jornada financials — both shop and almacen merma affect P&L
+    if (jornadaId !== undefined) {
       await this._db.sql(
         `UPDATE jornadas
          SET total_merma = total_merma + ?,

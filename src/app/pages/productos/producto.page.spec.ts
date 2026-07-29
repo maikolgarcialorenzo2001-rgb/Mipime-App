@@ -521,7 +521,7 @@ describe('ProductosPage', () => {
   describe('lotes loading state', () => {
     it('4.6 RED: muestra indicador de carga mientras se obtienen los lotes', async () => {
       // Create a promise that doesn't resolve immediately
-      let resolveLotes!: (v: LoteStock[]) => void;
+      let resolveLotes!: (v: LoteDetalle[]) => void;
       mockStockService.obtenerLotesAgrupados.mockReturnValue(
         new Promise<LoteDetalle[]>((resolve) => {
           resolveLotes = resolve;

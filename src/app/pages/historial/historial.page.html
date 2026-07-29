@@ -234,7 +234,7 @@
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_movimientos | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo esperado</span>
@@ -357,7 +357,7 @@
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
-                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_movimientos | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Monto inicial</span>
@@ -443,9 +443,17 @@
                       <tbody>
                         @for (mov of previewMovimientos(); track $index) {
                           <tr class="border-b border-gray-100 dark:border-gray-800">
-                            <td class="py-1.5 pr-2 capitalize text-gray-700 dark:text-gray-300">{{ mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra' }}</td>
+                            <td class="py-1.5 pr-2 capitalize text-gray-700 dark:text-gray-300">
+                              @if (mov.tipo === 'gasto') { Gasto }
+                              @else if (mov.tipo === 'compra_divisa') { Compra divisa }
+                              @else { Ingreso extra }
+                            </td>
                             <td class="py-1.5 pr-2 text-gray-900 dark:text-gray-100">{{ mov.descripcion }}</td>
-                             <td class="py-1.5 text-right tabular-nums font-medium" [class.text-red-600]="mov.tipo === 'gasto'" [class.dark:text-red-400]="mov.tipo === 'gasto'" [class.text-green-600]="mov.tipo === 'ingreso_extra'" [class.dark:text-green-400]="mov.tipo === 'ingreso_extra'">
+                             <td class="py-1.5 text-right tabular-nums font-medium"
+                               [class.text-red-600]="mov.tipo === 'gasto' || mov.tipo === 'compra_divisa'"
+                               [class.dark:text-red-400]="mov.tipo === 'gasto' || mov.tipo === 'compra_divisa'"
+                               [class.text-green-600]="mov.tipo === 'ingreso_extra'"
+                               [class.dark:text-green-400]="mov.tipo === 'ingreso_extra'">
                               {{ mov.monto | currency:'ARS':'symbol-narrow':'1.0-0' }}
                             </td>
                           </tr>

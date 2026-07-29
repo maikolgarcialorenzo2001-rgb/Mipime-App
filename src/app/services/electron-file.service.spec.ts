@@ -11,14 +11,14 @@ describe('ElectronFileService', () => {
 
   afterEach(() => {
     // Clean up electronAPI mock between tests
-    delete (window as Record<string, unknown>).electronAPI;
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
   });
 
   // ── isElectronPackaged ───────────────────────────────────
 
   describe('isElectronPackaged', () => {
     it('should return true when electronAPI.isPackaged === true', () => {
-      (window as Record<string, unknown>).electronAPI = { isPackaged: true } as ElectronAPI;
+      window.electronAPI = { isPackaged: true } as unknown as ElectronAPI;
 
       expect(service.isElectronPackaged).toBe(true);
     });
@@ -28,7 +28,7 @@ describe('ElectronFileService', () => {
     });
 
     it('should return false when electronAPI.isPackaged is false', () => {
-      (window as Record<string, unknown>).electronAPI = { isPackaged: false } as ElectronAPI;
+      window.electronAPI = { isPackaged: false } as unknown as ElectronAPI;
 
       expect(service.isElectronPackaged).toBe(false);
     });
@@ -39,10 +39,7 @@ describe('ElectronFileService', () => {
   describe('saveIndividual', () => {
     it('should call IPC with correct file path for a jornada', async () => {
       const invokeMock = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({ success: true });
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: true,
-        invoke: invokeMock,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: true, invoke: invokeMock } as unknown as ElectronAPI;
 
       await service.saveIndividual('base64data', { fecha: '2026-07-28', id: 123 });
 
@@ -58,10 +55,7 @@ describe('ElectronFileService', () => {
         success: false,
         error: 'Disk full',
       });
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: true,
-        invoke: invokeMock,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: true, invoke: invokeMock } as unknown as ElectronAPI;
 
       await expect(
         service.saveIndividual('base64data', { fecha: '2026-07-28', id: 123 }),
@@ -92,10 +86,7 @@ describe('ElectronFileService', () => {
   describe('saveMonthly', () => {
     it('should call IPC with correct monthly path', async () => {
       const invokeMock = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({ success: true });
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: true,
-        invoke: invokeMock,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: true, invoke: invokeMock } as unknown as ElectronAPI;
 
       await service.saveMonthly('base64mes', 2026, 6); // Julio (0-indexed)
 
@@ -111,10 +102,7 @@ describe('ElectronFileService', () => {
   describe('saveRange', () => {
     it('should call IPC with correct range path', async () => {
       const invokeMock = vi.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({ success: true });
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: true,
-        invoke: invokeMock,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: true, invoke: invokeMock } as unknown as ElectronAPI;
 
       await service.saveRange('base64rango', '2026-07-01', '2026-07-28');
 
@@ -133,9 +121,7 @@ describe('ElectronFileService', () => {
     });
 
     it('should skip Blob download when isElectronPackaged=true (save ya fue manejado por JornadaService)', () => {
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: true,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: true } as unknown as ElectronAPI;
 
       const createObjectURL = vi.spyOn(URL, 'createObjectURL');
 
@@ -145,9 +131,7 @@ describe('ElectronFileService', () => {
     });
 
     it('should do Blob fallback when isElectronPackaged=false', () => {
-      (window as Record<string, unknown>).electronAPI = {
-        isPackaged: false,
-      } as unknown as ElectronAPI;
+      window.electronAPI = { isPackaged: false } as unknown as ElectronAPI;
 
       const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:url');
       const clickMock = vi.fn();

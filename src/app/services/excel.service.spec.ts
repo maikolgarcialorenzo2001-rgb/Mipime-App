@@ -793,43 +793,50 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       productosMap,
     });
 
-    it('C3 RED: generarExcelJornada debe incluir hoja "Stock" cuando hay stockMovimientos', () => {
+    it('C3 RED: hoja Movimientos debe incluir detalle de stock cuando hay stockMovimientos', () => {
       const result = service.generarExcelJornada(dataConStock());
       const workbook = XLSX.read(result, { type: 'base64' });
-
-      expect(workbook.SheetNames).toContain('Stock');
-    });
-
-    it('C3 RED: hoja Stock debe tener columnas Producto, Tipo, Cantidad, Motivo, Fecha', () => {
-      const result = service.generarExcelJornada(dataConStock());
-      const workbook = XLSX.read(result, { type: 'base64' });
-      const sheet = workbook.Sheets['Stock'];
+      const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      const header = json[0] as string[];
+      // Find the stock section header (after movimientos rows + blank row)
+      const stockHeaderIdx = json.findIndex(
+        (row: unknown) => Array.isArray(row) && row[0] === 'Producto',
+      );
+      expect(stockHeaderIdx).toBeGreaterThan(0);
+      const header = json[stockHeaderIdx] as string[];
       expect(header[0]).toBe('Producto');
       expect(header[1]).toBe('Tipo');
       expect(header[2]).toBe('Cantidad');
-      expect(header[3]).toBe('Motivo');
-      expect(header[4]).toBe('Fecha');
+      expect(header[3]).toBe('Costo');
+      expect(header[4]).toBe('Motivo');
+      expect(header[5]).toBe('Fecha');
+
+      // Should have header + 3 movimientos
+      const stockData = json.slice(stockHeaderIdx + 1) as unknown[][];
+      expect(stockData.length).toBe(3);
+
+      // First data row: Harina 0000 1kg | Entrada | 100 | 55000 | Compra a proveedor | fecha
+      expect(stockData[0][0]).toBe('Harina 0000 1kg');
+      expect(stockData[0][1]).toBe('Entrada');
+      expect(stockData[0][2]).toBe(100);
+      expect(stockData[0][3]).toBe(55000);
+      expect(stockData[0][4]).toBe('Compra a proveedor');
+      expect(stockData[1][1]).toBe('Salida');
+      expect(stockData[2][1]).toBe('Ajuste');
     });
 
-    it('C3 RED: hoja Stock debe mostrar nombre de producto y tipo legible', () => {
-      const result = service.generarExcelJornada(dataConStock());
+    it('C3 RED: Movimientos sheet no debe tener sección de stock si stockMovimientos vacío', () => {
+      const dataSinStock: JornadaReportData = { ...data, stockMovimientos: undefined };
+      const result = service.generarExcelJornada(dataSinStock);
       const workbook = XLSX.read(result, { type: 'base64' });
-      const sheet = workbook.Sheets['Stock'];
+      const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Debería tener header + 3 movimientos
-      expect(json.length).toBe(4);
-      const filas = json as unknown[][];
-      // Primera fila de datos: Harina 0000 1kg | Entrada | 100 | Compra a proveedor | fecha
-      expect(filas[1][0]).toBe('Harina 0000 1kg');
-      expect(filas[1][1]).toBe('Entrada');
-      expect(filas[1][2]).toBe(100);
-      expect(filas[1][3]).toBe('Compra a proveedor');
-      expect(filas[2][1]).toBe('Salida');
-      expect(filas[3][1]).toBe('Ajuste');
+      const stockHeaderIdx = json.findIndex(
+        (row: unknown) => Array.isArray(row) && row[0] === 'Producto',
+      );
+      expect(stockHeaderIdx).toBe(-1);
     });
 
     it('C3 RED: generarExcelMensual debe incluir hoja "Movimientos de Stock" consolidada', () => {
@@ -861,13 +868,6 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filas[3][1]).toBe('Ajuste');
     });
 
-    it('C3 RED: no debe incluir hoja Stock si stockMovimientos está vacío o undefined', () => {
-      const dataSinStock: JornadaReportData = { ...data, stockMovimientos: undefined };
-      const result = service.generarExcelJornada(dataSinStock);
-      const workbook = XLSX.read(result, { type: 'base64' });
-
-      expect(workbook.SheetNames).not.toContain('Stock');
-    });
   });
 
     it('3.5 GREEN: Cuenta Casas en hoja por jornada del Excel mensual', () => {
@@ -1300,67 +1300,60 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       stockMovimientos: stockConResumen,
     });
 
-    it('5.1 RED: Movimientos sheet debe incluir resumen de operaciones stock después de movimientos', () => {
+    it('5.1 RED: Movimientos sheet debe incluir detalle de stock después de movimientos', () => {
       const result = service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // Después de header + 2 movimientos + blank row → debe aparecer "Resumen Operaciones Stock"
-      const resumenRow = (json as unknown[][]).find((r) => r[0] === 'Resumen Operaciones Stock');
-      expect(resumenRow).toBeTruthy();
+      // Find "Producto" header which marks start of stock section
+      const stockHeader = (json as unknown[][]).find((r) => r[0] === 'Producto');
+      expect(stockHeader).toBeTruthy();
     });
 
-    it('5.1 RED: resumen debe agrupar por tipo con cantidades correctas', () => {
+    it('5.1 RED: detalle de stock debe tener filas por cada movimiento', () => {
       const result = service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      // entrada: 2, salida: 1, merma: 1, ajuste: 1
-      const entradaRow = filas.find((r) => r[0] === 'entrada');
-      expect(entradaRow).toBeTruthy();
-      expect(entradaRow![1]).toBe(2);
+      const stockHeaderIdx = filas.findIndex((r) => r[0] === 'Producto');
+      expect(stockHeaderIdx).toBeGreaterThan(0);
 
-      const salidaRow = filas.find((r) => r[0] === 'salida');
+      const stockData = filas.slice(stockHeaderIdx + 1);
+      // 5 movimientos: 2 entrada + 1 salida + 1 merma + 1 ajuste
+      expect(stockData.length).toBe(5);
+
+      const entradaRows = stockData.filter((r) => r[1] === 'Entrada');
+      expect(entradaRows.length).toBe(2);
+
+      const salidaRow = stockData.find((r) => r[1] === 'Salida');
       expect(salidaRow).toBeTruthy();
-      expect(salidaRow![1]).toBe(1);
 
-      const mermaRow = filas.find((r) => r[0] === 'merma');
+      const mermaRow = stockData.find((r) => r[1] === 'Merma');
       expect(mermaRow).toBeTruthy();
-      expect(mermaRow![1]).toBe(1);
 
-      const ajusteRow = filas.find((r) => r[0] === 'ajuste');
+      const ajusteRow = stockData.find((r) => r[1] === 'Ajuste');
       expect(ajusteRow).toBeTruthy();
-      expect(ajusteRow![1]).toBe(1);
     });
 
-    it('5.1 RED: resumen debe tener fila de totales con suma correcta', () => {
+    it('5.1 RED: detalle de stock debe incluir costo_total por fila', () => {
       const result = service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       const filas = json as unknown[][];
-      const totalRow = filas.find((r) => r[0] === 'Total');
-      expect(totalRow).toBeTruthy();
-      expect(totalRow![1]).toBe(5); // 2+1+1+1
+      const stockHeaderIdx = filas.findIndex((r) => r[0] === 'Producto');
+      const stockData = filas.slice(stockHeaderIdx + 1);
+      // All test data has costo_total: 0, so each row should have 0 in the Costo column (index 3)
+      stockData.forEach((r) => {
+        expect(r[3]).toBe(0);
+      });
     });
 
-    it('5.1 RED: si no hay stockMovimientos, no debe mostrar resumen', () => {
-      const dataSinStock: JornadaReportData = { ...data, stockMovimientos: undefined };
-      const result = service.generarExcelJornada(dataSinStock);
-      const workbook = XLSX.read(result, { type: 'base64' });
-      const sheet = workbook.Sheets['Movimientos'];
-      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-
-      // Solo debe tener header + 2 movimientos (sin resumen)
-      expect(json.length).toBe(3);
-      expect((json as unknown[][]).some((r) => r[0] === 'Resumen Operaciones Stock')).toBe(false);
-    });
-
-    it('5.1 RED: summary debe aparecer aunque no haya movimientos tradicionales', () => {
+    it('5.1 RED: detalle de stock debe aparecer aunque no haya movimientos tradicionales', () => {
       const dataSoloStock: JornadaReportData = {
         ...data,
         movimientos: [],
@@ -1371,8 +1364,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
-      // header + blank row + resumen header + 4 tipo rows + total row = 7
-      expect((json as unknown[][]).some((r) => r[0] === 'Resumen Operaciones Stock')).toBe(true);
+      // Debe tener la tabla de detalle de stock con header Producto
+      expect((json as unknown[][]).some((r) => r[0] === 'Producto')).toBe(true);
     });
   });
 

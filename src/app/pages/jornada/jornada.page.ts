@@ -9,7 +9,7 @@ import { JornadaSummaryCardComponent } from '../../components/jornada-summary-ca
 import type { Venta, DetalleVenta } from '../../models/venta';
 import type { Movimiento } from '../../models/movimiento';
 import type { StockMovimiento } from '../../models/stock-movimiento';
-import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
+
 
 @Component({
   selector: 'app-jornada-page',
@@ -42,52 +42,13 @@ export class JornadaPage {
   readonly totalCup = computed(() => this.montoDivisa() * this.tasaCambio());
   readonly registrando = signal(false);
   readonly formError = signal<string | null>(null);
-
-  /** Modal de cierre */
-  readonly showCloseModal = signal(false);
-  readonly cerrando = signal(false);
-  readonly cerrarError = signal<string | null>(null);
-
-  /** Denomination form — signal puro, como quantity-input de POS */
-  readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
-  readonly arqueoForm = signal<Record<number, number>>(
-    Object.fromEntries(this.DENOMINACIONES.map(d => [d, 0])) as Record<number, number>,
-  );
   readonly soloNumeros = signal(false);
 
-  readonly showOptionalDenoms = signal(false);
-
-  readonly denominacionesVisibles = computed(() =>
-    this.showOptionalDenoms()
-      ? [...this.DENOMINACIONES]
-      : this.DENOMINACIONES.filter(d => d !== 1 && d !== 3),
+  readonly totalGastos = computed(() =>
+    this.movimientosDelDia()
+      .filter(m => m.tipo === 'gasto')
+      .reduce((sum, m) => sum + m.monto, 0),
   );
-
-  readonly arqueoTotal = computed(() => {
-    const f = this.arqueoForm();
-    return this.denominacionesVisibles().reduce((sum, d) => sum + d * (f[d] ?? 0), 0);
-  });
-
-  readonly totalEnCaja = computed(() => {
-    const j = this.jornadaService.jornadaAbierta();
-    if (!j) return 0;
-    const totalEfectivo = this.ventasDelDia()
-      .filter(v => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
-    const totalIngresosExtra = this.movimientosDelDia()
-      .filter(m => m.tipo === 'ingreso_extra')
-      .reduce((sum, m) => sum + m.monto, 0);
-    const totalGastos = this.movimientosDelDia()
-      .filter(m => m.tipo === 'gasto' || m.tipo === 'compra_divisa')
-      .reduce((sum, m) => sum + m.monto, 0);
-    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
-  });
-
-  readonly diferencia = computed(() => {
-    return this.totalEnCaja() - this.arqueoTotal();
-  });
-
-  readonly usuario = this._authService.usuario;
 
   constructor() {
     effect(() => {
@@ -165,9 +126,19 @@ export class JornadaPage {
     return this._authService.hasRole('admin');
   }
 
-  get puedeCerrar(): boolean {
-    const j = this.jornadaService.jornadaAbierta();
-    return j !== null && j.estado === 'abierta';
+  filtrarTecla(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab',
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'Home', 'End',
+      'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
   }
 
   registrarMovimiento(): void {
@@ -224,124 +195,5 @@ export class JornadaPage {
     });
   }
 
-  /** Maneja input del usuario: solo dígitos, actualiza signal (como quantity-input de POS) */
-  onDenomInput(denom: number, event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const soloDigitos = input.value.replace(/[^0-9]/g, '');
-    const cantidad = soloDigitos === '' ? 0 : parseInt(soloDigitos, 10);
 
-    // Forzar DOM al valor limpio
-    input.value = String(cantidad);
-
-    // Actualizar signal (única fuente de verdad)
-    this.arqueoForm.update(b => ({ ...b, [denom]: cantidad }));
-  }
-
-  filtrarTecla(event: KeyboardEvent): void {
-    const teclasPermitidas = [
-      'Backspace', 'Delete', 'Tab',
-      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-      'Home', 'End',
-      'Enter', 'Escape',
-    ];
-    if (teclasPermitidas.includes(event.key)) return;
-    if (!/^\d$/.test(event.key)) {
-      event.preventDefault();
-      this.soloNumeros.set(true);
-      setTimeout(() => this.soloNumeros.set(false), 1800);
-    }
-  }
-
-  abrirModalCierre(): void {
-    this.cerrarError.set(null);
-    this.showOptionalDenoms.set(false);
-    this.soloNumeros.set(false);
-    this.arqueoForm.set(
-      Object.fromEntries(this.DENOMINACIONES.map(d => [d, 0])) as Record<number, number>,
-    );
-    this.showCloseModal.set(true);
-  }
-
-  cerrarModalCierre(): void {
-    this.showCloseModal.set(false);
-  }
-
-  confirmarCierre(): void {
-    const j = this.jornadaService.jornadaAbierta();
-    const uid = this.usuario()?.id;
-
-    if (!j || uid === undefined) return;
-
-    // Build arqueo entries from signal (only entries with cantidad > 0)
-    const raw = this.arqueoForm();
-    const entries: ArqueoCajaEntry[] = [];
-    for (const d of this.denominacionesVisibles()) {
-      const cantidad = raw[d] ?? 0;
-      if (cantidad > 0) {
-        entries.push({ denominacion: d, cantidad, subtotal: d * cantidad });
-      }
-    }
-
-    if (entries.length === 0) {
-      this.cerrarError.set('Ingresa la cantidad de al menos una denominación');
-      return;
-    }
-
-    const saldoReal = this.arqueoTotal();
-    this.cerrando.set(true);
-    this.cerrarError.set(null);
-
-    this.jornadaService.cerrar(j.id, saldoReal, uid, entries).subscribe({
-      next: () => {
-        this.showCloseModal.set(false);
-        this.cerrando.set(false);
-
-        // Descargar Excel
-        this._descargarExcel(j.id);
-      },
-      error: (err: unknown) => {
-        this.cerrarError.set(
-          err instanceof Error ? err.message : 'Error al cerrar la jornada',
-        );
-        this.cerrando.set(false);
-      },
-    });
-  }
-
-  onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.cerrarModalCierre();
-    }
-  }
-
-  onModalKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      this.cerrarModalCierre();
-    }
-  }
-
-  private _descargarExcel(jornadaId: number): void {
-    this.jornadaService.obtenerReporte(jornadaId).subscribe({
-      next: (reporte) => {
-        if (!reporte) return;
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
-      },
-    });
-  }
 }
