@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Lift mock factories into hoisted scope so vi.mock can reference them
 const mockContextBridgeExpose = vi.hoisted(() => vi.fn());
 const mockIpcSend = vi.hoisted(() => vi.fn());
+const mockIpcSendSync = vi.hoisted(() => vi.fn(() => false));
 const mockIpcInvoke = vi.hoisted(() => vi.fn());
 const mockIpcOn = vi.hoisted(() => vi.fn());
 const mockIpcRemoveAll = vi.hoisted(() => vi.fn());
@@ -13,6 +14,7 @@ vi.mock('electron', () => ({
   },
   ipcRenderer: {
     send: mockIpcSend,
+    sendSync: mockIpcSendSync,
     invoke: mockIpcInvoke,
     on: mockIpcOn,
     removeAllListeners: mockIpcRemoveAll,
@@ -43,6 +45,7 @@ describe('preload', () => {
       'electronAPI',
       expect.objectContaining({
         platform: expect.any(String),
+        isPackaged: expect.any(Boolean),
         send: expect.any(Function),
         invoke: expect.any(Function),
         on: expect.any(Function),
@@ -50,6 +53,7 @@ describe('preload', () => {
       }),
     );
     expect(api.platform).toBeDefined();
+    expect(api.isPackaged).toBeDefined();
     expect(api.send).toBeDefined();
     expect(api.invoke).toBeDefined();
     expect(api.on).toBeDefined();
@@ -61,6 +65,29 @@ describe('preload', () => {
 
     expect(typeof api.platform).toBe('string');
     expect((api.platform as string).length).toBeGreaterThan(0);
+  });
+
+  describe('isPackaged', () => {
+    it('should query sendSync at module init and expose the result', async () => {
+      mockIpcSendSync.mockReturnValueOnce(true);
+      const api = await getPreloadApi();
+
+      expect(mockIpcSendSync).toHaveBeenCalledWith('app:isPackaged');
+      expect(api.isPackaged).toBe(true);
+    });
+
+    it('should be false when running in development mode', async () => {
+      mockIpcSendSync.mockReturnValueOnce(false);
+      const api = await getPreloadApi();
+
+      expect(api.isPackaged).toBe(false);
+    });
+
+    it('should call sendSync exactly once per module load', async () => {
+      await getPreloadApi();
+
+      expect(mockIpcSendSync).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('should allow send on valid channel app:ready', async () => {
@@ -94,6 +121,21 @@ describe('preload', () => {
       await (api.invoke as Function)('app:getPlatform');
 
       expect(mockIpcInvoke).toHaveBeenCalledWith('app:getPlatform');
+    });
+
+    it('should allow invoke on file:saveFile channel', async () => {
+      const api = await getPreloadApi();
+
+      const buffer = new ArrayBuffer(8);
+      await (api.invoke as Function)('file:saveFile', {
+        fileName: 'test.xlsx',
+        buffer,
+      });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('file:saveFile', {
+        fileName: 'test.xlsx',
+        buffer,
+      });
     });
 
     it('should allow invoke on dialog:saveFile channel', async () => {

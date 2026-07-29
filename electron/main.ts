@@ -147,6 +147,25 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePath ?? null;
   });
 
+  // Synchronous query — used by preload at module init
+  ipcMain.on('app:isPackaged', (event) => {
+    event.returnValue = app.isPackaged;
+  });
+
+  // Save file to Documents/Tienda IPVE/ without user-facing dialog
+  ipcMain.handle('file:saveFile', async (_event, { fileName, buffer }) => {
+    try {
+      const documentsPath = app.getPath('documents');
+      const destDir = path.join(documentsPath, 'Tienda IPVE');
+      fs.mkdirSync(destDir, { recursive: true });
+      const fullPath = path.join(destDir, fileName);
+      fs.writeFileSync(fullPath, Buffer.from(buffer));
+      return { success: true, filePath: fullPath };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // Configure auto-updater
   autoUpdater.autoDownload = false;
   autoUpdater.on('error', (err) => {
