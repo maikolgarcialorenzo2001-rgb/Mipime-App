@@ -13,6 +13,8 @@ Semantic Versioning (SemVer): `MAJOR.MINOR.PATCH[-prerelease]`
 ## Reglas
 
 - **Siempre** que se haga un build con cambios o fixes (no importa el entorno), se sube la versión.
+- La versión en `package.json` es la fuente de verdad — refleja el último build con cambios.
+- Al hacer `git pull`, la versión queda en la que el último que commiteó la dejó. Nadie la "baja".
 - Elegir `MAJOR.MINOR.PATCH` según el impacto del cambio:
   - `PATCH` — bug fixes, refactors, cambios menores sin features nuevas.
   - `MINOR` — features nuevas, cambios significativos pero compatibles.
