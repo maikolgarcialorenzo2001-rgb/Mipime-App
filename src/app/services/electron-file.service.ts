@@ -1,3 +1,4 @@
+/// <reference path="../../../electron/types.d.ts" />
 import { Injectable } from '@angular/core';
 
 /** Nombres de meses en español para los nombres de archivo. */
@@ -68,10 +69,11 @@ export class ElectronFileService {
   }
 
   /**
-   * Descarga un Blob en el navegador. Útil para el fallback cuando
-   * el save ya fue manejado por la capa de servicio (login, app-nav).
+   * Descarga un Blob en el navegador. En Electron empaquetado no hace
+   * nada porque el save ya lo manejó JornadaService vía IPC.
    */
   downloadBlob(base64: string, fileName: string): void {
+    if (this.isElectronPackaged) return;
     this._blobFallback(base64, fileName);
   }
 

@@ -124,4 +124,43 @@ describe('ElectronFileService', () => {
       });
     });
   });
+
+  // ── downloadBlob ──────────────────────────────────────────
+
+  describe('downloadBlob', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should skip Blob download when isElectronPackaged=true (save ya fue manejado por JornadaService)', () => {
+      (window as Record<string, unknown>).electronAPI = {
+        isPackaged: true,
+      } as unknown as ElectronAPI;
+
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL');
+
+      service.downloadBlob('base64data', 'test.xlsx');
+
+      expect(createObjectURL).not.toHaveBeenCalled();
+    });
+
+    it('should do Blob fallback when isElectronPackaged=false', () => {
+      (window as Record<string, unknown>).electronAPI = {
+        isPackaged: false,
+      } as unknown as ElectronAPI;
+
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:url');
+      const clickMock = vi.fn();
+      const createElement = vi.spyOn(document, 'createElement').mockReturnValue({
+        href: '',
+        download: '',
+        click: clickMock,
+      } as unknown as HTMLAnchorElement);
+
+      service.downloadBlob('base64data', 'test.xlsx');
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(clickMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });
