@@ -457,7 +457,6 @@ export class StockMovimientoService {
     jornadaId?: number,
     ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
-    this._checkAdmin();
     const ahora = new Date().toISOString();
 
     // 1. Consume from oldest lots (FIFO) at the given ubicacion
