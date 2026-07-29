@@ -78,8 +78,12 @@ export class ExcelService {
     const totalCompraDivisa = data.movimientos
       .filter((m) => m.tipo === 'compra_divisa')
       .reduce((sum, m) => sum + m.monto, 0);
+    const totalCostoCC = (data.cuentaCosas ?? []).reduce((sum, item) => {
+      const costo = data.productosMap?.get(item.producto_id)?.precio_costo ?? 0;
+      return sum + item.cantidad * costo;
+    }, 0);
 
-    const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0);
+    const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? ((gananciaBruta / totalVentasConExtra) * 100).toFixed(1) : '0.0';
 
     // Calcular desglose por forma de pago
@@ -131,6 +135,7 @@ export class ExcelService {
       ['Total costo productos', -data.totalCosto],
       ['Total gastos', -totalGastos],
       ['Total merma', -(j.total_merma ?? 0)],
+      ['Total cuenta casas', -totalCostoCC],
       ['Ganancia bruta', gananciaBruta],
       ['Ganancia %', `${gananciaPct}%`],
       [],
@@ -428,8 +433,12 @@ export class ExcelService {
     const totalCompraDivisa = data.movimientos
       .filter((m) => m.tipo === 'compra_divisa')
       .reduce((sum, m) => sum + m.monto, 0);
+    const totalCostoCC = (data.cuentaCosas ?? []).reduce((sum, item) => {
+      const costo = data.productosMap?.get(item.producto_id)?.precio_costo ?? 0;
+      return sum + item.cantidad * costo;
+    }, 0);
 
-    const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0);
+    const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
 
     // Pre-compute payment totals for Efectivo del Día table
@@ -467,6 +476,7 @@ export class ExcelService {
       ['Total costo productos', -(data.totalCosto ?? 0)],
       ['Total gastos', -totalGastos],
       ['Total merma', -(j.total_merma ?? 0)],
+      ['Total cuenta casas', -totalCostoCC],
       ['Ganancia bruta', gananciaBruta],
       ['Ganancia %', gananciaPct],
       [],
