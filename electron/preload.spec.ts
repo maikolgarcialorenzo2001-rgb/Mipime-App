@@ -126,15 +126,14 @@ describe('preload', () => {
     it('should allow invoke on file:saveFile channel', async () => {
       const api = await getPreloadApi();
 
-      const buffer = new ArrayBuffer(8);
       await (api.invoke as Function)('file:saveFile', {
-        fileName: 'test.xlsx',
-        buffer,
+        base64: 'SGVsbG8gV29ybGQ=',
+        filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
       });
 
       expect(mockIpcInvoke).toHaveBeenCalledWith('file:saveFile', {
-        fileName: 'test.xlsx',
-        buffer,
+        base64: 'SGVsbG8gV29ybGQ=',
+        filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
       });
     });
 

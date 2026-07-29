@@ -387,7 +387,7 @@ describe('main process', () => {
       );
     });
 
-    it('should create Tienda IPVE directory and write file', async () => {
+    it('should create Tienda IPVE directory and write file from base64', async () => {
       vi.resetModules();
       await import('./main');
       await flush();
@@ -396,23 +396,21 @@ describe('main process', () => {
         ([channel]) => channel === 'file:saveFile',
       )?.[1] as (...args: unknown[]) => Promise<unknown>;
 
-      const buffer = new ArrayBuffer(8);
       const result = await handler({}, {
-        fileName: 'ventas-2026-07.xlsx',
-        buffer,
+        base64: 'SGVsbG8gV29ybGQ=',  // "Hello World" in base64
+        filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
       });
 
       expect(mockAppGetPath).toHaveBeenCalledWith('documents');
+      // mkdirSync called with the parent directory (path.dirname)
       expect(mockFsMkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining('Tienda IPVE'),
+        expect.stringMatching(/Tienda IPVE.*Julio/),
         { recursive: true },
       );
       expect(mockFsWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('Tienda IPVE'),
+        expect.stringMatching(/Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
         expect.any(Buffer),
       );
-      // Also verify the specific filename is in the path
-      expect(mockFsWriteFileSync.mock.calls[0][0]).toContain('ventas-2026-07.xlsx');
       expect(result).toEqual({
         success: true,
         filePath: expect.stringContaining('Tienda IPVE'),
@@ -433,8 +431,8 @@ describe('main process', () => {
       )?.[1] as (...args: unknown[]) => Promise<unknown>;
 
       const result = await handler({}, {
-        fileName: 'test.xlsx',
-        buffer: new ArrayBuffer(4),
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
       });
 
       expect(result).toEqual({
@@ -457,14 +455,32 @@ describe('main process', () => {
       )?.[1] as (...args: unknown[]) => Promise<unknown>;
 
       const result = await handler({}, {
-        fileName: 'test.xlsx',
-        buffer: new ArrayBuffer(4),
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
       });
 
       expect(result).toEqual({
         success: false,
         error: 'ENOSPC: no space left',
       });
+    });
+
+    it('should decode base64 correctly into Buffer', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      await handler({}, {
+        base64: 'SGVsbG8gV29ybGQ=',
+        filePath: 'test.txt',
+      });
+
+      const writtenBuffer = mockFsWriteFileSync.mock.calls[0][1] as Buffer;
+      expect(writtenBuffer.toString()).toBe('Hello World');
     });
   });
 
