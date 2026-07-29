@@ -2,11 +2,14 @@ import { Injectable, inject, signal } from '@angular/core';
 import { from, firstValueFrom, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
+import { ElectronFileService } from './electron-file.service';
 import type { Jornada, JornadaReporte } from '../models';
 import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { VentaLote } from '../models/venta-lote';
+import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 import { ProductoService } from './producto.service';
 
@@ -16,6 +19,7 @@ import { ProductoService } from './producto.service';
 export class JornadaService {
   private readonly _db = inject(DATABASE);
   private readonly _excelService = inject(ExcelService);
+  private readonly _electronFileService = inject(ElectronFileService);
   private readonly _productoService = inject(ProductoService);
 
   /** Señal compartida de la jornada abierta actual (null si no hay). */
@@ -163,6 +167,28 @@ export class JornadaService {
       [hora, saldoRealCalculado, usuario.id, iso, jornada.id],
     );
 
+    // Generar y guardar Excel para la jornada auto-cerrada
+    const datos = await this._recolectarDatosJornada(jornada.id, usuario.id);
+    const base64 = await this._generarYGuardarExcel(jornada, {
+      ventas: datos.ventas,
+      movimientos: datos.movimientos,
+      stockMovimientos: datos.stockMovimientos,
+      ventaLotes: datos.ventaLotes,
+      productosMap: datos.productosMap,
+      totalCosto: datos.totalCosto,
+      userCierreNombre: datos.userCierreNombre,
+      cuentaCosas: datos.cuentaCosas,
+      arqueo: datos.arqueo,
+      inversionPorProducto: datos.inversionPorProducto,
+      totalUsd: datos.totalUsd,
+      totalEur: datos.totalEur,
+    });
+
+    // Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    if (this._electronFileService.isElectronPackaged) {
+      await this._electronFileService.saveIndividual(base64, jornada);
+    }
+
     this.jornadaAbierta.set(null);
     return null;
   }
@@ -204,6 +230,57 @@ export class JornadaService {
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
     return this._ejecutarCierre(id, saldoReal, userId, arqueo);
+  }
+
+  /**
+   * Genera y guarda el Excel de una jornada (debe estar cerrada).
+   * Recibe la jornada + los datos ya recolectados, genera Excel, guarda en jornada_reportes.
+   * No consulta la DB — el caller pasa los datos.
+   */
+  private async _generarYGuardarExcel(
+    jornada: Jornada,
+    datos: {
+      ventas: VentaConDetalles[];
+      movimientos: Movimiento[];
+      stockMovimientos: StockMovimiento[];
+      ventaLotes: VentaLote[];
+      productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
+      totalCosto: number;
+      userCierreNombre: string | null;
+      cuentaCosas: CuentaCosa[];
+      arqueo: ArqueoCajaEntry[];
+      inversionPorProducto: Map<number, number>;
+      totalUsd: number;
+      totalEur: number;
+    },
+  ): Promise<string> {
+    const iso = new Date().toISOString();
+
+    const base64 = this._excelService.generarExcelJornada({
+      jornada,
+      ventas: datos.ventas,
+      movimientos: datos.movimientos,
+      stockMovimientos: datos.stockMovimientos,
+      ventaLotes: datos.ventaLotes,
+      productosMap: datos.productosMap,
+      totalCosto: datos.totalCosto,
+      userCierreNombre: datos.userCierreNombre,
+      cuentaCosas: datos.cuentaCosas,
+      arqueo: datos.arqueo,
+      inversionPorProducto: datos.inversionPorProducto,
+      total_usd: datos.totalUsd,
+      total_eur: datos.totalEur,
+    });
+
+    const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
+
+    await this._db.sql(
+      `INSERT INTO jornada_reportes (jornada_id, content_type, content_base64, filename, created_at)
+       VALUES (?, 'excel', ?, ?, ?)`,
+      [jornada.id, base64, filename, iso],
+    );
+
+    return base64;
   }
 
   /**
@@ -375,9 +452,8 @@ export class JornadaService {
       inversionPorProducto.set(item.producto_id, item.total_invertido);
     }
 
-    // 12. Generar Excel con estado fresco y nombres de producto
-    const base64 = this._excelService.generarExcelJornada({
-      jornada,
+    // 12. Generar y guardar Excel via helper reutilizable
+    const base64 = await this._generarYGuardarExcel(jornada, {
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
@@ -386,20 +462,16 @@ export class JornadaService {
       totalCosto,
       userCierreNombre,
       cuentaCosas,
-      arqueo,
+      arqueo: arqueo ?? [],
       inversionPorProducto,
-      total_usd: totalUsd,
-      total_eur: totalEur,
+      totalUsd,
+      totalEur,
     });
 
-    const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
-
-    // 7. Almacenar en jornada_reportes
-    await this._db.sql(
-      `INSERT INTO jornada_reportes (jornada_id, content_type, content_base64, filename, created_at)
-       VALUES (?, 'excel', ?, ?, ?)`,
-      [id, base64, filename, iso],
-    );
+    // 13. Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    if (this._electronFileService.isElectronPackaged) {
+      await this._electronFileService.saveIndividual(base64, jornada);
+    }
 
     return jornada;
   }

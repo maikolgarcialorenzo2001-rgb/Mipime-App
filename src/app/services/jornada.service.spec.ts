@@ -10,6 +10,7 @@ import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
+import { ElectronFileService } from './electron-file.service';
 import { ProductoService } from './producto.service';
 import type { PerProductInvestment } from '../models';
 import { of } from 'rxjs';
@@ -42,6 +43,14 @@ const mockJornadaCerrada: Jornada = {
 
 const mockExcelBase64 = 'UEsDBBQAAAAIA...mock-base64...';
 
+/** Shared mock for ElectronFileService — resets in beforeEach. */
+let mockElectronFileService: {
+  isElectronPackaged: boolean;
+  saveIndividual: ReturnType<typeof vi.fn>;
+  saveMonthly: ReturnType<typeof vi.fn>;
+  saveRange: ReturnType<typeof vi.fn>;
+};
+
 function createMockDb(): Database {
   return {
     sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
@@ -54,6 +63,13 @@ describe('JornadaService', () => {
 
   beforeEach(() => {
     mockDb = createMockDb();
+
+    mockElectronFileService = {
+      isElectronPackaged: false,
+      saveIndividual: vi.fn().mockResolvedValue(undefined),
+      saveMonthly: vi.fn().mockResolvedValue(undefined),
+      saveRange: vi.fn().mockResolvedValue(undefined),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -71,6 +87,10 @@ describe('JornadaService', () => {
           useValue: {
             obtenerInversionPorProducto: vi.fn().mockReturnValue(of([])),
           },
+        },
+        {
+          provide: ElectronFileService,
+          useValue: mockElectronFileService,
         },
       ],
     });
@@ -221,6 +241,40 @@ describe('JornadaService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO jornada_reportes'),
       );
       expect(insertCall).toBeTruthy();
+    });
+
+    it('debería llamar ElectronFileService.saveIndividual en cerrar cuando isElectronPackaged=true', async () => {
+      mockElectronFileService.isElectronPackaged = true;
+
+      const mockVentasConData: Venta[] = [
+        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, usuario_id: 1, forma_pago: 'efectivo', created_at: '' },
+      ];
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta
+        .mockResolvedValueOnce(mockVentasConData) // ventas
+        .mockResolvedValueOnce([]) // detalles
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // SELECT productos
+        // venta_lotes cost (returns empty -> triggers fallback) + fallback (returns empty)
+        .mockResolvedValueOnce([]) // SELECT venta_lotes cost
+        .mockResolvedValueOnce([]) // fallback
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT venta_lotes detalle
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 7200, 1));
+
+      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledTimes(1);
+      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledWith(
+        mockExcelBase64,
+        expect.objectContaining({ id: 1 }),
+      );
     });
 
     it('debería lanzar error si la jornada no existe', async () => {
@@ -1146,11 +1200,21 @@ describe('JornadaService', () => {
       expect(resultado!.user_apertura_id).toBeNull();
     });
 
-    it('debería cerrar la jornada si es de OTRO usuario y retornar null', async () => {
+    it('debería cerrar la jornada si es de OTRO usuario, generar Excel, y retornar null', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada (user1)
-        .mockResolvedValueOnce([]); // UPDATE (auto-close)
+        .mockResolvedValueOnce([{ total: 0 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([]) // UPDATE (auto-close)
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
 
       const service = TestBed.inject(JornadaService);
       const resultado = await service.autoCerrarSiOtroUsuario(mockUser2);
@@ -1171,7 +1235,16 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaConMovs]) // SELECT open jornada
         .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
-        .mockResolvedValueOnce([]); // UPDATE
+        .mockResolvedValueOnce([]) // UPDATE
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
 
       const service = TestBed.inject(JornadaService);
       await service.autoCerrarSiOtroUsuario(mockUser2);
@@ -1182,6 +1255,106 @@ describe('JornadaService', () => {
       expect(updateCall).toBeTruthy();
       // saldo_real = 5000 (monto_inicial) + 3000 (efectivo) + 500 (total_movimientos) = 8500
       expect(updateCall![1]).toContain(8500); // saldo_real calculado
+    });
+
+    it('debería llamar ExcelService cuando se auto-cierra por otro usuario', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([]) // UPDATE
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      // Verify ExcelService was called
+      const excelService = TestBed.inject(ExcelService);
+      expect(excelService.generarExcelJornada).toHaveBeenCalledTimes(1);
+      expect(excelService.generarExcelJornada).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jornada: expect.objectContaining({ id: mockJornadaUser1.id }),
+        }),
+      );
+
+      // Verify INSERT into jornada_reportes
+      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO jornada_reportes'),
+      );
+      expect(insertCall).toBeTruthy();
+    });
+
+    it('debería llamar ElectronFileService.saveIndividual cuando isElectronPackaged=true en auto-cierre', async () => {
+      mockElectronFileService.isElectronPackaged = true;
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([]) // UPDATE
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledTimes(1);
+      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledWith(
+        mockExcelBase64,
+        expect.objectContaining({ id: mockJornadaUser1.id }),
+      );
+    });
+
+    it('NO debería llamar ElectronFileService cuando isElectronPackaged=false en auto-cierre', async () => {
+      mockElectronFileService.isElectronPackaged = false;
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([]) // UPDATE
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(mockUser2);
+
+      expect(mockElectronFileService.saveIndividual).not.toHaveBeenCalled();
+    });
+
+    it('debería NO llamar ExcelService cuando es el mismo usuario', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornadaUser1]); // SELECT open jornada (same user)
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(mockUser1);
+
+      // ExcelService should NOT have been called
+      const excelService = TestBed.inject(ExcelService);
+      expect(excelService.generarExcelJornada).not.toHaveBeenCalled();
     });
   });
 
