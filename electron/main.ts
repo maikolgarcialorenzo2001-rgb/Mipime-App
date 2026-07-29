@@ -147,6 +147,27 @@ app.whenReady().then(() => {
     return result.canceled ? null : result.filePath ?? null;
   });
 
+  // Synchronous query — used by preload at module init
+  ipcMain.on('app:isPackaged', (event) => {
+    event.returnValue = app.isPackaged;
+  });
+
+  // Save file to Documents/Tienda IPVE/ without user-facing dialog.
+  // filePath is relative, e.g. "2026/07 - Julio/jornada_2026-07-28_123.xlsx".
+  // base64 is the raw Excel base64 string.
+  ipcMain.handle('file:saveFile', async (_event, { base64, filePath }) => {
+    try {
+      const documentsPath = app.getPath('documents');
+      const destDir = path.join(documentsPath, 'Tienda IPVE');
+      const fullPath = path.join(destDir, filePath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, Buffer.from(base64, 'base64'));
+      return { success: true, filePath: fullPath };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+
   // Configure auto-updater
   autoUpdater.autoDownload = false;
   autoUpdater.on('error', (err) => {

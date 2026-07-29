@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
@@ -15,9 +16,12 @@ export class AppNavComponent {
   private readonly _router = inject(Router);
   private readonly _auth = inject(AuthService);
   readonly jornadaService = inject(JornadaService);
+  private readonly _electronFileService = inject(ElectronFileService);
   readonly themeService = inject(ThemeService);
 
   protected readonly auth = this._auth;
+
+  readonly soloNumeros = signal(false);
 
   /** Modal de apertura */
   readonly showOpenModal = signal(false);
@@ -88,7 +92,8 @@ export class AppNavComponent {
     this.abriendo.set(true);
     this.abrirError.set(null);
 
-    this.jornadaService.abrir(monto).subscribe({
+    const uid = this.auth.usuario()?.id;
+    this.jornadaService.abrir(monto, uid).subscribe({
       next: () => {
         this.showOpenModal.set(false);
         this.abriendo.set(false);
@@ -153,7 +158,7 @@ export class AppNavComponent {
         this.cerrando.set(false);
 
         // Descargar el reporte generado
-        this._descargarExcel(j.id);
+        this._descargarExcel(j.id, j);
       },
       error: (err: unknown) => {
         this.cerrarError.set(
@@ -173,6 +178,21 @@ export class AppNavComponent {
     }
   }
 
+  filtrarTecla(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab',
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'Home', 'End',
+      'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
+  }
+
   onModalKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       if (this.showOpenModal()) this.cerrarModalApertura();
@@ -182,10 +202,15 @@ export class AppNavComponent {
 
   // ── Internos ──────────────────────────────────────────
 
-  private _descargarExcel(jornadaId: number): void {
+  private _descargarExcel(jornadaId: number, jornada: { fecha: string; id: number }): void {
     this.jornadaService.obtenerReporte(jornadaId).subscribe({
-      next: (reporte) => {
+      next: async (reporte) => {
         if (!reporte) return;
+
+        if (this._electronFileService.isElectronPackaged) {
+          await this._electronFileService.saveIndividual(reporte.content_base64, jornada);
+          return;
+        }
 
         const byteCharacters = atob(reporte.content_base64);
         const byteNumbers = new Array(byteCharacters.length);

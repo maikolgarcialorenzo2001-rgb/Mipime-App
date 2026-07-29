@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -33,6 +34,7 @@ export interface DiaCalendario {
 })
 export class HistorialPage {
   private readonly _jornadaService = inject(JornadaService);
+  private readonly _electronFileService = inject(ElectronFileService);
 
   readonly jornadas = signal<Jornada[]>([]);
   readonly loading = signal(true);
@@ -218,8 +220,13 @@ export class HistorialPage {
 
   descargarExcel(j: Jornada): void {
     this._jornadaService.obtenerReporte(j.id).subscribe({
-      next: (reporte) => {
+      next: async (reporte) => {
         if (!reporte) return;
+
+        if (this._electronFileService.isElectronPackaged) {
+          await this._electronFileService.saveIndividual(reporte.content_base64, j);
+          return;
+        }
 
         const byteCharacters = atob(reporte.content_base64);
         const byteNumbers = new Array(byteCharacters.length);
@@ -315,6 +322,11 @@ export class HistorialPage {
   }
 
   private _descargarBase64Rango(base64: string, desde: string, hasta: string): void {
+    if (this._electronFileService.isElectronPackaged) {
+      this._electronFileService.saveRange(base64, desde, hasta);
+      return;
+    }
+
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -334,6 +346,11 @@ export class HistorialPage {
   }
 
   private _descargarBase64(base64: string, month: Date): void {
+    if (this._electronFileService.isElectronPackaged) {
+      this._electronFileService.saveMonthly(base64, month.getFullYear(), month.getMonth());
+      return;
+    }
+
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {

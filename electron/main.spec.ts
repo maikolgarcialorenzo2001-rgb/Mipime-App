@@ -42,6 +42,7 @@ const mockRegisterSchemesAsPrivileged = vi.hoisted(() => vi.fn());
 const mockProtocolHandle = vi.hoisted(() => vi.fn());
 
 const mockIpcMainHandle = vi.hoisted(() => vi.fn());
+const mockIpcMainOn = vi.hoisted(() => vi.fn());
 const mockDialogShowSaveDialog = vi.hoisted(() => vi.fn());
 const mockDialogShowMessageBox = vi.hoisted(() => vi.fn());
 const mockAppGetPath = vi.hoisted(() => vi.fn(() => '/fake/userData'));
@@ -67,6 +68,7 @@ vi.mock('electron', () => ({
   },
   ipcMain: {
     handle: mockIpcMainHandle,
+    on: mockIpcMainOn,
   },
   dialog: {
     showSaveDialog: mockDialogShowSaveDialog,
@@ -91,6 +93,15 @@ vi.mock('electron-updater', () => ({
   },
 }));
 
+const mockFsMkdirSync = vi.hoisted(() => vi.fn());
+const mockFsWriteFileSync = vi.hoisted(() => vi.fn());
+
+vi.mock('fs', () => ({
+  readFileSync: vi.fn(() => Buffer.from('mocked-content')),
+  mkdirSync: mockFsMkdirSync,
+  writeFileSync: mockFsWriteFileSync,
+}));
+
 const mockLoadWindowState = vi.hoisted(() => vi.fn(() => null));
 const mockSaveWindowState = vi.hoisted(() => vi.fn());
 const mockGetDefaultWindowState = vi.hoisted(() =>
@@ -113,6 +124,8 @@ describe('main process', () => {
     vi.clearAllMocks();
     mockIsPackaged = false;
     mockGetAllWindows.mockReturnValue([]);
+    // Restore default return value for app.getPath (can be overridden in nested describes)
+    mockAppGetPath.mockReturnValue('/fake/userData');
   });
 
   describe('custom protocol registration', () => {
@@ -216,6 +229,64 @@ describe('main process', () => {
     });
   });
 
+  describe('app:isPackaged handler', () => {
+    it('should register app:isPackaged IPC listener', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainOn).toHaveBeenCalledWith(
+        'app:isPackaged',
+        expect.any(Function),
+      );
+    });
+
+    it('should return app.isPackaged value via event.returnValue', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      expect(handler).toBeDefined();
+      const event = { returnValue: false as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(mockIsPackaged);
+    });
+
+    it('should return true when app is packaged', async () => {
+      mockIsPackaged = true;
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      const event = { returnValue: false as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(true);
+    });
+
+    it('should return false when app is not packaged', async () => {
+      mockIsPackaged = false;
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      const event = { returnValue: true as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(false);
+    });
+  });
+
   describe('dialog:saveFile IPC handler', () => {
     it('should register dialog:saveFile IPC handler', async () => {
       vi.resetModules();
@@ -297,6 +368,119 @@ describe('main process', () => {
       const result = await handler({}, { defaultPath: 'test.xlsx' });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('file:saveFile IPC handler', () => {
+    beforeEach(() => {
+      mockAppGetPath.mockReturnValue('/mock/Documents');
+    });
+
+    it('should register file:saveFile IPC handler', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith(
+        'file:saveFile',
+        expect.any(Function),
+      );
+    });
+
+    it('should create Tienda IPVE directory and write file from base64', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'SGVsbG8gV29ybGQ=',  // "Hello World" in base64
+        filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
+      });
+
+      expect(mockAppGetPath).toHaveBeenCalledWith('documents');
+      // mkdirSync called with the parent directory (path.dirname)
+      expect(mockFsMkdirSync).toHaveBeenCalledWith(
+        expect.stringMatching(/Tienda IPVE.*Julio/),
+        { recursive: true },
+      );
+      expect(mockFsWriteFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
+        expect.any(Buffer),
+      );
+      expect(result).toEqual({
+        success: true,
+        filePath: expect.stringContaining('Tienda IPVE'),
+      });
+    });
+
+    it('should return error when mkdirSync fails', async () => {
+      mockFsMkdirSync.mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'EACCES: permission denied',
+      });
+    });
+
+    it('should return error when writeFileSync fails', async () => {
+      mockFsWriteFileSync.mockImplementationOnce(() => {
+        throw new Error('ENOSPC: no space left');
+      });
+
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'ENOSPC: no space left',
+      });
+    });
+
+    it('should decode base64 correctly into Buffer', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      await handler({}, {
+        base64: 'SGVsbG8gV29ybGQ=',
+        filePath: 'test.txt',
+      });
+
+      const writtenBuffer = mockFsWriteFileSync.mock.calls[0][1] as Buffer;
+      expect(writtenBuffer.toString()).toBe('Hello World');
     });
   });
 

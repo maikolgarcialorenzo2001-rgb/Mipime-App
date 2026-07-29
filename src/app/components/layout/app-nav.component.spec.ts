@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AppNavComponent } from './app-nav.component';
 import { AuthService } from '../../services/auth.service';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
@@ -84,10 +85,18 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
   let component: AppNavComponent;
   let mockJornadaSvc: MockJornadaService;
   let mockAuth: MockAuthService;
+  let mockElectronFileSvc: {
+    isElectronPackaged: boolean;
+    saveIndividual: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockJornadaSvc = createMockJornadaService();
     mockAuth = createMockAuth(mockAdmin);
+    mockElectronFileSvc = {
+      isElectronPackaged: false,
+      saveIndividual: vi.fn().mockResolvedValue(undefined),
+    };
 
     TestBed.configureTestingModule({
       imports: [AppNavComponent],
@@ -95,6 +104,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
         provideRouter(routes),
         { provide: AuthService, useValue: mockAuth },
         { provide: JornadaService, useValue: mockJornadaSvc },
+        { provide: ElectronFileService, useValue: mockElectronFileSvc },
       ],
     });
 
@@ -161,6 +171,28 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 5000, 1, [
       { denominacion: 5000, cantidad: 1, subtotal: 5000 },
     ]);
+  });
+
+  it('should call ElectronFileService.saveIndividual after confirmarCierre when isElectronPackaged=true', () => {
+    mockJornadaSvc.obtenerReporte.mockReturnValue(of({
+      id: 1,
+      jornada_id: 1,
+      content_type: 'excel',
+      content_base64: 'dGVzdEJhc2U2NA==',
+      filename: 'jornada_2026-06-05_1.xlsx',
+      created_at: '',
+    }));
+    mockElectronFileSvc.isElectronPackaged = true;
+
+    component.abrirModalCierre();
+    fixture.detectChanges();
+    component.actualizarCantidad(5000, 1);
+    component.confirmarCierre();
+
+    expect(mockElectronFileSvc.saveIndividual).toHaveBeenCalledWith(
+      'dGVzdEJhc2U2NA==',
+      mockJornadaAbierta,
+    );
   });
 
   it('1.3 RED: checkbox toggle shows/hides $1 and $3 denomination rows in nav modal', () => {
