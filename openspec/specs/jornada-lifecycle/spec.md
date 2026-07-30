@@ -122,3 +122,51 @@ The `Venta` interface MUST include `completacion_efectivo?: number` so TypeScrip
 - GIVEN a venta object returned from the database where `completacion_efectivo` is present or NULL
 - WHEN TypeScript code accesses `v.completacion_efectivo`
 - THEN it compiles without errors and returns `number | undefined`
+
+### Requirement: Service guard — verificar saldo antes de egreso
+
+`JornadaService` MUST exponer `saldoSuficientePara(monto)` que compare `saldo_esperado - monto >= 0` dentro de una transacción explícita (BEGIN/COMMIT/ROLLBACK) y lanzar `Error` si el saldo es insuficiente.
+
+`_registrarMovimientoAsync` MUST invocar `saldoSuficientePara` DENTRO de una transacción BEGIN/COMMIT/ROLLBACK que envuelve guard + INSERT + UPDATE, ANTES de insertar movimientos de tipo `gasto` o `compra_divisa`. La validación usa `saldo_esperado` leído desde la DB (no el signal `totalEnCaja()`).
+
+#### Scenario: Gasto con saldo suficiente
+
+- GIVEN `saldo_esperado = 10000` y usuario intenta registrar gasto de $3000
+- WHEN `_registrarMovimientoAsync` ejecuta guard dentro de transacción
+- THEN el guard pasa y el movimiento se inserta normalmente
+
+#### Scenario: Gasto con saldo insuficiente
+
+- GIVEN `saldo_esperado = 2000` y usuario intenta registrar gasto de $3000
+- WHEN `_registrarMovimientoAsync` ejecuta guard
+- THEN el guard lanza `Error("Saldo insuficiente en caja")`, ROLLBACK, y NO se inserta el movimiento
+
+#### Scenario: Race condition — dos gastos simultáneos
+
+- GIVEN `saldo_esperado = 5000` y dos usuarios intentan gastar $3000 cada uno
+- WHEN ambos pasan el UI check simultáneamente
+- THEN el primer guard lee `saldo_esperado = 5000` dentro de su transacción, pasa, inserta, COMMIT con `saldo_esperado = 2000`
+- AND el segundo guard lee `saldo_esperado = 2000` dentro de su transacción, falla porque `2000 - 3000 < 0`, hace ROLLBACK
+- AND el primer gasto se registra, el segundo se rechaza con error
+
+#### Scenario: Merma sin validación de saldo
+
+- GIVEN `saldo_esperado = 100` y usuario registra merma de $500 (costo de inventario)
+- WHEN se llama `registrarMerma()`
+- THEN NO se invoca `saldoSuficientePara` — la merma se registra sin importar el saldo
+
+### Requirement: UI guard — deshabilitar botón si saldo insuficiente
+
+`jornada.page` MUST verificar `totalEnCaja()` signal antes de habilitar el botón de registrar gasto/compra_divisa. Usa el helper `saldoSuficientePara(monto)` para el cómputo reactivo. Si `totalEnCaja() < monto_ingresado`, el botón SHALL estar deshabilitado con tooltip "Saldo insuficiente en caja".
+
+#### Scenario: UI permite gasto con saldo suficiente
+
+- GIVEN `totalEnCaja() signal = 10000`, usuario ingresa monto gasto = $3000
+- WHEN el componente verifica `totalEnCaja() >= monto` via `saldoSuficientePara()`
+- THEN botón "Registrar gasto" está habilitado, sin tooltip
+
+#### Scenario: UI bloquea gasto con saldo insuficiente
+
+- GIVEN `totalEnCaja() signal = 2000`, usuario ingresa monto gasto = $3000
+- WHEN el componente verifica `totalEnCaja() < monto` via `saldoSuficientePara()`
+- THEN botón "Registrar gasto" está deshabilitado y tooltip "Saldo insuficiente en caja" es visible
