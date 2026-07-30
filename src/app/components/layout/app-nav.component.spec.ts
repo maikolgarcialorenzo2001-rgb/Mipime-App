@@ -170,7 +170,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     component.confirmarCierre();
 
     // saldoReal = 5000 * 1 = 5000
-    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 5000, 1, [
+    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 1, [
       { denominacion: 5000, cantidad: 1, subtotal: 5000 },
     ]);
   });

@@ -88,6 +88,20 @@ export class VentaService {
     await this._db.sql('BEGIN TRANSACTION');
 
     try {
+      // Service guard: verificar saldo_esperado antes de vuelto divisa
+      if (payload.formaPago === 'divisas') {
+        const vuelto = Math.max(0, (payload.billeteRecibido ?? 0) * (payload.tasaCambio ?? 0) - total);
+        if (vuelto > 0) {
+          const rows = await this._db.sql<{ saldo_esperado: number }>(
+            'SELECT saldo_esperado FROM jornadas WHERE id = ?',
+            [jornadaId],
+          );
+          const saldoActual = rows[0]?.saldo_esperado ?? 0;
+          if (saldoActual < vuelto) {
+            throw new Error(`Saldo insuficiente en caja para vuelto: $${saldoActual} < $${vuelto}`);
+          }
+        }
+      }
       // 1. Insertar venta con campos condicionales
       const columnasBase = ['jornada_id', 'fecha_hora', 'total', 'created_at', 'usuario_id', 'forma_pago'];
       const placeholdersBase = ['?', '?', '?', '?', '?', '?'];

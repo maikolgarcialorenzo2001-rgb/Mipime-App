@@ -268,7 +268,6 @@ describe('LoginPage', () => {
       // Debe llamar cerrar con uid = mockJornada.user_apertura_id (=1)
       expect(jornadaService.cerrar).toHaveBeenCalledWith(
         mockJornada.id,
-        mockJornada.saldo_esperado,
         mockJornada.user_apertura_id,
       );
     });

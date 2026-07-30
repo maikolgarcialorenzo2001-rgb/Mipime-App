@@ -28,6 +28,16 @@ export class JornadaService {
   /** Total en caja calculado: monto_inicial + efectivo + ingresos_extra - gastos. */
   readonly totalEnCaja = signal(0);
 
+  /**
+   * Verifica si el saldo en caja alcanza para un monto de egreso.
+   * @param monto - Monto a verificar
+   * @returns true si saldo >= monto (o monto <= 0 → true, ingresos no se bloquean)
+   */
+  saldoSuficientePara(monto: number): boolean {
+    if (monto <= 0) return true;
+    return this.totalEnCaja() >= monto;
+  }
+
   /** `true` mientras se carga la jornada por primera vez o se refresca. */
   readonly jornadaCargando = signal(true);
 
@@ -68,33 +78,52 @@ export class JornadaService {
 
     const ahora = new Date().toISOString();
 
-    let movs: Movimiento[];
-    if (tipo === 'compra_divisa' && divisa) {
-      movs = await this._db.sql<Movimiento>(
-        `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, divisa_tipo, monto_divisa, tasa_cambio, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
-        [jornadaId, tipo, descripcion, monto, divisa.divisaTipo, divisa.montoDivisa, divisa.tasaCambio, ahora],
+    await this._db.sql('BEGIN TRANSACTION');
+    try {
+      // Service guard: verificar saldo_esperado DENTRO de la transacción
+      if (tipo === 'gasto' || tipo === 'compra_divisa') {
+        const rows = await this._db.sql<{ saldo_esperado: number }>(
+          'SELECT saldo_esperado FROM jornadas WHERE id = ?',
+          [jornadaId],
+        );
+        const saldoActual = rows[0]?.saldo_esperado ?? 0;
+        if (saldoActual - monto < 0) {
+          throw new Error(`Saldo insuficiente en caja: $${saldoActual} < $${monto}`);
+        }
+      }
+
+      let movs: Movimiento[];
+      if (tipo === 'compra_divisa' && divisa) {
+        movs = await this._db.sql<Movimiento>(
+          `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, divisa_tipo, monto_divisa, tasa_cambio, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+          [jornadaId, tipo, descripcion, monto, divisa.divisaTipo, divisa.montoDivisa, divisa.tasaCambio, ahora],
+        );
+      } else {
+        movs = await this._db.sql<Movimiento>(
+          `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
+           VALUES (?, ?, ?, ?, ?) RETURNING *`,
+          [jornadaId, tipo, descripcion, monto, ahora],
+        );
+      }
+
+      // compra_divisa reduces cash like a gasto
+      const ajuste = (tipo === 'gasto' || tipo === 'compra_divisa') ? -monto : monto;
+      await this._db.sql(
+        `UPDATE jornadas
+         SET total_movimientos = total_movimientos + ?,
+             saldo_esperado = saldo_esperado + ?,
+             updated_at = ?
+         WHERE id = ?`,
+        [ajuste, ajuste, ahora, jornadaId],
       );
-    } else {
-      movs = await this._db.sql<Movimiento>(
-        `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
-         VALUES (?, ?, ?, ?, ?) RETURNING *`,
-        [jornadaId, tipo, descripcion, monto, ahora],
-      );
+
+      await this._db.sql('COMMIT');
+      return movs[0];
+    } catch (error) {
+      await this._db.sql('ROLLBACK');
+      throw error;
     }
-
-    // compra_divisa reduces cash like a gasto
-    const ajuste = (tipo === 'gasto' || tipo === 'compra_divisa') ? -monto : monto;
-    await this._db.sql(
-      `UPDATE jornadas
-       SET total_movimientos = total_movimientos + ?,
-           saldo_esperado = saldo_esperado + ?,
-           updated_at = ?
-       WHERE id = ?`,
-      [ajuste, ajuste, ahora, jornadaId],
-    );
-
-    return movs[0];
   }
 
   /**
@@ -262,19 +291,18 @@ export class JornadaService {
    * 1. Verifica que el usuario sea admin
    * 2. Ejecuta el cierre (UPDATE → arqueo → SELECT → Excel → reporte)
    */
-  cerrar(id: number, saldoReal: number, userId: number, arqueo?: ArqueoCajaEntry[]): Observable<Jornada> {
-    return from(this._cerrarAsync(id, saldoReal, userId, arqueo)).pipe(
+  cerrar(id: number, userId: number, arqueo?: ArqueoCajaEntry[]): Observable<Jornada> {
+    return from(this._cerrarAsync(id, userId, arqueo)).pipe(
       tap(() => this.jornadaAbierta.set(null)),
     );
   }
 
   private async _cerrarAsync(
     id: number,
-    saldoReal: number,
     userId: number,
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
-    return this._ejecutarCierre(id, saldoReal, userId, arqueo);
+    return this._ejecutarCierre(id, userId, arqueo);
   }
 
   /**
@@ -338,7 +366,6 @@ export class JornadaService {
    */
   private async _ejecutarCierre(
     id: number,
-    saldoReal: number,
     userId: number,
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {

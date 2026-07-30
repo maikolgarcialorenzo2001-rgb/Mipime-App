@@ -147,12 +147,10 @@ export class AppNavComponent {
       return;
     }
 
-    const saldoReal = this.arqueoTotal();
-
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, saldoReal, uid, entries).subscribe({
+    this.jornadaService.cerrar(j.id, uid, entries).subscribe({
       next: () => {
         this.showCloseModal.set(false);
         this.cerrando.set(false);

@@ -213,11 +213,12 @@ describe('VentaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
         .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
-        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
-        .mockResolvedValueOnce([])                       // 3: INSERT detalle
-        .mockResolvedValueOnce([])                       // 4: UPDATE jornada
-        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
-        .mockResolvedValueOnce([]);                      // 6: COMMIT
+        .mockResolvedValueOnce([{ saldo_esperado: 5000 }]) // 2: SELECT saldo_esperado (guard)
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
+        .mockResolvedValueOnce([])                       // 4: INSERT detalle
+        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 7: COMMIT
 
       const venta = await firstValueFrom(service.registrar({
         jornadaId: 1,
@@ -315,6 +316,141 @@ describe('VentaService', () => {
       expect(jornadaUpdates.length).toBe(1);
     });
 
+    // ─── 2.2 RED: service guard — saldo_esperado antes de vuelto divisa ──
+
+    it('2.2 RED: debería permitir divisa con vuelto cuando saldo_esperado >= vuelto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 5000 }]) // 2: SELECT saldo_esperado (guard)
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 5, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
+        .mockResolvedValueOnce([])                       // 4: INSERT detalle
+        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 7: COMMIT
+
+      const venta = await firstValueFrom(service.registrar({
+        jornadaId: 1,
+        items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
+        usuarioId: 1,
+        formaPago: 'divisas',
+        divisaTipo: 'USD',
+        billeteRecibido: 5,
+        tasaCambio: 700,
+      }));
+
+      expect(venta.id).toBe(1);
+      // vuelto = 5*700 - 850 = 2650, saldo_esperado = 5000 >= 2650 → OK
+    });
+
+    it('2.2 RED: debería rechazar divisa con vuelto cuando saldo_esperado < vuelto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 1000 }]); // 2: SELECT saldo_esperado (guard) — insuficiente
+
+      await expect(
+        firstValueFrom(service.registrar({
+          jornadaId: 1,
+          items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
+          usuarioId: 1,
+          formaPago: 'divisas',
+          divisaTipo: 'USD',
+          billeteRecibido: 5,
+          tasaCambio: 700,
+        })),
+      ).rejects.toThrow('Saldo insuficiente');
+      // vuelto = 5*700 - 850 = 2650, saldo = 1000 < 2650 → throw
+    });
+
+    it('2.2 RED: debería permitir divisa sin vuelto (pago exacto) sin validar saldo', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 1, tasa_cambio: 850, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([])                       // 3: INSERT detalle
+        .mockResolvedValueOnce([])                       // 4: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 6: COMMIT
+
+      const venta = await firstValueFrom(service.registrar({
+        jornadaId: 1,
+        items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
+        usuarioId: 1,
+        formaPago: 'divisas',
+        divisaTipo: 'USD',
+        billeteRecibido: 1,
+        tasaCambio: 850,
+      }));
+
+      expect(venta.id).toBe(1);
+      // vuelto = 1*850 - 850 = 0 → no hay vuelto, no se valida saldo
+    });
+
+    it('2.2 RED: debería permitir efectivo sin validar saldo (no aplica guard)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 20 }])   // 0: _validarStock item 1
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 1700, created_at: '2026-06-04T10:00:00Z' }])  // 2: INSERT ventas
+        .mockResolvedValueOnce([])                       // 3: INSERT detalle
+        .mockResolvedValueOnce([])                       // 4: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 5: INSERT venta_lotes item 1
+        .mockResolvedValueOnce([])                       // 6: COMMIT
+
+      const venta = await firstValueFrom(service.registrar({
+        jornadaId: 1,
+        items: [{ producto: mockProducto, cantidad: 2, subtotal: 1700 }],
+        usuarioId: 1,
+        formaPago: 'efectivo',
+      }));
+
+      expect(venta.id).toBe(1);
+    });
+
+    it('2.2 RED: debería rechazar divisa con vuelto cuando saldo_esperado === 0', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 0 }]); // 2: SELECT saldo_esperado (guard) — insuficiente
+
+      await expect(
+        firstValueFrom(service.registrar({
+          jornadaId: 1,
+          items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
+          usuarioId: 1,
+          formaPago: 'divisas',
+          divisaTipo: 'USD',
+          billeteRecibido: 2,
+          tasaCambio: 700,
+        })),
+      ).rejects.toThrow('Saldo insuficiente');
+      // vuelto = 2*700 - 850 = 550, saldo = 0 < 550 → throw
+    });
+
+    it('2.2 RED: debería permitir divisa con saldo exacto al vuelto (borde exacto)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock
+        .mockResolvedValueOnce([])                       // 1: BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 550 }]) // 2: SELECT saldo_esperado (guard)
+        .mockResolvedValueOnce([{ id: 1, jornada_id: 1, fecha_hora: '2026-06-04T10:00:00Z', total: 850, divisa_tipo: 'USD', monto_divisa: 2, tasa_cambio: 700, created_at: '2026-06-04T10:00:00Z' }])  // 3: INSERT ventas
+        .mockResolvedValueOnce([])                       // 4: INSERT detalle
+        .mockResolvedValueOnce([])                       // 5: UPDATE jornada
+        .mockResolvedValueOnce([])                       // 6: INSERT venta_lotes
+        .mockResolvedValueOnce([]);                      // 7: COMMIT
+
+      const venta = await firstValueFrom(service.registrar({
+        jornadaId: 1,
+        items: [{ producto: mockProducto, cantidad: 1, subtotal: 850 }],
+        usuarioId: 1,
+        formaPago: 'divisas',
+        divisaTipo: 'USD',
+        billeteRecibido: 2,
+        tasaCambio: 700,
+      }));
+
+      expect(venta.id).toBe(1);
+      // vuelto = 2*700 - 850 = 550, saldo = 550 >= 550 → OK (borde exacto)
+    });
     it('2.9: debería incluir comprador_nombre, autorizado_por, descripcion en el INSERT', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([{ stock_shop: 50 }])   // 0: _validarStock item 1

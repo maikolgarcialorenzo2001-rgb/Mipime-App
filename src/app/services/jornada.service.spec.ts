@@ -175,7 +175,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.cerrar(1, 7200, 1));
+      const resultado = await firstValueFrom(service.cerrar(1, 1));
 
       expect(resultado.estado).toBe('cerrada');
       expect(resultado.user_cierre_id).toBe(1);
@@ -193,7 +193,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.cerrar(1, 7200, 2));
+      const resultado = await firstValueFrom(service.cerrar(1, 2));
 
       expect(resultado.estado).toBe('cerrada');
     });
@@ -230,7 +230,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       // Verificar que se llamó a ExcelService con los datos correctos
       const excelService = TestBed.inject(ExcelService);
@@ -274,7 +274,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT jornada_reportes
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       expect(mockElectronFileService.saveIndividual).toHaveBeenCalledTimes(1);
       expect(mockElectronFileService.saveIndividual).toHaveBeenCalledWith(
@@ -294,7 +294,7 @@ describe('JornadaService', () => {
       const service = TestBed.inject(JornadaService);
 
       await expect(
-        firstValueFrom(service.cerrar(999, 0, 1)),
+        firstValueFrom(service.cerrar(999, 1)),
       ).rejects.toThrow('Jornada no encontrada');
     });
   });
@@ -364,7 +364,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const excelService = TestBed.inject(ExcelService);
 
@@ -398,7 +398,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
@@ -417,7 +417,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 999));
+      await firstValueFrom(service.cerrar(1, 999));
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
@@ -454,7 +454,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
@@ -525,8 +525,11 @@ describe('JornadaService', () => {
 
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 5000 }]) // SELECT saldo_esperado (guard)
         .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos
-        .mockResolvedValueOnce([mockJornadaActualizada]); // UPDATE jornadas
+        .mockResolvedValueOnce([mockJornadaActualizada]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Luz', 500));
@@ -559,8 +562,10 @@ describe('JornadaService', () => {
 
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
         .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos
-        .mockResolvedValueOnce([mockJornadaActualizada]); // UPDATE jornadas
+        .mockResolvedValueOnce([mockJornadaActualizada]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.registrarMovimiento(1, 'ingreso_extra', 'Venta envases', 300));
@@ -609,7 +614,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.cerrar(1, 7200, 1));
+      const resultado = await firstValueFrom(service.cerrar(1, 1));
 
       expect(resultado.estado).toBe('cerrada');
 
@@ -653,7 +658,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]);
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       // Verificar que productosMap fue pasado a ExcelService
       const excelService = TestBed.inject(ExcelService);
@@ -900,7 +905,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
@@ -974,7 +979,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas') && call[0].includes('saldo_real'),
@@ -1008,7 +1013,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1, arqueoEntries));
+      await firstValueFrom(service.cerrar(1, 1, arqueoEntries));
 
       const arqueoInserts = vi.mocked(mockDb.sql).mock.calls.filter(
         (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO arqueo_caja'),
@@ -1038,7 +1043,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1, arqueoEntries));
+      await firstValueFrom(service.cerrar(1, 1, arqueoEntries));
 
       const arqueoInserts = vi.mocked(mockDb.sql).mock.calls.filter(
         (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO arqueo_caja'),
@@ -1135,6 +1140,150 @@ describe('JornadaService', () => {
     });
   });
 
+  describe('service guard en registrarMovimiento (saldo_esperado)', () => {
+    it('2.1 RED: debería permitir gasto cuando saldo_esperado >= monto', async () => {
+      const mockMovimiento: Movimiento = {
+        id: 1, jornada_id: 1, tipo: 'gasto', descripcion: 'Luz', monto: 500, created_at: '2026-06-05T12:00:00Z',
+      };
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 5000 }]) // SELECT saldo_esperado
+        .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos
+        .mockResolvedValueOnce([]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Luz', 500));
+
+      expect(resultado.tipo).toBe('gasto');
+      expect(resultado.descripcion).toBe('Luz');
+    });
+
+    it('2.1 RED: debería rechazar gasto cuando saldo_esperado < monto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 200 }]) // SELECT saldo_esperado
+        .mockResolvedValueOnce([]); // ROLLBACK (catch block)
+
+      const service = TestBed.inject(JornadaService);
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Luz', 500)),
+      ).rejects.toThrow('Saldo insuficiente');
+    });
+
+    it('2.1 RED: debería rechazar compra_divisa cuando saldo_esperado < monto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 500 }]) // SELECT saldo_esperado
+        .mockResolvedValueOnce([]); // ROLLBACK (catch block)
+
+      const service = TestBed.inject(JornadaService);
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'compra_divisa', 'Compra USD 10 @ 120', 1200, {
+          divisaTipo: 'USD', montoDivisa: 10, tasaCambio: 120,
+        })),
+      ).rejects.toThrow('Saldo insuficiente');
+    });
+
+    it('2.1 RED: debería permitir compra_divisa cuando saldo_esperado >= monto', async () => {
+      const mockMovimiento: Movimiento = {
+        id: 2, jornada_id: 1, tipo: 'compra_divisa', descripcion: 'Compra USD 10 @ 120', monto: 1200,
+        divisa_tipo: 'USD', monto_divisa: 10, tasa_cambio: 120, created_at: '2026-06-05T12:00:00Z',
+      };
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 5000 }]) // SELECT saldo_esperado
+        .mockResolvedValueOnce([mockMovimiento]) // INSERT movimientos (compra_divisa)
+        .mockResolvedValueOnce([]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'compra_divisa', 'Compra USD 10 @ 120', 1200, {
+        divisaTipo: 'USD', montoDivisa: 10, tasaCambio: 120,
+      }));
+
+      expect(resultado.tipo).toBe('compra_divisa');
+    });
+
+    it('2.1 RED: debería permitir ingreso_extra aunque saldo sea insuficiente (no hay validación)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ id: 3, jornada_id: 1, tipo: 'ingreso_extra', descripcion: 'Venta envases', monto: 300, created_at: '' }])
+        .mockResolvedValueOnce([]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'ingreso_extra', 'Venta envases', 300));
+
+      expect(resultado.tipo).toBe('ingreso_extra');
+    });
+
+    it('2.1 RED: debería permitir gasto cuando saldo_esperado === monto (borde exacto)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: 500 }]) // SELECT saldo_esperado
+        .mockResolvedValueOnce([{ id: 4, jornada_id: 1, tipo: 'gasto', descripcion: 'Exacto', monto: 500, created_at: '' }])
+        .mockResolvedValueOnce([]) // UPDATE jornadas
+        .mockResolvedValueOnce([]); // COMMIT
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Exacto', 500));
+
+      expect(resultado.tipo).toBe('gasto');
+    });
+
+    it('2.1 RED: debería tratar saldo_esperado NULL como 0 y rechazar gasto', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // BEGIN TRANSACTION
+        .mockResolvedValueOnce([{ saldo_esperado: null }]) // SELECT saldo_esperado -> NULL
+        .mockResolvedValueOnce([]); // ROLLBACK (catch block)
+
+      const service = TestBed.inject(JornadaService);
+      await expect(
+        firstValueFrom(service.registrarMovimiento(1, 'gasto', 'Test', 100)),
+      ).rejects.toThrow('Saldo insuficiente');
+    });
+  });
+
+  describe('saldoSuficientePara', () => {
+    it('1.1 RED: debería retornar true cuando totalEnCaja >= monto (saldo suficiente)', () => {
+      const service = TestBed.inject(JornadaService);
+      service.totalEnCaja.set(10000);
+      expect(service.saldoSuficientePara(5000)).toBe(true);
+    });
+
+    it('1.1 RED: debería retornar false cuando totalEnCaja < monto (saldo insuficiente)', () => {
+      const service = TestBed.inject(JornadaService);
+      service.totalEnCaja.set(1000);
+      expect(service.saldoSuficientePara(5000)).toBe(false);
+    });
+
+    it('1.2 RED: debería retornar true cuando monto = 0 (ingresos sin monto no se bloquean)', () => {
+      const service = TestBed.inject(JornadaService);
+      service.totalEnCaja.set(0);
+      expect(service.saldoSuficientePara(0)).toBe(true);
+    });
+
+    it('1.2 RED: debería retornar true cuando monto < 0 (no es egreso)', () => {
+      const service = TestBed.inject(JornadaService);
+      service.totalEnCaja.set(1000);
+      expect(service.saldoSuficientePara(-500)).toBe(true);
+    });
+
+    it('1.2 RED: debería retornar true cuando monto === totalEnCaja (borde exacto)', () => {
+      const service = TestBed.inject(JornadaService);
+      service.totalEnCaja.set(5000);
+      expect(service.saldoSuficientePara(5000)).toBe(true);
+    });
+  });
+
   describe('saldo_esperado con merma', () => {
     it('debería restar total_merma de saldo_esperado al cerrar', async () => {
       const mockJornadaConMerma: Jornada = {
@@ -1154,7 +1303,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.cerrar(1, 4700, 1));
+      const resultado = await firstValueFrom(service.cerrar(1, 1));
 
       expect(resultado.total_merma).toBe(300);
       expect(resultado.saldo_esperado).toBe(4700);
@@ -1215,7 +1364,7 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada (user1)
-        .mockResolvedValueOnce([{ total: 0 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([{ total: 0, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
         .mockResolvedValueOnce([]) // UPDATE (auto-close)
         // _recolectarDatosJornada calls
         .mockResolvedValueOnce([]) // SELECT ventas
@@ -1245,7 +1394,7 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaConMovs]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
         .mockResolvedValueOnce([]) // UPDATE
         // _recolectarDatosJornada calls
         .mockResolvedValueOnce([]) // SELECT ventas
@@ -1272,7 +1421,7 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
         .mockResolvedValueOnce([]) // UPDATE
         // _recolectarDatosJornada calls
         .mockResolvedValueOnce([]) // SELECT ventas
@@ -1309,7 +1458,7 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
         .mockResolvedValueOnce([]) // UPDATE
         // _recolectarDatosJornada calls
         .mockResolvedValueOnce([]) // SELECT ventas
@@ -1337,7 +1486,7 @@ describe('JornadaService', () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000 }]) // SELECT ventas efectivo
+        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
         .mockResolvedValueOnce([]) // UPDATE
         // _recolectarDatosJornada calls
         .mockResolvedValueOnce([]) // SELECT ventas
@@ -1469,7 +1618,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte (rest use default)
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       // Verificar que el UPDATE incluyó total_usd = 150 (100 venta + 50 compra)
       const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
@@ -1497,7 +1646,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
         (call) => typeof call[0] === 'string' && call[0].includes('total_eur'),
@@ -1519,7 +1668,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
         (call) => typeof call[0] === 'string' && call[0].includes('total_usd'),
@@ -1546,7 +1695,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // INSERT reporte (rest default)
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.cerrar(1, 7200, 1));
+      await firstValueFrom(service.cerrar(1, 1));
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];

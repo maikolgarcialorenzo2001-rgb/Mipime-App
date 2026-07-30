@@ -82,7 +82,7 @@ export class LoginPage {
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, j.saldo_esperado, uid).subscribe({
+    this.jornadaService.cerrar(j.id, uid).subscribe({
       next: () => {
         this.showReopenModal.set(false);
         this._jornadaPendiente = null;
