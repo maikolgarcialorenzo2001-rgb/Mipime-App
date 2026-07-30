@@ -24,6 +24,7 @@ export class CheckoutModalComponent {
   readonly items = input.required<CartItem[]>();
   readonly total = input.required<number>();
   readonly errorMessage = input<string | null>(null);
+  readonly saldoEnCaja = input<number>(0);
   readonly confirmar = output<CheckoutPayload>();
   readonly cancelar = output();
 
@@ -79,6 +80,39 @@ export class CheckoutModalComponent {
     const t = this.total();
     if (tasa == null || tasa <= 0 || t <= 0) return null;
     return t / tasa;
+  });
+
+  readonly pendienteValido = computed(() =>
+    this.compradorNombre().trim().length > 0 && this.autorizadoPor().trim().length > 0,
+  );
+  readonly cuentaCosasValido = computed(() =>
+    this.autorizadoPor().trim().length > 0,
+  );
+  readonly divisaValido = computed(() =>
+    this.tasaCambio() != null && this.tasaCambio()! > 0
+    && this.billeteRecibido() != null && this.billeteRecibido()! > 0
+    && (this.pagoSuficiente() || (this.completacionEfectivo() != null && this.errorCompletacion() == null)),
+  );
+  /** True si el formulario activo tiene todos los campos requeridos. */
+  readonly formularioValido = computed(() => {
+    const fp = this.formaPago();
+    if (fp === 'divisas') return this.divisaValido();
+    if (fp === 'pendiente') return this.pendienteValido();
+    if (fp === 'cuenta_cosas') return this.cuentaCosasValido();
+    return true; // efectivo y transferencia no tienen sub-form
+  });
+
+  /** UI guard: true si formaPago=divisas, hay vuelto > 0 y saldoEnCaja < vuelto */
+  readonly saldoInsuficienteVuelto = computed(() => {
+    if (this.formaPago() !== 'divisas') return false;
+    const v = this.vuelto();
+    if (v == null || v <= 0) return false;
+    return this.saldoEnCaja() < v;
+  });
+
+  /** Formulario válido incluyendo saldo suficiente para vuelto */
+  readonly formularioValidoConSaldo = computed(() => {
+    return this.formularioValido() && !this.saldoInsuficienteVuelto();
   });
 
   // Pendiente / Cuenta Casas sub-form
