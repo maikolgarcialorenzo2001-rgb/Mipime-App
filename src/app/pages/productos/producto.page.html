@@ -153,7 +153,7 @@
                       <input
                         [(ngModel)]="mermaMotivo"
                         name="mermaMotivo"
-                        placeholder="Motivo (opcional)"
+                        placeholder="Motivo"
                         class="border rounded px-3 py-2 text-sm w-48 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                       />
                     </div>
@@ -170,10 +170,16 @@
                         </select>
                       </div>
                     }
-                    <div class="flex gap-2">
+                    <div class="flex items-end gap-2">
+                      @if (selectedProductoId() !== null) {
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1 whitespace-nowrap">
+                          Stock disponible: <strong class="tabular-nums">{{ mermaStockDisponible() }}</strong>
+                        </div>
+                      }
                       <button
                         type="submit"
-                        [disabled]="mermaProcesando() || !mermaCantidad() || mermaCantidad()! <= 0"
+                        [disabled]="mermaProcesando() || !mermaCantidad() || mermaCantidad()! <= 0 || !mermaStockSuficiente()"
+                        [title]="!mermaStockSuficiente() ? 'Stock insuficiente' : ''"
                         class="bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
                       >
                         <span class="inline-flex items-center gap-1">

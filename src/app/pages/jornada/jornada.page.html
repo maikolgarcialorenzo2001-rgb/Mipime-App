@@ -121,6 +121,7 @@
                     <th class="px-3 py-2">Cantidad</th>
                     <th class="px-3 py-2">Costo total</th>
                     <th class="px-3 py-2">Motivo</th>
+                    <th class="px-3 py-2">Ubicación</th>
                     <th class="px-3 py-2">Hora</th>
                   </tr>
                 </thead>
@@ -131,6 +132,7 @@
                       <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ m.cantidad }}</td>
                       <td class="px-3 py-2 text-red-600 dark:text-red-400 font-medium">${{ m.costo_total.toLocaleString() }}</td>
                       <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.motivo ?? '—' }}</td>
+                      <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.ubicacion ? (m.ubicacion === 'almacen' ? 'Almacén' : 'Tienda') : '—' }}</td>
                       <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ m.created_at | date:'short' }}</td>
                     </tr>
                   }
@@ -190,7 +192,7 @@
             }
           </div>
         }
-        <button (click)="registrarMovimiento()" [disabled]="registrando()" class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-blue-600">
+        <button (click)="registrarMovimiento()" [disabled]="registrando() || saldoInsuficiente()" [title]="saldoInsuficiente() ? 'Saldo insuficiente en caja' : ''" class="cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">add_circle</span>
             Registrar

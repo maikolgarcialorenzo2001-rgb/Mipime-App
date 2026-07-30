@@ -444,19 +444,26 @@ export class StockMovimientoService {
 
   /**
    * Registra una merma (rotura/pérdida) de producto:
-   * 1. Consume stock desde los lotes más antiguos de TIENDA (FIFO)
-   * 2. Calcula costo_total = Σ(cantidad × precio_costo_real)
-   * 3. Inserta stock_movimiento con tipo='merma' y costo_total
-   * 4. Actualiza stock_shop del producto (derivado de lotes de tienda)
-   * 5. Actualiza total_merma y saldo_esperado de la jornada
+   * 1. Valida que el motivo no esté vacío
+   * 2. Consume stock desde los lotes más antiguos (FIFO) de la ubicación especificada
+   * 3. Calcula costo_total = Σ(cantidad × precio_costo_real)
+   * 4. Inserta stock_movimiento con tipo='merma' y costo_total
+   * 5. Actualiza stock de la ubicación del producto (derivado de lotes)
+   * 6. Actualiza total_merma y saldo_esperado de la jornada
+   *
+   * @param motivo Motivo de la merma — obligatorio, no puede ser vacío ni whitespace-only
    */
   async registrarMerma(
     productoId: number,
     cantidad: number,
-    motivo?: string,
+    motivo: string,
     jornadaId?: number,
     ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
+    if (!motivo || motivo.trim().length === 0) {
+      throw new Error('El motivo es obligatorio');
+    }
+
     const ahora = new Date().toISOString();
 
     // 1. Consume from oldest lots (FIFO) at the given ubicacion

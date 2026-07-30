@@ -664,6 +664,49 @@ describe('StockMovimientoService', () => {
   });
 
   describe('registrarMerma', () => {
+    it('debería rechazar motivo vacío con "El motivo es obligatorio"', async () => {
+      await expect(
+        service.registrarMerma(1, 5, ''),
+      ).rejects.toThrow('El motivo es obligatorio');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('debería rechazar motivo con solo whitespace', async () => {
+      await expect(
+        service.registrarMerma(1, 5, '   '),
+      ).rejects.toThrow('El motivo es obligatorio');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('debería pasar ubicacion a _consumirFIFO cuando ubicacion=almacen', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockLotes)       // 1: SELECT lotes_stock for almacen
+        .mockResolvedValueOnce([])               // 2: UPDATE lot 1 (consume 3 of 10)
+        .mockResolvedValueOnce([{ precio_costo: 8 }]) // 3: SELECT next lot
+        .mockResolvedValueOnce([])               // 4: UPDATE precio_costo
+        .mockResolvedValueOnce([])               // 5: INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 17 }])  // 6: SELECT SUM almacen (10+10-3)
+        .mockResolvedValueOnce([]);              // 7: UPDATE stock_almacen
+
+      await service.registrarMerma(1, 3, 'Rotura', undefined, 'almacen');
+
+      // Should filter by ubicacion='almacen'
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('ubicacion = ?'),
+        expect.arrayContaining(['almacen']),
+      );
+
+      // Should update stock_almacen, not stock_shop
+      const stockUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos'),
+      );
+      const stockUpdate = stockUpdates[stockUpdates.length - 1]!;
+      expect(stockUpdate[0]).toContain('stock_almacen');
+    });
+
     it('debería consumir FIFO de shop solamente e ignorar almacen', async () => {
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce(mockShopLotes)    // SELECT lotes_stock (shop)
@@ -703,7 +746,7 @@ describe('StockMovimientoService', () => {
       vi.mocked(mockDb.sql).mockResolvedValueOnce(mockShopLotes); // Only 8 in shop
 
       await expect(
-        service.registrarMerma(1, 10),
+        service.registrarMerma(1, 10, 'Rotura'),
       ).rejects.toThrow('Stock insuficiente');
     });
 

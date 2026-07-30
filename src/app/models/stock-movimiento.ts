@@ -6,5 +6,6 @@ export interface StockMovimiento {
   motivo: string | null;
   costo_total: number;
   jornada_id?: number;
+  ubicacion?: string;
   created_at: string;
 }

@@ -41,6 +41,14 @@ export class JornadaPage {
   readonly tasaCambio = signal(0);
   readonly totalCup = computed(() => this.montoDivisa() * this.tasaCambio());
   readonly registrando = signal(false);
+
+  /** UI guard: deshabilitar botón si saldo en caja es insuficiente. */
+  readonly saldoInsuficiente = computed(() => {
+    const tipo = this.tipo();
+    if (tipo !== 'gasto' && tipo !== 'compra_divisa') return false;
+    const monto = tipo === 'compra_divisa' ? this.totalCup() : this.monto();
+    return !this.jornadaService.saldoSuficientePara(monto);
+  });
   readonly formError = signal<string | null>(null);
   readonly soloNumeros = signal(false);
 

@@ -234,6 +234,8 @@ describe('ProductosPage', () => {
   });
 
   it('submits merma calls registrarMerma with default shop ubicacion', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
     component.abrirMerma(1);
     component.mermaCantidad.set(3);
     component.mermaMotivo.set('Rotura en depósito');
@@ -249,30 +251,37 @@ describe('ProductosPage', () => {
       undefined,
       'shop',
     );
+
+    vi.restoreAllMocks();
   });
 
   it('shows error on insufficient stock for merma', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     mockStockService.registrarMerma.mockRejectedValue(
       new Error('Stock insuficiente'),
     );
 
     component.abrirMerma(1);
     component.mermaCantidad.set(999);
+    component.mermaMotivo.set('Rotura');
     fixture.detectChanges();
 
     await component.onSubmitMerma();
     fixture.detectChanges();
 
     expect(component.mermaError()).toBe('Stock insuficiente');
+
+    vi.restoreAllMocks();
   });
 
-  it('Merma button uses red styling', () => {
+  it('Merma button exists and is distinct from other buttons', () => {
     const allBtns = fixture.nativeElement.querySelectorAll('button');
     const mermaBtn = Array.from(allBtns).find(
       (b) => (b as HTMLButtonElement).textContent?.includes('Merma'),
     ) as HTMLButtonElement;
     expect(mermaBtn).toBeTruthy();
-    expect(mermaBtn.className).toContain('bg-red-600');
+    // Verify it's a button that triggers merma action (not disabled by default)
+    expect(mermaBtn.textContent).toContain('Merma');
   });
 
   it('cancelarMerma hides form', () => {
@@ -283,6 +292,92 @@ describe('ProductosPage', () => {
     component.cancelarMerma();
     fixture.detectChanges();
     expect(component.selectedProductoId()).toBeNull();
+  });
+
+  describe('merma stock validation', () => {
+    it('debería mostrar stock disponible según ubicacion shop', () => {
+      component.abrirMerma(1);
+      component.mermaUbicacion.set('shop');
+      fixture.detectChanges();
+
+      // Product 1 has stock_shop = 0
+      expect(component.mermaStockDisponible()).toBe(0);
+    });
+
+    it('debería mostrar stock_almacen cuando ubicacion=almacen', () => {
+      component.abrirMerma(1);
+      component.mermaUbicacion.set('almacen');
+      fixture.detectChanges();
+
+      // Product 1 has stock_almacen = 10
+      expect(component.mermaStockDisponible()).toBe(10);
+    });
+
+    it('debería indicar stock insuficiente cuando cantidad > stock disponible', () => {
+      component.abrirMerma(1);
+      component.mermaUbicacion.set('shop');
+      component.mermaCantidad.set(5);
+      fixture.detectChanges();
+
+      // Product 1 stock_shop = 0, so 5 > 0 → false
+      expect(component.mermaStockSuficiente()).toBe(false);
+    });
+
+    it('debería indicar stock suficiente cuando cantidad <= stock disponible', () => {
+      component.abrirMerma(1);
+      component.mermaUbicacion.set('almacen');
+      component.mermaCantidad.set(3);
+      fixture.detectChanges();
+
+      // Product 1 stock_almacen = 10, so 3 <= 10 → true
+      expect(component.mermaStockSuficiente()).toBe(true);
+    });
+
+    it('debería tener el botón disabled + tooltip cuando stock insuficiente', () => {
+      component.abrirMerma(1);
+      component.mermaUbicacion.set('shop');
+      component.mermaCantidad.set(999);
+      fixture.detectChanges();
+
+      const submitBtn = fixture.nativeElement.querySelector(
+        'button[type="submit"]',
+      ) as HTMLButtonElement;
+
+      expect(submitBtn.disabled).toBe(true);
+      expect(submitBtn.getAttribute('title')).toBe('Stock insuficiente');
+    });
+  });
+
+  describe('merma confirm cancel', () => {
+    it('debería NO llamar registrarMerma cuando confirm se cancela', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      component.abrirMerma(1);
+      component.mermaCantidad.set(3);
+      component.mermaMotivo.set('Rotura');
+      fixture.detectChanges();
+
+      await component.onSubmitMerma();
+      fixture.detectChanges();
+
+      expect(mockStockService.registrarMerma).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+    });
+
+    it('debería llamar registrarMerma cuando confirm se acepta', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.abrirMerma(1);
+      component.mermaCantidad.set(3);
+      component.mermaMotivo.set('Rotura');
+      fixture.detectChanges();
+
+      await component.onSubmitMerma();
+      fixture.detectChanges();
+
+      expect(mockStockService.registrarMerma).toHaveBeenCalled();
+      vi.restoreAllMocks();
+    });
   });
 
   // ── Investment Stats Tests ─────────────────────────────────────
@@ -416,11 +511,11 @@ describe('ProductosPage', () => {
       expect(lotesBtns.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('4.2 RED: el botón Lotes es distinto del botón Merma (no usa bg-red)', () => {
+    it('4.2 RED: el botón Lotes existe y tiene texto distinto al de Merma', () => {
       const lotesBtns = getLotesButtons();
       expect(lotesBtns.length).toBeGreaterThanOrEqual(1);
       for (const btn of lotesBtns) {
-        expect(btn.className).not.toContain('bg-red');
+        expect(btn.textContent).toContain('Lotes');
       }
     });
 

@@ -20,15 +20,18 @@ function createMockDb(): Database {
 interface MockJornadaService {
   jornadaAbierta: WritableSignal<Jornada | null>;
   jornadaCargando: WritableSignal<boolean>;
+  totalEnCaja: WritableSignal<number>;
   obtenerAbierta: () => import('rxjs').Observable<Jornada | null>;
   registrarMovimiento: ReturnType<typeof vi.fn>;
   refreshJornadaAbierta: ReturnType<typeof vi.fn>;
   calcularTotalMerma: ReturnType<typeof vi.fn>;
+  saldoSuficientePara: (monto: number) => boolean;
 }
 
 interface MockJornadaServiceInput {
   jornadaAbierta?: Jornada | null;
   jornadaCargando?: boolean;
+  totalEnCaja?: number;
   obtenerAbierta?: () => import('rxjs').Observable<Jornada | null>;
   registrarMovimiento?: ReturnType<typeof vi.fn>;
   refreshJornadaAbierta?: ReturnType<typeof vi.fn>;
@@ -36,13 +39,16 @@ interface MockJornadaServiceInput {
 }
 
 function createMockJornadaService(overrides: MockJornadaServiceInput = {}): MockJornadaService {
+  const totalEnCaja = signal<number>(overrides.totalEnCaja ?? 0);
   return {
     jornadaAbierta: signal<Jornada | null>(overrides.jornadaAbierta ?? null),
     jornadaCargando: signal<boolean>(overrides.jornadaCargando ?? false),
+    totalEnCaja,
     obtenerAbierta: overrides.obtenerAbierta ?? (() => of(null)),
     registrarMovimiento: overrides.registrarMovimiento ?? vi.fn(),
     refreshJornadaAbierta: overrides.refreshJornadaAbierta ?? vi.fn(),
     calcularTotalMerma: overrides.calcularTotalMerma ?? vi.fn(),
+    saldoSuficientePara: (monto: number) => totalEnCaja() >= monto,
   };
 }
 
@@ -322,7 +328,6 @@ describe('JornadaPage', () => {
 
       // Should show a second select for divisa type
       const selects = fixture.nativeElement.querySelectorAll('select');
-      // Find the divisa select (not the tipo select)
       const divisaSelect = Array.from(selects).find(
         (s: unknown) => (s as HTMLSelectElement).querySelector('option[value="USD"]')
       );
@@ -519,8 +524,134 @@ describe('JornadaPage', () => {
       );
       expect(mermaRowText.some((t) => t?.includes('Rotura'))).toBe(false);
     });
+
+    it('debería mostrar columna Ubicación en la tabla de mermas', () => {
+      const mermasMock: StockMovimiento[] = [
+        { id: 1, producto_id: 1, cantidad: 5, tipo: 'merma', motivo: 'Rotura', costo_total: 250, created_at: '2026-06-04T10:00:00Z', ubicacion: 'shop' },
+        { id: 2, producto_id: 2, cantidad: 3, tipo: 'merma', motivo: 'Vencimiento', costo_total: 120, created_at: '2026-06-04T11:00:00Z', ubicacion: 'almacen' },
+      ];
+      component.mermasDelDia.set(mermasMock);
+      fixture.detectChanges();
+
+      const ths = fixture.nativeElement.querySelectorAll('thead tr th');
+      const ubicacionHeader = Array.from(ths).find(
+        (th) => (th as HTMLElement).textContent?.includes('Ubicación'),
+      );
+      expect(ubicacionHeader).toBeTruthy();
+
+      const texto = fixture.nativeElement.textContent;
+      expect(texto).toContain('Tienda');
+      expect(texto).toContain('Almacén');
+    });
+
+    it('debería mostrar "—" cuando ubicacion es undefined en merma', () => {
+      const mermasMock: StockMovimiento[] = [
+        { id: 1, producto_id: 1, cantidad: 5, tipo: 'merma', motivo: 'Rotura', costo_total: 250, created_at: '2026-06-04T10:00:00Z' },
+      ];
+      component.mermasDelDia.set(mermasMock);
+      fixture.detectChanges();
+
+      const texto = fixture.nativeElement.textContent;
+      expect(texto).toContain('—');
+    });
   });
 });
+
+describe('UI guard — saldo insuficiente deshabilita botón', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+    let component: JornadaPage;
+
+    beforeEach(() => {
+      const mockDb = createMockDb();
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(mockJornadaAbierta),
+              totalEnCaja: 10000,
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('3.1 RED: debería tener botón habilitado cuando saldo es suficiente para gasto', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(1000);
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('3.1 RED: debería tener botón deshabilitado cuando saldo es insuficiente para gasto', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(50000); // > totalEnCaja(10000)
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.disabled).toBe(true);
+    });
+
+    it('3.1 RED: debería tener botón deshabilitado con tooltip cuando saldo es insuficiente', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(50000); // > totalEnCaja(10000)
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.title).toContain('Saldo insuficiente');
+    });
+
+    it('3.1 RED: debería tener botón habilitado para ingreso_extra aunque saldo sea bajo', () => {
+      component.tipo.set('ingreso_extra');
+      component.descripcion.set('Test');
+      component.monto.set(50000); // > totalEnCaja, pero ingreso_extra no egresa
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('3.1 RED: debería tener botón deshabilitado para compra_divisa con saldo insuficiente', () => {
+      component.tipo.set('compra_divisa');
+      component.montoDivisa.set(500);
+      component.tasaCambio.set(120);
+      // totalCup = 500 * 120 = 60000 > totalEnCaja(10000)
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.disabled).toBe(true);
+      expect(btn.title).toContain('Saldo insuficiente');
+    });
+
+    it('3.1 RED: debería actualizar computed cuando cambia monto (reactividad)', () => {
+      component.tipo.set('gasto');
+      component.descripcion.set('Test');
+      component.monto.set(1000);
+      fixture.detectChanges();
+
+      const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+
+      // Cambiar a monto insuficiente
+      component.monto.set(50000);
+      fixture.detectChanges();
+      expect(btn.disabled).toBe(true);
+    });
+  });
 
 describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
   let fixture: ComponentFixture<JornadaPage>;

@@ -36,14 +36,30 @@ export class ProductosPage implements OnInit {
   getTotalInvertido(productoId: number): number {
     return this.inversionPorProducto().get(productoId) ?? 0;
   }
-
   // ── Merma ──────────────────────────────────────────────────
+
   readonly selectedProductoId = signal<number | null>(null);
   readonly mermaCantidad = signal<number | null>(null);
   readonly mermaMotivo = signal('');
   readonly mermaUbicacion = signal<'almacen' | 'shop'>('shop');
   readonly mermaError = signal<string | null>(null);
   readonly mermaProcesando = signal(false);
+
+  /** Stock disponible en la ubicación seleccionada */
+  readonly mermaStockDisponible = computed(() => {
+    const pid = this.selectedProductoId();
+    if (pid === null) return 0;
+    const prod = this.productos().find((p) => p.id === pid);
+    if (!prod) return 0;
+    return this.mermaUbicacion() === 'almacen' ? prod.stock_almacen : prod.stock_shop;
+  });
+
+  /** True cuando la cantidad ingresada es ≤ stock disponible (o null/0) */
+  readonly mermaStockSuficiente = computed(() => {
+    const cantidad = this.mermaCantidad();
+    if (!cantidad || cantidad <= 0) return true;
+    return cantidad <= this.mermaStockDisponible();
+  });
 
   // ── Lotes ──────────────────────────────────────────────────
   readonly lotesProductoId = signal<number | null>(null);
@@ -175,13 +191,27 @@ export class ProductosPage implements OnInit {
       return;
     }
 
+    if (!this.mermaMotivo().trim()) {
+      this.mermaError.set('El motivo es obligatorio');
+      return;
+    }
+
+    const producto = this.productos().find((p) => p.id === productoId);
+    const nombreProducto = producto?.nombre ?? `#${productoId}`;
+    const cant = this.mermaCantidad()!;
+    const ubicLabel = this.mermaUbicacion() === 'almacen' ? 'Almacén' : 'Tienda';
+
+    if (!confirm(`¿Registrar merma de ${cant} unidades de "${nombreProducto}"?\nMotivo: ${this.mermaMotivo().trim()}\nUbicación: ${ubicLabel}`)) {
+      return;
+    }
+
     this.mermaProcesando.set(true);
     this.mermaError.set(null);
     try {
       await this._stockService.registrarMerma(
         productoId,
-        this.mermaCantidad()!,
-        this.mermaMotivo() || undefined,
+        cant,
+        this.mermaMotivo().trim(),
         this._jornadaService.jornadaAbierta()?.id,
         this.mermaUbicacion(),
       );
