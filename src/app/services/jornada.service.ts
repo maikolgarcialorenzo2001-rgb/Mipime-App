@@ -283,7 +283,10 @@ export class JornadaService {
       ),
     ).pipe(
       map((rows) => rows[0]),
-      tap((j) => this.jornadaAbierta.set(j)),
+      tap((j) => {
+        this.jornadaAbierta.set(j);
+        this.totalEnCaja.set(montoInicial);
+      }),
     );
   }
 
