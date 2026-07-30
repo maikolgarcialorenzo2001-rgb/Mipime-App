@@ -26,7 +26,7 @@ import type { Producto } from '../../models';
 export class PosPage {
   private readonly _productoService = inject(ProductoService);
   private readonly _cartService = inject(CartService);
-  private readonly _jornadaService = inject(JornadaService);
+  readonly _jornadaService = inject(JornadaService);
   private readonly _ventaService = inject(VentaService);
   private readonly _cuentaCosasService = inject(CuentaCosasService);
   private readonly _auth = inject(AuthService);
