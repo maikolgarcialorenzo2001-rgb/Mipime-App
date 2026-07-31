@@ -63,8 +63,14 @@ export class SqliteService implements Database {
     const client = await this._getClient();
 
     // schema_version lo crea el propio runner (única fuente de verdad, R4).
+    // El cast es necesario: SQLocal devuelve Record<string, any>[] y el
+    // executor es genérico; mismo patrón que _mapRows. await (no .then)
+    // porque los mocks de test devuelven arrays planos.
     await runMigrations(
-      { sql: (q, p) => client.sql(q, ...(p ?? [])) },
+      {
+        sql: async <T>(q: string, p?: unknown[]) =>
+          ((await client.sql(q, ...(p ?? []))) as unknown) as T[],
+      },
       { seedEnabled: environment.seedEnabled },
     );
   }
