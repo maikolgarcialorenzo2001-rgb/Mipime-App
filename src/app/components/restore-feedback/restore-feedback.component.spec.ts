@@ -88,7 +88,7 @@ describe('RestoreFeedbackComponent', () => {
 
   it('mapea las etiquetas de origen para cada RestoreFrom', () => {
     const labels = fixture.componentInstance.originLabel;
-    const cases: Array<[RestoreFrom, string]> = [
+    const cases: [RestoreFrom, string][] = [
       ['recover', 'recuperada'],
       ['rodante', 'rodante'],
       ['timestamped', 'fecha'],
