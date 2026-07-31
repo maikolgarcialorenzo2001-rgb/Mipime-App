@@ -81,7 +81,13 @@ export class NativeSqliteService implements Database {
       const { SQLocal } = await import('sqlocal');
       const client = new SQLocal({ databasePath: environment.dbName });
       // getDatabaseFile devuelve un File web; el contrato IPC pide ArrayBuffer.
+      // Lectura NO destructiva (R8): OPFS queda intacto, solo VACUUM INTO.
       file = await (await client.getDatabaseFile()).arrayBuffer();
+      // Archivo OPFS vacío (0 bytes) = sin datos → mismo contrato que
+      // CANTOPEN: file:null para que main continúe adopt-or-fresh.
+      if (file.byteLength === 0) {
+        file = null;
+      }
     } catch {
       // CANTOPEN / vacío: sin datos OPFS → file queda en null (inicial).
     }

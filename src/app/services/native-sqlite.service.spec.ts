@@ -263,6 +263,39 @@ describe('NativeSqliteService', () => {
     ).toBe(0);
   });
 
+  it('initialize debería enviar file:null cuando el archivo OPFS está vacío (0 bytes) (T7)', async () => {
+    mockGetDatabaseFile.mockResolvedValue(new File([], 'tienda-app.db'));
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: true },
+      { status: 'ok' },
+    ]);
+
+    await service.initialize();
+
+    // Archivo OPFS vacío = sin datos → mismo contrato que CANTOPEN (file:null)
+    expect(invokeMock).toHaveBeenCalledWith('db:import', { file: null });
+  });
+
+  it('el roundtrip es no destructivo: solo lee OPFS vía getDatabaseFile y nunca invoca canales ajenos al contrato (R8)', async () => {
+    mockGetDatabaseFile.mockResolvedValue(
+      new File([new Uint8Array(16)], 'tienda-app.db'),
+    );
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: true },
+      { status: 'ok' },
+    ]);
+
+    await service.initialize();
+
+    expect(mockGetDatabaseFile).toHaveBeenCalledTimes(1);
+    const channels = invokeMock.mock.calls.map(([ch]) => ch);
+    for (const ch of channels) {
+      expect(['db:initialize', 'db:import', 'db:sql']).toContain(ch);
+    }
+  });
+
   it('sql debería rechazar cuando electronAPI no está disponible', async () => {
     delete (window as unknown as { electronAPI?: unknown }).electronAPI;
 
