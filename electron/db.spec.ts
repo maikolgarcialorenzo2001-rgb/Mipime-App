@@ -297,6 +297,36 @@ describe('runStartupSequence', () => {
     expect(count).toBe(6);
   });
 
+  it('preserves the corrupt working DB as .corrupt-<ts> when restoring from a backup (M1)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    const dbPath = path.join(userData, 'tienda-app.db');
+    writeGarbage(dbPath);
+
+    const docs = docsRoot(dir);
+    fs.mkdirSync(docs, { recursive: true });
+    createValidDb(path.join(docs, 'tienda-app.db'), 6, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: path.join(dir, 'docs'),
+      appVersion: '0.1.9-beta',
+      platform: 'win32',
+    });
+
+    expect(result.status).toBe('restored');
+    expect(result.restoreInfo?.from).toBe('rodante');
+    const preserved = fs
+      .readdirSync(userData)
+      .filter((f) => f.startsWith('tienda-app.db.corrupt-'));
+    expect(preserved).toHaveLength(1);
+    expect(preserved[0]).toMatch(
+      /^tienda-app\.db\.corrupt-\d{4}-\d{2}-\d{2}_\d{6}$/,
+    );
+    expect(fs.existsSync(dbPath)).toBe(true);
+  });
+
   it('tries timestamped backups newest-first and records skipped candidates', () => {
     const dir = tmpDir();
     const userData = path.join(dir, 'userData');

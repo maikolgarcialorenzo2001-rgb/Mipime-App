@@ -135,6 +135,20 @@ function stamp(d: Date): string {
   )}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
+/**
+ * Destino `<dbPath>.corrupt-<ts>` libre de colisiones: si ya existe
+ * (mismo segundo), se anexa un contador.
+ */
+function corruptTargetFor(dbPath: string): string {
+  const base = `${dbPath}.corrupt-${stamp(new Date())}`;
+  let target = base;
+  let n = 1;
+  while (fs.existsSync(target)) {
+    target = `${base}-${n++}`;
+  }
+  return target;
+}
+
 function listTimestampedBackups(backupsDir: string): string[] {
   if (!fs.existsSync(backupsDir)) return [];
   return fs
@@ -169,7 +183,7 @@ function toMessage(err: unknown): string {
 export function recoverInPlace(dbPath: string): RecoverResult {
   const ts = stamp(new Date());
   const tmpPath = `${dbPath}.recover-${ts}`;
-  const corruptPath = `${dbPath}.corrupt-${ts}`;
+  const corruptPath = corruptTargetFor(dbPath);
   try {
     const src = new Database(dbPath, { readonly: true });
     try {
@@ -228,7 +242,11 @@ function tryRestore(
       });
       return null;
     }
-    fs.unlinkSync(dbPath);
+    // Preserva el original corrupto (puede contener datos recuperables) en
+    // vez de destruirlo (AD-4, M1): renombrar antes de copiar el candidato.
+    if (fs.existsSync(dbPath)) {
+      fs.renameSync(dbPath, corruptTargetFor(dbPath));
+    }
     fs.copyFileSync(candidatePath, dbPath);
     return {
       status: 'restored',
