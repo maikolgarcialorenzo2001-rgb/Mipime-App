@@ -14,6 +14,8 @@ import * as path from 'path';
 
 export const DB_FILENAME = 'tienda-app.db';
 export const IMPORT_FLAG_FILENAME = 'native-db-imported.flag';
+/** Tope de payload para db:import (defensa en profundidad, S2/T7). */
+export const MAX_IMPORT_BYTES = 512 * 1024 * 1024;
 const TIMESTAMPED_RE = /^tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/;
 const MIN_SCHEMA_VERSION = 1;
 const MAX_SCHEMA_VERSION = 16;

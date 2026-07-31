@@ -465,6 +465,34 @@ describe('main process', () => {
       expect(result).toEqual({ ok: false, error: 'disk full' });
     });
 
+    it('db:import should reject non-ArrayBuffer payloads without touching the DB (T7)', async () => {
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({ file: 'not-a-buffer' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('ArrayBuffer'),
+      });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).not.toHaveBeenCalled();
+    });
+
+    it('db:import should reject oversized ArrayBuffer payloads (T7)', async () => {
+      const { MAX_IMPORT_BYTES } = await import('./db');
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({
+        file: new ArrayBuffer(MAX_IMPORT_BYTES + 1),
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('512MB'),
+      });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+    });
+
     it('db:backupNow with trigger open should back up rodante only', async () => {
       const handler = await getDbHandler('db:backupNow');
 

@@ -16,6 +16,7 @@ import {
   adoptOrFresh,
   DB_FILENAME,
   IMPORT_FLAG_FILENAME,
+  MAX_IMPORT_BYTES,
 } from './db';
 
 let mainWindow: BrowserWindow | null = null;
@@ -273,7 +274,18 @@ app.whenReady().then(() => {
   // continúa adopt-or-fresh para romper el ciclo import-needed.
   ipcMain.handle(
     'db:import',
-    (_event, { file }: { file: ArrayBuffer | null }) => {
+    (_event, { file }: { file: unknown }) => {
+      // T7/S2: validación de payload (IPC = entrada no confiable). El
+      // instanceof corre en runtime aunque TS ya tipa el contrato.
+      if (file !== null && !(file instanceof ArrayBuffer)) {
+        return { ok: false, error: 'db:import requires an ArrayBuffer or null' };
+      }
+      if (file !== null && file.byteLength > MAX_IMPORT_BYTES) {
+        return {
+          ok: false,
+          error: 'db:import payload exceeds the 512MB limit',
+        };
+      }
       try {
         if (file === null) {
           console.log(
