@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import type { Database } from './database';
 import { DbStatusService } from './db-status.service';
+import { BackupService } from './backup.service';
 import { environment } from '../environments/environment';
 import { runMigrations } from './db-migrations';
 import { createSqlocalClient } from './sqlocal-client';
@@ -14,6 +15,7 @@ import { createSqlocalClient } from './sqlocal-client';
 @Injectable()
 export class NativeSqliteService implements Database {
   private readonly _dbStatus = inject(DbStatusService);
+  private readonly _backup = inject(BackupService);
 
   /** Versión cacheada del invoke app:getVersion (MINOR-5); 'unknown' si falla. */
   private _appVersion: string | null = null;
@@ -80,6 +82,15 @@ export class NativeSqliteService implements Database {
       // botón de copiar (todo T6 saltado). Publicar fatal y resolver.
       this._dbStatus.setFatal(await this._synthesizeDiagnostics('open', err));
       return;
+    }
+
+    // C1 (review slice 4): backup rodante al abrir (R1, design.md:67) — el
+    // snapshot cubre la DB recién migrada. AWAITED en try/catch: un fallo se
+    // traga y loguea (R6: los fallos de backup NUNCA interrumpen el arranque).
+    try {
+      await this._backup.backup('open');
+    } catch (err) {
+      console.warn('[NativeSqliteService] backup("open") failed (R6):', err);
     }
   }
 

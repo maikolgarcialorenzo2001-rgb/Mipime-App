@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { NativeSqliteService } from './native-sqlite.service';
 import { DbStatusService } from './db-status.service';
+import { BackupService } from './backup.service';
 
 const mockGetDatabaseFile = vi.hoisted(() => vi.fn());
 const mockCreateSqlocalClient = vi.hoisted(() => vi.fn());
@@ -16,6 +17,7 @@ describe('NativeSqliteService', () => {
   let service: NativeSqliteService;
   let dbStatus: DbStatusService;
   let invokeMock: ReturnType<typeof vi.fn>;
+  let mockBackup: { backup: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     // hash-password usa Web Crypto (jsdom no expone crypto.subtle.digest)
@@ -37,8 +39,14 @@ describe('NativeSqliteService', () => {
       getDatabaseFile: mockGetDatabaseFile,
     } as never);
 
+    mockBackup = { backup: vi.fn().mockResolvedValue(undefined) };
+
     TestBed.configureTestingModule({
-      providers: [NativeSqliteService, DbStatusService],
+      providers: [
+        NativeSqliteService,
+        DbStatusService,
+        { provide: BackupService, useValue: mockBackup },
+      ],
     });
     service = TestBed.inject(NativeSqliteService);
     dbStatus = TestBed.inject(DbStatusService);
@@ -83,6 +91,35 @@ describe('NativeSqliteService', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('db:sql', {
       query: 'SELECT ? AS b',
       params: [7],
+    });
+  });
+
+  describe('C1 — backup de apertura (R1, design.md:67)', () => {
+    it('debería invocar backup("open") DESPUÉS de las migraciones (snapshot de la DB migrada)', async () => {
+      mockInvokeSequence([{ status: 'ok' }]);
+      let sqlCountAtBackup = -1;
+      mockBackup.backup.mockImplementation(() => {
+        sqlCountAtBackup = invokeMock.mock.calls.filter(
+          ([ch]) => ch === 'db:sql',
+        ).length;
+        return Promise.resolve();
+      });
+
+      await service.initialize();
+
+      expect(mockBackup.backup).toHaveBeenCalledWith('open');
+      expect(sqlCountAtBackup).toBeGreaterThan(0); // las migraciones ya corrieron
+      expect(dbStatus.fatal()).toBeNull();
+    });
+
+    it('debería resolver aunque backup("open") falle (R6: los fallos de backup no interrumpen)', async () => {
+      mockInvokeSequence([{ status: 'ok' }]);
+      mockBackup.backup.mockRejectedValue(new Error('ipc broken'));
+
+      await expect(service.initialize()).resolves.toBeUndefined();
+
+      expect(mockBackup.backup).toHaveBeenCalledWith('open');
+      expect(dbStatus.fatal()).toBeNull();
     });
   });
 
