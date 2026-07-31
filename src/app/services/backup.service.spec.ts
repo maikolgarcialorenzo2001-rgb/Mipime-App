@@ -135,7 +135,9 @@ describe('BackupService exportarRespaldo (T12)', () => {
     });
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => {});
+      .mockImplementation(() => {
+        return undefined;
+      });
 
     const result = await service.exportarRespaldo();
 
