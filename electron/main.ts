@@ -15,6 +15,7 @@ import {
   pruneBackups,
   adoptOrFresh,
   timestampedBackupName,
+  backupRodanteSync,
   DB_FILENAME,
   IMPORT_FLAG_FILENAME,
   MAX_IMPORT_BYTES,
@@ -58,6 +59,14 @@ function exportName(d: Date): string {
   )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
 }
 
+// Rutas de la DB nativa (single source). Se invocan solo tras whenReady
+// (createMainWindow / handlers IPC), donde app.getPath ya es seguro.
+const dbPathFor = () => path.join(app.getPath('userData'), DB_FILENAME);
+const rodantePathFor = () =>
+  path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', DB_FILENAME);
+const backupsDirFor = () =>
+  path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
+
 function createMainWindow(): BrowserWindow {
   const isDev = !app.isPackaged;
 
@@ -87,10 +96,12 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
-  // Save window state before closing
+  // Save window state before closing + backup rodante sincrónico best-effort
+  // (AD-8, T8). backupRodanteSync nunca lanza (R6): no puede bloquear el cierre.
   win.on('close', () => {
     const bounds = win.getBounds();
     saveWindowState(app.getPath('userData'), bounds);
+    backupRodanteSync(dbPathFor(), rodantePathFor());
   });
 
   if (isDev) {
@@ -189,11 +200,8 @@ app.whenReady().then(() => {
   });
 
   // ---- DB nativa: contrato IPC de 5 canales (T3, AD-9) ----
-  const dbPathFor = () => path.join(app.getPath('userData'), DB_FILENAME);
-  const rodantePathFor = () =>
-    path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', DB_FILENAME);
-  const backupsDirFor = () =>
-    path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
+  // (dbPathFor / rodantePathFor / backupsDirFor viven en scope de módulo:
+  // el close handler de createMainWindow los necesita — AD-8.)
 
   // C1 (CRITICAL): conexión PERSISTENTE para db:sql. El runner de
   // migraciones emite BEGIN/COMMIT como llamadas separadas (V3..V15); con

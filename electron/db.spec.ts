@@ -9,6 +9,7 @@ import {
   backupDb,
   pruneBackups,
   timestampedBackupName,
+  backupRodanteSync,
   recoverInPlace,
   runStartupSequence,
   importDbFile,
@@ -207,6 +208,57 @@ describe('timestampedBackupName', () => {
 
     expect(removed).toHaveLength(1);
     expect(removed[0]).toContain(name);
+  });
+});
+
+describe('backupRodanteSync', () => {
+  it('copia un snapshot consistente de la DB viva al destino rodante (AD-8)', () => {
+    const dir = tmpDir();
+    const live = path.join(dir, 'live.db');
+    const rod = path.join(dir, 'rodante.db');
+    createValidDb(live, 10, 16);
+
+    backupRodanteSync(live, rod);
+
+    const r = openNativeDb(rod);
+    const rows = r.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number };
+    const version = r.prepare('SELECT version FROM schema_version').get() as {
+      version: number;
+    };
+    r.close();
+    expect(rows.c).toBe(10);
+    expect(version.version).toBe(16);
+  });
+
+  it('sobreescribe un rodante existente (destino en uso se reemplaza)', () => {
+    const dir = tmpDir();
+    const live = path.join(dir, 'live.db');
+    const rod = path.join(dir, 'rodante.db');
+    createValidDb(live, 3, 16);
+    fs.writeFileSync(rod, 'stale');
+
+    backupRodanteSync(live, rod);
+
+    const r = openNativeDb(rod);
+    const rows = r.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number };
+    r.close();
+    expect(rows.c).toBe(3);
+  });
+
+  it('nunca lanza (R6): DB viva inexistente, destino bajo un archivo, o mismo path', () => {
+    const dir = tmpDir();
+    const live = path.join(dir, 'live.db');
+    createValidDb(live, 1, 16);
+    const fileAsDir = path.join(dir, 'not-a-dir');
+    fs.writeFileSync(fileAsDir, 'x');
+
+    expect(() =>
+      backupRodanteSync(path.join(dir, 'missing.db'), path.join(dir, 'x.db')),
+    ).not.toThrow();
+    expect(() =>
+      backupRodanteSync(live, path.join(fileAsDir, 'x.db')),
+    ).not.toThrow();
+    expect(() => backupRodanteSync(live, live)).not.toThrow();
   });
 });
 

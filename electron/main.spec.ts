@@ -124,6 +124,7 @@ const mockBackupDb = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const mockPruneBackups = vi.hoisted(() => vi.fn(() => []));
 const mockAdoptOrFresh = vi.hoisted(() => vi.fn(() => ({ status: 'fresh' })));
 const mockOpenNativeDb = vi.hoisted(() => vi.fn());
+const mockBackupRodanteSync = vi.hoisted(() => vi.fn());
 
 vi.mock('./db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./db')>();
@@ -135,6 +136,7 @@ vi.mock('./db', async (importOriginal) => {
     pruneBackups: mockPruneBackups,
     adoptOrFresh: mockAdoptOrFresh,
     openNativeDb: mockOpenNativeDb,
+    backupRodanteSync: mockBackupRodanteSync,
   };
 });
 
@@ -1111,6 +1113,27 @@ describe('main process', () => {
       expect(mockBrowserWindowInstance.on).toHaveBeenCalledWith(
         'closed',
         expect.any(Function),
+      );
+    });
+  });
+
+  describe('close handler rodante backup (AD-8, T8)', () => {
+    it('should back up rodante synchronously on window close (best-effort)', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const closeHandler = mockBrowserWindowInstance.on.mock.calls.find(
+        ([event]) => event === 'close',
+      )?.[1] as () => void;
+
+      expect(closeHandler).toBeDefined();
+      closeHandler();
+
+      expect(mockBackupRodanteSync).toHaveBeenCalledTimes(1);
+      expect(mockBackupRodanteSync).toHaveBeenCalledWith(
+        path.join('/fake/userData', 'tienda-app.db'),
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'tienda-app.db'),
       );
     });
   });

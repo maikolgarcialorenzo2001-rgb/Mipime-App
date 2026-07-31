@@ -130,6 +130,28 @@ export async function backupDb(db: Database.Database, destPath: string): Promise
   await db.backup(destPath);
 }
 
+/**
+ * Backup rodante SÍNCRONO best-effort (AD-8, T8): snapshot consistente vía
+ * VACUUM INTO (lee a través del engine, incluye WAL). Usado en el close
+ * handler de la ventana principal. R6: NUNCA lanza.
+ */
+export function backupRodanteSync(livePath: string, rodantePath: string): void {
+  try {
+    if (path.resolve(livePath) === path.resolve(rodantePath)) return;
+    if (!fs.existsSync(livePath)) return;
+    const db = openNativeDb(livePath);
+    try {
+      fs.mkdirSync(path.dirname(rodantePath), { recursive: true });
+      fs.rmSync(rodantePath, { force: true }); // VACUUM INTO falla si el destino existe
+      db.exec(`VACUUM INTO '${rodantePath.replace(/'/g, "''")}'`);
+    } finally {
+      db.close();
+    }
+  } catch {
+    // R6: los fallos de backup nunca interrumpen (cierre de app).
+  }
+}
+
 function stamp(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(
