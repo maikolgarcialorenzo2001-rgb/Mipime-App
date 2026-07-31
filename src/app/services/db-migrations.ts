@@ -21,6 +21,13 @@ export async function runMigrations(
   exec: MigrationExecutor,
   opts: RunMigrationsOptions,
 ): Promise<void> {
+  // Runner autocontenido: crea schema_version él mismo (M2). Antes solo
+  // funcionaba en web porque SqliteService.initialize() creaba la tabla
+  // aparte; la ruta fresh de adoptOrFresh (T4) fallaba en el primer arranque.
+  await exec.sql(`CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY
+  )`);
+
   const rows = await exec.sql<{ version: number }>(
     'SELECT COALESCE(MAX(version), 0) AS version FROM schema_version',
   );

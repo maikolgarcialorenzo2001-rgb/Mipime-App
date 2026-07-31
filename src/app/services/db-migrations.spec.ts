@@ -10,10 +10,20 @@ class FakeExecutor implements MigrationExecutor {
   version = 0;
   adminCount = 0;
   productCount = 0;
+  /** true => imita sqlite real: el SELECT de schema_version falla si la tabla no existe. */
+  strictSchema = false;
+  private createdSchemaTable = false;
 
   async sql<T>(query: string, params: unknown[] = []): Promise<T[]> {
     this.calls.push({ query, params });
+    if (query.includes('CREATE TABLE IF NOT EXISTS schema_version')) {
+      this.createdSchemaTable = true;
+      return [] as T[];
+    }
     if (query.includes('COALESCE(MAX(version), 0)')) {
+      if (this.strictSchema && !this.createdSchemaTable) {
+        throw new Error('no such table: schema_version');
+      }
       return [{ version: this.version }] as T[];
     }
     if (
@@ -115,9 +125,26 @@ describe('runMigrations', () => {
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([]);
-    expect(exec.calls.some((c) => c.query.includes('CREATE TABLE'))).toBe(
-      false,
+    // el runner crea schema_version siempre, pero NO ejecuta migraciones v1-v16
+    expect(exec.calls[0].query).toContain(
+      'CREATE TABLE IF NOT EXISTS schema_version',
     );
+    expect(
+      exec.calls.some((c) => c.query.includes('CREATE TABLE IF NOT EXISTS jornadas')),
+    ).toBe(false);
+  });
+
+  it('works on a completely fresh DB without a pre-created schema_version (M2)', async () => {
+    exec.strictSchema = true;
+    await runMigrations(exec, { seedEnabled: true });
+
+    // el runner es autocontenido: la primera sentencia crea schema_version
+    expect(exec.calls[0].query).toContain(
+      'CREATE TABLE IF NOT EXISTS schema_version',
+    );
+    expect(exec.versionNumbers()).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+    ]);
   });
 
   it('runs only pending migrations from version 5 and still seeds', async () => {

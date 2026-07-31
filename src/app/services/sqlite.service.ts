@@ -62,10 +62,7 @@ export class SqliteService implements Database {
     if (!this._isBrowser) return;
     const client = await this._getClient();
 
-    await client.sql(`CREATE TABLE IF NOT EXISTS schema_version (
-      version INTEGER PRIMARY KEY
-    )`);
-
+    // schema_version lo crea el propio runner (única fuente de verdad, R4).
     await runMigrations(
       { sql: (q, p) => client.sql(q, ...(p ?? [])) },
       { seedEnabled: environment.seedEnabled },
