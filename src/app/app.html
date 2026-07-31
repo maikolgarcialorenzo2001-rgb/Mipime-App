@@ -4,7 +4,10 @@
     <app-db-error />
   } @else if (ttlExpired()) {
     <app-ttl-expired />
-  } @else {
+  }   @else {
     <router-outlet />
+  }
+  @if (dbStatus.restoreInfo()) {
+    <app-restore-feedback />
   }
 </main>

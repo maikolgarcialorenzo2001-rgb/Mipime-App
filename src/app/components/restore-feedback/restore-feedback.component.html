@@ -1,0 +1,36 @@
+@if (restoreInfo(); as info) {
+  <div
+    role="status"
+    class="fixed bottom-4 right-4 z-40 max-w-sm rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-lg dark:border-amber-700 dark:bg-amber-950"
+  >
+    <div class="flex items-start gap-3">
+      <span
+        class="material-symbols-outlined text-2xl leading-none text-amber-600 dark:text-amber-400"
+        aria-hidden="true"
+        >restore</span
+      >
+      <div class="flex-1">
+        <p class="text-sm font-semibold text-amber-900 dark:text-amber-100">
+          Base de datos restaurada
+        </p>
+        <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+          Se restauró desde {{ originLabel() }}
+          @if (whenLabel()) {
+            del {{ whenLabel() }}
+          }
+          @if (lostWindowLabel(); as lost) {
+            — se perdieron hasta {{ lost }} de cambios.
+          }
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="descartar()"
+        aria-label="Descartar aviso"
+        class="cursor-pointer rounded p-1 text-amber-500 transition-colors hover:bg-amber-200 hover:text-amber-700 dark:hover:bg-amber-800 dark:hover:text-amber-200"
+      >
+        <span class="material-symbols-outlined text-lg leading-none">close</span>
+      </button>
+    </div>
+  </div>
+}
