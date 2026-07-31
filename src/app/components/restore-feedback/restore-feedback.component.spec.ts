@@ -49,11 +49,13 @@ describe('RestoreFeedbackComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('copia con fecha');
   });
 
-  it('muestra el cuándo del backup restaurado', () => {
-    // Locale-agnóstico: misma llamada que el componente → mismo formato.
-    expect(fixture.nativeElement.textContent).toContain(
-      new Date(INFO.when!).toLocaleString(),
-    );
+  it('muestra el cuándo del backup restaurado (formato es-AR determinístico, no tautológico)', () => {
+    const text = fixture.nativeElement.textContent;
+    // Pinea el formato concreto que el toast debe producir a partir del when
+    // ISO: es-AR = d/m/yyyy + hora 24h (sin AM/PM). Independiente del TZ del
+    // host: el año siempre es 2026.
+    expect(text).toMatch(/\d{1,2}\/\d{1,2}\/2026/);
+    expect(text).not.toMatch(/AM|PM/);
   });
 
   it('muestra la ventana de pérdida estimada (lostWindowMs)', () => {

@@ -221,6 +221,26 @@ describe('App component nav', () => {
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeFalsy();
   });
 
+  it('debería renderizar app-restore-feedback JUNTO a router-outlet cuando hay restoreInfo (R4: no bloquea)', () => {
+    const dbStatus = TestBed.inject(DbStatusService);
+    dbStatus.setRestoreInfo({
+      from: 'timestamped',
+      path: '/backups/tienda_2026-06-02_1407.db',
+      when: '2026-06-02T14:07:00Z',
+      lostWindowMs: 0,
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    // Superficie distinta de db-error (R4): el toast coexiste con la app.
+    expect(
+      fixture.nativeElement.querySelector('app-restore-feedback'),
+    ).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-db-error')).toBeFalsy();
+  });
+
   it('debería llamar a logout cuando se hace clic en el botón', async () => {
     const salt = generateSalt();
     const hash = await hashPassword('admin123', salt);

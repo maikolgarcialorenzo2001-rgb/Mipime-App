@@ -33,7 +33,10 @@ export class RestoreFeedbackComponent {
     const info = this.dbStatus.restoreInfo();
     if (!info?.when) return '';
     const d = new Date(info.when);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
+    if (Number.isNaN(d.getTime())) return '';
+    // es-AR fijo: formato determinístico (d/m/yyyy, hora 24h) para toda la
+    // app (UI en español) e independiente del locale del SO (review M2).
+    return d.toLocaleString('es-AR');
   });
 
   /** Ventana de pérdida legible; null si no aplica (0 o sin info). */
