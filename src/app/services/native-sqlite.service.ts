@@ -48,6 +48,14 @@ export class NativeSqliteService implements Database {
       return;
     }
 
+    // T9: restauración/adopción del arranque → aviso transitorio en UI (R4).
+    // Solo se publica cuando el resultado lo reporta: un status fresh/ok
+    // posterior NUNCA borra un aviso ya publicado (el re-init del roundtrip
+    // devolvería 'ok' sin restoreInfo y mataría el aviso de adopt).
+    if (init.restoreInfo) {
+      this._dbStatus.setRestoreInfo(init.restoreInfo);
+    }
+
     if (init.status === 'import-needed') {
       const roundtripOk = await this._runImportRoundtrip();
       if (!roundtripOk) {
@@ -135,6 +143,11 @@ export class NativeSqliteService implements Database {
         );
         return false;
       }
+      // T9: file:null + adoptOrFresh adoptó → el restoreInfo viaja en el
+      // resultado del import; publicarlo para el aviso de restauración (R4).
+      if (imported.restoreInfo) {
+        this._dbStatus.setRestoreInfo(imported.restoreInfo);
+      }
     } catch (err) {
       this._dbStatus.setFatal(await this._synthesizeDiagnostics('import', err));
       return false;
@@ -161,6 +174,11 @@ export class NativeSqliteService implements Database {
         ),
       );
       return false;
+    }
+    // T9: el re-init post-import también puede reportar restauración (R4).
+    // No toca un restoreInfo ya publicado (adopt del import, p.ej.).
+    if (after.restoreInfo) {
+      this._dbStatus.setRestoreInfo(after.restoreInfo);
     }
     return true;
   }

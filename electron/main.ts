@@ -335,8 +335,16 @@ app.whenReady().then(() => {
           console.log(
             '[db:import] no OPFS data — continuing with adopt-or-fresh',
           );
-          adoptOrFresh(dbPathFor(), rodantePathFor(), backupsDirFor());
-          return { ok: true };
+          // T9: si adoptOrFresh adopta un backup, el restoreInfo viaja al
+          // renderer para que la UI muestre el aviso de restauración (R4).
+          const adopt = adoptOrFresh(
+            dbPathFor(),
+            rodantePathFor(),
+            backupsDirFor(),
+          );
+          return adopt.status === 'adopted'
+            ? { ok: true, restoreInfo: adopt.restoreInfo }
+            : { ok: true };
         }
         return importDbFile(
           file,

@@ -58,6 +58,8 @@ interface DbBackupResult {
 
 interface DbImportResult {
   ok: boolean;
+  /** Presente cuando file:null y adoptOrFresh adoptó un backup (T9). */
+  restoreInfo?: DbRestoreInfo;
   error?: string;
 }
 

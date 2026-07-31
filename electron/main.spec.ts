@@ -458,6 +458,29 @@ describe('main process', () => {
       expect(result).toEqual({ ok: true });
     });
 
+    it('db:import with null file should surface restoreInfo when adoptOrFresh adopts (T9)', async () => {
+      const restoreInfo = {
+        from: 'adopt',
+        path: '/fake/rodante.db',
+        when: '2026-01-01T00:00:00Z',
+        lostWindowMs: 3600000,
+      } as const;
+      mockAdoptOrFresh.mockReturnValue({ status: 'adopted', restoreInfo });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: null });
+
+      expect(result).toEqual({ ok: true, restoreInfo });
+    });
+
+    it('R5: db:sql nunca usa :memory: — abre la DB nativa en ruta real', async () => {
+      const handler = await getDbHandler('db:sql');
+      await handler({ query: 'SELECT 1 AS v', params: [] });
+
+      expect(mockOpenNativeDb).toHaveBeenCalledWith(DB_FILE);
+      expect(mockOpenNativeDb.mock.calls[0][0]).not.toBe(':memory:');
+    });
+
     it('db:import with null file should return {ok:false, error} instead of throwing when adoptOrFresh fails (M1)', async () => {
       mockAdoptOrFresh.mockImplementation(() => {
         throw new Error('disk full');

@@ -142,6 +142,73 @@ describe('NativeSqliteService', () => {
     expect(dbStatus.fatal()).toBeNull();
   });
 
+  describe('T9 — publicación de restoreInfo', () => {
+    it('initialize con status restored debería publicar restoreInfo', async () => {
+      const restoreInfo: DbRestoreInfo = {
+        from: 'timestamped',
+        path: '/backups/tienda_2026-06-02_1407.db',
+        when: '2026-06-02T14:07:00Z',
+        lostWindowMs: 3600000,
+      };
+      mockInvokeSequence([{ status: 'restored', restoreInfo }]);
+
+      await service.initialize();
+
+      expect(dbStatus.restoreInfo()).toEqual(restoreInfo);
+      expect(dbStatus.fatal()).toBeNull();
+    });
+
+    it('initialize con status fresh no publica restoreInfo (queda null)', async () => {
+      mockInvokeSequence([{ status: 'fresh' }]);
+
+      await service.initialize();
+
+      expect(dbStatus.restoreInfo()).toBeNull();
+    });
+
+    it('debería publicar restoreInfo del roundtrip cuando db:import adoptó (T9)', async () => {
+      mockGetDatabaseFile.mockResolvedValue(
+        new File([new Uint8Array(16)], 'tienda-app.db'),
+      );
+      const adoptInfo: DbRestoreInfo = {
+        from: 'adopt',
+        path: '/rodante.db',
+        when: '2026-01-01T00:00:00Z',
+        lostWindowMs: 0,
+      };
+      mockInvokeSequence([
+        { status: 'import-needed' },
+        { ok: true, restoreInfo: adoptInfo }, // db:import adoptó un backup
+        { status: 'ok' },
+      ]);
+
+      await service.initialize();
+
+      expect(dbStatus.restoreInfo()).toEqual(adoptInfo);
+    });
+
+    it('el db:initialize re-run del roundtrip puede publicar su propio restoreInfo (T9)', async () => {
+      mockGetDatabaseFile.mockResolvedValue(
+        new File([new Uint8Array(16)], 'tienda-app.db'),
+      );
+      const restored: DbRestoreInfo = {
+        from: 'rodante',
+        path: '/rodante.db',
+        when: '2026-02-02T00:00:00Z',
+        lostWindowMs: 5000,
+      };
+      mockInvokeSequence([
+        { status: 'import-needed' },
+        { ok: true },
+        { status: 'restored', restoreInfo: restored },
+      ]);
+
+      await service.initialize();
+
+      expect(dbStatus.restoreInfo()).toEqual(restored);
+    });
+  });
+
   it('initialize debería enviar file:null cuando no hay datos OPFS (CANTOPEN/empty)', async () => {
     mockGetDatabaseFile.mockRejectedValue(new Error('SQLITE_CANTOPEN'));
     mockInvokeSequence([
