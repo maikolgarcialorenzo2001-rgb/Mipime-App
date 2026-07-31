@@ -27,7 +27,15 @@ export class NativeSqliteService implements Database {
   }
 
   async initialize(): Promise<void> {
-    const init = await this._invoke<DbInitResult>('db:initialize');
+    let init: DbInitResult;
+    try {
+      init = await this._invoke<DbInitResult>('db:initialize');
+    } catch (err) {
+      // M1: el arranque NUNCA lanza (RESOLVED-RISK-2). Un rechazo del canal
+      // se traduce a fatal con diagnóstico sintetizado.
+      this._dbStatus.setFatal(this._synthesizeDiagnostics('open', err));
+      return;
+    }
 
     if (init.status === 'fatal') {
       // RESOLVED-RISK-2: el arranque fatal NUNCA lanza; se publica el
@@ -37,9 +45,14 @@ export class NativeSqliteService implements Database {
     }
 
     if (init.status === 'import-needed') {
-      // Roundtrip one-shot OPFS→native: datos OPFS (o null si CANTOPEN/empty)
-      // -> db:import -> main decide (importDbFile con flag, o adopt-or-fresh).
-      await this._runImportRoundtrip();
+      const roundtripOk = await this._runImportRoundtrip();
+      if (!roundtripOk) {
+        // M2: el roundtrip no produjo una DB usable (fatal, import {ok:false}
+        // o import-needed repetido). NO migrar: db:sql crearía la DB fresca
+        // y el flag de import quedaría saltado para siempre → datos OPFS
+        // varados (RESOLVED-RISK-1 roto, fresh+seed silencioso).
+        return;
+      }
     }
 
     // AD-3: migraciones sobre el mismo contrato IPC, sentencia por sentencia.
@@ -49,7 +62,20 @@ export class NativeSqliteService implements Database {
     );
   }
 
-  private async _runImportRoundtrip(): Promise<void> {
+  private _synthesizeDiagnostics(
+    stage: 'open' | 'import',
+    err: unknown,
+  ): DbDiagnostics {
+    return {
+      appVersion: 'unknown',
+      platform: window.electronAPI?.platform ?? 'unknown',
+      sqliteError: (err as Error).message,
+      stage,
+      backupsTried: [],
+    };
+  }
+
+  private async _runImportRoundtrip(): Promise<boolean> {
     let file: ArrayBuffer | null = null;
     try {
       const { SQLocal } = await import('sqlocal');
@@ -59,11 +85,47 @@ export class NativeSqliteService implements Database {
     } catch {
       // CANTOPEN / vacío: sin datos OPFS → file queda en null (inicial).
     }
-    await this._invoke<DbImportResult>('db:import', { file });
 
-    const after = await this._invoke<DbInitResult>('db:initialize');
+    try {
+      const imported = await this._invoke<DbImportResult>('db:import', { file });
+      if (!imported.ok) {
+        // M2: el resultado del import NO se descarta. Fallo (validación o
+        // disco) → fatal stage 'import' sin migrar.
+        this._dbStatus.setFatal(
+          this._synthesizeDiagnostics(
+            'import',
+            new Error(imported.error ?? 'import failed'),
+          ),
+        );
+        return false;
+      }
+    } catch (err) {
+      this._dbStatus.setFatal(this._synthesizeDiagnostics('import', err));
+      return false;
+    }
+
+    let after: DbInitResult;
+    try {
+      after = await this._invoke<DbInitResult>('db:initialize');
+    } catch (err) {
+      this._dbStatus.setFatal(this._synthesizeDiagnostics('import', err));
+      return false;
+    }
     if (after.status === 'fatal') {
       this._dbStatus.setFatal(after.diagnostics ?? null);
+      return false;
     }
+    if (after.status === 'import-needed') {
+      // M2: el import no produjo una DB usable; publicar fatal para no caer
+      // en fresh+seed silencioso con los datos OPFS varados.
+      this._dbStatus.setFatal(
+        this._synthesizeDiagnostics(
+          'import',
+          new Error('import did not produce a working database'),
+        ),
+      );
+      return false;
+    }
+    return true;
   }
 }

@@ -151,6 +151,118 @@ describe('NativeSqliteService', () => {
     expect(invokeMock).toHaveBeenCalledWith('db:import', { file: null });
   });
 
+  it('initialize con re-init fatal tras roundtrip debería publicar diagnostics y NO migrar (M1)', async () => {
+    const diagnostics: DbDiagnostics = {
+      appVersion: '0.1.8-beta',
+      platform: 'win32',
+      sqliteError: 'disk failure',
+      stage: 'open',
+      backupsTried: [],
+    };
+    mockGetDatabaseFile.mockResolvedValue(
+      new File([new Uint8Array(16)], 'tienda-app.db'),
+    );
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: true },
+      { status: 'fatal', diagnostics },
+    ]);
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toEqual(diagnostics);
+    // fatal tras el roundtrip corta ANTES de runMigrations
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:sql').length,
+    ).toBe(0);
+  });
+
+  it('initialize con re-init import-needed tras roundtrip debería publicar fatal stage import y NO migrar (M2)', async () => {
+    mockGetDatabaseFile.mockResolvedValue(
+      new File([new Uint8Array(16)], 'tienda-app.db'),
+    );
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: true },
+      { status: 'import-needed' },
+    ]);
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({
+      stage: 'import',
+      sqliteError: expect.any(String),
+    });
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:sql').length,
+    ).toBe(0);
+  });
+
+  it('initialize debería publicar fatal stage import y NO migrar cuando db:import devuelve {ok:false} (M2)', async () => {
+    mockGetDatabaseFile.mockResolvedValue(
+      new File([new Uint8Array(16)], 'tienda-app.db'),
+    );
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: false, error: 'import validation failed: integrity=corrupt' },
+    ]);
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({
+      stage: 'import',
+      sqliteError: 'import validation failed: integrity=corrupt',
+    });
+    // import fallido: NO se re-ejecuta db:initialize ni se migra
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:initialize').length,
+    ).toBe(1);
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:sql').length,
+    ).toBe(0);
+  });
+
+  it('initialize debería publicar fatal stage import cuando db:import rechaza el invoke (M1)', async () => {
+    invokeMock.mockImplementation((channel: string) => {
+      if (channel === 'db:initialize') {
+        return Promise.resolve({ status: 'import-needed' });
+      }
+      if (channel === 'db:import') {
+        return Promise.reject(new Error('ipc broken'));
+      }
+      return Promise.resolve([]);
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({
+      stage: 'import',
+      sqliteError: 'ipc broken',
+    });
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:sql').length,
+    ).toBe(0);
+  });
+
+  it('initialize debería publicar fatal stage open cuando el primer db:initialize rechaza (M1)', async () => {
+    invokeMock.mockImplementation((channel: string) => {
+      if (channel === 'db:initialize') {
+        return Promise.reject(new Error('boot broken'));
+      }
+      return Promise.resolve([]);
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({
+      stage: 'open',
+      sqliteError: 'boot broken',
+    });
+    expect(
+      invokeMock.mock.calls.filter(([ch]) => ch === 'db:sql').length,
+    ).toBe(0);
+  });
+
   it('sql debería rechazar cuando electronAPI no está disponible', async () => {
     delete (window as unknown as { electronAPI?: unknown }).electronAPI;
 
