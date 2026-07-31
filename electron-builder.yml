@@ -13,6 +13,7 @@ files:
   - dist-electron/main.js
   - dist-electron/preload.js
   - dist-electron/window-state.js
+  - dist-electron/db.js
   - dist/Mipime-Cuentas/browser/**/*
   - package.json
 
