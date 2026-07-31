@@ -196,14 +196,7 @@ export class ProductosPage implements OnInit {
       return;
     }
 
-    const producto = this.productos().find((p) => p.id === productoId);
-    const nombreProducto = producto?.nombre ?? `#${productoId}`;
     const cant = this.mermaCantidad()!;
-    const ubicLabel = this.mermaUbicacion() === 'almacen' ? 'Almacén' : 'Tienda';
-
-    if (!confirm(`¿Registrar merma de ${cant} unidades de "${nombreProducto}"?\nMotivo: ${this.mermaMotivo().trim()}\nUbicación: ${ubicLabel}`)) {
-      return;
-    }
 
     this.mermaProcesando.set(true);
     this.mermaError.set(null);

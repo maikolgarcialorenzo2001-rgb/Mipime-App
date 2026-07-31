@@ -234,8 +234,6 @@ describe('ProductosPage', () => {
   });
 
   it('submits merma calls registrarMerma with default shop ubicacion', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     component.abrirMerma(1);
     component.mermaCantidad.set(3);
     component.mermaMotivo.set('Rotura en depósito');
@@ -251,12 +249,9 @@ describe('ProductosPage', () => {
       undefined,
       'shop',
     );
-
-    vi.restoreAllMocks();
   });
 
   it('shows error on insufficient stock for merma', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     mockStockService.registrarMerma.mockRejectedValue(
       new Error('Stock insuficiente'),
     );
@@ -270,8 +265,6 @@ describe('ProductosPage', () => {
     fixture.detectChanges();
 
     expect(component.mermaError()).toBe('Stock insuficiente');
-
-    vi.restoreAllMocks();
   });
 
   it('Merma button exists and is distinct from other buttons', () => {
@@ -345,38 +338,6 @@ describe('ProductosPage', () => {
 
       expect(submitBtn.disabled).toBe(true);
       expect(submitBtn.getAttribute('title')).toBe('Stock insuficiente');
-    });
-  });
-
-  describe('merma confirm cancel', () => {
-    it('debería NO llamar registrarMerma cuando confirm se cancela', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
-
-      component.abrirMerma(1);
-      component.mermaCantidad.set(3);
-      component.mermaMotivo.set('Rotura');
-      fixture.detectChanges();
-
-      await component.onSubmitMerma();
-      fixture.detectChanges();
-
-      expect(mockStockService.registrarMerma).not.toHaveBeenCalled();
-      vi.restoreAllMocks();
-    });
-
-    it('debería llamar registrarMerma cuando confirm se acepta', async () => {
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-      component.abrirMerma(1);
-      component.mermaCantidad.set(3);
-      component.mermaMotivo.set('Rotura');
-      fixture.detectChanges();
-
-      await component.onSubmitMerma();
-      fixture.detectChanges();
-
-      expect(mockStockService.registrarMerma).toHaveBeenCalled();
-      vi.restoreAllMocks();
     });
   });
 
