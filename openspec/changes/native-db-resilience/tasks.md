@@ -119,6 +119,7 @@ Decision needed before apply: (1) chain strategy — stacked-to-main vs feature-
 - **Deps**: T2, T6, T9.
 
 ### T11 — navigator.storage.persist() on web
+- [x] T11 DONE (slice 5, 2026-07-31): `sqlite.service.ts` `initialize()` llama `_requestStoragePersistence()` tras runMigrations exitoso — `navigator.storage?.persist?.()` fire-and-forget con log de resultado (granted/rejected) envuelto en try/catch (API ausente → no-op silencioso). Web = 689 tests verdes; electron 136; tsc app+electron OK.
 - **Files**: MOD `src/app/services/sqlite.service.ts` + spec
 - **Steps**: after successful `initialize()`, fire-and-forget `navigator.storage.persist?.()` with log (R9).
 - **Tests (RED)**: spec — persist called after init when available; no throw when absent.
@@ -126,16 +127,18 @@ Decision needed before apply: (1) chain strategy — stacked-to-main vs feature-
 - **Deps**: T1.
 
 ### T12 — Manual export
+- [x] T12 DONE (slice 5, 2026-07-31): **Web inclusion CONFIRMADA por el usuario** (2026-07-31). `backup.service.ts` `exportarRespaldo()`: desktop → `invoke('db:export')` (main YA tenía el handler completo: showSaveDialog con filtro SQLite/db + `backupDb` incremental + `exportName()` → `tienda_export_<YYYYMMDD_HHmm>.db`; cancelado → `{ok:false,canceled:true}` — sin cambios en main.ts, T12 fue solo renderer); web → `createSqlocalClient()` (factoría M1, nunca SQLocal crudo) → `getDatabaseFile()` (lectura no destructiva R8) → blob download con `<a download="tienda_export_<YYYYMMDD_HHmm>.db">` + revokeObjectURL; fallos → `{ok:false, error}` (el export manual SÍ propaga errores, distinto de backup() R6). +4 tests en backup.service.spec (nativo, cancelado, web blob, web rechazo).
 - **Files**: MOD `src/app/services/backup.service.ts` + spec, `electron/main.ts`
 - **Steps**: (1) `exportarRespaldo()`: desktop → `invoke('db:export')` → main `dialog.showSaveDialog` + `backupDb` to chosen path (R5). (2) Web scope per design AD-6 default = blob download via existing `getDatabaseFile()` — FLAGGED: confirm before apply (extends spec R5).
 - **Tests (RED)**: spec — export invokes `db:export`; canceled → `{ok:false, canceled:true}`.
 - **DoD**: suites green.
 - **Deps**: T8.
-- **Decision**: confirm web manual export inclusion.
+- **Decision**: confirm web manual export inclusion. → CONFIRMADO 2026-07-31 (web blob download incluido).
 
 ## Phase 4: Packaging
 
 ### T13 — Packaging: builder files + manifest + version
+- [x] T13 DONE (slice 5, 2026-07-31): (1) `electron-builder.yml` `files` += `dist-electron/db.js` (R11; `asarUnpack: "**/*.node"` ya estaba). (2) `package.json` `0.1.8-beta` → `0.1.9-beta` (R10) + `package-lock.json` raíz sincronizada (bun.lock no guarda versión raíz). (3) `electron:rebuild` ya existía (T2) y ahora está cableado en `electron:build:win|mac|linux` antes de electron-builder. (4) Dual-lockfile VERIFICADO: better-sqlite3 13.0.2 pinneado idéntico en package-lock.json (resolved 13.0.2) y bun.lock (better-sqlite3@13.0.2); @types/better-sqlite3 7.6.13 en ambos. **Build BLOCKED por entorno** (reportado, no por código): `@electron/rebuild` falla con "Could not find any Visual Studio installation" — node-gyp no detecta el VS 18 (2026) instalado: la instancia NO está registrada en vswhere (solo SSMS aparece), falta vcvarsall.bat en VC/Auxiliary/Build, y no hay Windows SDK en `C:\Program Files (x86)\Windows Kits\10`. MSVC 14.51 + MSBuild.exe EXISTEN pero sin registro completo el toolchain es inutilizable para node-gyp. `electron-builder --win --dir` también falla en su propio paso @electron/rebuild. Smoke manual del instalador queda como paso de usuario (ver DoD).
 - **Files**: MOD `electron-builder.yml`, `package.json`, `package-lock.json`, `bun.lock`
 - **Steps**: (1) `electron-builder.yml` `files` += `dist-electron/db.js` (R11); `asarUnpack: "**/*.node"` already covers native binary. (2) `package.json`: version `0.1.9-beta` (R10); deps `better-sqlite3`; dev `@types/better-sqlite3`, `@electron/rebuild`; script `electron:rebuild` (`npx @electron/rebuild -f -w better-sqlite3`) wired into `electron:build*`. (3) Pin identical better-sqlite3 version in BOTH `package-lock.json` AND `bun.lock` (dual-lockfile caution).
 - **Tests**: `electron:build:win` succeeds; packaged app launches with native DB (manual smoke); `dist-electron/db.js` present in asar.
