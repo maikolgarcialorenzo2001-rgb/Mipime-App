@@ -14,6 +14,7 @@ import {
   backupDb,
   pruneBackups,
   adoptOrFresh,
+  timestampedBackupName,
   DB_FILENAME,
   IMPORT_FLAG_FILENAME,
   MAX_IMPORT_BYTES,
@@ -47,14 +48,6 @@ export function addIsolationHeaders(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
-}
-
-/** Nombre de snapshot timestamped: backups\tienda_<YYYY-MM-DD_HHmm>.db (R1). */
-function timestampedBackupName(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `tienda_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(
-    d.getHours(),
-  )}${p(d.getMinutes())}.db`;
 }
 
 /** Nombre sugerido para export manual: tienda_export_<YYYYMMDD_HHmm>.db. */

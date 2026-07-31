@@ -8,6 +8,7 @@ import {
   validateDb,
   backupDb,
   pruneBackups,
+  timestampedBackupName,
   recoverInPlace,
   runStartupSequence,
   importDbFile,
@@ -182,6 +183,30 @@ describe('pruneBackups', () => {
   it('returns an empty list when the directory does not exist', () => {
     const dir = tmpDir();
     expect(pruneBackups(path.join(dir, 'missing'))).toEqual([]);
+  });
+});
+
+describe('timestampedBackupName', () => {
+  it('genera nombres con formato tienda_YYYY-MM-DD_HHmm.db (compatible con TIMESTAMPED_RE)', () => {
+    const d = new Date(2026, 5, 2, 14, 7, 59);
+
+    const name = timestampedBackupName(d);
+
+    expect(name).toMatch(/^tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/);
+    expect(name).toBe('tienda_2026-06-02_1407.db');
+  });
+
+  it('los snapshots generados son detectados por pruneBackups (sin drift de formato)', () => {
+    const dir = tmpDir();
+    const backupsDir = path.join(dir, 'backups');
+    fs.mkdirSync(backupsDir, { recursive: true });
+    const name = timestampedBackupName(new Date(2026, 5, 2, 14, 7));
+    fs.writeFileSync(path.join(backupsDir, name), 'x');
+
+    const removed = pruneBackups(backupsDir, 0);
+
+    expect(removed).toHaveLength(1);
+    expect(removed[0]).toContain(name);
   });
 });
 

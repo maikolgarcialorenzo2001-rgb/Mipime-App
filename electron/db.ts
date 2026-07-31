@@ -138,6 +138,18 @@ function stamp(d: Date): string {
 }
 
 /**
+ * Nombre de snapshot timestamped: tienda_<YYYY-MM-DD_HHmm>.db (R1).
+ * Compatible con TIMESTAMPED_RE — única fuente para no duplicar formatos
+ * (stamp() es 6 dígitos y es SOLO para archivos .corrupt-<ts>).
+ */
+export function timestampedBackupName(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `tienda_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(
+    d.getHours(),
+  )}${p(d.getMinutes())}.db`;
+}
+
+/**
  * Destino `<dbPath>.corrupt-<ts>` libre de colisiones: si ya existe
  * (mismo segundo), se anexa un contador.
  */
