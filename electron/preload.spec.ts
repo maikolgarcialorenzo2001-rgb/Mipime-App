@@ -109,6 +109,15 @@ describe('preload', () => {
     expect(mockIpcSend).not.toHaveBeenCalled();
   });
 
+  it('should NOT allow send on db:* channels (invoke-only, S5)', async () => {
+    const api = await getPreloadApi();
+
+    (api.send as VoidFn)('db:initialize', 'payload');
+    (api.send as VoidFn)('db:sql', { query: 'SELECT 1' });
+
+    expect(mockIpcSend).not.toHaveBeenCalled();
+  });
+
   describe('invoke channels', () => {
     it('should allow invoke on app:getVersion channel', async () => {
       const api = await getPreloadApi();
@@ -222,6 +231,16 @@ describe('preload', () => {
     const callback = vi.fn();
 
     (api.on as VoidFn)('any:channel', callback);
+
+    expect(mockIpcOn).not.toHaveBeenCalled();
+  });
+
+  it('should NOT register on listeners for db:* channels (invoke-only, S5)', async () => {
+    const api = await getPreloadApi();
+    const callback = vi.fn();
+
+    (api.on as VoidFn)('db:sql', callback);
+    (api.on as VoidFn)('db:backupNow', callback);
 
     expect(mockIpcOn).not.toHaveBeenCalled();
   });
