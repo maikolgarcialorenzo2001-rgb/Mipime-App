@@ -202,11 +202,35 @@ app.whenReady().then(() => {
   const backupsDirFor = () =>
     path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
 
+  // C1 (CRITICAL): conexión PERSISTENTE para db:sql. El runner de
+  // migraciones emite BEGIN/COMMIT como llamadas separadas (V3..V15); con
+  // una conexión por llamada, el COMMIT lanza 'cannot commit - no
+  // transaction is active' y el arranque nativo fresco queda garantizado en
+  // rojo. Una sola conexión reutilizada (semántica web con SQLocal) hace
+  // funcionar las transacciones. Se recrea si db:initialize/db:import
+  // reemplazan el archivo (adopt/fresh/import), y se cierra al salir.
+  let sqlConn: ReturnType<typeof openNativeDb> | null = null;
+  function getSqlConn(): ReturnType<typeof openNativeDb> {
+    if (!sqlConn) {
+      sqlConn = openNativeDb(dbPathFor());
+    }
+    return sqlConn;
+  }
+  function closeSqlConn(): void {
+    if (sqlConn) {
+      sqlConn.close();
+      sqlConn = null;
+    }
+  }
+
   // Arranque completo: open -> recoverInPlace -> rodante -> timestamped ->
   // adopt/fresh. Adopt y diagnostics van DENTRO del resultado (AD-9), no son
   // canales aparte.
   ipcMain.handle('db:initialize', () => {
     try {
+      // C1: el arranque puede reemplazar el archivo (adopt/fresh/import);
+      // una conexión abierta apuntaría al inode viejo → cerrar primero.
+      closeSqlConn();
       return runStartupSequence({
         userDataPath: app.getPath('userData'),
         documentsPath: app.getPath('documents'),
@@ -255,7 +279,7 @@ app.whenReady().then(() => {
       ) {
         throw new Error('db:sql does not allow PRAGMA writes');
       }
-      const db = openNativeDb(dbPathFor());
+      const db = getSqlConn();
       try {
         const stmt = db.prepare(query);
         if (stmt.reader) {
@@ -263,8 +287,15 @@ app.whenReady().then(() => {
         }
         stmt.run(...(params ?? []));
         return [];
-      } finally {
-        db.close();
+      } catch (err) {
+        // C1: si una sentencia falla dentro de una transacción del runner
+        // (BEGIN/COMMIT multi-llamada), la conexión persistente quedaría con
+        // la transacción abierta y el próximo BEGIN lanzaría. Rollback para
+        // no envenenar la conexión.
+        if (db.inTransaction) {
+          db.exec('ROLLBACK');
+        }
+        throw err;
       }
     },
   );
@@ -286,6 +317,18 @@ app.whenReady().then(() => {
           error: 'db:import payload exceeds the 512MB limit',
         };
       }
+      // MINOR-2: el import es one-shot (RESOLVED-RISK-1). Si la DB nativa o
+      // el flag de import ya existen, no hay nada que importar → rechazo
+      // defensivo sin tocar el disco.
+      if (
+        fs.existsSync(dbPathFor()) ||
+        fs.existsSync(path.join(app.getPath('userData'), IMPORT_FLAG_FILENAME))
+      ) {
+        return { ok: false, error: 'native DB already exists' };
+      }
+      // C1: importDbFile/adoptOrFresh reemplazan el archivo → la conexión
+      // persistente quedaría apuntando al inode viejo. Cerrar primero.
+      closeSqlConn();
       try {
         if (file === null) {
           console.log(
@@ -417,6 +460,10 @@ app.whenReady().then(() => {
       mainWindow = createMainWindow();
     }
   });
+
+  // C1: higiene de conexión al salir (cierra la conexión persistente, NO
+  // borra archivos; tampoco es el backup de cierre de jornada — T8).
+  app.on('will-quit', closeSqlConn);
 });
 
 app.on('window-all-closed', () => {

@@ -96,11 +96,13 @@ vi.mock('electron-updater', () => ({
 
 const mockFsMkdirSync = vi.hoisted(() => vi.fn());
 const mockFsWriteFileSync = vi.hoisted(() => vi.fn());
+const mockFsExistsSync = vi.hoisted(() => vi.fn(() => false));
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn(() => Buffer.from('mocked-content')),
   mkdirSync: mockFsMkdirSync,
   writeFileSync: mockFsWriteFileSync,
+  existsSync: mockFsExistsSync,
 }));
 
 const mockLoadWindowState = vi.hoisted(() => vi.fn(() => null));
@@ -491,6 +493,45 @@ describe('main process', () => {
         error: expect.stringContaining('512MB'),
       });
       expect(mockImportDbFile).not.toHaveBeenCalled();
+    });
+
+    it('db:import should reject when the native DB or import flag already exists (MINOR-2)', async () => {
+      mockFsExistsSync.mockReturnValue(true);
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: new ArrayBuffer(4) });
+
+      expect(result).toEqual({ ok: false, error: 'native DB already exists' });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).not.toHaveBeenCalled();
+    });
+
+    it('INTEGRATION: real runMigrations a través del handler db:sql real completa V1→V16 en DB temp real (C1)', async () => {
+      // C1 (CRITICAL): el runner emite BEGIN/COMMIT como llamadas separadas
+      // (V3..V15). Con UNA conexión por llamada (estado previo al fix), el
+      // COMMIT de V5 lanza 'cannot commit - no transaction is active' y el
+      // arranque nativo fresco está garantizado en rojo. La conexión
+      // persistente (semántica web con SQLocal) hace funcionar las
+      // transacciones: V1→V16 completan y schema_version queda en 16.
+      mockAppGetPath.mockReturnValue(path.dirname(dbFile));
+      const handler = await getDbHandler('db:sql');
+
+      const { runMigrations } = await import(
+        '../src/app/services/db-migrations'
+      );
+      const executor = {
+        sql: async <T>(query: string, params?: unknown[]) =>
+          (await handler({ query, params: params ?? [] })) as T[],
+      };
+
+      await expect(
+        runMigrations(executor, { seedEnabled: false }),
+      ).resolves.toBeUndefined();
+
+      const rows = (await handler({
+        query: 'SELECT MAX(version) AS version FROM schema_version',
+      })) as { version: number }[];
+      expect(rows[0].version).toBe(16);
     });
 
     it('db:backupNow with trigger open should back up rodante only', async () => {
