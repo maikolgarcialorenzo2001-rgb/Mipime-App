@@ -341,6 +341,26 @@ describe('main process', () => {
       expect(result).toEqual(canned);
     });
 
+    it('db:initialize should return {status:fatal, diagnostics} instead of throwing when runStartupSequence throws (M1)', async () => {
+      mockRunStartupSequence.mockImplementation(() => {
+        throw new Error('disk failure');
+      });
+
+      const handler = await getDbHandler('db:initialize');
+      const result = await handler();
+
+      expect(result).toEqual({
+        status: 'fatal',
+        diagnostics: {
+          appVersion: '1.0.0',
+          platform: process.platform,
+          sqliteError: 'disk failure',
+          stage: 'open',
+          backupsTried: [],
+        },
+      });
+    });
+
     it('db:sql should run a SELECT with params and return rows', async () => {
       const handler = await getDbHandler('db:sql');
 
@@ -370,6 +390,29 @@ describe('main process', () => {
       const handler = await getDbHandler('db:sql');
 
       await expect(handler({ query: '   ' })).rejects.toThrow();
+    });
+
+    it('db:sql should reject ATTACH/DETACH statements (S1)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: "ATTACH DATABASE 'C:/x.db' AS other" }),
+      ).rejects.toThrow('ATTACH/DETACH');
+      await expect(handler({ query: 'DETACH DATABASE other' })).rejects.toThrow(
+        'ATTACH/DETACH',
+      );
+    });
+
+    it('db:sql should reject PRAGMA writes but allow foreign_keys (S1)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: 'PRAGMA journal_mode = WAL' }),
+      ).rejects.toThrow('PRAGMA writes');
+
+      // Exención: migrationV15 corre PRAGMA foreign_keys = OFF/ON vía db:sql
+      const result = await handler({ query: 'PRAGMA foreign_keys = OFF' });
+      expect(Array.isArray(result)).toBe(true);
     });
 
     it('db:import should delegate to importDbFile and return its result', async () => {
@@ -411,6 +454,17 @@ describe('main process', () => {
       expect(result).toEqual({ ok: true });
     });
 
+    it('db:import with null file should return {ok:false, error} instead of throwing when adoptOrFresh fails (M1)', async () => {
+      mockAdoptOrFresh.mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: null });
+
+      expect(result).toEqual({ ok: false, error: 'disk full' });
+    });
+
     it('db:backupNow with trigger open should back up rodante only', async () => {
       const handler = await getDbHandler('db:backupNow');
 
@@ -449,6 +503,18 @@ describe('main process', () => {
       const result = await handler({ trigger: 'open' });
 
       expect(result).toEqual({ ok: false, error: 'disk full' });
+    });
+
+    it('db:backupNow should return {ok:false, error} for an unknown trigger (S3)', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = await handler({ trigger: 'mystery' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('trigger'),
+      });
+      expect(mockOpenNativeDb).not.toHaveBeenCalled();
     });
 
     it('db:export should return {ok:false, canceled:true} when the dialog is canceled', async () => {

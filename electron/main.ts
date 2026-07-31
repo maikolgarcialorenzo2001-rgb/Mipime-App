@@ -204,14 +204,30 @@ app.whenReady().then(() => {
   // Arranque completo: open -> recoverInPlace -> rodante -> timestamped ->
   // adopt/fresh. Adopt y diagnostics van DENTRO del resultado (AD-9), no son
   // canales aparte.
-  ipcMain.handle('db:initialize', () =>
-    runStartupSequence({
-      userDataPath: app.getPath('userData'),
-      documentsPath: app.getPath('documents'),
-      appVersion: app.getVersion(),
-      platform: process.platform,
-    }),
-  );
+  ipcMain.handle('db:initialize', () => {
+    try {
+      return runStartupSequence({
+        userDataPath: app.getPath('userData'),
+        documentsPath: app.getPath('documents'),
+        appVersion: app.getVersion(),
+        platform: process.platform,
+      });
+    } catch (err) {
+      // M1: el handler NUNCA lanza (RESOLVED-RISK-2). Un fallo inesperado
+      // de runStartupSequence (p.ej. disco al crear la DB fresca dentro de
+      // adoptOrFresh) se traduce a fatal con diagnóstico sintetizado.
+      return {
+        status: 'fatal',
+        diagnostics: {
+          appVersion: app.getVersion(),
+          platform: process.platform,
+          sqliteError: (err as Error).message,
+          stage: 'open',
+          backupsTried: [],
+        },
+      };
+    }
+  });
 
   // SQL de una sola sentencia (R6): prepare() lanza si hay más de una.
   // Las sentencias sin filas (CREATE/INSERT/UPDATE) se ejecutan con run()
@@ -223,6 +239,20 @@ app.whenReady().then(() => {
     (_event, { query, params }: { query: string; params?: unknown[] }) => {
       if (typeof query !== 'string' || !query.trim()) {
         throw new Error('db:sql requires a non-empty query string');
+      }
+      const trimmed = query.trim();
+      // S1: ATTACH/DETACH están prohibidos (abrirían archivos arbitrarios
+      // dentro del contexto de la DB nativa).
+      if (/^(ATTACH|DETACH)\b/i.test(trimmed)) {
+        throw new Error('db:sql does not allow ATTACH/DETACH');
+      }
+      // S1: escrituras PRAGMA (forma asignación) rechazadas salvo
+      // foreign_keys, que el runner de migraciones necesita (migrationV15).
+      if (
+        !/^PRAGMA\s+foreign_keys\b/i.test(trimmed) &&
+        /^PRAGMA\b[^()=]*=/i.test(trimmed)
+      ) {
+        throw new Error('db:sql does not allow PRAGMA writes');
       }
       const db = openNativeDb(dbPathFor());
       try {
@@ -244,17 +274,26 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'db:import',
     (_event, { file }: { file: ArrayBuffer | null }) => {
-      if (file === null) {
-        console.log('[db:import] no OPFS data — continuing with adopt-or-fresh');
-        adoptOrFresh(dbPathFor(), rodantePathFor(), backupsDirFor());
-        return { ok: true };
+      try {
+        if (file === null) {
+          console.log(
+            '[db:import] no OPFS data — continuing with adopt-or-fresh',
+          );
+          adoptOrFresh(dbPathFor(), rodantePathFor(), backupsDirFor());
+          return { ok: true };
+        }
+        return importDbFile(
+          file,
+          dbPathFor(),
+          path.join(app.getPath('userData'), IMPORT_FLAG_FILENAME),
+          app.getVersion(),
+        );
+      } catch (err) {
+        // M1: adoptOrFresh puede lanzar al crear la DB fresca (disco).
+        // El handler NUNCA lanza: {ok:false} deja que el renderer publique
+        // fatal stage 'import' en vez de migrar sobre una DB inexistente.
+        return { ok: false, error: (err as Error).message };
       }
-      return importDbFile(
-        file,
-        dbPathFor(),
-        path.join(app.getPath('userData'), IMPORT_FLAG_FILENAME),
-        app.getVersion(),
-      );
     },
   );
 
@@ -263,7 +302,14 @@ app.whenReady().then(() => {
   // {ok:false, error} (R6: los fallos de backup no interrumpen).
   ipcMain.handle(
     'db:backupNow',
-    async (_event, { trigger }: { trigger: 'open' | 'jornada-close' }) => {
+    async (_event, { trigger }: { trigger: string }) => {
+      // S3: trigger desconocido → {ok:false} sin tocar la DB.
+      if (trigger !== 'open' && trigger !== 'jornada-close') {
+        return {
+          ok: false,
+          error: `Unknown backup trigger: ${String(trigger)}`,
+        };
+      }
       try {
         const db = openNativeDb(dbPathFor());
         try {
