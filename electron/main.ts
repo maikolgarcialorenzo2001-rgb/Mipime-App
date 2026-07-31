@@ -7,6 +7,16 @@ import {
   saveWindowState,
   getDefaultWindowState,
 } from './window-state';
+import {
+  runStartupSequence,
+  importDbFile,
+  openNativeDb,
+  backupDb,
+  pruneBackups,
+  adoptOrFresh,
+  DB_FILENAME,
+  IMPORT_FLAG_FILENAME,
+} from './db';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -36,6 +46,22 @@ export function addIsolationHeaders(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
+}
+
+/** Nombre de snapshot timestamped: backups\tienda_<YYYY-MM-DD_HHmm>.db (R1). */
+function timestampedBackupName(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `tienda_${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(
+    d.getHours(),
+  )}${p(d.getMinutes())}.db`;
+}
+
+/** Nombre sugerido para export manual: tienda_export_<YYYYMMDD_HHmm>.db. */
+function exportName(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `tienda_export_${d.getFullYear()}${p(d.getMonth() + 1)}${p(
+    d.getDate(),
+  )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
 }
 
 function createMainWindow(): BrowserWindow {
@@ -165,6 +191,135 @@ app.whenReady().then(() => {
       return { success: true, filePath: fullPath };
     } catch (error) {
       return { success: false, error: (error as Error).message };
+    }
+  });
+
+  // ---- DB nativa: contrato IPC de 5 canales (T3, AD-9) ----
+  const dbPathFor = () => path.join(app.getPath('userData'), DB_FILENAME);
+  const rodantePathFor = () =>
+    path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', DB_FILENAME);
+  const backupsDirFor = () =>
+    path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
+
+  // Arranque completo: open -> recoverInPlace -> rodante -> timestamped ->
+  // adopt/fresh. Adopt y diagnostics van DENTRO del resultado (AD-9), no son
+  // canales aparte.
+  ipcMain.handle('db:initialize', () =>
+    runStartupSequence({
+      userDataPath: app.getPath('userData'),
+      documentsPath: app.getPath('documents'),
+      appVersion: app.getVersion(),
+      platform: process.platform,
+    }),
+  );
+
+  // SQL de una sola sentencia (R6): prepare() lanza si hay más de una.
+  // Las sentencias sin filas (CREATE/INSERT/UPDATE) se ejecutan con run()
+  // y devuelven []; las que devuelven filas (SELECT/PRAGMA/RETURNING) con
+  // all(). En better-sqlite3 v13 all() LANZA si la sentencia no devuelve
+  // datos, por eso el branch por stmt.reader.
+  ipcMain.handle(
+    'db:sql',
+    (_event, { query, params }: { query: string; params?: unknown[] }) => {
+      if (typeof query !== 'string' || !query.trim()) {
+        throw new Error('db:sql requires a non-empty query string');
+      }
+      const db = openNativeDb(dbPathFor());
+      try {
+        const stmt = db.prepare(query);
+        if (stmt.reader) {
+          return stmt.all(...(params ?? []));
+        }
+        stmt.run(...(params ?? []));
+        return [];
+      } finally {
+        db.close();
+      }
+    },
+  );
+
+  // Import one-shot OPFS→native. null = no hay datos OPFS: NO se escribe el
+  // flag (reintento permitido el próximo arranque, RESOLVED-RISK-1) y se
+  // continúa adopt-or-fresh para romper el ciclo import-needed.
+  ipcMain.handle(
+    'db:import',
+    (_event, { file }: { file: ArrayBuffer | null }) => {
+      if (file === null) {
+        console.log('[db:import] no OPFS data — continuing with adopt-or-fresh');
+        adoptOrFresh(dbPathFor(), rodantePathFor(), backupsDirFor());
+        return { ok: true };
+      }
+      return importDbFile(
+        file,
+        dbPathFor(),
+        path.join(app.getPath('userData'), IMPORT_FLAG_FILENAME),
+        app.getVersion(),
+      );
+    },
+  );
+
+  // Backup bajo demanda. 'open' -> solo rodante; 'jornada-close' -> rodante +
+  // snapshot timestamped + prune(30) (R1–R3). Nunca lanza: devuelve
+  // {ok:false, error} (R6: los fallos de backup no interrumpen).
+  ipcMain.handle(
+    'db:backupNow',
+    async (_event, { trigger }: { trigger: 'open' | 'jornada-close' }) => {
+      try {
+        const db = openNativeDb(dbPathFor());
+        try {
+          await backupDb(db, rodantePathFor());
+        } finally {
+          db.close();
+        }
+        if (trigger === 'jornada-close') {
+          const snapshotPath = path.join(
+            backupsDirFor(),
+            timestampedBackupName(new Date()),
+          );
+          const snapDb = openNativeDb(dbPathFor());
+          try {
+            await backupDb(snapDb, snapshotPath);
+          } finally {
+            snapDb.close();
+          }
+          pruneBackups(backupsDirFor(), 30);
+          return {
+            ok: true,
+            rodantePath: rodantePathFor(),
+            timestampedPath: snapshotPath,
+          };
+        }
+        return { ok: true, rodantePath: rodantePathFor() };
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+    },
+  );
+
+  // Export manual (R5): diálogo guardar + backupDb incremental al destino.
+  ipcMain.handle('db:export', async () => {
+    try {
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        defaultPath: path.join(
+          app.getPath('documents'),
+          'Tienda - App',
+          'DataBase',
+          exportName(new Date()),
+        ),
+        filters: [{ name: 'SQLite database', extensions: ['db'] }],
+      });
+      if (result.canceled || !result.filePath) {
+        return { ok: false, canceled: true };
+      }
+      const db = openNativeDb(dbPathFor());
+      try {
+        await backupDb(db, result.filePath);
+      } finally {
+        db.close();
+      }
+      return { ok: true, path: result.filePath };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
     }
   });
 

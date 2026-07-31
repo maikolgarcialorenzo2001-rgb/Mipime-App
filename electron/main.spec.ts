@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'path';
 
 // ---- mock factories hoisted so vi.mock can reference them ----
 let mockIsPackaged = false;
@@ -114,6 +115,27 @@ vi.mock('./window-state', () => ({
   getDefaultWindowState: mockGetDefaultWindowState,
 }));
 
+// ---- electron/db.ts mock: orchestration fns mocked, low-level fns real ----
+const mockRunStartupSequence = vi.hoisted(() => vi.fn(() => ({ status: 'ok' })));
+const mockImportDbFile = vi.hoisted(() => vi.fn(() => ({ ok: true })));
+const mockBackupDb = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const mockPruneBackups = vi.hoisted(() => vi.fn(() => []));
+const mockAdoptOrFresh = vi.hoisted(() => vi.fn(() => ({ status: 'fresh' })));
+const mockOpenNativeDb = vi.hoisted(() => vi.fn());
+
+vi.mock('./db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./db')>();
+  return {
+    ...actual,
+    runStartupSequence: mockRunStartupSequence,
+    importDbFile: mockImportDbFile,
+    backupDb: mockBackupDb,
+    pruneBackups: mockPruneBackups,
+    adoptOrFresh: mockAdoptOrFresh,
+    openNativeDb: mockOpenNativeDb,
+  };
+});
+
 /** Flush pending microtasks so .then() callbacks execute */
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -226,6 +248,242 @@ describe('main process', () => {
 
       expect(handler).toBeDefined();
       expect(handler()).toBe(process.platform);
+    });
+  });
+
+  describe('db IPC handlers (T3)', () => {
+    let Database: typeof import('better-sqlite3').default;
+    let dbFile: string;
+
+    beforeAll(async () => {
+      ({ default: Database } = await import('better-sqlite3'));
+      // DB real en archivo temporal: persiste entre llamadas db:sql
+      // (:memory: se reinicia por conexión y no sirve para CREATE→INSERT).
+      const realFs = await vi.importActual<typeof import('fs')>('fs');
+      const realOs = await vi.importActual<typeof import('os')>('os');
+      const dir = realFs.mkdtempSync(
+        path.join(realOs.tmpdir(), 'mipime-main-spec-'),
+      );
+      dbFile = path.join(dir, 'tienda-app.db');
+    });
+
+    beforeEach(() => {
+      // db:sql / db:backupNow / db:export abren la DB nativa: usa SQLite real
+      mockOpenNativeDb.mockImplementation(() => new Database(dbFile));
+      mockRunStartupSequence.mockReturnValue({ status: 'ok' });
+    });
+
+    async function getDbHandler(
+      channel: string,
+    ): Promise<(args?: unknown) => Promise<unknown>> {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([ch]) => ch === channel,
+      )?.[1] as (event: unknown, args?: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+      // Simula la firma real de Electron: (event, ...args) → payload en
+      // args[0]. El wrapper async convierte throws síncronos en rechazos,
+      // igual que ipcMain.handle en runtime.
+      return async (args?: unknown) => handler({} as never, args);
+    }
+
+    const DB_FILE = path.join('/fake/userData', 'tienda-app.db');
+    const RODANTE_PATH = path.join(
+      '/fake/userData',
+      'Tienda - App',
+      'DataBase',
+      'tienda-app.db',
+    );
+
+    it('should register all 5 db:* IPC handlers', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      for (const channel of [
+        'db:initialize',
+        'db:sql',
+        'db:import',
+        'db:backupNow',
+        'db:export',
+      ]) {
+        expect(mockIpcMainHandle).toHaveBeenCalledWith(
+          channel,
+          expect.any(Function),
+        );
+      }
+    });
+
+    it('db:initialize should run runStartupSequence with app paths and return its result', async () => {
+      const canned = {
+        status: 'fatal',
+        diagnostics: {
+          appVersion: '1.0.0',
+          platform: process.platform,
+          sqliteError: 'integrity check failed: database disk image is malformed',
+          stage: 'open',
+          backupsTried: [{ path: 'x.db', reason: 'invalid' }],
+        },
+      } as const;
+      mockRunStartupSequence.mockReturnValue(canned as never);
+
+      const handler = await getDbHandler('db:initialize');
+      const result = await handler();
+
+      expect(mockRunStartupSequence).toHaveBeenCalledWith({
+        userDataPath: '/fake/userData',
+        documentsPath: '/fake/userData',
+        appVersion: '1.0.0',
+        platform: process.platform,
+      });
+      expect(result).toEqual(canned);
+    });
+
+    it('db:sql should run a SELECT with params and return rows', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      const result = await handler({ query: 'SELECT ? AS v', params: [42] });
+
+      expect(result).toEqual([{ v: 42 }]);
+    });
+
+    it('db:sql should run non-returning statements (CREATE/INSERT) and return []', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      expect(await handler({ query: 'CREATE TABLE t (x INTEGER)' })).toEqual([]);
+      expect(
+        await handler({ query: 'INSERT INTO t (x) VALUES (?)', params: [1] }),
+      ).toEqual([]);
+    });
+
+    it('db:sql should reject multi-statement input (R6)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: 'SELECT 1; SELECT 2' }),
+      ).rejects.toThrow('more than one statement');
+    });
+
+    it('db:sql should reject empty query input', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(handler({ query: '   ' })).rejects.toThrow();
+    });
+
+    it('db:import should delegate to importDbFile and return its result', async () => {
+      mockImportDbFile.mockReturnValue({ ok: true });
+      const file = new ArrayBuffer(8);
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file });
+
+      expect(mockImportDbFile).toHaveBeenCalledWith(
+        file,
+        DB_FILE,
+        path.join('/fake/userData', 'native-db-imported.flag'),
+        '1.0.0',
+      );
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('db:import should propagate importDbFile failure', async () => {
+      mockImportDbFile.mockReturnValue({ ok: false, error: 'validation failed' });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: new ArrayBuffer(4) });
+
+      expect(result).toEqual({ ok: false, error: 'validation failed' });
+    });
+
+    it('db:import with null file should NOT write the flag and continue adopt-or-fresh', async () => {
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({ file: null });
+
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).toHaveBeenCalledWith(
+        DB_FILE,
+        RODANTE_PATH,
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'backups'),
+      );
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('db:backupNow with trigger open should back up rodante only', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = await handler({ trigger: 'open' });
+
+      expect(mockBackupDb).toHaveBeenCalledTimes(1);
+      expect(mockBackupDb).toHaveBeenCalledWith(expect.anything(), RODANTE_PATH);
+      expect(mockPruneBackups).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, rodantePath: RODANTE_PATH });
+    });
+
+    it('db:backupNow with trigger jornada-close should back up rodante + timestamped + prune', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = (await handler({
+        trigger: 'jornada-close',
+      })) as { ok: boolean; timestampedPath?: string };
+
+      expect(mockBackupDb).toHaveBeenCalledTimes(2);
+      expect(mockPruneBackups).toHaveBeenCalledWith(
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'backups'),
+        30,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.timestampedPath).toMatch(
+        /tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/,
+      );
+    });
+
+    it('db:backupNow should return {ok:false, error} instead of throwing', async () => {
+      mockOpenNativeDb.mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      const handler = await getDbHandler('db:backupNow');
+      const result = await handler({ trigger: 'open' });
+
+      expect(result).toEqual({ ok: false, error: 'disk full' });
+    });
+
+    it('db:export should return {ok:false, canceled:true} when the dialog is canceled', async () => {
+      mockDialogShowSaveDialog.mockResolvedValue({
+        canceled: true,
+        filePath: undefined,
+      });
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(mockBackupDb).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: false, canceled: true });
+    });
+
+    it('db:export should back up to the chosen path and return it', async () => {
+      mockDialogShowSaveDialog.mockResolvedValue({
+        canceled: false,
+        filePath: 'C:/out/backup.db',
+      });
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(mockBackupDb).toHaveBeenCalledWith(expect.anything(), 'C:/out/backup.db');
+      expect(result).toEqual({ ok: true, path: 'C:/out/backup.db' });
+    });
+
+    it('db:export should return {ok:false, error} on failure', async () => {
+      mockDialogShowSaveDialog.mockRejectedValue(new Error('dialog failed'));
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(result).toEqual({ ok: false, error: 'dialog failed' });
     });
   });
 
