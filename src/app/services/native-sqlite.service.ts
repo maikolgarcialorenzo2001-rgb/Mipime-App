@@ -3,6 +3,7 @@ import type { Database } from './database';
 import { DbStatusService } from './db-status.service';
 import { environment } from '../environments/environment';
 import { runMigrations } from './db-migrations';
+import { createSqlocalClient } from './sqlocal-client';
 
 /**
  * Implementación de `Database` sobre el proceso main vía IPC (T4, AD-1/AD-3).
@@ -13,6 +14,9 @@ import { runMigrations } from './db-migrations';
 @Injectable()
 export class NativeSqliteService implements Database {
   private readonly _dbStatus = inject(DbStatusService);
+
+  /** Versión cacheada del invoke app:getVersion (MINOR-5); 'unknown' si falla. */
+  private _appVersion: string | null = null;
 
   private _invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
     const api = window.electronAPI;
@@ -33,7 +37,7 @@ export class NativeSqliteService implements Database {
     } catch (err) {
       // M1: el arranque NUNCA lanza (RESOLVED-RISK-2). Un rechazo del canal
       // se traduce a fatal con diagnóstico sintetizado.
-      this._dbStatus.setFatal(this._synthesizeDiagnostics('open', err));
+      this._dbStatus.setFatal(await this._synthesizeDiagnostics('open', err));
       return;
     }
 
@@ -56,18 +60,27 @@ export class NativeSqliteService implements Database {
     }
 
     // AD-3: migraciones sobre el mismo contrato IPC, sentencia por sentencia.
-    await runMigrations(
-      { sql: (q, p) => this.sql(q, p) },
-      { seedEnabled: environment.seedEnabled },
-    );
+    try {
+      await runMigrations(
+        { sql: (q, p) => this.sql(q, p) },
+        { seedEnabled: environment.seedEnabled },
+      );
+    } catch (err) {
+      // C2 (CRITICAL): un rechazo de db:sql DURANTE runMigrations también es
+      // fatal. Si llegara a rechazar, initialize() rechazaría → APP_INITIALIZER
+      // → bootstrapApplication rechaza → pantalla genérica SIN diagnóstico ni
+      // botón de copiar (todo T6 saltado). Publicar fatal y resolver.
+      this._dbStatus.setFatal(await this._synthesizeDiagnostics('open', err));
+      return;
+    }
   }
 
-  private _synthesizeDiagnostics(
+  private async _synthesizeDiagnostics(
     stage: 'open' | 'import',
     err: unknown,
-  ): DbDiagnostics {
+  ): Promise<DbDiagnostics> {
     return {
-      appVersion: 'unknown',
+      appVersion: await this._appVersionOrUnknown(),
       platform: window.electronAPI?.platform ?? 'unknown',
       sqliteError: (err as Error).message,
       stage,
@@ -75,11 +88,28 @@ export class NativeSqliteService implements Database {
     };
   }
 
+  /** Versión real vía app:getVersion (canal existente); 'unknown' si falla. */
+  private async _appVersionOrUnknown(): Promise<string> {
+    if (this._appVersion === null) {
+      try {
+        const v = await this._invoke<string>('app:getVersion');
+        this._appVersion = typeof v === 'string' ? v : 'unknown';
+      } catch {
+        this._appVersion = 'unknown';
+      }
+    }
+    return this._appVersion;
+  }
+
   private async _runImportRoundtrip(): Promise<boolean> {
     let file: ArrayBuffer | null = null;
     try {
-      const { SQLocal } = await import('sqlocal');
-      const client = new SQLocal({ databasePath: environment.dbName });
+      // M1: factoría compartida con SqliteService. El Worker explícito
+      // procesado por Vite evita NS_ERROR_CORRUPTED_CONTENT; si el worker
+      // fallara en el renderer, getDatabaseFile() rechazaría → file:null →
+      // adoptOrFresh crearía DB fresca y el flag bloquearía re-imports
+      // (datos OPFS varados).
+      const client = await createSqlocalClient();
       // getDatabaseFile devuelve un File web; el contrato IPC pide ArrayBuffer.
       // Lectura NO destructiva (R8): OPFS queda intacto, solo VACUUM INTO.
       file = await (await client.getDatabaseFile()).arrayBuffer();
@@ -98,7 +128,7 @@ export class NativeSqliteService implements Database {
         // M2: el resultado del import NO se descarta. Fallo (validación o
         // disco) → fatal stage 'import' sin migrar.
         this._dbStatus.setFatal(
-          this._synthesizeDiagnostics(
+          await this._synthesizeDiagnostics(
             'import',
             new Error(imported.error ?? 'import failed'),
           ),
@@ -106,7 +136,7 @@ export class NativeSqliteService implements Database {
         return false;
       }
     } catch (err) {
-      this._dbStatus.setFatal(this._synthesizeDiagnostics('import', err));
+      this._dbStatus.setFatal(await this._synthesizeDiagnostics('import', err));
       return false;
     }
 
@@ -114,7 +144,7 @@ export class NativeSqliteService implements Database {
     try {
       after = await this._invoke<DbInitResult>('db:initialize');
     } catch (err) {
-      this._dbStatus.setFatal(this._synthesizeDiagnostics('import', err));
+      this._dbStatus.setFatal(await this._synthesizeDiagnostics('import', err));
       return false;
     }
     if (after.status === 'fatal') {
@@ -125,7 +155,7 @@ export class NativeSqliteService implements Database {
       // M2: el import no produjo una DB usable; publicar fatal para no caer
       // en fresh+seed silencioso con los datos OPFS varados.
       this._dbStatus.setFatal(
-        this._synthesizeDiagnostics(
+        await this._synthesizeDiagnostics(
           'import',
           new Error('import did not produce a working database'),
         ),

@@ -3,13 +3,13 @@ import { NativeSqliteService } from './native-sqlite.service';
 import { DbStatusService } from './db-status.service';
 
 const mockGetDatabaseFile = vi.hoisted(() => vi.fn());
+const mockCreateSqlocalClient = vi.hoisted(() => vi.fn());
 
-vi.mock('sqlocal', () => ({
-  // Clase real (no vi.fn): el servicio hace `new SQLocal(...)` y una arrow
-  // function no es constructor → lanzaría y el catch enviaría file:null.
-  SQLocal: class {
-    getDatabaseFile = mockGetDatabaseFile;
-  },
+// M1: el roundtrip construye SQLocal vía la factoría compartida
+// (sqlocal-client), NO con `new SQLocal(...)` directo: el Worker explícito
+// procesado por Vite evita NS_ERROR_CORRUPTED_CONTENT en este build.
+vi.mock('./sqlocal-client', () => ({
+  createSqlocalClient: mockCreateSqlocalClient,
 }));
 
 describe('NativeSqliteService', () => {
@@ -32,6 +32,10 @@ describe('NativeSqliteService', () => {
     (window as unknown as { electronAPI?: unknown }).electronAPI = {
       invoke: invokeMock,
     } as unknown as ElectronAPI;
+
+    mockCreateSqlocalClient.mockResolvedValue({
+      getDatabaseFile: mockGetDatabaseFile,
+    } as never);
 
     TestBed.configureTestingModule({
       providers: [NativeSqliteService, DbStatusService],
@@ -275,6 +279,56 @@ describe('NativeSqliteService', () => {
 
     // Archivo OPFS vacío = sin datos → mismo contrato que CANTOPEN (file:null)
     expect(invokeMock).toHaveBeenCalledWith('db:import', { file: null });
+  });
+
+  it('initialize debería publicar fatal stage open y resolver sin lanzar cuando db:sql rechaza durante runMigrations (C2)', async () => {
+    invokeMock.mockImplementation((channel: string) => {
+      if (channel === 'db:initialize') {
+        return Promise.resolve({ status: 'ok' });
+      }
+      if (channel === 'db:sql') {
+        return Promise.reject(new Error('sql failed'));
+      }
+      return Promise.resolve([]);
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({
+      stage: 'open',
+      sqliteError: 'sql failed',
+    });
+  });
+
+  it('el roundtrip debería construir SQLocal vía la factoría compartida (M1)', async () => {
+    mockGetDatabaseFile.mockResolvedValue(
+      new File([new Uint8Array(16)], 'tienda-app.db'),
+    );
+    mockInvokeSequence([
+      { status: 'import-needed' },
+      { ok: true },
+      { status: 'ok' },
+    ]);
+
+    await service.initialize();
+
+    expect(mockCreateSqlocalClient).toHaveBeenCalledTimes(1);
+  });
+
+  it('el diagnóstico sintetizado debería usar la versión real de app:getVersion (MINOR-5)', async () => {
+    invokeMock.mockImplementation((channel: string) => {
+      if (channel === 'app:getVersion') {
+        return Promise.resolve('0.9.0');
+      }
+      if (channel === 'db:initialize') {
+        return Promise.reject(new Error('boot broken'));
+      }
+      return Promise.resolve([]);
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+
+    expect(dbStatus.fatal()).toMatchObject({ appVersion: '0.9.0' });
   });
 
   it('el roundtrip es no destructivo: solo lee OPFS vía getDatabaseFile y nunca invoca canales ajenos al contrato (R8)', async () => {
