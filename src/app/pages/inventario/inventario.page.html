@@ -29,10 +29,12 @@
     <app-error-alert [message]="err" />
   }
 
-  <!-- States -->
-  @if (loading()) {
+  <!-- States: full loading state only on initial load (list empty); the table
+       stays mounted during refresh so document height never collapses and the
+       window scroll position survives. -->
+  @if (loading() && filteredProductos().length === 0) {
     <app-loading-spinner />
-  } @else if (filteredProductos().length === 0) {
+  } @else if (!loading() && filteredProductos().length === 0) {
     <app-empty-state message="No hay productos" />
   } @else {
     <div class="overflow-x-auto">
