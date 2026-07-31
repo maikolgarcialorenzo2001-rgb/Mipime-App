@@ -59,5 +59,23 @@ export class SqliteService implements Database {
       },
       { seedEnabled: environment.seedEnabled },
     );
+
+    // T11 (R9): pedir persistencia del storage OPFS tras un init exitoso.
+    // Best-effort y fire-and-forget: si el API no existe o rechaza, el
+    // arranque continúa igual (nunca bloquea ni lanza).
+    this._requestStoragePersistence();
+  }
+
+  private _requestStoragePersistence(): void {
+    try {
+      void navigator.storage?.persist?.().then(
+        (granted) =>
+          console.log('[SqliteService] storage.persist() =', granted),
+        (err) =>
+          console.warn('[SqliteService] storage.persist() falló (R9):', err),
+      );
+    } catch {
+      // R9 best-effort: API ausente (navegador viejo / no soportado).
+    }
   }
 }

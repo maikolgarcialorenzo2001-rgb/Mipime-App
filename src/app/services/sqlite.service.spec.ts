@@ -930,3 +930,60 @@ describe('SqliteService migration v14', () => {
     expect(jornadaAlters.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('SqliteService persist web (T11/R9)', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  it('T11 RED: debería solicitar persist() tras initialize exitoso (R9)', async () => {
+    const persistMock = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(navigator, 'storage', {
+      value: { persist: persistMock },
+      configurable: true,
+    });
+
+    await service.initialize();
+
+    expect(persistMock).toHaveBeenCalled();
+  });
+
+  it('T11 RED: no debería lanzar si navigator.storage no está disponible (R9)', async () => {
+    Object.defineProperty(navigator, 'storage', {
+      value: undefined,
+      configurable: true,
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+  });
+});
