@@ -830,6 +830,91 @@ describe('InventarioPage', () => {
     expect(fixture.nativeElement.querySelector('app-empty-state')).toBeTruthy();
   });
 
+  // ── Double-submit guard ───────────────────────────────────────
+
+  it('29. ignores a second submit while a movement is in progress', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+
+    let resolveSalida!: () => void;
+    mockStockService.registrarSalida.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSalida = resolve;
+      }),
+    );
+
+    const first = component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    // Double-click: a second submit fires while the first is still pending.
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(1);
+
+    resolveSalida();
+    await first;
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(1);
+    // After the movement completes, the in-progress state is released.
+    expect(component.procesandoMovimiento()).toBe(false);
+  });
+
+  it('30. disables the submit button while a movement is in progress', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+
+    let resolveSalida!: () => void;
+    mockStockService.registrarSalida.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSalida = resolve;
+      }),
+    );
+
+    const first = component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const submitBtn = fixture.nativeElement.querySelector(
+      'form button[type="submit"]',
+    ) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+    expect(submitBtn.textContent).toContain('Guardando...');
+    expect(component.procesandoMovimiento()).toBe(true);
+
+    resolveSalida();
+    await first;
+    fixture.detectChanges();
+
+    // The movement completed: in-progress state released and the inline form
+    // is closed (so the button element itself is gone from the DOM).
+    expect(component.procesandoMovimiento()).toBe(false);
+    expect(component.selectedAction()).toBeNull();
+    expect(fixture.nativeElement.querySelector('form')).toBeFalsy();
+  });
+
   describe('responsive layout', () => {
     it('debería tener container con max-w-7xl', () => {
       fixture.detectChanges();
