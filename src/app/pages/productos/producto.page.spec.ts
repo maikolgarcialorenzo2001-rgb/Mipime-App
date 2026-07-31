@@ -117,7 +117,11 @@ describe('ProductosPage', () => {
     expect(fixture.nativeElement.textContent).toContain('No hay productos cargados');
   });
 
-  it('muestra "Cargando…" mientras carga', () => {
+  it('muestra "Cargando…" en la carga inicial con lista vacía', () => {
+    // Initial-load semantics: the full loading state only renders when the
+    // list is empty. A refresh over an already-loaded list must keep the table.
+    component.productos.set([]);
+
     let resolve!: (v: Producto[]) => void;
     vi.spyOn(productoService, 'listar').mockReturnValue(
       new Observable((sub) => {
