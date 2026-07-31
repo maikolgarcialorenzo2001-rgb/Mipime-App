@@ -103,6 +103,7 @@ Decision needed before apply: (1) chain strategy — stacked-to-main vs feature-
 ### T9 — ADOPT + restore feedback
 - **Files**: NEW `src/app/components/restore-feedback/restore-feedback.component.ts` + `.html` + `.css` + spec; MOD `src/app/app.ts`, `src/app/app.html`; tests in `electron/db.spec.ts`
 - **Steps**: (1) `adoptOrFresh`: no DB + no flag + no OPFS data → newest valid backup (validate integrity_check + schema_version 1..16, AD-5) → copy to userData, `{status:'adopted'}` + restoreInfo; else fresh DB no flag. (2) `restore-feedback.component`: transient toast/modal — WHAT restored / FROM WHEN / lost window (R4), fed by `dbStatus.restoreInfo`; distinct from blocking screen. (3) `app.html`: render `<app-restore-feedback/>` when restoreInfo set.
+- **Coordination note (slice 3 review)**: `electron/main.ts` db:import null-branch (adoptOrFresh) DISCARDA el `restoreInfo` que devuelve adoptOrFresh (`{status:'adopted'|'fresh'}` — el handler solo devuelve `{ok:true}`). T9 debe capturar ese restoreInfo y publicarlo en `dbStatus.restoreInfo` (R4). NO implementado en slice 3 (fuera de scope).
 - **Tests (RED)**: component spec — restoreInfo renders what/from/lost; electron/db.spec — valid backup adopted, invalid skipped with reason.
 - **DoD**: suites green.
 - **Deps**: T8, T5.

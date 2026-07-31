@@ -25,8 +25,13 @@ export class DbErrorComponent {
   async copiarDiagnostico(): Promise<void> {
     const text = this.diagnosticsText();
     if (!text) return;
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      }
+    } catch {
+      // MINOR-4: el portapapeles puede rechazar (permisos/privacidad);
+      // no es fatal — evitar ruido en consola.
     }
   }
 }

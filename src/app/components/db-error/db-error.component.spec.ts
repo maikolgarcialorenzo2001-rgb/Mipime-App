@@ -94,4 +94,14 @@ describe('DbErrorComponent', () => {
     expect(text).not.toContain('Copiar diagnóstico');
     expect(text).not.toContain('integrity check failed');
   });
+
+  it('no lanza si el portapapeles rechaza la escritura (MINOR-4)', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
+
+    const component = fixture.componentInstance;
+    await expect(component.copiarDiagnostico()).resolves.toBeUndefined();
+  });
 });
