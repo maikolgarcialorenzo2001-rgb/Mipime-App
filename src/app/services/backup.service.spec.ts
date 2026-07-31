@@ -1,6 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
 
+const { createSqlocalClientMock, getDatabaseFileMock } = vi.hoisted(() => ({
+  createSqlocalClientMock: vi.fn(),
+  getDatabaseFileMock: vi.fn(),
+}));
+
+vi.mock('./sqlocal-client', () => ({
+  createSqlocalClient: createSqlocalClientMock,
+}));
+
 describe('BackupService', () => {
   let service: BackupService;
   let invokeMock: ReturnType<typeof vi.fn>;
@@ -59,5 +68,96 @@ describe('BackupService', () => {
     invokeMock.mockResolvedValue({ ok: false, error: 'disk full' });
 
     await expect(service.backup('jornada-close')).resolves.toBeUndefined();
+  });
+});
+
+describe('BackupService exportarRespaldo (T12)', () => {
+  let service: BackupService;
+  let invokeMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    invokeMock = vi.fn().mockResolvedValue({ ok: true });
+    TestBed.configureTestingModule({ providers: [BackupService] });
+    service = TestBed.inject(BackupService);
+    getDatabaseFileMock.mockReset();
+    createSqlocalClientMock.mockReset();
+  });
+
+  afterEach(() => {
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+    vi.clearAllMocks();
+  });
+
+  function setNative(): void {
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      invoke: invokeMock,
+    } as unknown as ElectronAPI;
+  }
+
+  it('T12 RED: delega en db:export y devuelve la ruta elegida (nativo)', async () => {
+    setNative();
+    invokeMock.mockResolvedValue({
+      ok: true,
+      path: 'C:\\Users\\Test\\Documents\\Tienda - App\\DataBase\\tienda_export_20260731_1500.db',
+    });
+
+    const result = await service.exportarRespaldo();
+
+    expect(invokeMock).toHaveBeenCalledWith('db:export');
+    expect(result.ok).toBe(true);
+  });
+
+  it('T12 RED: devuelve {ok:false, canceled:true} si el diálogo se cancela', async () => {
+    setNative();
+    invokeMock.mockResolvedValue({ ok: false, canceled: true });
+
+    const result = await service.exportarRespaldo();
+
+    expect(result).toEqual({ ok: false, canceled: true });
+  });
+
+  it('T12 RED: web descarga el archivo vía getDatabaseFile() (AD-6 confirmado)', async () => {
+    const fakeFile = new File(['sqlite-bytes'], 'tienda.db');
+    getDatabaseFileMock.mockResolvedValue(fakeFile);
+    createSqlocalClientMock.mockResolvedValue({
+      getDatabaseFile: getDatabaseFileMock,
+    });
+
+    const createObjectUrlMock = vi.fn(() => 'blob:mock-export');
+    const revokeObjectUrlMock = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectUrlMock,
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectUrlMock,
+      configurable: true,
+    });
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+
+    const result = await service.exportarRespaldo();
+
+    expect(createSqlocalClientMock).toHaveBeenCalled();
+    expect(getDatabaseFileMock).toHaveBeenCalled();
+    expect(createObjectUrlMock).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectUrlMock).toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+
+    clickSpy.mockRestore();
+  });
+
+  it('T12 RED: web resuelve {ok:false, error} si getDatabaseFile rechaza (R6)', async () => {
+    createSqlocalClientMock.mockResolvedValue({
+      getDatabaseFile: vi
+        .fn()
+        .mockRejectedValue(new Error('opfs unavailable')),
+    });
+
+    const result = await service.exportarRespaldo();
+
+    expect(result.ok).toBe(false);
   });
 });
