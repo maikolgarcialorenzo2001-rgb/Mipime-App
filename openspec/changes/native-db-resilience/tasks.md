@@ -78,14 +78,16 @@ Decision needed before apply: (1) chain strategy — stacked-to-main vs feature-
 ## Phase 3: Fail-Loud + Resilience
 
 ### T6 — Fail-loud blocking UI
+- [x] T6 DONE (slice 3, 2026-07-31): NEW `src/app/components/db-error/` (component + html + css + spec, 9 tests) — overlay full-screen z-50 (espejo ttl-expired), título "Error crítico en la base de datos", "Contactá al desarrollador", diagnóstico JSON en bloque mono + botón "Copiar diagnóstico" (navigator.clipboard). MOD `src/app/app.ts`/`app.html` (inyecta DbStatusService; `@if (dbStatus.fatal()) <app-db-error/> @else if (ttlExpired()) ...` — fatal PRIORIZA sobre TTL), `src/main.ts` (`.catch()` → mensaje mínimo DOM en `<app-root>`). app.spec +2 (fatal → db-error en vez de router-outlet; prioridad sobre ttl). Sin path `:memory:` silencioso en ningún lado (R1/R5).
 - **Files**: NEW `src/app/components/db-error/db-error.component.ts` + `.html` + `.css` + spec; MOD `src/app/app.ts`, `src/app/app.html`, `src/main.ts`
-- **Steps**: (1) Component: full-screen "Contactá al desarrollador" + diagnostics `{appVersion, platform, sqliteError, stage, backupsTried}` + "Copiar diagnóstico" button (Spanish copy, TTL-pattern styling). (2) `app.ts`/`app.html`: inject DbStatusService; `@if (dbStatus.fatal()) <app-db-error/> @else <router-outlet/>` (mirrors `ttlExpired`). (3) `main.ts`: `bootstrapApplication(...).catch()` → minimal DOM message into `<app-root>`.
+- **Steps**: (1) Component: full-screen "Contactá al desarrollador" + diagnostics `{appVersion, platform, sqliteError, stage, backupsTried}` + "Copiar diagnóstico" button (Spanish copy, TTL-pattern styling — look at the existing TTL-expired pattern in the app for styling conventions). (2) `app.ts`/`app.html`: inject DbStatusService; `@if (dbStatus.fatal()) <app-db-error/> @else <router-outlet/>` (mirrors `ttlExpired`). (3) `main.ts`: `bootstrapApplication(...).catch()` → minimal DOM message into `<app-root>`.
 - **Tests (RED)**: db-error.spec — fatal signal renders blocking content + diagnostics + copy; app.spec — fatal renders db-error instead of router-outlet (R1/R5).
-- **DoD**: `ng test` green; no silent `:memory:` path anywhere.
-- **Deps**: T5.
+- **DoD**: web tests green via vitest; no silent `:memory:` path anywhere.
+- **Deps**: T5 (DbStatusService exists from slice 2).
 
 ### T7 — One-shot OPFS→native import (flag-guarded)
-- **Files**: MOD `src/app/services/native-sqlite.service.ts`, `electron/main.ts`; tests in `electron/db.spec.ts`, `native-sqlite.service.spec.ts`
+- [x] T7 DONE (slice 3, 2026-07-31): roundtrip YA construido en T4 — T7 lo completa: (a) renderer: archivo OPFS VACÍO (0 bytes) → `db:import {file:null}` (mismo contrato que CANTOPEN, +1 test); test R8 no destructivo (solo getDatabaseFile, canales = db:initialize/db:import/db:sql); (b) main: validación de payload `db:import` (S2/T7) — instanceof ArrayBuffer + `MAX_IMPORT_BYTES` (512MB, exportado desde electron/db.ts) → `{ok:false, error}` sin tocar DB (+2 tests main.spec). Semántica flag intacta (RESOLVED-RISK-1): flag solo tras import+validate OK (tests ya en db.spec T2); fallo → sin flag → reintento próximo arranque; OPFS intacto (R8, lectura VACUUM INTO, no destructiva).
+- **Files**: MOD `src/app/services/native-sqlite.service.ts`, `electron/main.ts`, `electron/db.ts` (export MAX_IMPORT_BYTES); tests en `electron/main.spec.ts`, `native-sqlite.service.spec.ts` (electron/db.spec flag tests ya existentes desde T2)
 - **Steps**: (1) Import-needed branch in `initialize()`: dynamic-import SQLocal `getDatabaseFile()` → ArrayBuffer; data → `invoke('db:import', {file})`; empty/CANTOPEN → `invoke('db:import', {file:null})`; re-run `db:initialize`. (2) main `db:import`: data → `importDbFile` (tmp+rename+validate+flag); null → log "no OPFS data", NO flag, continue `adoptOrFresh`; validation failure → no flag, retry next launch; disk failure → fatal diagnostics (RESOLVED-RISK-1 failure semantics).
 - **Tests (RED)**: electron/db.spec — flag written only after successful import+validation, absent on failure; native-sqlite.spec — import-needed roundtrip then re-initialize.
 - **DoD**: both suites green; OPFS left intact (non-destructive, R8).
