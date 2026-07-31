@@ -106,7 +106,7 @@ export function openNativeDb(dbPath: string): Database.Database {
 export function validateDb(db: Database.Database): DbValidation {
   const rows = db.pragma('integrity_check') as { integrity_check: string }[];
   const integrity = rows[0]?.integrity_check ?? 'unknown';
-  let schemaVersion = 0;
+  let schemaVersion: number;
   try {
     const row = db
       .prepare('SELECT MAX(version) AS version FROM schema_version')
@@ -289,13 +289,27 @@ function tryRestore(
       restoreInfo: {
         from,
         path: candidatePath,
-        when: when ?? new Date().toISOString(),
+        // rodante: mtime real del archivo; timestamped: timestamp del nombre.
+        when: when ?? rodanteWhen(candidatePath),
         lostWindowMs: lostWindowMs(candidatePath),
       },
     };
   } catch (err) {
     backupsTried.push({ path: candidatePath, reason: toMessage(err) });
     return null;
+  }
+}
+
+/**
+ * when del backup rodante: mtime del archivo (cuándo se escribió por última
+ * vez), no "ahora" — el aviso de restauración mostraría una hora falsa
+ * (review MINOR). Fallback a now si el stat falla.
+ */
+function rodanteWhen(rodantePath: string): string {
+  try {
+    return fs.statSync(rodantePath).mtime.toISOString();
+  } catch {
+    return new Date().toISOString();
   }
 }
 
@@ -409,7 +423,7 @@ export function adoptOrFresh(
 ): AdoptResult {
   const candidates: { path: string; when: string }[] = [];
   if (fs.existsSync(rodantePath)) {
-    candidates.push({ path: rodantePath, when: new Date().toISOString() });
+    candidates.push({ path: rodantePath, when: rodanteWhen(rodantePath) });
   }
   for (const file of listTimestampedBackups(backupsDir)) {
     candidates.push({ path: path.join(backupsDir, file), when: whenFromName(file) });

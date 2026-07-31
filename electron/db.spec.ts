@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import Database from 'better-sqlite3';
 import {
   openNativeDb,
   validateDb,
@@ -535,6 +534,29 @@ describe('adoptOrFresh', () => {
 
     expect(result.status).toBe('fresh');
     expect(fs.existsSync(dbPath)).toBe(true);
+  });
+
+  it('usa el mtime del rodante como when al adoptar (no "ahora")', () => {
+    const dir = tmpDir();
+    const dbPath = path.join(dir, 'userData', 'tienda-app.db');
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    const docs = docsRoot(dir);
+    const backups = path.join(docs, 'backups');
+    fs.mkdirSync(backups, { recursive: true });
+    const rodante = path.join(docs, 'tienda-app.db');
+    createValidDb(rodante, 2, 16);
+    const past = new Date('2026-06-02T14:07:00Z');
+    fs.utimesSync(rodante, past, past);
+
+    const result = adoptOrFresh(dbPath, rodante, backups);
+
+    expect(result.status).toBe('adopted');
+    const mtime = fs.statSync(rodante).mtime.toISOString();
+    expect(result.restoreInfo?.when).toBe(mtime);
+    // ISO ordena cronológicamente: el when es del pasado, no "ahora".
+    expect((result.restoreInfo?.when ?? '') < new Date().toISOString()).toBe(
+      true,
+    );
   });
 });
 
