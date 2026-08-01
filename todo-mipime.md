@@ -2,13 +2,72 @@
 
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
-> Branch: `feature/auth-y-pages`
-> Tests: **392 / 34 test files** (↑ desde 375)
-> Última actualización: 2026-07-26
+> Branch: `main`
+> Tests: **689 / 43 test files** (web) + **136 / 4** (electron)
+> Última actualización: 2026-07-31
+
+---
+
+## 🔴 Alta Prioridad — Backlog SDD `native-db-resilience` (post-merge)
+
+> Trabajo pendiente registrado al cerrar el SDD native-db-resilience (merge a main `94bc153`).
+> Foco actual: **DESKTOP primero**, después web, build/tooling, y el botón de exportar al final.
+
+### BACKLOG-1. Título app desync (DESKTOP)
+**Contexto:** `src/index.html:5` muestra `0.0.4-beta.test` pero la versión real es `0.1.9-beta` (el instalador dice 0.1.9-beta, la ventana/tab dice la vieja).
+**Fix:** sincronizar el title con la versión real (package.json).
+
+### BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)
+**Contexto:** backups nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
+**Fix:** resolución de colisión (sufijo/secuencia) en el nombre del snapshot.
+
+### BACKLOG-3. Cascade fatal stage siempre 'open' (DESKTOP)
+**Contexto:** en la cascada de recuperación, el stage del diagnóstico fatal siempre reporta 'open' aunque el fallo ocurra en otra etapa.
+**Fix:** reportar el stage real de la cascada en los diagnósticos.
+
+### BACKLOG-4. postinstall electron-builder install-app-deps (DESKTOP)
+**Contexto:** el build desktop depende de `@electron/rebuild` manual; falta el `postinstall` para automatizar la reinstalación de deps nativas.
+**Fix:** agregar script `postinstall: electron-builder install-app-deps`.
+
+### BACKLOG-5. revokeObjectURL timing (WEB)
+**Contexto:** en el export web, `URL.revokeObjectURL` se llama síncronamente después de `a.click()` — frágil en Safari viejo.
+**Fix:** `setTimeout(0)` antes de revocar.
+
+### BACKLOG-6. Duplicación formato `tienda_export_` (WEB/DESKTOP)
+**Contexto:** el nombre de export está duplicado entre `main.ts:55` y `backup.service._webExportName` (drift risk).
+**Fix:** fuente única para el nombre de export.
+
+### BACKLOG-7. Web fail-loud parity SqliteService (WEB)
+**Contexto:** SqliteService (web/OPFS) aún cae a `:memory:` silenciosamente ante fallo de apertura; el desktop ya es fail-loud.
+**Fix:** parity de comportamiento fail-loud en la versión web.
+
+### BACKLOG-8. Bundle budget 696kB vs 500kB (BUILD)
+**Contexto:** el bundle excede el budget de 500kB configurado (696kB actual).
+**Fix:** decisión: subir el budget o reducir el bundle.
+
+### BACKLOG-9. CI de PRs (TOOLING)
+**Contexto:** no hay CI que corra tests en los PRs.
+**Fix:** GitHub Actions con vitest (web) + test:electron.
+
+### BACKLOG-10. ng test roto TS2532 venta.service.spec (TOOLING)
+**Contexto:** `ng test` falla con TS2532 en venta.service.spec.
+**Fix:** arreglar el spec.
+
+### BACKLOG-11. 110 lint errors (TOOLING)
+**Contexto:** hay ~110 errores de eslint pendientes.
+**Fix:** limpiar o configurar excepciones.
+
+### BACKLOG-12. ~~Botón UI exportarRespaldo~~ (FINAL — bien lejitos)
+**Contexto:** la función `exportarRespaldo()` existe y está testeada, pero NO tiene caller en la UI.
+**Fix:** agregar el botón en HistorialPage. **Dejado al final del flujo a pedido del usuario.**
 
 ---
 
 ## ✅ Completado
+
+### ~~B4. Reabrir jornada~~ ✅
+**Commits:** `c41032b`, `a8c9010`
+Modal de reapertura de jornada para el mismo usuario con opción de cerrar (implementado en jornada lifecycle).
 
 ### ~~A1. ErrorAlert en POS — `_buscar()` traga errores~~ ✅
 **Commit:** `f8e72e8`
@@ -90,19 +149,10 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 ---
 
-## 🟡 Prioridad Media — Features a medio implementar
+## 🟢 Prioridad Baja — Pendientes otros
 
-### B4. Reabrir jornada
-**Contexto:** Si una jornada se cierra por error (o el `pending_close` la cierra sin querer), no hay forma de reabrirla.
-**Posible approach:** Botón "Reabrir" en HistorialPage para jornadas del día actual, solo admin. `UPDATE estado = 'abierta'`, limpia `hora_cierre`, `saldo_real`, `user_cierre_id`.
-
-### ~~B5. LoginPage sin tests~~ ✅
-**Commit:** 2026-07-26
-11 tests: render formulario, inputs, botón, credenciales válidas → navega /pos, credenciales inválidas → error, estado loading, limpieza de error.
-
-### ~~B6. ProductosPage sin tests~~ ✅
-**Commit:** 2026-07-26
-16 tests: carga inicial, tabla, búsqueda con debounce, estados vacío/loading/error, recargar, cantidad singular/plural, precio y stock.
+- **Push a origin** — main está 112 commits adelante de `origin/main` ~~(resuelto: merge a `94bc153`)~~
+- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio)
 
 ---
 
@@ -114,17 +164,11 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 ---
 
-## 🟢 Prioridad Baja — Pendientes otros
-
-- **Push a origin** — main está 112 commits adelante de `origin/main`
-- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio)
-
----
-
 ## Historial de cambios
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-07-31 | B4 reabrir jornada marcado ✅ (c41032b, a8c9010); backlog post-native-db-resilience agregado como Alta Prioridad; C7 al final, Pendientes otros encima | — |
 | 2026-07-26 | P1-P4: prod-improvements-julio-2026 — jornada refresh, dark mode numbers, TTL 7d, limpieza TODO (17 tests nuevos) | — |
 | 2026-07-26 | C5: Tests de 4 componentes + B5: LoginPage tests + B6: ProductosPage tests (50 tests nuevos) | — |
 | 2026-06-24 | C10: Modo oscuro + Material Icons — 4 PRs (infra/icons/dark-nav/dark-pages) | `40d7e84`, `f5e026a`, `0f7c2ad`, `d31f1f1` |
