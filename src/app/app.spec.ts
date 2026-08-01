@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { AuthService } from './services/auth.service';
+import { DbStatusService } from './services/db-status.service';
 import { DATABASE, type Database } from './services/database';
 import { hashPassword, generateSalt } from './services/hash-password';
 import { firstValueFrom } from 'rxjs';
@@ -181,6 +182,63 @@ describe('App component nav', () => {
 
     const ttlExpired = fixture.nativeElement.querySelector('app-ttl-expired');
     expect(ttlExpired).toBeTruthy();
+  });
+
+  it('debería renderizar app-db-error (y no router-outlet) cuando la DB reporta fatal', () => {
+    const dbStatus = TestBed.inject(DbStatusService);
+    dbStatus.setFatal({
+      appVersion: '0.1.8-beta',
+      platform: 'win32',
+      sqliteError: 'integrity check failed: database disk image is malformed',
+      stage: 'open',
+      backupsTried: [],
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-db-error')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('router-outlet')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('app-ttl-expired')).toBeFalsy();
+  });
+
+  it('debería priorizar app-db-error sobre app-ttl-expired cuando ambos aplican', () => {
+    localStorage.setItem('mipime_ttl_expired', 'true');
+    const dbStatus = TestBed.inject(DbStatusService);
+    dbStatus.setFatal({
+      appVersion: '0.1.8-beta',
+      platform: 'win32',
+      sqliteError: 'disk full',
+      stage: 'open',
+      backupsTried: [],
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-db-error')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-ttl-expired')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('router-outlet')).toBeFalsy();
+  });
+
+  it('debería renderizar app-restore-feedback JUNTO a router-outlet cuando hay restoreInfo (R4: no bloquea)', () => {
+    const dbStatus = TestBed.inject(DbStatusService);
+    dbStatus.setRestoreInfo({
+      from: 'timestamped',
+      path: '/backups/tienda_2026-06-02_1407.db',
+      when: '2026-06-02T14:07:00Z',
+      lostWindowMs: 0,
+    });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    // Superficie distinta de db-error (R4): el toast coexiste con la app.
+    expect(
+      fixture.nativeElement.querySelector('app-restore-feedback'),
+    ).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-db-error')).toBeFalsy();
   });
 
   it('debería llamar a logout cuando se hace clic en el botón', async () => {

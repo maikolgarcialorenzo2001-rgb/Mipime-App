@@ -14,6 +14,12 @@ const VALID_INVOKE_CHANNELS: readonly string[] = [
   'app:getPlatform',
   'dialog:saveFile',
   'file:saveFile',
+  // DB nativa (T3): contrato IPC completo, 5 canales (AD-9).
+  'db:initialize',
+  'db:sql',
+  'db:import',
+  'db:backupNow',
+  'db:export',
 ];
 
 /**

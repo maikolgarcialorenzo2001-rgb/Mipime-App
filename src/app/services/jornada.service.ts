@@ -12,6 +12,7 @@ import type { VentaLote } from '../models/venta-lote';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 import { ProductoService } from './producto.service';
+import { BackupService } from './backup.service';
 
 @Injectable({
   providedIn: 'root',
@@ -21,6 +22,7 @@ export class JornadaService {
   private readonly _excelService = inject(ExcelService);
   private readonly _electronFileService = inject(ElectronFileService);
   private readonly _productoService = inject(ProductoService);
+  private readonly _backup = inject(BackupService);
 
   /** Señal compartida de la jornada abierta actual (null si no hay). */
   readonly jornadaAbierta = signal<Jornada | null>(null);
@@ -305,7 +307,15 @@ export class JornadaService {
     userId: number,
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
-    return this._ejecutarCierre(id, userId, arqueo);
+    const jornada = await this._ejecutarCierre(id, userId, arqueo);
+    // AD-7/T8: backup jornada-close AWAITED después del cierre (el snapshot
+    // incluye la jornada cerrada). Fallo trago y el cierre no se interrumpe (R6).
+    try {
+      await this._backup.backup('jornada-close');
+    } catch {
+      // R6: los fallos de backup no interrumpen el cierre de jornada.
+    }
+    return jornada;
   }
 
   /**

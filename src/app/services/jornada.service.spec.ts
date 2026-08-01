@@ -12,6 +12,7 @@ import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 import { ElectronFileService } from './electron-file.service';
 import { ProductoService } from './producto.service';
+import { BackupService } from './backup.service';
 import type { PerProductInvestment } from '../models';
 import { of } from 'rxjs';
 
@@ -51,6 +52,9 @@ let mockElectronFileService: {
   saveRange: ReturnType<typeof vi.fn>;
 };
 
+/** Shared mock for BackupService (T8) — resets in beforeEach. */
+let mockBackup: { backup: ReturnType<typeof vi.fn> };
+
 function createMockDb(): Database {
   return {
     sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
@@ -71,10 +75,13 @@ describe('JornadaService', () => {
       saveRange: vi.fn().mockResolvedValue(undefined),
     };
 
+    mockBackup = { backup: vi.fn().mockResolvedValue(undefined) };
+
     TestBed.configureTestingModule({
       providers: [
         JornadaService,
         { provide: DATABASE, useValue: mockDb },
+        { provide: BackupService, useValue: mockBackup },
         {
           provide: ExcelService,
           useValue: {
@@ -1307,6 +1314,77 @@ describe('JornadaService', () => {
 
       expect(resultado.total_merma).toBe(300);
       expect(resultado.saldo_esperado).toBe(4700);
+    });
+
+    describe('T8 — backup de jornada-close (AD-7)', () => {
+      const mockCierreExitoso = () =>
+        vi.mocked(mockDb.sql)
+          .mockResolvedValueOnce([]) // constructor: obtenerAbierta
+          .mockResolvedValueOnce([]) // ventas
+          .mockResolvedValueOnce([]) // movimientos
+          .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // SELECT monto_inicial + total_movimientos
+          .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+          .mockResolvedValueOnce([]) // SELECT productos
+          .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+          .mockResolvedValueOnce([]); // INSERT reporte
+
+      it('debería invocar backup("jornada-close") al cerrar (AD-7)', async () => {
+        mockCierreExitoso();
+
+        const service = TestBed.inject(JornadaService);
+        await firstValueFrom(service.cerrar(1, 1));
+
+        expect(mockBackup.backup).toHaveBeenCalledWith('jornada-close');
+      });
+
+      it('debería esperar el backup antes de resolver el cierre (AD-7: el snapshot incluye el cierre)', async () => {
+        mockCierreExitoso();
+        let releaseBackup!: () => void;
+        mockBackup.backup.mockReturnValue(
+          new Promise<void>((resolve) => (releaseBackup = resolve)),
+        );
+
+        const service = TestBed.inject(JornadaService);
+        const promise = firstValueFrom(service.cerrar(1, 1));
+
+        // Espera a que el cierre llegue al backup (los sql mocks resuelven
+        // en cadena de microtasks; vi.waitFor absorbe la secuencia).
+        await vi.waitFor(() => {
+          expect(mockBackup.backup).toHaveBeenCalledWith('jornada-close');
+        });
+
+        let settled = false;
+        promise.then(() => (settled = true));
+        await Promise.resolve();
+        expect(settled).toBe(false); // aún pendiente: el backup es awaited
+
+        releaseBackup();
+        const resultado = await promise;
+        expect(resultado.estado).toBe('cerrada');
+      });
+
+      it('debería cerrar igual aunque el backup falle (R6/AD-7: fallo no interrumpe)', async () => {
+        mockCierreExitoso();
+        mockBackup.backup.mockRejectedValue(new Error('ipc broken'));
+
+        const service = TestBed.inject(JornadaService);
+        const resultado = await firstValueFrom(service.cerrar(1, 1));
+
+        expect(resultado.estado).toBe('cerrada');
+        expect(mockBackup.backup).toHaveBeenCalledWith('jornada-close');
+      });
+
+      it('no debería invocar backup si el cierre falla', async () => {
+        vi.mocked(mockDb.sql)
+          .mockResolvedValueOnce([]) // constructor
+          .mockResolvedValueOnce([]) // ventas
+          .mockResolvedValueOnce([]) // movimientos
+          .mockRejectedValueOnce(new Error('boom')); // SELECT monto_inicial falla
+
+        const service = TestBed.inject(JornadaService);
+        await expect(firstValueFrom(service.cerrar(1, 1))).rejects.toThrow('boom');
+        expect(mockBackup.backup).not.toHaveBeenCalled();
+      });
     });
 
     it('saldo_esperado inicial debería ser monto_inicial sin merma', async () => {

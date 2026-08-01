@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+type InvokeFn = (channel: string, ...args: unknown[]) => Promise<unknown>;
+type VoidFn = (channel: string, ...args: unknown[]) => void;
+
 // Lift mock factories into hoisted scope so vi.mock can reference them
 const mockContextBridgeExpose = vi.hoisted(() => vi.fn());
 const mockIpcSend = vi.hoisted(() => vi.fn());
@@ -93,7 +96,7 @@ describe('preload', () => {
   it('should allow send on valid channel app:ready', async () => {
     const api = await getPreloadApi();
 
-    (api.send as Function)('app:ready', { data: 'test' });
+    (api.send as VoidFn)('app:ready', { data: 'test' });
 
     expect(mockIpcSend).toHaveBeenCalledWith('app:ready', { data: 'test' });
   });
@@ -101,7 +104,16 @@ describe('preload', () => {
   it('should reject send on invalid channel', async () => {
     const api = await getPreloadApi();
 
-    (api.send as Function)('invalid:channel', 'payload');
+    (api.send as VoidFn)('invalid:channel', 'payload');
+
+    expect(mockIpcSend).not.toHaveBeenCalled();
+  });
+
+  it('should NOT allow send on db:* channels (invoke-only, S5)', async () => {
+    const api = await getPreloadApi();
+
+    (api.send as VoidFn)('db:initialize', 'payload');
+    (api.send as VoidFn)('db:sql', { query: 'SELECT 1' });
 
     expect(mockIpcSend).not.toHaveBeenCalled();
   });
@@ -110,7 +122,7 @@ describe('preload', () => {
     it('should allow invoke on app:getVersion channel', async () => {
       const api = await getPreloadApi();
 
-      await (api.invoke as Function)('app:getVersion');
+      await (api.invoke as InvokeFn)('app:getVersion');
 
       expect(mockIpcInvoke).toHaveBeenCalledWith('app:getVersion');
     });
@@ -118,7 +130,7 @@ describe('preload', () => {
     it('should allow invoke on app:getPlatform channel', async () => {
       const api = await getPreloadApi();
 
-      await (api.invoke as Function)('app:getPlatform');
+      await (api.invoke as InvokeFn)('app:getPlatform');
 
       expect(mockIpcInvoke).toHaveBeenCalledWith('app:getPlatform');
     });
@@ -126,7 +138,7 @@ describe('preload', () => {
     it('should allow invoke on file:saveFile channel', async () => {
       const api = await getPreloadApi();
 
-      await (api.invoke as Function)('file:saveFile', {
+      await (api.invoke as InvokeFn)('file:saveFile', {
         base64: 'SGVsbG8gV29ybGQ=',
         filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
       });
@@ -140,7 +152,7 @@ describe('preload', () => {
     it('should allow invoke on dialog:saveFile channel', async () => {
       const api = await getPreloadApi();
 
-      await (api.invoke as Function)('dialog:saveFile', {
+      await (api.invoke as InvokeFn)('dialog:saveFile', {
         defaultPath: 'reporte.xlsx',
       });
 
@@ -149,17 +161,67 @@ describe('preload', () => {
       });
     });
 
+    it('should allow invoke on db:initialize channel', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('db:initialize');
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('db:initialize');
+    });
+
+    it('should allow invoke on db:sql channel with query and params', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('db:sql', {
+        query: 'SELECT ? AS v',
+        params: [42],
+      });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('db:sql', {
+        query: 'SELECT ? AS v',
+        params: [42],
+      });
+    });
+
+    it('should allow invoke on db:import channel with file payload', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('db:import', { file: null });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('db:import', { file: null });
+    });
+
+    it('should allow invoke on db:backupNow channel with trigger', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('db:backupNow', {
+        trigger: 'jornada-close',
+      });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('db:backupNow', {
+        trigger: 'jornada-close',
+      });
+    });
+
+    it('should allow invoke on db:export channel', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('db:export');
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('db:export');
+    });
+
     it('should reject invoke on unknown channels', async () => {
       const api = await getPreloadApi();
 
-      await expect((api.invoke as Function)('any:channel')).rejects.toThrow('Invalid channel');
+      await expect((api.invoke as InvokeFn)('any:channel')).rejects.toThrow('Invalid channel');
       expect(mockIpcInvoke).not.toHaveBeenCalled();
     });
 
     it('should reject invoke on send-only channel app:ready', async () => {
       const api = await getPreloadApi();
 
-      await expect((api.invoke as Function)('app:ready')).rejects.toThrow('Invalid channel');
+      await expect((api.invoke as InvokeFn)('app:ready')).rejects.toThrow('Invalid channel');
       expect(mockIpcInvoke).not.toHaveBeenCalled();
     });
   });
@@ -168,7 +230,17 @@ describe('preload', () => {
     const api = await getPreloadApi();
     const callback = vi.fn();
 
-    (api.on as Function)('any:channel', callback);
+    (api.on as VoidFn)('any:channel', callback);
+
+    expect(mockIpcOn).not.toHaveBeenCalled();
+  });
+
+  it('should NOT register on listeners for db:* channels (invoke-only, S5)', async () => {
+    const api = await getPreloadApi();
+    const callback = vi.fn();
+
+    (api.on as VoidFn)('db:sql', callback);
+    (api.on as VoidFn)('db:backupNow', callback);
 
     expect(mockIpcOn).not.toHaveBeenCalled();
   });
@@ -176,7 +248,7 @@ describe('preload', () => {
   it('should delegate removeAllListeners to ipcRenderer', async () => {
     const api = await getPreloadApi();
 
-    (api.removeAllListeners as Function)('app:ready');
+    (api.removeAllListeners as VoidFn)('app:ready');
 
     expect(mockIpcRemoveAll).toHaveBeenCalledWith('app:ready');
   });
