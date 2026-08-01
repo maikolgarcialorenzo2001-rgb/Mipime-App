@@ -3,7 +3,7 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main`
-> Tests: **689 / 43 test files** (web) + **136 / 4** (electron)
+> Tests: **697 / 43 test files** (web) + **136 / 4** (electron)
 > Última actualización: 2026-08-01
 
 ---
@@ -16,7 +16,11 @@
 ### ~~BACKLOG-1. Título app desync (DESKTOP)~~ ✅
 **Contexto:** `src/index.html:5` mostraba `0.0.4-beta.test` pero la versión real es `0.1.9-beta` (el instalador dice 0.1.9-beta, la ventana/tab dice la vieja).
 **Fix:** sincronizar el title con la versión real (package.json).
-**Commit:** `b19cb21` — title → `Tienda-App 0.1.10-beta` (resuelto junto al bump).
+**Resuelto en dos pasos:** `b19cb21` (bump manual a 0.1.10-beta) + **branch `version-sync-feature` (0.1.12-beta)**: sistema de sync automático — `package.json#version` es fuente única; `scripts/sync-version.mjs` genera `src/app/version.ts` y actualiza el `<title>`, `src/main.ts` setea `document.title` en runtime, badge `vX.Y.Z-beta` en el nav. Ya no se edita el title a mano. Ver `VERSIONING.md`.
+
+### BACKLOG-1b. `ng test` roto por TS2532 (TOOLING)
+**Contexto:** `ng test` falla a nivel build con TS2532 en `venta.service.spec.ts` (`updateJornada![1]` bajo `noUncheckedIndexedAccess`, commit `f52caf5`). El suite verde solo corre con `npx vitest run` (`disableTypeChecking: true`). El fix existe en `feat/seed-productos-reales` (`ca76a83`) pero aún no está en `main`.
+**Fix:** mergear el fix de `venta.service.spec.ts` a `main` (viene con la branch del seed).
 
 ### BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)
 **Contexto:** backups nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
