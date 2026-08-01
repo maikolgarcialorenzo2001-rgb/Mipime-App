@@ -153,9 +153,8 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 ## 🟢 Prioridad Baja — Pendientes otros
 
 - ✅ **Sync con origin/main** — `main` == `origin/main` (0 adelante / 0 atrás), verificado 2026-08-01
-- **betatest-features** — local atrasada 4 commits de `origin/betatest-features` (double-submit guard, scroll refresh, test fixes: `0a14327`, `e0f24ac`, `552a8b5`, `b349413`) — falta pull/merge
-- **electron/auto-save-excel** — local adelante 4 commits sin pushear (ElectronFileService en login/app-nav/historial + auto-save en JornadaService: `4666fef`–`bdba941`)
-- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio). Setup presente: `capacitor.config.ts` + deps `@capacitor/*@8.4.2` + scripts `cap:*` (remote `mobile-capacitor` marca Fase 3 complete)
+- **feat/seed-productos-reales** — branch activa con 4 commits NO integrados a main (seed 74 productos reales + fix TS2532 venta spec + migración specs TestBed/DI + skip native rebuild): `358eb93`, `ca76a83`, `6bd9e31`, `1654773`. Tracking local creado 2026-08-01 — pendiente merge/PR
+- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio). Setup presente: `capacitor.config.ts` + deps `@capacitor/*@8.4.2` + scripts `cap:*`
 
 ---
 
@@ -171,7 +170,8 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
-| 2026-08-01 | TODO sync vs remote: BACKLOG-7 y BACKLOG-10 ✅ (verificado en código); main == origin/main (0/0); ramas betatest-features (behind 4) y electron/auto-save-excel (ahead 4) anotadas; Capacitor setup documentado | — |
+| 2026-08-01 | Limpieza de ramas: 11 remotes + 7 locales obsoletas eliminadas (todo contenido ya en main); `feat/seed-productos-reales` traída a local con tracking; ruta auto-save Excel unificada a `Documents/Tienda - App/Tienda IPVE` | `e6243a8`, `189e951` |
+| 2026-08-01 | TODO sync vs remote: BACKLOG-7 ✅, BACKLOG-10 revertido a pendiente (fix solo en branch); main == origin/main (0/0); ramas betatest-features (behind 4) y electron/auto-save-excel (ahead 4) anotadas; Capacitor setup documentado | — |
 | 2026-07-31 | B4 reabrir jornada marcado ✅ (c41032b, a8c9010); backlog post-native-db-resilience agregado como Alta Prioridad; C7 al final, Pendientes otros encima | — |
 | 2026-07-31 | BACKLOG-1 (título desync) ✅ con bump a 0.1.10-beta (`b19cb21`) | `b19cb21` |
 | 2026-07-26 | P1-P4: prod-improvements-julio-2026 — jornada refresh, dark mode numbers, TTL 7d, limpieza TODO (17 tests nuevos) | — |
