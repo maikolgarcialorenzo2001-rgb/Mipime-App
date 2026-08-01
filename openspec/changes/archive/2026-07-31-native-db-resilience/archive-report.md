@@ -14,7 +14,6 @@
 | Verify Verdicts | ✅ Slice-5 APPROVE (final gate); slice-2 REQUEST_CHANGES resolved via review fixes |
 | Installer Smoke | ✅ 0.1.9-beta built and smoke-tested by user; backups verified OK |
 | Source Code | ✅ Untouched by archive (docs-only commit) |
-
 ## Implementation vs Spec Delta
 
 | Aspect | Spec Original | Implemented |
@@ -31,7 +30,7 @@
 |--------|--------|---------|
 | database-storage | Created | 11 requirements, 12 scenarios (new domain) |
 | db-backup | Created | 6 requirements, 7 scenarios (new domain) |
-| db-recovery | Created | 5 requirements, 6 scenarios (new domain) |
+| db-recovery | Created | 5 requirements, 7 scenarios (new domain) |
 
 Main specs: `openspec/specs/database-storage/spec.md`, `openspec/specs/db-backup/spec.md`, `openspec/specs/db-recovery/spec.md` (full-spec format per repo convention).
 
