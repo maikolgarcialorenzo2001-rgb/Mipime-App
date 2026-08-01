@@ -735,4 +735,12 @@ describe('InventarioPage', () => {
     expect(component.formError()).toBeNull();
     expect(component.procesando()).toBe(false);
   });
+
+  describe('responsive layout', () => {
+    it('debería tener container con max-w-7xl', () => {
+      fixture.detectChanges();
+      const container = fixture.nativeElement.querySelector('.max-w-7xl');
+      expect(container).toBeTruthy();
+    });
+  });
 });

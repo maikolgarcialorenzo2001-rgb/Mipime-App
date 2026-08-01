@@ -2,7 +2,7 @@
 # Docs: https://www.electron.build/configuration/configuration
 
 appId: com.mipime.cuentas
-productName: Tienda - App 0.0.5
+productName: Tienda - App
 copyright: Copyright © 2026 Mipime
 
 directories:
@@ -13,6 +13,7 @@ files:
   - dist-electron/main.js
   - dist-electron/preload.js
   - dist-electron/window-state.js
+  - dist-electron/db.js
   - dist/Mipime-Cuentas/browser/**/*
   - package.json
 
@@ -32,7 +33,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Tienda - App 0.0.5
+  shortcutName: Tienda - App
 
 mac:
   target:
@@ -44,7 +45,7 @@ mac:
   hardenedRuntime: true
 
 dmg:
-  title: Tienda - App 0.0.5
+  title: Tienda - App
 
 linux:
   target:

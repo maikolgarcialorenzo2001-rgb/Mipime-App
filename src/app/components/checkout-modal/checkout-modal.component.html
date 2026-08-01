@@ -6,7 +6,7 @@
   (keydown)="onKeydown($event)"
 >
   <div
-    class="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
+    class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
   >
     <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Confirmar venta</h3>
 
@@ -159,7 +159,7 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X ARS)</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
           <input
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
@@ -180,13 +180,55 @@
             (ngModelChange)="billeteRecibido.set($event)"
           />
         </div>
+        @if (estimadoDivisa(); as est) {
+          <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Estimado a pagar:</span>
+            <strong class="text-blue-700 dark:text-blue-300 ml-1">
+              {{ est | currency: divisaTipo() === 'USD' ? 'USD' : 'EUR': 'symbol': '1.2-2' }}
+            </strong>
+            <span class="text-gray-500 dark:text-gray-400 text-xs ml-1">
+              ({{ total() | currency: 'ARS': 'symbol-narrow': '1.0-0' }} ÷ tasa {{ tasaCambio() }})
+            </span>
+          </div>
+        }
+        @if (!pagoSuficiente() && falta(); as f) {
+          <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-500 text-sm">warning</span>
+              <span class="text-red-700 dark:text-red-400 font-medium">Moneda insuficiente</span>
+            </div>
+            <p class="text-red-600 dark:text-red-300 text-xs mt-1">
+              El monto en divisa no cubre el total. Faltan
+              <strong>{{ f | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong>.
+              Completá con efectivo o aumentá el monto en divisa.
+            </p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Completar con efectivo <span class="text-red-500">*</span>
+              <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | currency:'ARS':'symbol-narrow':'1.0-0' }})</span>
+            </label>
+            <input
+              type="number"
+              class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              placeholder="{{ f }}"
+              [min]="f"
+              step="100"
+              [ngModel]="completacionEfectivo()"
+              (ngModelChange)="completacionEfectivo.set($event)"
+            />
+            @if (errorCompletacion(); as err) {
+              <p class="text-red-600 dark:text-red-400 text-xs mt-1">{{ err }}</p>
+            }
+          </div>
+        }
       </div>
     }
 
     @if (formaPago() === 'pendiente') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador <span class="text-red-500">*</span></label>
           <input
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
@@ -194,9 +236,12 @@
             [ngModel]="compradorNombre()"
             (ngModelChange)="compradorNombre.set($event)"
           />
+          @if (formaPago() === 'pendiente' && compradorNombre().trim().length === 0) {
+            <p class="text-red-500 dark:text-red-400 text-xs mt-1">Campo obligatorio</p>
+          }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
@@ -204,6 +249,9 @@
             [ngModel]="autorizadoPor()"
             (ngModelChange)="autorizadoPor.set($event)"
           />
+          @if (formaPago() === 'pendiente' && autorizadoPor().trim().length === 0) {
+            <p class="text-red-500 dark:text-red-400 text-xs mt-1">Campo obligatorio</p>
+          }
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
@@ -221,7 +269,7 @@
     @if (formaPago() === 'cuenta_cosas') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
@@ -229,6 +277,9 @@
             [ngModel]="autorizadoPor()"
             (ngModelChange)="autorizadoPor.set($event)"
           />
+          @if (formaPago() === 'cuenta_cosas' && autorizadoPor().trim().length === 0) {
+            <p class="text-red-500 dark:text-red-400 text-xs mt-1">Campo obligatorio</p>
+          }
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
@@ -265,6 +316,19 @@
             </span>
           }
         </div>
+        @if (saldoInsuficienteVuelto()) {
+          <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-500 text-sm">account_balance</span>
+              <span class="font-medium">Saldo insuficiente en caja</span>
+            </div>
+            <p class="text-xs mt-1">
+              El vuelto de ${{ vuelto()! | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              supera el saldo disponible en caja (${{ saldoEnCaja() | currency:'ARS':'symbol-narrow':'1.0-0' }}).
+              Reducí el billete o elegí otra forma de pago.
+            </p>
+          </div>
+        }
       }
     }
 
@@ -282,7 +346,7 @@
       <button
         type="button"
         class="flex-1 cursor-pointer rounded-lg bg-green-600 dark:bg-green-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[48px]"
-        [disabled]="formaPago() === 'divisas' && (tasaCambio() == null || tasaCambio()! <= 0 || billeteRecibido() == null || billeteRecibido()! <= 0)"
+        [disabled]="!formularioValidoConSaldo()"
         (click)="onConfirmar()"
       >
         <span class="inline-flex items-center gap-1.5">

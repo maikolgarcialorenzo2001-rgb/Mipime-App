@@ -1,8 +1,13 @@
 <app-nav />
 <main class="min-h-screen pt-16 px-2 lg:px-4 bg-gray-50 dark:bg-gray-950">
-  @if (ttlExpired()) {
+  @if (dbStatus.fatal()) {
+    <app-db-error />
+  } @else if (ttlExpired()) {
     <app-ttl-expired />
-  } @else {
+  }   @else {
     <router-outlet />
+  }
+  @if (dbStatus.restoreInfo()) {
+    <app-restore-feedback />
   }
 </main>

@@ -6,12 +6,15 @@ export interface Jornada {
   monto_inicial: number;
   total_ventas: number;
   total_movimientos: number;
+  total_gastos?: number;
   saldo_esperado: number;
   saldo_real: number | null;
   estado: 'abierta' | 'cerrada';
   user_cierre_id: number | null;
   user_apertura_id: number | null;
   total_merma: number;
+  total_usd?: number;
+  total_eur?: number;
   created_at: string;
   updated_at: string;
 }

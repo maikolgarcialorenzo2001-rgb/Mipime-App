@@ -1,13 +1,18 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { from, map, Observable, switchMap, tap } from 'rxjs';
+import { from, firstValueFrom, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
+import { ElectronFileService } from './electron-file.service';
 import type { Jornada, JornadaReporte } from '../models';
 import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { VentaLote } from '../models/venta-lote';
+import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
+import { ProductoService } from './producto.service';
+import { BackupService } from './backup.service';
 
 @Injectable({
   providedIn: 'root',
@@ -15,6 +20,9 @@ import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 export class JornadaService {
   private readonly _db = inject(DATABASE);
   private readonly _excelService = inject(ExcelService);
+  private readonly _electronFileService = inject(ElectronFileService);
+  private readonly _productoService = inject(ProductoService);
+  private readonly _backup = inject(BackupService);
 
   /** Señal compartida de la jornada abierta actual (null si no hay). */
   readonly jornadaAbierta = signal<Jornada | null>(null);
@@ -22,6 +30,15 @@ export class JornadaService {
   /** Total en caja calculado: monto_inicial + efectivo + ingresos_extra - gastos. */
   readonly totalEnCaja = signal(0);
 
+  /**
+   * Verifica si el saldo en caja alcanza para un monto de egreso.
+   * @param monto - Monto a verificar
+   * @returns true si saldo >= monto (o monto <= 0 → true, ingresos no se bloquean)
+   */
+  saldoSuficientePara(monto: number): boolean {
+    if (monto <= 0) return true;
+    return this.totalEnCaja() >= monto;
+  }
   /** `true` mientras se carga la jornada por primera vez o se refresca. */
   readonly jornadaCargando = signal(true);
 
@@ -35,42 +52,79 @@ export class JornadaService {
    */
   registrarMovimiento(
     jornadaId: number,
-    tipo: 'gasto' | 'ingreso_extra',
+    tipo: 'gasto' | 'ingreso_extra' | 'compra_divisa',
     descripcion: string,
     monto: number,
+    divisa?: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number },
   ): Observable<Movimiento> {
-    return from(this._registrarMovimientoAsync(jornadaId, tipo, descripcion, monto));
+    return from(this._registrarMovimientoAsync(jornadaId, tipo, descripcion, monto, divisa));
   }
 
   private async _registrarMovimientoAsync(
     jornadaId: number,
-    tipo: 'gasto' | 'ingreso_extra',
+    tipo: 'gasto' | 'ingreso_extra' | 'compra_divisa',
     descripcion: string,
     monto: number,
+    divisa?: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number },
   ): Promise<Movimiento> {
-    if (!['gasto', 'ingreso_extra'].includes(tipo)) throw new Error('Tipo inválido');
+    if (!['gasto', 'ingreso_extra', 'compra_divisa'].includes(tipo)) throw new Error('Tipo inválido');
     if (!descripcion || descripcion.trim().length === 0) throw new Error('Descripción requerida');
     if (!monto || monto <= 0) throw new Error('Monto debe ser mayor a 0');
 
+    if (tipo === 'compra_divisa') {
+      if (!divisa || divisa.montoDivisa <= 0 || divisa.tasaCambio <= 0) {
+        throw new Error('Datos de divisa inválidos');
+      }
+    }
+
     const ahora = new Date().toISOString();
 
-    const movs = await this._db.sql<Movimiento>(
-      `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
-       VALUES (?, ?, ?, ?, ?) RETURNING *`,
-      [jornadaId, tipo, descripcion, monto, ahora],
-    );
+    await this._db.sql('BEGIN TRANSACTION');
+    try {
+      // Service guard: verificar saldo_esperado DENTRO de la transacción
+      if (tipo === 'gasto' || tipo === 'compra_divisa') {
+        const rows = await this._db.sql<{ saldo_esperado: number }>(
+          'SELECT saldo_esperado FROM jornadas WHERE id = ?',
+          [jornadaId],
+        );
+        const saldoActual = rows[0]?.saldo_esperado ?? 0;
+        if (saldoActual - monto < 0) {
+          throw new Error(`Saldo insuficiente en caja: $${saldoActual} < $${monto}`);
+        }
+      }
 
-    const ajuste = tipo === 'gasto' ? -monto : monto;
-    await this._db.sql(
-      `UPDATE jornadas
-       SET total_movimientos = total_movimientos + ?,
-           saldo_esperado = saldo_esperado + ?,
-           updated_at = ?
-       WHERE id = ?`,
-      [ajuste, ajuste, ahora, jornadaId],
-    );
+      let movs: Movimiento[];
+      if (tipo === 'compra_divisa' && divisa) {
+        movs = await this._db.sql<Movimiento>(
+          `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, divisa_tipo, monto_divisa, tasa_cambio, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+          [jornadaId, tipo, descripcion, monto, divisa.divisaTipo, divisa.montoDivisa, divisa.tasaCambio, ahora],
+        );
+      } else {
+        movs = await this._db.sql<Movimiento>(
+          `INSERT INTO movimientos (jornada_id, tipo, descripcion, monto, created_at)
+           VALUES (?, ?, ?, ?, ?) RETURNING *`,
+          [jornadaId, tipo, descripcion, monto, ahora],
+        );
+      }
 
-    return movs[0];
+      // compra_divisa reduces cash like a gasto
+      const ajuste = (tipo === 'gasto' || tipo === 'compra_divisa') ? -monto : monto;
+      await this._db.sql(
+        `UPDATE jornadas
+         SET total_movimientos = total_movimientos + ?,
+             saldo_esperado = saldo_esperado + ?,
+             updated_at = ?
+         WHERE id = ?`,
+        [ajuste, ajuste, ahora, jornadaId],
+      );
+
+      await this._db.sql('COMMIT');
+      return movs[0];
+    } catch (error) {
+      await this._db.sql('ROLLBACK');
+      throw error;
+    }
   }
 
   /**
@@ -107,13 +161,18 @@ export class JornadaService {
   }
 
   private async _calcularTotalEnCaja(j: Jornada): Promise<number> {
-    const ventas = await this._db.sql<{ total: number; forma_pago: string }>(
-      'SELECT total, forma_pago FROM ventas WHERE jornada_id = ?',
+    const ventas = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null; monto_divisa: number | null; tasa_cambio: number | null }>(
+      'SELECT total, forma_pago, completacion_efectivo, monto_divisa, tasa_cambio FROM ventas WHERE jornada_id = ?',
       [j.id],
     );
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const movimientos = await this._db.sql<{ tipo: string; monto: number }>(
       'SELECT tipo, monto FROM movimientos WHERE jornada_id = ?',
       [j.id],
@@ -124,7 +183,10 @@ export class JornadaService {
     const totalGastos = movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
-    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalCompraDivisa = movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
   }
 
   /**
@@ -157,12 +219,19 @@ export class JornadaService {
     const hora = ahora.toLocaleTimeString();
     const iso = ahora.toISOString();
 
-    // Calcular saldo_real = monto_inicial + total_ventas_efectivo + total_movimientos
-    const ventasJornada = await this._db.sql<{ total: number }>(
-      `SELECT COALESCE(SUM(total), 0) as total FROM ventas WHERE jornada_id = ? AND forma_pago = 'efectivo'`,
+    // Calcular saldo_real = monto_inicial + efectivo_en_caja + total_movimientos
+    const ventasJornada = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null; monto_divisa: number | null; tasa_cambio: number | null }>(
+      'SELECT total, forma_pago, completacion_efectivo, monto_divisa, tasa_cambio FROM ventas WHERE jornada_id = ?',
       [jornada.id],
     );
-    const totalVentasEfectivo = ventasJornada[0]?.total ?? 0;
+    const totalVentasEfectivo = ventasJornada.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo + jornada.total_movimientos;
 
     await this._db.sql(
@@ -172,6 +241,28 @@ export class JornadaService {
        WHERE id = ?`,
       [hora, saldoRealCalculado, usuario.id, iso, jornada.id],
     );
+
+    // Generar y guardar Excel para la jornada auto-cerrada
+    const datos = await this._recolectarDatosJornada(jornada.id, usuario.id);
+    const base64 = await this._generarYGuardarExcel(jornada, {
+      ventas: datos.ventas,
+      movimientos: datos.movimientos,
+      stockMovimientos: datos.stockMovimientos,
+      ventaLotes: datos.ventaLotes,
+      productosMap: datos.productosMap,
+      totalCosto: datos.totalCosto,
+      userCierreNombre: datos.userCierreNombre,
+      cuentaCosas: datos.cuentaCosas,
+      arqueo: datos.arqueo,
+      inversionPorProducto: datos.inversionPorProducto,
+      totalUsd: datos.totalUsd,
+      totalEur: datos.totalEur,
+    });
+
+    // Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    if (this._electronFileService.isElectronPackaged) {
+      await this._electronFileService.saveIndividual(base64, jornada);
+    }
 
     this.jornadaAbierta.set(null);
     return null;
@@ -193,7 +284,10 @@ export class JornadaService {
       ),
     ).pipe(
       map((rows) => rows[0]),
-      tap((j) => this.jornadaAbierta.set(j)),
+      tap((j) => {
+        this.jornadaAbierta.set(j);
+        this.totalEnCaja.set(montoInicial);
+      }),
     );
   }
 
@@ -201,19 +295,77 @@ export class JornadaService {
    * 1. Verifica que el usuario sea admin
    * 2. Ejecuta el cierre (UPDATE → arqueo → SELECT → Excel → reporte)
    */
-  cerrar(id: number, saldoReal: number, userId: number, arqueo?: ArqueoCajaEntry[]): Observable<Jornada> {
-    return from(this._cerrarAsync(id, saldoReal, userId, arqueo)).pipe(
+  cerrar(id: number, userId: number, arqueo?: ArqueoCajaEntry[]): Observable<Jornada> {
+    return from(this._cerrarAsync(id, userId, arqueo)).pipe(
       tap(() => this.jornadaAbierta.set(null)),
     );
   }
 
   private async _cerrarAsync(
     id: number,
-    saldoReal: number,
     userId: number,
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
-    return this._ejecutarCierre(id, saldoReal, userId, arqueo);
+    const jornada = await this._ejecutarCierre(id, userId, arqueo);
+    // AD-7/T8: backup jornada-close AWAITED después del cierre (el snapshot
+    // incluye la jornada cerrada). Fallo trago y el cierre no se interrumpe (R6).
+    try {
+      await this._backup.backup('jornada-close');
+    } catch {
+      // R6: los fallos de backup no interrumpen el cierre de jornada.
+    }
+    return jornada;
+  }
+
+  /**
+   * Genera y guarda el Excel de una jornada (debe estar cerrada).
+   * Recibe la jornada + los datos ya recolectados, genera Excel, guarda en jornada_reportes.
+   * No consulta la DB — el caller pasa los datos.
+   */
+  private async _generarYGuardarExcel(
+    jornada: Jornada,
+    datos: {
+      ventas: VentaConDetalles[];
+      movimientos: Movimiento[];
+      stockMovimientos: StockMovimiento[];
+      ventaLotes: VentaLote[];
+      productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
+      totalCosto: number;
+      userCierreNombre: string | null;
+      cuentaCosas: CuentaCosa[];
+      arqueo: ArqueoCajaEntry[];
+      inversionPorProducto: Map<number, number>;
+      totalUsd: number;
+      totalEur: number;
+    },
+  ): Promise<string> {
+    const iso = new Date().toISOString();
+
+    const base64 = this._excelService.generarExcelJornada({
+      jornada,
+      ventas: datos.ventas,
+      movimientos: datos.movimientos,
+      stockMovimientos: datos.stockMovimientos,
+      ventaLotes: datos.ventaLotes,
+      productosMap: datos.productosMap,
+      totalCosto: datos.totalCosto,
+      userCierreNombre: datos.userCierreNombre,
+      cuentaCosas: datos.cuentaCosas,
+      arqueo: datos.arqueo,
+      inversionPorProducto: datos.inversionPorProducto,
+      total_usd: datos.totalUsd,
+      total_eur: datos.totalEur,
+    });
+
+    const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
+
+    await this._db.sql(
+      `INSERT INTO jornada_reportes (jornada_id, content_type, content_base64, filename, created_at)
+       VALUES (?, 'excel', ?, ?, ?)`,
+      [jornada.id, base64, filename, iso],
+    );
+
+    return base64;
   }
 
   /**
@@ -226,7 +378,6 @@ export class JornadaService {
    */
   private async _ejecutarCierre(
     id: number,
-    saldoReal: number,
     userId: number,
     arqueo?: ArqueoCajaEntry[],
   ): Promise<Jornada> {
@@ -263,18 +414,43 @@ export class JornadaService {
     );
     const montoInicial = jornadaRow[0]?.monto_inicial ?? 0;
     const totalMovimientos = jornadaRow[0]?.total_movimientos ?? 0;
-    const totalVentasEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalVentasEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const saldoRealCalculado = montoInicial + totalVentasEfectivo + totalMovimientos;
+
+    // 3b. Calcular totales de divisas desde ventas y compra_divisa
+    const totalUsdVentas = ventas
+      .filter((v) => v.divisa_tipo === 'USD')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0);
+    const totalEurVentas = ventas
+      .filter((v) => v.divisa_tipo === 'EUR')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0);
+    const totalUsdCompras = movimientos
+      .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'USD')
+      .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalEurCompras = movimientos
+      .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'EUR')
+      .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalUsd = totalUsdVentas + totalUsdCompras;
+    const totalEur = totalEurVentas + totalEurCompras;
+
+    // 3c. Recalcular total_merma desde los movimientos reales (cubre mermas de almacén que no actualizaron el campo incrementalmente)
+    const totalMermaRecalculado = await this.calcularTotalMerma(id);
 
     // 4. Cerrar la jornada PRIMERO (UPDATE antes de generar Excel)
     const result = await this._db.sql<Jornada>(
       `UPDATE jornadas
-       SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada', updated_at = ?
+       SET hora_cierre = ?, saldo_real = ?, user_cierre_id = ?, estado = 'cerrada',
+           total_usd = ?, total_eur = ?, total_merma = ?, updated_at = ?
        WHERE id = ?
        RETURNING *`,
-      [hora, saldoRealCalculado, userId, iso, id],
+      [hora, saldoRealCalculado, userId, totalUsd, totalEur, totalMermaRecalculado, iso, id],
     );
     if (result.length === 0) throw new Error('Jornada no encontrada');
     const jornada = result[0];
@@ -292,13 +468,13 @@ export class JornadaService {
       }
     }
 
-    // 5. Obtener productos para el mapa de nombres + precio_costo
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
-      'SELECT id, nombre, precio_costo FROM productos',
+    // 5. Obtener productos para el mapa de nombres + precio_costo + stock + precio_venta
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number; precio_venta: number | null }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop, precio_venta FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop, precio_venta: p.precio_venta ?? undefined });
     }
 
     // 5. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
@@ -361,9 +537,15 @@ export class JornadaService {
       );
     }
 
-    // 11. Generar Excel con estado fresco y nombres de producto
-    const base64 = this._excelService.generarExcelJornada({
-      jornada,
+    // 11. Obtener inversión por producto
+    const perProductData = await firstValueFrom(this._productoService.obtenerInversionPorProducto());
+    const inversionPorProducto = new Map<number, number>();
+    for (const item of perProductData) {
+      inversionPorProducto.set(item.producto_id, item.total_invertido);
+    }
+
+    // 12. Generar y guardar Excel via helper reutilizable
+    const base64 = await this._generarYGuardarExcel(jornada, {
       ventas: ventasConDetalles,
       movimientos,
       stockMovimientos,
@@ -372,17 +554,16 @@ export class JornadaService {
       totalCosto,
       userCierreNombre,
       cuentaCosas,
-      arqueo,
+      arqueo: arqueo ?? [],
+      inversionPorProducto,
+      totalUsd,
+      totalEur,
     });
 
-    const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
-
-    // 7. Almacenar en jornada_reportes
-    await this._db.sql(
-      `INSERT INTO jornada_reportes (jornada_id, content_type, content_base64, filename, created_at)
-       VALUES (?, 'excel', ?, ?, ?)`,
-      [id, base64, filename, iso],
-    );
+    // 13. Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    if (this._electronFileService.isElectronPackaged) {
+      await this._electronFileService.saveIndividual(base64, jornada);
+    }
 
     return jornada;
   }
@@ -410,6 +591,9 @@ export class JornadaService {
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
+              inversionPorProducto: datos.inversionPorProducto,
+              total_usd: datos.totalUsd,
+              total_eur: datos.totalEur,
             }),
           ),
         );
@@ -438,6 +622,9 @@ export class JornadaService {
         userCierreNombre: datos.userCierreNombre,
         cuentaCosas: datos.cuentaCosas,
         arqueo: datos.arqueo,
+        inversionPorProducto: datos.inversionPorProducto,
+        total_usd: datos.totalUsd,
+        total_eur: datos.totalEur,
       })),
     );
   }
@@ -451,11 +638,14 @@ export class JornadaService {
     movimientos: Movimiento[];
     stockMovimientos: StockMovimiento[];
     ventaLotes: import('../models/venta-lote').VentaLote[];
-    productosMap: Map<number, { nombre: string; precio_costo: number | null }>;
+    productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
     totalCosto: number;
     userCierreNombre: string | null;
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
     arqueo: ArqueoCajaEntry[];
+    inversionPorProducto: Map<number, number>;
+    totalUsd: number;
+    totalEur: number;
   }> {
     // 1. Obtener ventas con detalles de esta jornada
     const ventas = await this._db.sql<Venta>(
@@ -495,13 +685,13 @@ export class JornadaService {
       );
     }
 
-    // 3. Obtener productos para el mapa de nombres + precio_costo
-    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null }>(
-      'SELECT id, nombre, precio_costo FROM productos',
+    // 3. Obtener productos para el mapa de nombres + precio_costo + stock + precio_venta
+    const productos = await this._db.sql<{ id: number; nombre: string; precio_costo: number | null; stock_almacen: number; stock_shop: number; precio_venta: number | null }>(
+      'SELECT id, nombre, precio_costo, stock_almacen, stock_shop, precio_venta FROM productos',
     );
-    const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>();
+    const productosMap = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>();
     for (const p of productos) {
-      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo });
+      productosMap.set(p.id, { nombre: p.nombre, precio_costo: p.precio_costo, stock_almacen: p.stock_almacen, stock_shop: p.stock_shop, precio_venta: p.precio_venta ?? undefined });
     }
 
     // 4. Calcular costo total de productos vendidos (FIFO: desde venta_lotes)
@@ -562,6 +752,27 @@ export class JornadaService {
       detalles: detalles.filter((d) => d.venta_id === v.id),
     }));
 
+    // 9. Obtener inversión por producto
+    const perProductData = await firstValueFrom(this._productoService.obtenerInversionPorProducto());
+    const inversionPorProducto = new Map<number, number>();
+    for (const item of perProductData) {
+      inversionPorProducto.set(item.producto_id, item.total_invertido);
+    }
+
+    // 10. Calcular totales de divisas
+    const totalUsd = ventas
+      .filter((v) => v.divisa_tipo === 'USD')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0)
+      + movimientos
+        .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'USD')
+        .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+    const totalEur = ventas
+      .filter((v) => v.divisa_tipo === 'EUR')
+      .reduce((sum, v) => sum + (v.monto_divisa ?? 0), 0)
+      + movimientos
+        .filter((m) => m.tipo === 'compra_divisa' && m.divisa_tipo === 'EUR')
+        .reduce((sum, m) => sum + (m.monto_divisa ?? 0), 0);
+
     return {
       ventas: ventasConDetalles,
       movimientos,
@@ -572,6 +783,9 @@ export class JornadaService {
       userCierreNombre,
       cuentaCosas,
       arqueo,
+      inversionPorProducto,
+      totalUsd,
+      totalEur,
     };
   }
 
@@ -652,6 +866,9 @@ export class JornadaService {
               userCierreNombre: datos.userCierreNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
+              inversionPorProducto: datos.inversionPorProducto,
+              total_usd: datos.totalUsd,
+              total_eur: datos.totalEur,
             }),
           ),
         );
@@ -665,7 +882,14 @@ export class JornadaService {
   historial(limite = 30): Observable<Jornada[]> {
     return from(
       this._db.sql<Jornada>(
-        'SELECT * FROM jornadas ORDER BY fecha DESC, id DESC LIMIT ?',
+        `SELECT j.*, COALESCE(mg.total_gastos, 0) AS total_gastos
+         FROM jornadas j
+         LEFT JOIN (
+           SELECT jornada_id, SUM(monto) AS total_gastos
+           FROM movimientos WHERE tipo = 'gasto'
+           GROUP BY jornada_id
+         ) mg ON mg.jornada_id = j.id
+         ORDER BY j.fecha DESC, j.id DESC LIMIT ?`,
         [limite],
       ),
     );

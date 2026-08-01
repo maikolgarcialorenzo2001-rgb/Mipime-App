@@ -13,6 +13,7 @@ export interface VentaPayload {
   divisaTipo?: 'EUR' | 'USD';
   billeteRecibido?: number;
   tasaCambio?: number;
+  completacionEfectivo?: number;
   compradorNombre?: string;
   autorizadoPor?: string;
   descripcion?: string;
@@ -42,14 +43,9 @@ export class VentaService {
 
     const ahora = new Date().toISOString();
 
-    // Para divisas: total = billeteRecibido * tasaCambio
-    // Para otros: total = suma del carrito
-    let total: number;
-    if (payload.formaPago === 'divisas' && payload.billeteRecibido != null && payload.tasaCambio != null) {
-      total = payload.billeteRecibido * payload.tasaCambio;
-    } else {
-      total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
-    }
+    // Total siempre es la suma del carrito
+    // Para divisas, billete * tasa (+ completación) se validan en UI como >= total
+    const total = payload.items.reduce((sum, item) => sum + item.subtotal, 0);
 
     return from(
       this._ejecutar(
@@ -92,6 +88,20 @@ export class VentaService {
     await this._db.sql('BEGIN TRANSACTION');
 
     try {
+      // Service guard: verificar saldo_esperado antes de vuelto divisa
+      if (payload.formaPago === 'divisas') {
+        const vuelto = Math.max(0, (payload.billeteRecibido ?? 0) * (payload.tasaCambio ?? 0) - total);
+        if (vuelto > 0) {
+          const rows = await this._db.sql<{ saldo_esperado: number }>(
+            'SELECT saldo_esperado FROM jornadas WHERE id = ?',
+            [jornadaId],
+          );
+          const saldoActual = rows[0]?.saldo_esperado ?? 0;
+          if (saldoActual < vuelto) {
+            throw new Error(`Saldo insuficiente en caja para vuelto: $${saldoActual} < $${vuelto}`);
+          }
+        }
+      }
       // 1. Insertar venta con campos condicionales
       const columnasBase = ['jornada_id', 'fecha_hora', 'total', 'created_at', 'usuario_id', 'forma_pago'];
       const placeholdersBase = ['?', '?', '?', '?', '?', '?'];
@@ -131,6 +141,11 @@ export class VentaService {
           columnasExtra.push('descripcion');
           placeholdersExtra.push('?');
           valoresExtra.push(payload.descripcion);
+        }
+        if (payload.completacionEfectivo != null) {
+          columnasExtra.push('completacion_efectivo');
+          placeholdersExtra.push('?');
+          valoresExtra.push(payload.completacionEfectivo);
         }
       }
 
@@ -172,14 +187,22 @@ export class VentaService {
         );
       }
 
-      // 3. Actualizar jornada (incluye pendientes en saldo_esperado)
+      // 3. Solo lo que realmente entra (o sale) de la caja física
+      let efectivoEnCaja = 0;
+      if (payload.formaPago === 'efectivo') {
+        efectivoEnCaja = total;
+      } else if (payload.formaPago === 'divisas') {
+        const vuelto = (payload.billeteRecibido ?? 0) * (payload.tasaCambio ?? 0) - total;
+        efectivoEnCaja = (payload.completacionEfectivo ?? 0) - Math.max(0, vuelto);
+      }
+
       await this._db.sql(
         `UPDATE jornadas
          SET total_ventas = total_ventas + ?,
               saldo_esperado = saldo_esperado + ?,
               updated_at = ?
          WHERE id = ?`,
-        [total, total, ahora, jornadaId],
+        [total, efectivoEnCaja, ahora, jornadaId],
       );
 
       // 4. Consumir stock vía FIFO y registrar venta_lotes

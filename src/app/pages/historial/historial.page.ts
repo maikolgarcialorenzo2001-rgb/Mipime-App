@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -33,6 +34,7 @@ export interface DiaCalendario {
 })
 export class HistorialPage {
   private readonly _jornadaService = inject(JornadaService);
+  private readonly _electronFileService = inject(ElectronFileService);
 
   readonly jornadas = signal<Jornada[]>([]);
   readonly loading = signal(true);
@@ -220,22 +222,7 @@ export class HistorialPage {
     this._jornadaService.obtenerReporte(j.id).subscribe({
       next: (reporte) => {
         if (!reporte) return;
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        this._electronFileService.saveIndividual(reporte.content_base64, j);
       },
     });
   }
@@ -315,41 +302,11 @@ export class HistorialPage {
   }
 
   private _descargarBase64Rango(base64: string, desde: string, hasta: string): void {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `jornadas_${desde}_a_${hasta}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    this._electronFileService.saveRange(base64, desde, hasta);
   }
 
   private _descargarBase64(base64: string, month: Date): void {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `jornadas_${month.getFullYear()}_${String(month.getMonth() + 1).padStart(2, '0')}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    this._electronFileService.saveMonthly(base64, month.getFullYear(), month.getMonth());
   }
 
   private _cargarJornadas(): void {

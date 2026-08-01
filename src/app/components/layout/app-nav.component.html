@@ -246,7 +246,7 @@
 
       <div class="mb-4">
         <label for="monto-inicial-nav" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Monto inicial ($)
+          Fondo de caja
         </label>
         <input
           id="monto-inicial-nav"
@@ -255,43 +255,33 @@
           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-lg font-medium text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:bg-gray-900 placeholder-gray-400 dark:placeholder-gray-500"
           [class.border-red-400]="abrirError()"
           [class.dark:border-red-500]="abrirError()"
-          placeholder="Monto inicial"
+          placeholder="Fondo de caja"
           (input)="onMontoInicialChange($any($event.target).value)"
-          (keydown)="onModalKeydown($event)"
+          (keydown)="filtrarTecla($event)"
         />
+        @if (soloNumeros()) {
+          <p class="text-xs text-red-500 dark:text-red-400 mt-1 animate-pulse">Solo se permiten números</p>
+        }
       </div>
 
-      <div class="flex gap-3">
-        <button
-          type="button"
-          class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          [disabled]="abriendo()"
-          (click)="cerrarModalApertura()"
-        >
-          <span class="inline-flex items-center gap-1.5">
-            <span class="material-symbols-outlined leading-none text-sm">close</span>
-            Cancelar
+      <button
+        type="button"
+        class="w-full cursor-pointer rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 active:bg-emerald-800 dark:active:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="abriendo()"
+        (click)="confirmarApertura()"
+      >
+        @if (abriendo()) {
+          <span class="inline-flex items-center gap-2">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            Abriendo...
           </span>
-        </button>
-        <button
-          type="button"
-          class="flex-1 cursor-pointer rounded-lg bg-emerald-600 dark:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 dark:hover:bg-emerald-600 active:bg-emerald-800 dark:active:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          [disabled]="abriendo()"
-          (click)="confirmarApertura()"
-        >
-          @if (abriendo()) {
-            <span class="inline-flex items-center gap-2">
-              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-              Abriendo...
-            </span>
-          } @else {
-            <span class="inline-flex items-center gap-1.5">
-              <span class="material-symbols-outlined leading-none text-sm">play_arrow</span>
-              Iniciar
-            </span>
-          }
-        </button>
-      </div>
+        } @else {
+          <span class="inline-flex items-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-sm">play_arrow</span>
+            Iniciar
+          </span>
+        }
+      </button>
     </div>
   </div>
 }
@@ -338,8 +328,8 @@
               </span>
               <input
                 type="number"
-                min="0"
                 inputmode="numeric"
+                min="0"
                 [value]="arqueoForm()[denom]"
                 (input)="actualizarCantidad(denom, +$any($event.target).value)"
                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"

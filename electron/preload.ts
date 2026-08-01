@@ -13,6 +13,13 @@ const VALID_INVOKE_CHANNELS: readonly string[] = [
   'app:getVersion',
   'app:getPlatform',
   'dialog:saveFile',
+  'file:saveFile',
+  // DB nativa (T3): contrato IPC completo, 5 canales (AD-9).
+  'db:initialize',
+  'db:sql',
+  'db:import',
+  'db:backupNow',
+  'db:export',
 ];
 
 /**
@@ -20,8 +27,15 @@ const VALID_INVOKE_CHANNELS: readonly string[] = [
  */
 const VALID_ON_CHANNELS: readonly string[] = [];
 
+/**
+ * Synchronously query packaging status. Called once at module init so
+ * `isPackaged` is available as a static property on the exposed API.
+ */
+const isPackaged = ipcRenderer.sendSync('app:isPackaged') as boolean;
+
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  isPackaged,
 
   /** Send a one-way message to the main process on a validated channel. */
   send: (channel: string, ...args: unknown[]) => {

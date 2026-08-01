@@ -27,32 +27,65 @@ The system MUST create a new jornada with the owner's user ID when an admin open
 
 ### Requirement: Jornada Financial Calculations
 
-The system MUST calculate saldo_esperado considering all financial factors.
+The system MUST calculate cash-based balances (saldo_esperado at insert time, totalEnCaja and saldoRealCalculado at read time) by accounting for both `efectivo` ventas (full total) and `divisas` ventas (only their `completacion_efectivo` portion, COALESCE to 0). Other payment forms (`transferencia`, `pendiente`, `cuenta_cosas`) MUST NOT affect cash register totals.
 
-#### Scenario: Saldo esperado with all factors
+(Previously: Only `forma_pago === 'efectivo'` was counted; divisa ventas inflated saldo_esperado by their full total and were invisible to read-time cash calculations)
 
-- GIVEN a jornada with monto_inicial=10000
-- WHEN total_ventas=8000, total_gastos=500, total_merma=300
-- THEN saldo_esperado MUST be 10000 + 8000 - 500 - 300 = 17200
+#### Scenario: Efectivo sale
 
-#### Scenario: Saldo esperado without merma (backward compatibility)
+- GIVEN a sale of $3000 with `forma_pago = 'efectivo'`
+- WHEN the sale is registered
+- THEN `saldo_esperado += 3000`
+- AND read-time cash calculations include $3000
 
-- GIVEN a jornada with total_merma = NULL or 0
-- WHEN calculating saldo_esperado
-- THEN saldo_esperado = monto_inicial + total_ventas - total_gastos (no change)
+#### Scenario: Pure divisa sale (no cash completion)
+
+- GIVEN a sale of $5000 (10 USD × 500) with NO `completacion_efectivo`
+- WHEN the sale is registered
+- THEN `saldo_esperado += 0` (no cash entered the register)
+- AND read-time cash calculations show $0 from this sale
+
+#### Scenario: Mixed divisa+cash sale
+
+- GIVEN a sale of $5000 (7 USD × 700 = $4900) with `completacion_efectivo = $100`
+- WHEN the sale is registered
+- THEN `saldo_esperado += 100` (only the cash portion)
+- AND read-time cash calculations include $100 from completacion
+
+#### Scenario: Transferencia sale
+
+- GIVEN a sale of $2000 with `forma_pago = 'transferencia'`
+- WHEN the sale is registered
+- THEN `saldo_esperado += 0`
+- AND read-time cash calculations exclude this sale
+
+#### Scenario: Pendiente sale
+
+- GIVEN a sale of $1500 with `forma_pago = 'pendiente'`
+- WHEN the sale is registered
+- THEN `saldo_esperado += 0`
+- AND read-time cash calculations exclude this sale
 
 ### Requirement: Jornada Closure
 
-The system MUST close a jornada with complete financial data and Excel report.
+The system MUST close a jornada with complete financial data and Excel report. At closure, `saldo_real` MUST be calculated as `monto_inicial + totalEfectivoCash + totalMovimientos`, where `totalEfectivoCash` sums `efectivo.total` plus `divisas.completacion_efectivo` (COALESCE 0).
 
-#### Scenario: Close jornada generates Excel
+(Previously: saldo_real only summed `efectivo.total`, missing cash completacion from divisa ventas)
 
-- GIVEN an open jornada with sales, movements, and mermas
+#### Scenario: Close jornada with mixed payments
+
+- GIVEN an open jornada with $5000 monto_inicial, $3000 efectivo sale, $5000 divisa sale with $100 completacion, $0 movimientos
 - WHEN the admin confirms closure
-- THEN estado changes to 'cerrada'
-- AND hora_cierre, saldo_real, user_cierre_id are set
-- AND Excel report is generated including merma data
-- AND jornadaAbierta signal is set to null
+- THEN `saldo_real = 5000 + (3000 + 100) + 0 = 8100`
+- AND estado changes to 'cerrada'
+- AND Excel report is generated
+
+#### Scenario: Auto-cierre with mixed payments
+
+- GIVEN another user opens a jornada, a divisa sale with $200 completacion is recorded, and the current user opens the app
+- WHEN the system auto-closes the other user's jornada
+- THEN the auto-cierre SQL sums `efectivo.total + COALESCE(divisas.completacion_efectivo, 0)`
+- AND `saldo_real` includes the completacion amount
 
 ### Requirement: Jornada State Tracking
 
@@ -69,3 +102,71 @@ The system MUST track the jornada state via the `jornadaAbierta` signal.
 - GIVEN no jornada is open for today
 - WHEN jornadaAbierta is read
 - THEN it returns null
+
+### Requirement: Saldo en caja label
+
+The system MUST display "Saldo en caja" instead of "Saldo esperado" in the jornada summary card UI, reflecting that the value represents actual cash in the register.
+
+#### Scenario: Label shows "Saldo en caja"
+
+- GIVEN a jornada summary card is rendered
+- WHEN the UI shows the cash balance
+- THEN the label reads "Saldo en caja" and the value is `jornada().saldo_esperado`
+
+### Requirement: Venta model includes completacion_efectivo
+
+The `Venta` interface MUST include `completacion_efectivo?: number` so TypeScript code can access the field without type casts.
+
+#### Scenario: Access completacion_efectivo from venta object
+
+- GIVEN a venta object returned from the database where `completacion_efectivo` is present or NULL
+- WHEN TypeScript code accesses `v.completacion_efectivo`
+- THEN it compiles without errors and returns `number | undefined`
+
+### Requirement: Service guard — verificar saldo antes de egreso
+
+`JornadaService` MUST exponer `saldoSuficientePara(monto)` que compare `saldo_esperado - monto >= 0` dentro de una transacción explícita (BEGIN/COMMIT/ROLLBACK) y lanzar `Error` si el saldo es insuficiente.
+
+`_registrarMovimientoAsync` MUST invocar `saldoSuficientePara` DENTRO de una transacción BEGIN/COMMIT/ROLLBACK que envuelve guard + INSERT + UPDATE, ANTES de insertar movimientos de tipo `gasto` o `compra_divisa`. La validación usa `saldo_esperado` leído desde la DB (no el signal `totalEnCaja()`).
+
+#### Scenario: Gasto con saldo suficiente
+
+- GIVEN `saldo_esperado = 10000` y usuario intenta registrar gasto de $3000
+- WHEN `_registrarMovimientoAsync` ejecuta guard dentro de transacción
+- THEN el guard pasa y el movimiento se inserta normalmente
+
+#### Scenario: Gasto con saldo insuficiente
+
+- GIVEN `saldo_esperado = 2000` y usuario intenta registrar gasto de $3000
+- WHEN `_registrarMovimientoAsync` ejecuta guard
+- THEN el guard lanza `Error("Saldo insuficiente en caja")`, ROLLBACK, y NO se inserta el movimiento
+
+#### Scenario: Race condition — dos gastos simultáneos
+
+- GIVEN `saldo_esperado = 5000` y dos usuarios intentan gastar $3000 cada uno
+- WHEN ambos pasan el UI check simultáneamente
+- THEN el primer guard lee `saldo_esperado = 5000` dentro de su transacción, pasa, inserta, COMMIT con `saldo_esperado = 2000`
+- AND el segundo guard lee `saldo_esperado = 2000` dentro de su transacción, falla porque `2000 - 3000 < 0`, hace ROLLBACK
+- AND el primer gasto se registra, el segundo se rechaza con error
+
+#### Scenario: Merma sin validación de saldo
+
+- GIVEN `saldo_esperado = 100` y usuario registra merma de $500 (costo de inventario)
+- WHEN se llama `registrarMerma()`
+- THEN NO se invoca `saldoSuficientePara` — la merma se registra sin importar el saldo
+
+### Requirement: UI guard — deshabilitar botón si saldo insuficiente
+
+`jornada.page` MUST verificar `totalEnCaja()` signal antes de habilitar el botón de registrar gasto/compra_divisa. Usa el helper `saldoSuficientePara(monto)` para el cómputo reactivo. Si `totalEnCaja() < monto_ingresado`, el botón SHALL estar deshabilitado con tooltip "Saldo insuficiente en caja".
+
+#### Scenario: UI permite gasto con saldo suficiente
+
+- GIVEN `totalEnCaja() signal = 10000`, usuario ingresa monto gasto = $3000
+- WHEN el componente verifica `totalEnCaja() >= monto` via `saldoSuficientePara()`
+- THEN botón "Registrar gasto" está habilitado, sin tooltip
+
+#### Scenario: UI bloquea gasto con saldo insuficiente
+
+- GIVEN `totalEnCaja() signal = 2000`, usuario ingresa monto gasto = $3000
+- WHEN el componente verifica `totalEnCaja() < monto` via `saldoSuficientePara()`
+- THEN botón "Registrar gasto" está deshabilitado y tooltip "Saldo insuficiente en caja" es visible

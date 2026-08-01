@@ -9,7 +9,7 @@ import { JornadaSummaryCardComponent } from '../../components/jornada-summary-ca
 import type { Venta, DetalleVenta } from '../../models/venta';
 import type { Movimiento } from '../../models/movimiento';
 import type { StockMovimiento } from '../../models/stock-movimiento';
-import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
+
 
 @Component({
   selector: 'app-jornada-page',
@@ -33,55 +33,30 @@ export class JornadaPage {
   readonly detallesPorVenta = signal<Map<number, DetalleVenta[]>>(new Map());
 
   /** Movimiento form */
-  readonly tipo = signal<'gasto' | 'ingreso_extra'>('gasto');
+  readonly tipo = signal<'gasto' | 'ingreso_extra' | 'compra_divisa'>('gasto');
   readonly descripcion = signal('');
   readonly monto = signal(0);
+  readonly divisaTipo = signal<'USD' | 'EUR'>('USD');
+  readonly montoDivisa = signal(0);
+  readonly tasaCambio = signal(0);
+  readonly totalCup = computed(() => this.montoDivisa() * this.tasaCambio());
   readonly registrando = signal(false);
+
+  /** UI guard: deshabilitar botón si saldo en caja es insuficiente. */
+  readonly saldoInsuficiente = computed(() => {
+    const tipo = this.tipo();
+    if (tipo !== 'gasto' && tipo !== 'compra_divisa') return false;
+    const monto = tipo === 'compra_divisa' ? this.totalCup() : this.monto();
+    return !this.jornadaService.saldoSuficientePara(monto);
+  });
   readonly formError = signal<string | null>(null);
+  readonly soloNumeros = signal(false);
 
-  /** Modal de cierre */
-  readonly showCloseModal = signal(false);
-  readonly cerrando = signal(false);
-  readonly cerrarError = signal<string | null>(null);
-
-  /** Denomination form */
-  readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
-  readonly arqueoForm = signal<Record<number, number>>({
-    5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-  });
-  readonly showOptionalDenoms = signal(false);
-
-  readonly denominacionesVisibles = computed(() =>
-    this.showOptionalDenoms()
-      ? [...this.DENOMINACIONES]
-      : this.DENOMINACIONES.filter(d => d !== 1 && d !== 3),
-  );
-
-  readonly arqueoTotal = computed(() => {
-    const f = this.arqueoForm();
-    return this.denominacionesVisibles().reduce((sum, d) => sum + d * (f[d] ?? 0), 0);
-  });
-
-  readonly totalEnCaja = computed(() => {
-    const j = this.jornadaService.jornadaAbierta();
-    if (!j) return 0;
-    const totalEfectivo = this.ventasDelDia()
-      .filter(v => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
-    const totalIngresosExtra = this.movimientosDelDia()
-      .filter(m => m.tipo === 'ingreso_extra')
-      .reduce((sum, m) => sum + m.monto, 0);
-    const totalGastos = this.movimientosDelDia()
+  readonly totalGastos = computed(() =>
+    this.movimientosDelDia()
       .filter(m => m.tipo === 'gasto')
-      .reduce((sum, m) => sum + m.monto, 0);
-    return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
-  });
-
-  readonly diferencia = computed(() => {
-    return this.totalEnCaja() - this.arqueoTotal();
-  });
-
-  readonly usuario = this._authService.usuario;
+      .reduce((sum, m) => sum + m.monto, 0),
+  );
 
   constructor() {
     effect(() => {
@@ -159,21 +134,47 @@ export class JornadaPage {
     return this._authService.hasRole('admin');
   }
 
-  get puedeCerrar(): boolean {
-    const j = this.jornadaService.jornadaAbierta();
-    return j !== null && j.estado === 'abierta';
+  filtrarTecla(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab',
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'Home', 'End',
+      'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
   }
 
   registrarMovimiento(): void {
-    const desc = this.descripcion().trim();
-    const monto = this.monto();
+    const tipo = this.tipo();
+    const desc = tipo === 'compra_divisa'
+      ? `Compra ${this.divisaTipo()} ${this.montoDivisa()} @ ${this.tasaCambio()}`
+      : this.descripcion().trim();
 
-    if (!desc) {
+    if (tipo !== 'compra_divisa' && !desc) {
       this.formError.set('La descripción es requerida');
       return;
     }
 
-    if (monto <= 0) {
+    let monto = this.monto();
+    let divisa: { divisaTipo: 'USD' | 'EUR'; montoDivisa: number; tasaCambio: number } | undefined;
+
+    if (tipo === 'compra_divisa') {
+      if (this.montoDivisa() <= 0) {
+        this.formError.set('El monto en divisa debe ser mayor a 0');
+        return;
+      }
+      if (this.tasaCambio() <= 0) {
+        this.formError.set('La tasa de cambio debe ser mayor a 0');
+        return;
+      }
+      monto = this.totalCup();
+      divisa = { divisaTipo: this.divisaTipo(), montoDivisa: this.montoDivisa(), tasaCambio: this.tasaCambio() };
+    } else if (monto <= 0) {
       this.formError.set('El monto debe ser mayor a 0');
       return;
     }
@@ -184,113 +185,23 @@ export class JornadaPage {
     this.formError.set(null);
     this.registrando.set(true);
 
-    this.jornadaService.registrarMovimiento(j.id, this.tipo(), desc, monto).subscribe({
+    this.jornadaService.registrarMovimiento(j.id, tipo, desc, monto, divisa).subscribe({
       next: () => {
         this.registrando.set(false);
         this.descripcion.set('');
         this.monto.set(0);
+        this.divisaTipo.set('USD');
+        this.montoDivisa.set(0);
+        this.tasaCambio.set(0);
         this.tipo.set('gasto');
         this.jornadaService.refreshJornadaAbierta();
       },
       error: (err: unknown) => {
         this.registrando.set(false);
-        this.formError.set(err instanceof Error ? err.message : 'Error al registrar movimiento');
+        this.formError.set(err instanceof Error ? err.message : 'Error al registro');
       },
     });
   }
 
-  actualizarCantidad(denominacion: number, cantidad: number): void {
-    this.arqueoForm.update(f => ({ ...f, [denominacion]: cantidad }));
-  }
 
-  abrirModalCierre(): void {
-    this.cerrarError.set(null);
-    this.arqueoForm.set({
-      5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-    });
-    this.showOptionalDenoms.set(false);
-    this.showCloseModal.set(true);
-  }
-
-  cerrarModalCierre(): void {
-    this.showCloseModal.set(false);
-  }
-
-  confirmarCierre(): void {
-    const j = this.jornadaService.jornadaAbierta();
-    const uid = this.usuario()?.id;
-
-    if (!j || uid === undefined) return;
-
-    // Build arqueo entries from form (only entries with cantidad > 0)
-    const entries: ArqueoCajaEntry[] = [];
-    for (const d of this.denominacionesVisibles()) {
-      const cantidad = this.arqueoForm()[d] ?? 0;
-      if (cantidad > 0) {
-        entries.push({ denominacion: d, cantidad, subtotal: d * cantidad });
-      }
-    }
-
-    if (entries.length === 0) {
-      this.cerrarError.set('Ingresa la cantidad de al menos una denominación');
-      return;
-    }
-
-    const saldoReal = this.arqueoTotal();
-    this.cerrando.set(true);
-    this.cerrarError.set(null);
-
-    this.jornadaService.cerrar(j.id, saldoReal, uid, entries).subscribe({
-      next: () => {
-        this.showCloseModal.set(false);
-        this.cerrando.set(false);
-
-        // Descargar Excel
-        this._descargarExcel(j.id);
-      },
-      error: (err: unknown) => {
-        this.cerrarError.set(
-          err instanceof Error ? err.message : 'Error al cerrar la jornada',
-        );
-        this.cerrando.set(false);
-      },
-    });
-  }
-
-  onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) {
-      this.cerrarModalCierre();
-    }
-  }
-
-  onModalKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      this.cerrarModalCierre();
-    }
-  }
-
-  private _descargarExcel(jornadaId: number): void {
-    this.jornadaService.obtenerReporte(jornadaId).subscribe({
-      next: (reporte) => {
-        if (!reporte) return;
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
-      },
-    });
-  }
 }

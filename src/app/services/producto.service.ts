@@ -3,6 +3,7 @@ import { from, map, Observable, switchMap, of } from 'rxjs';
 import { DATABASE } from './database';
 import { StockMovimientoService } from './stock-movimiento.service';
 import type { Producto } from '../models';
+import type { GlobalInvestment, PerProductInvestment } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -83,6 +84,32 @@ export class ProductoService {
         [data.nombre, data.precio_costo, data.precio_venta, ahora, id],
       ),
     ).pipe(map((rows) => rows[0]));
+  }
+
+  /** Obtiene el total global invertido en inventario, con desglose por ubicación. */
+  obtenerInversionGlobal(): Observable<GlobalInvestment> {
+    return from(
+      this._db.sql<GlobalInvestment>(
+        `SELECT
+          COALESCE(SUM(cantidad * precio_costo), 0) as total_global,
+          COALESCE(SUM(CASE WHEN ubicacion = 'almacen' THEN cantidad * precio_costo ELSE 0 END), 0) as total_almacen,
+          COALESCE(SUM(CASE WHEN ubicacion = 'shop' THEN cantidad * precio_costo ELSE 0 END), 0) as total_shop
+        FROM lotes_stock
+        WHERE cantidad > 0`,
+      ),
+    ).pipe(map((rows) => rows[0] ?? { total_global: 0, total_almacen: 0, total_shop: 0 }));
+  }
+
+  /** Obtiene la inversión agregada por producto desde lotes_stock activos. */
+  obtenerInversionPorProducto(): Observable<PerProductInvestment[]> {
+    return from(
+      this._db.sql<PerProductInvestment>(
+        `SELECT producto_id, COALESCE(SUM(cantidad * precio_costo), 0) as total_invertido
+        FROM lotes_stock
+        WHERE cantidad > 0
+        GROUP BY producto_id`,
+      ),
+    );
   }
 
   /** Elimina un producto y sus lotes/movimientos asociados por ID. */

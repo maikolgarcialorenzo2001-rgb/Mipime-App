@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'path';
 
 // ---- mock factories hoisted so vi.mock can reference them ----
 let mockIsPackaged = false;
@@ -42,11 +43,11 @@ const mockRegisterSchemesAsPrivileged = vi.hoisted(() => vi.fn());
 const mockProtocolHandle = vi.hoisted(() => vi.fn());
 
 const mockIpcMainHandle = vi.hoisted(() => vi.fn());
+const mockIpcMainOn = vi.hoisted(() => vi.fn());
 const mockDialogShowSaveDialog = vi.hoisted(() => vi.fn());
 const mockDialogShowMessageBox = vi.hoisted(() => vi.fn());
 const mockAppGetPath = vi.hoisted(() => vi.fn(() => '/fake/userData'));
 const mockAppGetName = vi.hoisted(() => vi.fn(() => 'MipimeCuentas'));
-const mockMenuBuildFromTemplate = vi.hoisted(() => vi.fn(() => ({})));
 const mockMenuSetApplicationMenu = vi.hoisted(() => vi.fn());
 
 vi.mock('electron', () => ({
@@ -68,13 +69,13 @@ vi.mock('electron', () => ({
   },
   ipcMain: {
     handle: mockIpcMainHandle,
+    on: mockIpcMainOn,
   },
   dialog: {
     showSaveDialog: mockDialogShowSaveDialog,
     showMessageBox: mockDialogShowMessageBox,
   },
   Menu: {
-    buildFromTemplate: mockMenuBuildFromTemplate,
     setApplicationMenu: mockMenuSetApplicationMenu,
   },
 }));
@@ -93,6 +94,17 @@ vi.mock('electron-updater', () => ({
   },
 }));
 
+const mockFsMkdirSync = vi.hoisted(() => vi.fn());
+const mockFsWriteFileSync = vi.hoisted(() => vi.fn());
+const mockFsExistsSync = vi.hoisted(() => vi.fn(() => false));
+
+vi.mock('fs', () => ({
+  readFileSync: vi.fn(() => Buffer.from('mocked-content')),
+  mkdirSync: mockFsMkdirSync,
+  writeFileSync: mockFsWriteFileSync,
+  existsSync: mockFsExistsSync,
+}));
+
 const mockLoadWindowState = vi.hoisted(() => vi.fn(() => null));
 const mockSaveWindowState = vi.hoisted(() => vi.fn());
 const mockGetDefaultWindowState = vi.hoisted(() =>
@@ -105,6 +117,29 @@ vi.mock('./window-state', () => ({
   getDefaultWindowState: mockGetDefaultWindowState,
 }));
 
+// ---- electron/db.ts mock: orchestration fns mocked, low-level fns real ----
+const mockRunStartupSequence = vi.hoisted(() => vi.fn(() => ({ status: 'ok' })));
+const mockImportDbFile = vi.hoisted(() => vi.fn(() => ({ ok: true })));
+const mockBackupDb = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const mockPruneBackups = vi.hoisted(() => vi.fn(() => []));
+const mockAdoptOrFresh = vi.hoisted(() => vi.fn(() => ({ status: 'fresh' })));
+const mockOpenNativeDb = vi.hoisted(() => vi.fn());
+const mockBackupRodanteSync = vi.hoisted(() => vi.fn());
+
+vi.mock('./db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./db')>();
+  return {
+    ...actual,
+    runStartupSequence: mockRunStartupSequence,
+    importDbFile: mockImportDbFile,
+    backupDb: mockBackupDb,
+    pruneBackups: mockPruneBackups,
+    adoptOrFresh: mockAdoptOrFresh,
+    openNativeDb: mockOpenNativeDb,
+    backupRodanteSync: mockBackupRodanteSync,
+  };
+});
+
 /** Flush pending microtasks so .then() callbacks execute */
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -115,6 +150,8 @@ describe('main process', () => {
     vi.clearAllMocks();
     mockIsPackaged = false;
     mockGetAllWindows.mockReturnValue([]);
+    // Restore default return value for app.getPath (can be overridden in nested describes)
+    mockAppGetPath.mockReturnValue('/fake/userData');
   });
 
   describe('custom protocol registration', () => {
@@ -218,6 +255,456 @@ describe('main process', () => {
     });
   });
 
+  describe('db IPC handlers (T3)', () => {
+    let Database: typeof import('better-sqlite3').default;
+    let dbFile: string;
+
+    beforeAll(async () => {
+      ({ default: Database } = await import('better-sqlite3'));
+      // DB real en archivo temporal: persiste entre llamadas db:sql
+      // (:memory: se reinicia por conexión y no sirve para CREATE→INSERT).
+      const realFs = await vi.importActual<typeof import('fs')>('fs');
+      const realOs = await vi.importActual<typeof import('os')>('os');
+      const dir = realFs.mkdtempSync(
+        path.join(realOs.tmpdir(), 'mipime-main-spec-'),
+      );
+      dbFile = path.join(dir, 'tienda-app.db');
+    });
+
+    beforeEach(() => {
+      // db:sql / db:backupNow / db:export abren la DB nativa: usa SQLite real
+      mockOpenNativeDb.mockImplementation(() => new Database(dbFile));
+      mockRunStartupSequence.mockReturnValue({ status: 'ok' });
+    });
+
+    async function getDbHandler(
+      channel: string,
+    ): Promise<(args?: unknown) => Promise<unknown>> {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([ch]) => ch === channel,
+      )?.[1] as (event: unknown, args?: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+      // Simula la firma real de Electron: (event, ...args) → payload en
+      // args[0]. El wrapper async convierte throws síncronos en rechazos,
+      // igual que ipcMain.handle en runtime.
+      return async (args?: unknown) => handler({} as never, args);
+    }
+
+    const DB_FILE = path.join('/fake/userData', 'tienda-app.db');
+    const RODANTE_PATH = path.join(
+      '/fake/userData',
+      'Tienda - App',
+      'DataBase',
+      'tienda-app.db',
+    );
+
+    it('should register all 5 db:* IPC handlers', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      for (const channel of [
+        'db:initialize',
+        'db:sql',
+        'db:import',
+        'db:backupNow',
+        'db:export',
+      ]) {
+        expect(mockIpcMainHandle).toHaveBeenCalledWith(
+          channel,
+          expect.any(Function),
+        );
+      }
+    });
+
+    it('db:initialize should run runStartupSequence with app paths and return its result', async () => {
+      const canned = {
+        status: 'fatal',
+        diagnostics: {
+          appVersion: '1.0.0',
+          platform: process.platform,
+          sqliteError: 'integrity check failed: database disk image is malformed',
+          stage: 'open',
+          backupsTried: [{ path: 'x.db', reason: 'invalid' }],
+        },
+      } as const;
+      mockRunStartupSequence.mockReturnValue(canned as never);
+
+      const handler = await getDbHandler('db:initialize');
+      const result = await handler();
+
+      expect(mockRunStartupSequence).toHaveBeenCalledWith({
+        userDataPath: '/fake/userData',
+        documentsPath: '/fake/userData',
+        appVersion: '1.0.0',
+        platform: process.platform,
+      });
+      expect(result).toEqual(canned);
+    });
+
+    it('db:initialize should return {status:fatal, diagnostics} instead of throwing when runStartupSequence throws (M1)', async () => {
+      mockRunStartupSequence.mockImplementation(() => {
+        throw new Error('disk failure');
+      });
+
+      const handler = await getDbHandler('db:initialize');
+      const result = await handler();
+
+      expect(result).toEqual({
+        status: 'fatal',
+        diagnostics: {
+          appVersion: '1.0.0',
+          platform: process.platform,
+          sqliteError: 'disk failure',
+          stage: 'open',
+          backupsTried: [],
+        },
+      });
+    });
+
+    it('db:sql should run a SELECT with params and return rows', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      const result = await handler({ query: 'SELECT ? AS v', params: [42] });
+
+      expect(result).toEqual([{ v: 42 }]);
+    });
+
+    it('db:sql should run non-returning statements (CREATE/INSERT) and return []', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      expect(await handler({ query: 'CREATE TABLE t (x INTEGER)' })).toEqual([]);
+      expect(
+        await handler({ query: 'INSERT INTO t (x) VALUES (?)', params: [1] }),
+      ).toEqual([]);
+    });
+
+    it('db:sql should reject multi-statement input (R6)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: 'SELECT 1; SELECT 2' }),
+      ).rejects.toThrow('more than one statement');
+    });
+
+    it('db:sql should reject empty query input', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(handler({ query: '   ' })).rejects.toThrow();
+    });
+
+    it('db:sql should reject ATTACH/DETACH statements (S1)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: "ATTACH DATABASE 'C:/x.db' AS other" }),
+      ).rejects.toThrow('ATTACH/DETACH');
+      await expect(handler({ query: 'DETACH DATABASE other' })).rejects.toThrow(
+        'ATTACH/DETACH',
+      );
+    });
+
+    it('db:sql should reject PRAGMA writes but allow foreign_keys (S1)', async () => {
+      const handler = await getDbHandler('db:sql');
+
+      await expect(
+        handler({ query: 'PRAGMA journal_mode = WAL' }),
+      ).rejects.toThrow('PRAGMA writes');
+
+      // Exención: migrationV15 corre PRAGMA foreign_keys = OFF/ON vía db:sql
+      const result = await handler({ query: 'PRAGMA foreign_keys = OFF' });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('db:import should delegate to importDbFile and return its result', async () => {
+      mockImportDbFile.mockReturnValue({ ok: true });
+      const file = new ArrayBuffer(8);
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file });
+
+      expect(mockImportDbFile).toHaveBeenCalledWith(
+        file,
+        DB_FILE,
+        path.join('/fake/userData', 'native-db-imported.flag'),
+        '1.0.0',
+      );
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('db:import should propagate importDbFile failure', async () => {
+      mockImportDbFile.mockReturnValue({ ok: false, error: 'validation failed' });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: new ArrayBuffer(4) });
+
+      expect(result).toEqual({ ok: false, error: 'validation failed' });
+    });
+
+    it('db:import with null file should NOT write the flag and continue adopt-or-fresh', async () => {
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({ file: null });
+
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).toHaveBeenCalledWith(
+        DB_FILE,
+        RODANTE_PATH,
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'backups'),
+      );
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('db:import with null file should surface restoreInfo when adoptOrFresh adopts (T9)', async () => {
+      const restoreInfo = {
+        from: 'adopt',
+        path: '/fake/rodante.db',
+        when: '2026-01-01T00:00:00Z',
+        lostWindowMs: 3600000,
+      } as const;
+      mockAdoptOrFresh.mockReturnValue({ status: 'adopted', restoreInfo });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: null });
+
+      expect(result).toEqual({ ok: true, restoreInfo });
+    });
+
+    it('R5: db:sql nunca usa :memory: — abre la DB nativa en ruta real', async () => {
+      const handler = await getDbHandler('db:sql');
+      await handler({ query: 'SELECT 1 AS v', params: [] });
+
+      expect(mockOpenNativeDb).toHaveBeenCalledWith(DB_FILE);
+      expect(mockOpenNativeDb.mock.calls[0][0]).not.toBe(':memory:');
+    });
+
+    it('db:import with null file should return {ok:false, error} instead of throwing when adoptOrFresh fails (M1)', async () => {
+      mockAdoptOrFresh.mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: null });
+
+      expect(result).toEqual({ ok: false, error: 'disk full' });
+    });
+
+    it('db:import should reject non-ArrayBuffer payloads without touching the DB (T7)', async () => {
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({ file: 'not-a-buffer' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('ArrayBuffer'),
+      });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).not.toHaveBeenCalled();
+    });
+
+    it('db:import should reject oversized ArrayBuffer payloads (T7)', async () => {
+      const { MAX_IMPORT_BYTES } = await import('./db');
+      const handler = await getDbHandler('db:import');
+
+      const result = await handler({
+        file: new ArrayBuffer(MAX_IMPORT_BYTES + 1),
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('512MB'),
+      });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+    });
+
+    it('db:import should reject when the native DB or import flag already exists (MINOR-2)', async () => {
+      mockFsExistsSync.mockReturnValue(true);
+
+      const handler = await getDbHandler('db:import');
+      const result = await handler({ file: new ArrayBuffer(4) });
+
+      expect(result).toEqual({ ok: false, error: 'native DB already exists' });
+      expect(mockImportDbFile).not.toHaveBeenCalled();
+      expect(mockAdoptOrFresh).not.toHaveBeenCalled();
+    });
+
+    it('INTEGRATION: real runMigrations a través del handler db:sql real completa V1→V16 en DB temp real (C1)', async () => {
+      // C1 (CRITICAL): el runner emite BEGIN/COMMIT como llamadas separadas
+      // (V3..V15). Con UNA conexión por llamada (estado previo al fix), el
+      // COMMIT de V5 lanza 'cannot commit - no transaction is active' y el
+      // arranque nativo fresco está garantizado en rojo. La conexión
+      // persistente (semántica web con SQLocal) hace funcionar las
+      // transacciones: V1→V16 completan y schema_version queda en 16.
+      mockAppGetPath.mockReturnValue(path.dirname(dbFile));
+      const handler = await getDbHandler('db:sql');
+
+      const { runMigrations } = await import(
+        '../src/app/services/db-migrations'
+      );
+      const executor = {
+        sql: async <T>(query: string, params?: unknown[]) =>
+          (await handler({ query, params: params ?? [] })) as T[],
+      };
+
+      await expect(
+        runMigrations(executor, { seedEnabled: false }),
+      ).resolves.toBeUndefined();
+
+      const rows = (await handler({
+        query: 'SELECT MAX(version) AS version FROM schema_version',
+      })) as { version: number }[];
+      expect(rows[0].version).toBe(16);
+    });
+
+    it('db:backupNow with trigger open should back up rodante only', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = await handler({ trigger: 'open' });
+
+      expect(mockBackupDb).toHaveBeenCalledTimes(1);
+      expect(mockBackupDb).toHaveBeenCalledWith(expect.anything(), RODANTE_PATH);
+      expect(mockPruneBackups).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, rodantePath: RODANTE_PATH });
+    });
+
+    it('db:backupNow with trigger jornada-close should back up rodante + timestamped + prune', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = (await handler({
+        trigger: 'jornada-close',
+      })) as { ok: boolean; timestampedPath?: string };
+
+      expect(mockBackupDb).toHaveBeenCalledTimes(2);
+      expect(mockPruneBackups).toHaveBeenCalledWith(
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'backups'),
+        30,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.timestampedPath).toMatch(
+        /tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/,
+      );
+    });
+
+    it('db:backupNow should return {ok:false, error} instead of throwing', async () => {
+      mockOpenNativeDb.mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      const handler = await getDbHandler('db:backupNow');
+      const result = await handler({ trigger: 'open' });
+
+      expect(result).toEqual({ ok: false, error: 'disk full' });
+    });
+
+    it('db:backupNow should return {ok:false, error} for an unknown trigger (S3)', async () => {
+      const handler = await getDbHandler('db:backupNow');
+
+      const result = await handler({ trigger: 'mystery' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('trigger'),
+      });
+      expect(mockOpenNativeDb).not.toHaveBeenCalled();
+    });
+
+    it('db:export should return {ok:false, canceled:true} when the dialog is canceled', async () => {
+      mockDialogShowSaveDialog.mockResolvedValue({
+        canceled: true,
+        filePath: undefined,
+      });
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(mockBackupDb).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: false, canceled: true });
+    });
+
+    it('db:export should back up to the chosen path and return it', async () => {
+      mockDialogShowSaveDialog.mockResolvedValue({
+        canceled: false,
+        filePath: 'C:/out/backup.db',
+      });
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(mockBackupDb).toHaveBeenCalledWith(expect.anything(), 'C:/out/backup.db');
+      expect(result).toEqual({ ok: true, path: 'C:/out/backup.db' });
+    });
+
+    it('db:export should return {ok:false, error} on failure', async () => {
+      mockDialogShowSaveDialog.mockRejectedValue(new Error('dialog failed'));
+
+      const handler = await getDbHandler('db:export');
+      const result = await handler();
+
+      expect(result).toEqual({ ok: false, error: 'dialog failed' });
+    });
+  });
+
+  describe('app:isPackaged handler', () => {
+    it('should register app:isPackaged IPC listener', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainOn).toHaveBeenCalledWith(
+        'app:isPackaged',
+        expect.any(Function),
+      );
+    });
+
+    it('should return app.isPackaged value via event.returnValue', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      expect(handler).toBeDefined();
+      const event = { returnValue: false as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(mockIsPackaged);
+    });
+
+    it('should return true when app is packaged', async () => {
+      mockIsPackaged = true;
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      const event = { returnValue: false as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(true);
+    });
+
+    it('should return false when app is not packaged', async () => {
+      mockIsPackaged = false;
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainOn.mock.calls.find(
+        ([channel]) => channel === 'app:isPackaged',
+      )?.[1] as (event: { returnValue: boolean }) => void;
+
+      const event = { returnValue: true as boolean };
+      handler(event);
+      expect(event.returnValue).toBe(false);
+    });
+  });
+
   describe('dialog:saveFile IPC handler', () => {
     it('should register dialog:saveFile IPC handler', async () => {
       vi.resetModules();
@@ -299,6 +786,119 @@ describe('main process', () => {
       const result = await handler({}, { defaultPath: 'test.xlsx' });
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('file:saveFile IPC handler', () => {
+    beforeEach(() => {
+      mockAppGetPath.mockReturnValue('/mock/Documents');
+    });
+
+    it('should register file:saveFile IPC handler', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith(
+        'file:saveFile',
+        expect.any(Function),
+      );
+    });
+
+    it('should create Tienda IPVE directory and write file from base64', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'SGVsbG8gV29ybGQ=',  // "Hello World" in base64
+        filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
+      });
+
+      expect(mockAppGetPath).toHaveBeenCalledWith('documents');
+      // mkdirSync called with the parent directory (path.dirname)
+      expect(mockFsMkdirSync).toHaveBeenCalledWith(
+        expect.stringMatching(/Tienda IPVE.*Julio/),
+        { recursive: true },
+      );
+      expect(mockFsWriteFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
+        expect.any(Buffer),
+      );
+      expect(result).toEqual({
+        success: true,
+        filePath: expect.stringContaining('Tienda IPVE'),
+      });
+    });
+
+    it('should return error when mkdirSync fails', async () => {
+      mockFsMkdirSync.mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'EACCES: permission denied',
+      });
+    });
+
+    it('should return error when writeFileSync fails', async () => {
+      mockFsWriteFileSync.mockImplementationOnce(() => {
+        throw new Error('ENOSPC: no space left');
+      });
+
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      const result = await handler({}, {
+        base64: 'dGVzdA==',
+        filePath: 'test.xlsx',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'ENOSPC: no space left',
+      });
+    });
+
+    it('should decode base64 correctly into Buffer', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:saveFile',
+      )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+      await handler({}, {
+        base64: 'SGVsbG8gV29ybGQ=',
+        filePath: 'test.txt',
+      });
+
+      const writtenBuffer = mockFsWriteFileSync.mock.calls[0][1] as Buffer;
+      expect(writtenBuffer.toString()).toBe('Hello World');
     });
   });
 
@@ -540,101 +1140,29 @@ describe('main process', () => {
     });
   });
 
-  describe('native menus (R3)', () => {
-    it('should build and set application menu on ready', async () => {
+  describe('close handler rodante backup (AD-8, T8)', () => {
+    it('should back up rodante synchronously on window close (best-effort)', async () => {
       vi.resetModules();
       await import('./main');
       await flush();
 
-      expect(mockMenuBuildFromTemplate).toHaveBeenCalledTimes(1);
-      expect(mockMenuSetApplicationMenu).toHaveBeenCalledTimes(1);
-    });
+      const closeHandler = mockBrowserWindowInstance.on.mock.calls.find(
+        ([event]) => event === 'close',
+      )?.[1] as () => void;
 
-    it('should build menu with File and Help submenus', async () => {
-      vi.resetModules();
-      await import('./main');
-      await flush();
+      expect(closeHandler).toBeDefined();
+      closeHandler();
 
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      expect(template).toBeDefined();
-
-      const labels = template
-        .filter((item: any) => item && typeof item === 'object')
-        .map((item: any) => item.label);
-
-      // On non-macOS: File, Help with no macOS app menu
-      expect(labels).toContain('File');
-      expect(labels).toContain('Help');
-    });
-
-    it('should include macOS app menu when platform is darwin', async () => {
-      // Override process.platform for this test
-      const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-
-      mockLoadWindowState.mockReturnValue(null);
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      // First item should be macOS app menu (has role 'appMenu' not label)
-      expect(template[0]).toEqual(
-        expect.objectContaining({ role: 'appMenu' }),
-      );
-
-      // Restore platform
-      if (originalPlatform) {
-        Object.defineProperty(process, 'platform', originalPlatform);
-      } else {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-      }
-    });
-
-    it('should include Exit item in File submenu', async () => {
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      const fileMenu = template.find((item: any) => item.label === 'File');
-      expect(fileMenu).toBeDefined();
-
-      const exitItem = fileMenu.submenu.find(
-        (item: any) => item.label === 'Salir' || item.label === 'Exit',
-      );
-      expect(exitItem).toBeDefined();
-      expect(typeof exitItem.click).toBe('function');
-
-      // Invoking click should call app.quit
-      exitItem.click();
-      expect(mockAppQuit).toHaveBeenCalled();
-    });
-
-    it('should include About item in Help submenu with version dialog', async () => {
-      mockDialogShowMessageBox.mockReset();
-      vi.resetModules();
-      await import('./main');
-      await flush();
-
-      const template = mockMenuBuildFromTemplate.mock.calls[0]?.[0] as unknown[];
-      const helpMenu = template.find((item: any) => item.label === 'Help');
-      expect(helpMenu).toBeDefined();
-
-      const aboutItem = helpMenu.submenu.find(
-        (item: any) => item.label === 'About' || item.label === 'Acerca de',
-      );
-      expect(aboutItem).toBeDefined();
-      expect(typeof aboutItem.click).toBe('function');
-
-      aboutItem.click();
-      expect(mockDialogShowMessageBox).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('MipimeCuentas'),
-        }),
+      expect(mockBackupRodanteSync).toHaveBeenCalledTimes(1);
+      expect(mockBackupRodanteSync).toHaveBeenCalledWith(
+        path.join('/fake/userData', 'tienda-app.db'),
+        path.join('/fake/userData', 'Tienda - App', 'DataBase', 'tienda-app.db'),
       );
     });
   });
+
+  // Native menus removed by design — setApplicationMenu(null)
+  // See main.ts line ~177
 
   describe('app lifecycle', () => {
     it('should call whenReady and create window', async () => {

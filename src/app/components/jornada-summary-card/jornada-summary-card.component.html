@@ -11,13 +11,15 @@
       <dt class="text-sm text-gray-500 dark:text-gray-400">Monto inicial</dt>
       <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().monto_inicial }}</dd>
     </div>
-    <div>
-      <dt class="text-sm text-gray-500 dark:text-gray-400">Total ventas</dt>
-      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().total_ventas }}</dd>
-    </div>
+    @if (isAdmin()) {
+      <div>
+        <dt class="text-sm text-gray-500 dark:text-gray-400">Total ventas</dt>
+        <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().total_ventas }}</dd>
+      </div>
+    }
     <div>
       <dt class="text-sm text-gray-500 dark:text-gray-400">Total gastos</dt>
-      <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().total_movimientos }}</dd>
+      <dd class="text-lg font-semibold text-red-600 dark:text-red-400">${{ totalGastos() ?? 0 }}</dd>
     </div>
     @if (jornada().total_merma > 0) {
       <div>
@@ -26,7 +28,7 @@
       </div>
     }
     <div>
-      <dt class="text-sm text-gray-500 dark:text-gray-400">Saldo esperado</dt>
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Saldo en caja</dt>
       <dd class="text-lg font-semibold text-gray-900 dark:text-gray-100">${{ jornada().saldo_esperado }}</dd>
     </div>
   </dl>

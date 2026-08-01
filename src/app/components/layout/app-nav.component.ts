@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
@@ -15,13 +16,16 @@ export class AppNavComponent {
   private readonly _router = inject(Router);
   private readonly _auth = inject(AuthService);
   readonly jornadaService = inject(JornadaService);
+  private readonly _electronFileService = inject(ElectronFileService);
   readonly themeService = inject(ThemeService);
 
   protected readonly auth = this._auth;
 
+  readonly soloNumeros = signal(false);
+
   /** Modal de apertura */
   readonly showOpenModal = signal(false);
-  readonly montoInicial = signal(0);
+  readonly montoInicial = signal(500);
   readonly abriendo = signal(false);
   readonly abrirError = signal<string | null>(null);
 
@@ -69,7 +73,6 @@ export class AppNavComponent {
 
   abrirModalApertura(): void {
     this.abrirError.set(null);
-    this.montoInicial.set(0);
     this.showOpenModal.set(true);
   }
 
@@ -89,7 +92,8 @@ export class AppNavComponent {
     this.abriendo.set(true);
     this.abrirError.set(null);
 
-    this.jornadaService.abrir(monto).subscribe({
+    const uid = this.auth.usuario()?.id;
+    this.jornadaService.abrir(monto, uid).subscribe({
       next: () => {
         this.showOpenModal.set(false);
         this.abriendo.set(false);
@@ -143,18 +147,16 @@ export class AppNavComponent {
       return;
     }
 
-    const saldoReal = this.arqueoTotal();
-
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, saldoReal, uid, entries).subscribe({
+    this.jornadaService.cerrar(j.id, uid, entries).subscribe({
       next: () => {
         this.showCloseModal.set(false);
         this.cerrando.set(false);
 
         // Descargar el reporte generado
-        this._descargarExcel(j.id);
+        this._descargarExcel(j.id, j);
       },
       error: (err: unknown) => {
         this.cerrarError.set(
@@ -174,6 +176,21 @@ export class AppNavComponent {
     }
   }
 
+  filtrarTecla(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab',
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'Home', 'End',
+      'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
+  }
+
   onModalKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       if (this.showOpenModal()) this.cerrarModalApertura();
@@ -183,27 +200,12 @@ export class AppNavComponent {
 
   // ── Internos ──────────────────────────────────────────
 
-  private _descargarExcel(jornadaId: number): void {
+  private _descargarExcel(jornadaId: number, _jornada: { fecha: string; id: number }): void {
     this.jornadaService.obtenerReporte(jornadaId).subscribe({
       next: (reporte) => {
         if (!reporte) return;
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Solo Blob download: ElectronFileService ya guardó en JornadaService
+        this._electronFileService.downloadBlob(reporte.content_base64, reporte.filename);
       },
     });
   }

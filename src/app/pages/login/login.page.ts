@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import type { Jornada } from '../../models';
@@ -18,10 +19,12 @@ export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly jornadaService = inject(JornadaService);
+  private readonly _electronFileService = inject(ElectronFileService);
 
   readonly username = signal('');
   readonly password = signal('');
   readonly loginError = signal<string | null>(null);
+  readonly successMessage = signal<string | null>(null);
   readonly cargando = signal(false);
 
   /** Modal de reapertura — solo se muestra si hay journa del mismo usuario */
@@ -32,6 +35,7 @@ export class LoginPage {
 
   async onSubmit(): Promise<void> {
     this.loginError.set(null);
+    this.successMessage.set(null);
     this.cargando.set(true);
 
     try {
@@ -42,9 +46,10 @@ export class LoginPage {
       if (abierta) {
         const result = await this.jornadaService.autoCerrarSiOtroUsuario(user);
         if (result === null) {
-          // Jornada de otro usuario fue auto-cerrada → flag para toast
-          sessionStorage.setItem('mipime_jornada_auto_cerrada', 'true');
-          this.router.navigate(['/pos']);
+          // Jornada de otro usuario fue auto-cerrada → descargar Excel + toast
+          this._descargarExcel(abierta.id, abierta);
+          this.successMessage.set('Jornada anterior cerrada automáticamente ✓');
+          setTimeout(() => this.router.navigate(['/pos']), 1500);
         } else {
           // Jornada del MISMO usuario → modal de reapertura
           this._jornadaPendiente = result;
@@ -70,19 +75,19 @@ export class LoginPage {
   /** Cerrar y guardar — cerrar la jornada, descargar Excel, navegar a /pos */
   cerrarYGuardar(): void {
     const j = this._jornadaPendiente;
-    const uid = this.jornadaService.jornadaAbierta()?.user_apertura_id;
-
     if (!j) return;
+
+    const uid = j.user_apertura_id ?? 0;
 
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, j.saldo_esperado, uid ?? 0).subscribe({
+    this.jornadaService.cerrar(j.id, uid).subscribe({
       next: () => {
         this.showReopenModal.set(false);
         this._jornadaPendiente = null;
         this.cerrando.set(false);
-        this._descargarExcel(j.id);
+        this._descargarExcel(j.id, j);
         this.router.navigate(['/pos']);
       },
       error: (err: unknown) => {
@@ -106,27 +111,12 @@ export class LoginPage {
     }
   }
 
-  private _descargarExcel(jornadaId: number): void {
+  private _descargarExcel(jornadaId: number, _jornada: { fecha: string; id: number }): void {
     this.jornadaService.obtenerReporte(jornadaId).subscribe({
       next: (reporte) => {
         if (!reporte) return;
-
-        const byteCharacters = atob(reporte.content_base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = reporte.filename;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Solo Blob download: ElectronFileService ya guardó en JornadaService
+        this._electronFileService.downloadBlob(reporte.content_base64, reporte.filename);
       },
     });
   }

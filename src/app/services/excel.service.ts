@@ -13,6 +13,7 @@ export interface ProductoInfo {
   precio_costo: number | null;
   stock_almacen?: number;
   stock_shop?: number;
+  precio_venta?: number;
 }
 
 export interface VentaConDetalles extends Venta {
@@ -30,6 +31,9 @@ export interface JornadaReportData {
   stockMovimientos?: StockMovimiento[];
   ventaLotes?: VentaLote[];
   arqueo?: ArqueoCajaEntry[];
+  inversionPorProducto?: Map<number, number>;
+  total_usd?: number;
+  total_eur?: number;
 }
 
 @Injectable({
@@ -50,8 +54,8 @@ export class ExcelService {
     this._agregarResumen(wb, data);
     this._agregarVentas(wb, data);
     this._agregarMovimientos(wb, data);
-    this._agregarMovimientosStock(wb, data);
     this._agregarArqueo(wb, data);
+    this._agregarIpve(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
@@ -68,17 +72,29 @@ export class ExcelService {
       .filter((v) => v.forma_pago !== 'pendiente')
       .reduce((sum, v) => sum + v.total, 0);
     const totalVentasConExtra = totalVentasSinPendientes + totalIngresosExtra;
-
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
-    const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0);
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalCostoCC = (data.cuentaCosas ?? []).reduce((sum, item) => {
+      const costo = data.productosMap?.get(item.producto_id)?.precio_costo ?? 0;
+      return sum + item.cantidad * costo;
+    }, 0);
+
+    const gananciaBruta = totalVentasConExtra - data.totalCosto - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? ((gananciaBruta / totalVentasConExtra) * 100).toFixed(1) : '0.0';
 
-    // Calcular desglose por forma de pago
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    // Calcular desglose por forma de pago (efectivo que entra a caja)
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const totalTransferencia = ventas
       .filter((v) => v.forma_pago === 'transferencia')
       .reduce((sum, v) => sum + v.total, 0);
@@ -108,7 +124,7 @@ export class ExcelService {
     }
     const totalUnidadesDivisas = Array.from(divisaPorTipo.values()).reduce((sum, d) => sum + d.monto, 0);
 
-    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -124,6 +140,7 @@ export class ExcelService {
       ['Total costo productos', -data.totalCosto],
       ['Total gastos', -totalGastos],
       ['Total merma', -(j.total_merma ?? 0)],
+      ['Total cuenta casas', -totalCostoCC],
       ['Ganancia bruta', gananciaBruta],
       ['Ganancia %', `${gananciaPct}%`],
       [],
@@ -144,13 +161,34 @@ export class ExcelService {
     }
 
     // Desglose de divisas por tipo
-    if (divisaPorTipo.size > 0) {
+    if (divisaPorTipo.size > 0 || data.movimientos.some(m => m.tipo === 'compra_divisa')) {
       filas.push([]);
       filas.push(['Divisas', totalUnidadesDivisas]);
       for (const [tipo, datos] of divisaPorTipo) {
         filas.push([tipo, datos.monto, datos.tasa, datos.monto * datos.tasa]);
       }
       filas.push(['Total divisas en pesos cubanos', totalDivisas]);
+
+      // Breakdown: ventas vs compra_divisa — collect types from BOTH sources
+      const tiposDivisa = new Set(divisaPorTipo.keys());
+      for (const m of data.movimientos) {
+        if (m.tipo === 'compra_divisa' && m.divisa_tipo) {
+          tiposDivisa.add(m.divisa_tipo);
+        }
+      }
+      filas.push([]);
+      filas.push(['Origen de divisas']);
+      for (const tipo of tiposDivisa) {
+        const deVentas = ventas
+          .filter(v => (v as any).divisa_tipo === tipo)
+          .reduce((s, v) => s + ((v as any).monto_divisa ?? 0), 0);
+        const deCompra = data.movimientos
+          .filter(m => m.tipo === 'compra_divisa' && m.divisa_tipo === tipo)
+          .reduce((s, m) => s + (m.monto_divisa ?? 0), 0);
+        filas.push([`${tipo} de ventas`, deVentas]);
+        filas.push([`${tipo} de compra`, deCompra]);
+        filas.push([`Total ${tipo}`, deVentas + deCompra]);
+      }
     }
 
     // Tabla Cuenta Casas
@@ -185,11 +223,12 @@ export class ExcelService {
     const tieneDivisas = data.ventas.some((v) => v.forma_pago === 'divisas');
     const tienePendientes = data.ventas.some((v) => v.forma_pago === 'pendiente');
 
-    const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Total', 'Forma de pago'];
+    const headerBase = ['Producto', 'Cantidad', 'Precio unitario', 'Precio venta', 'Total', 'Forma de pago'];
     const headerExtra: string[] = [];
-    if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos');
+    if (tieneDivisas) headerExtra.push('Divisa', 'Monto en divisa', 'Tasa de cambio', 'Equivalente en Pesos', 'Completación efectivo');
     if (tienePendientes) headerExtra.push('Comprador');
 
+    const footerLen = headerBase.length + headerExtra.length;
     const filas: unknown[][] = [[...headerBase, ...headerExtra]];
 
     const pmap = data.productosMap;
@@ -199,13 +238,17 @@ export class ExcelService {
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
+      const detalleRows: unknown[][] = [];
+
       for (const detalle of venta.detalles) {
         const info = pmap?.get(detalle.producto_id);
         const nombreProducto = info?.nombre ?? detalle.producto_id;
+        const precioVenta = info?.precio_venta ?? '—';
         const fila: unknown[] = [
           nombreProducto,
           detalle.cantidad,
           detalle.precio_unitario,
+          precioVenta,
           detalle.subtotal,
           (venta as any).forma_pago ?? 'efectivo',
         ];
@@ -216,8 +259,9 @@ export class ExcelService {
             fila.push((venta as any).monto_divisa ?? '—');
             fila.push((venta as any).tasa_cambio ?? '—');
             fila.push(venta.total);
+            fila.push((venta as any).completacion_efectivo ?? '—');
           } else {
-            fila.push('', '', '', '');
+            fila.push('', '', '', '', '');
           }
         }
         if (tienePendientes) {
@@ -227,21 +271,28 @@ export class ExcelService {
             fila.push('');
           }
         }
-        filas.push(fila);
+        detalleRows.push(fila);
 
         // Desglose de lotes para este detalle
         const lotesDelDetalle = vlotes.filter(
           (vl) => vl.venta_id === venta.id && vl.producto_id === detalle.producto_id,
         );
         if (lotesDelDetalle.length > 1) {
+          let sumLotSubtotals = 0;
           for (const vl of lotesDelDetalle) {
-            const loteFila: unknown[] = Array(headerBase.length + headerExtra.length).fill('');
+            const loteFila: unknown[] = Array(footerLen).fill('');
             loteFila[0] = `  └ Lote #${vl.lote_id}`;
             loteFila[1] = vl.cantidad;
             loteFila[2] = detalle.precio_unitario;
-            loteFila[3] = vl.cantidad * detalle.precio_unitario;
-            filas.push(loteFila);
+            loteFila[4] = vl.cantidad * detalle.precio_unitario;
+            detalleRows.push(loteFila);
+            sumLotSubtotals += vl.cantidad * detalle.precio_unitario;
           }
+          // Subtotal row after multi-lot group
+          const subLotRow: unknown[] = Array(footerLen).fill('');
+          subLotRow[0] = `  Subtotal ${nombreProducto}`;
+          subLotRow[4] = sumLotSubtotals;
+          detalleRows.push(subLotRow);
         }
 
         if (venta.forma_pago === 'pendiente') {
@@ -254,27 +305,39 @@ export class ExcelService {
           totalCaja += detalle.subtotal;
         }
       }
+
+      // Push all detail rows (and lote/sublot rows) for this venta
+      for (const row of detalleRows) {
+        filas.push(row);
+      }
+
+      // Multi-item sale subtotal
+      if (venta.detalles.length >= 2) {
+        const ventaSubRow: unknown[] = Array(footerLen).fill('');
+        ventaSubRow[0] = `Total venta #${venta.id}`;
+        ventaSubRow[4] = venta.total;
+        filas.push(ventaSubRow);
+      }
     }
 
     const totalDivisas = data.ventas
       .filter((v) => v.forma_pago === 'divisas')
       .reduce((sum, v) => sum + v.total, 0);
-    const footerLen = headerBase.length + headerExtra.length;
     const cajaFooter = Array(footerLen).fill('');
     cajaFooter[0] = 'Total de ingresos en ventas';
-    cajaFooter[3] = totalCaja;
+    cajaFooter[4] = totalCaja;
     const divisasFooter = Array(footerLen).fill('');
     divisasFooter[0] = 'Total divisas';
-    divisasFooter[3] = totalDivisas;
+    divisasFooter[4] = totalDivisas;
     const pendientesFooter = Array(footerLen).fill('');
     pendientesFooter[0] = 'Total pendientes';
-    pendientesFooter[3] = totalPendientes;
+    pendientesFooter[4] = totalPendientes;
     const transferenciaFooter = Array(footerLen).fill('');
     transferenciaFooter[0] = 'Total transferencia';
-    transferenciaFooter[3] = totalTransferencia;
+    transferenciaFooter[4] = totalTransferencia;
     const esperadoFooter = Array(footerLen).fill('');
     esperadoFooter[0] = 'Total esperado';
-    esperadoFooter[3] = totalCaja + totalDivisas + totalPendientes + totalTransferencia;
+    esperadoFooter[4] = totalCaja + totalDivisas + totalPendientes + totalTransferencia;
     filas.push([], cajaFooter, divisasFooter, pendientesFooter, transferenciaFooter, esperadoFooter);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
@@ -282,9 +345,10 @@ export class ExcelService {
       { wch: 20 },
       { wch: 10 },
       { wch: 16 },
+      { wch: 12 },
       { wch: 14 },
       { wch: 16 },
-      ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }] : []),
+      ...(tieneDivisas ? [{ wch: 8 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 14 }] : []),
       ...(tienePendientes ? [{ wch: 16 }] : []),
     ];
     ws['!protect'] = {};
@@ -325,9 +389,16 @@ export class ExcelService {
       0,
     );
     const totalCosto = data.reduce((s, d) => s + (d.totalCosto ?? 0), 0);
-    const totalEfectivo = data.reduce(
-      (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'efectivo').reduce((ss, v) => ss + v.total, 0),
-      0,
+    const totalEfectivo = data.reduce((s, d) =>
+      s + d.ventas.reduce((ss, v) => {
+        if (v.forma_pago === 'efectivo') return ss + v.total;
+        if (v.forma_pago === 'divisas') {
+          const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+          return ss + ((v as any).completacion_efectivo ?? 0) - vuelto;
+        }
+        return ss;
+      }, 0),
+    0,
     );
     const totalTransferencia = data.reduce(
       (s, d) => s + d.ventas.filter((v) => v.forma_pago === 'transferencia').reduce((ss, v) => ss + v.total, 0),
@@ -372,14 +443,26 @@ export class ExcelService {
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalCostoCC = (data.cuentaCosas ?? []).reduce((sum, item) => {
+      const costo = data.productosMap?.get(item.producto_id)?.precio_costo ?? 0;
+      return sum + item.cantidad * costo;
+    }, 0);
 
-    const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0);
+    const gananciaBruta = totalVentasConExtra - (data.totalCosto ?? 0) - totalGastos - (j.total_merma ?? 0) - totalCostoCC;
     const gananciaPct = totalVentasConExtra > 0 ? `${((gananciaBruta / totalVentasConExtra) * 100).toFixed(1)}%` : '0.0%';
 
-    // Pre-compute payment totals for Efectivo del Día table
-    const totalEfectivo = data.ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    // Pre-compute payment totals for Efectivo del Día table (solo efectivo que entra a caja)
+    const totalEfectivo = data.ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
@@ -395,7 +478,7 @@ export class ExcelService {
       .filter((v) => v.forma_pago === 'divisas')
       .reduce((sum, v) => sum + v.total, 0);
 
-    const totalEnCajaJ = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalEnCajaJ = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
 
     const filas: unknown[][] = [
       ['Tienda - App — Resumen de Jornada'],
@@ -411,6 +494,7 @@ export class ExcelService {
       ['Total costo productos', -(data.totalCosto ?? 0)],
       ['Total gastos', -totalGastos],
       ['Total merma', -(j.total_merma ?? 0)],
+      ['Total cuenta casas', -totalCostoCC],
       ['Ganancia bruta', gananciaBruta],
       ['Ganancia %', gananciaPct],
       [],
@@ -532,63 +616,59 @@ export class ExcelService {
   }
 
   private _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): void {
-    const filas: unknown[][] = [
-      ['Tipo', 'Descripción', 'Monto'],
-    ];
+    const tieneCompraDivisa = data.movimientos.some(m => m.tipo === 'compra_divisa');
+    const filas: unknown[][] = tieneCompraDivisa
+      ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total CUP']]
+      : [['Tipo', 'Descripción', 'Monto']];
 
     for (const mov of data.movimientos) {
-      filas.push([
-        mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra',
-        mov.descripcion,
-        mov.monto,
-      ]);
+      if (mov.tipo === 'compra_divisa') {
+        filas.push([
+          'Compra divisa',
+          mov.descripcion,
+          mov.divisa_tipo ?? '—',
+          mov.monto_divisa ?? '—',
+          mov.tasa_cambio ?? '—',
+          mov.monto,
+        ]);
+      } else {
+        filas.push([
+          mov.tipo === 'gasto' ? 'Gasto' : 'Ingreso extra',
+          mov.descripcion,
+          mov.monto,
+        ]);
+      }
+    }
+
+    // Stock operations detail (if stockMovimientos exist)
+    const stock = data.stockMovimientos;
+    const pmap = data.productosMap;
+    if (stock && stock.length > 0) {
+      filas.push([]);
+      filas.push(['Producto', 'Tipo', 'Cantidad', 'Costo', 'Motivo', 'Fecha']);
+
+      for (const mov of stock) {
+        const info = pmap?.get(mov.producto_id);
+        const nombreProducto = info?.nombre ?? mov.producto_id;
+        const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
+        filas.push([
+          nombreProducto,
+          tipoLabel,
+          mov.cantidad,
+          mov.costo_total ?? 0,
+          mov.motivo ?? '',
+          mov.created_at,
+        ]);
+      }
     }
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = [
-      { wch: 16 },
-      { wch: 40 },
-      { wch: 14 },
-    ];
+    ws['!cols'] = tieneCompraDivisa
+      ? [{ wch: 22 }, { wch: 30 }, { wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 16 }]
+      : [{ wch: 22 }, { wch: 30 }, { wch: 16 }];
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
-  }
-
-  private _agregarMovimientosStock(wb: XLSX.WorkBook, data: JornadaReportData): void {
-    const stock = data.stockMovimientos;
-    if (!stock || stock.length === 0) return;
-
-    const pmap = data.productosMap;
-
-    const filas: unknown[][] = [
-      ['Producto', 'Tipo', 'Cantidad', 'Motivo', 'Fecha'],
-    ];
-
-    for (const mov of stock) {
-      const info = pmap?.get(mov.producto_id);
-      const nombreProducto = info?.nombre ?? mov.producto_id;
-      const tipoLabel = mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'salida' ? 'Salida' : mov.tipo === 'merma' ? 'Merma' : mov.tipo === 'traslado' ? 'Traslado' : 'Ajuste';
-      filas.push([
-        nombreProducto,
-        tipoLabel,
-        mov.cantidad,
-        mov.motivo ?? '',
-        mov.created_at,
-      ]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(filas);
-    ws['!cols'] = [
-      { wch: 20 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 30 },
-      { wch: 20 },
-    ];
-    ws['!protect'] = {};
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
   }
 
   private _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): void {
@@ -598,16 +678,24 @@ export class ExcelService {
     const j = data.jornada;
     const ventas = data.ventas;
     const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
-    const totalEfectivo = ventas
-      .filter((v) => v.forma_pago === 'efectivo')
-      .reduce((sum, v) => sum + v.total, 0);
+    const totalEfectivo = ventas.reduce((sum, v) => {
+      if (v.forma_pago === 'efectivo') return sum + v.total;
+      if (v.forma_pago === 'divisas') {
+        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
+        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+      }
+      return sum;
+    }, 0);
     const totalIngresosExtra = data.movimientos
       .filter((m) => m.tipo === 'ingreso_extra')
       .reduce((sum, m) => sum + m.monto, 0);
     const totalGastos = data.movimientos
       .filter((m) => m.tipo === 'gasto')
       .reduce((sum, m) => sum + m.monto, 0);
-    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos;
+    const totalCompraDivisa = data.movimientos
+      .filter((m) => m.tipo === 'compra_divisa')
+      .reduce((sum, m) => sum + m.monto, 0);
+    const totalEnCaja = j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
     const diferencia = totalEnCaja - totalArqueo;
 
     const filas: unknown[][] = [
@@ -691,5 +779,62 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos de Stock');
+  }
+
+  private _agregarIpve(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const inv = data.inversionPorProducto;
+    const pmap = data.productosMap;
+    if (!inv || !pmap) return;
+
+    // Left table: product stock + investment + expected revenue + potential profit
+    const filas: unknown[][] = [
+      ['Nombre', 'Stock Almacén', 'Stock Tienda', 'Precio Venta', 'Ingreso Esperado', 'Total Invertido', 'Ganancia Potencial'],
+    ];
+
+    let sumIngreso = 0;
+    let sumInversion = 0;
+    let sumGanancia = 0;
+
+    for (const [productoId, info] of pmap) {
+      const inversion = inv.get(productoId) ?? 0;
+      const pv = info.precio_venta;
+      const stockAlmacen = info.stock_almacen;
+      const stockShop = info.stock_shop;
+
+      if (pv != null && stockAlmacen != null && stockShop != null) {
+        const totalStock = stockAlmacen + stockShop;
+        const ingreso = totalStock * pv;
+        const ganancia = ingreso - inversion;
+        sumIngreso += ingreso;
+        sumInversion += inversion;
+        sumGanancia += ganancia;
+        filas.push([info.nombre, stockAlmacen, stockShop, pv, ingreso, inversion, ganancia]);
+      } else {
+        sumInversion += inversion;
+        filas.push([info.nombre, stockAlmacen ?? '—', stockShop ?? '—', '—', '—', inversion, '—']);
+      }
+    }
+
+    // Totals row
+    filas.push(['TOTALES', '', '', '', sumIngreso, sumInversion, sumGanancia]);
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+
+    // Merma table to the RIGHT (offset after 7 data columns + 1 blank = starting at col I)
+    const mermaVal = data.jornada.total_merma ?? 0;
+    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 8 } });
+
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'ipve');
   }
 }

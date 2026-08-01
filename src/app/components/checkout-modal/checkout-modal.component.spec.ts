@@ -246,4 +246,109 @@ describe('CheckoutModalComponent', () => {
     component.billeteRecibido.set(0);
     expect(component.vuelto()).toBeNull();
   });
+
+  // ─── 3.3 RED: saldoEnCaja input + saldoInsuficienteVuelto ──────────
+
+  describe('saldoInsuficienteVuelto', () => {
+    it('debería ser false cuando formaPago no es divisas', () => {
+      component.formaPago.set('efectivo');
+      fixture.componentRef.setInput('saldoEnCaja', 1000);
+      expect(component.saldoInsuficienteVuelto()).toBe(false);
+    });
+
+    it('debería ser false cuando vuelto <= 0 (pago exacto o insuficiente sin vuelto)', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 0);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(1);
+      // vuelto = 1*700 - 1700 = -1000 → Math.max(0, -1000) = 0 → no hay vuelto
+      fixture.detectChanges();
+      expect(component.saldoInsuficienteVuelto()).toBe(false);
+    });
+
+    it('debería ser false cuando saldoEnCaja >= vuelto (saldo suficiente)', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 5000);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      // vuelto = 5*700 - 1700 = 1800, saldo = 5000 >= 1800 → suficiente
+      fixture.detectChanges();
+      expect(component.saldoInsuficienteVuelto()).toBe(false);
+    });
+
+    it('debería ser true cuando saldoEnCaja < vuelto (saldo insuficiente)', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 500);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      // vuelto = 5*700 - 1700 = 1800, saldo = 500 < 1800 → insuficiente
+      fixture.detectChanges();
+      expect(component.saldoInsuficienteVuelto()).toBe(true);
+    });
+
+    it('debería ser false cuando saldoEnCaja === vuelto (borde exacto)', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 1800);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      // vuelto = 5*700 - 1700 = 1800, saldo = 1800 >= 1800 → suficiente
+      fixture.detectChanges();
+      expect(component.saldoInsuficienteVuelto()).toBe(false);
+    });
+
+    it('debería deshabilitar botón Confirmar cuando saldoInsuficienteVuelto es true', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 500);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      fixture.detectChanges();
+
+      const buttons = fixture.nativeElement.querySelectorAll('button');
+      const confirmBtn = Array.from(buttons).find(
+        (b) => (b as HTMLButtonElement).textContent?.includes('Confirmar'),
+      ) as HTMLButtonElement;
+      expect(confirmBtn).toBeTruthy();
+      expect(confirmBtn.disabled).toBe(true);
+    });
+
+    it('debería mostrar mensaje de saldo insuficiente cuando saldoInsuficienteVuelto es true', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 500);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      fixture.detectChanges();
+
+      const mensaje = fixture.nativeElement.querySelector('.text-red-700');
+      expect(mensaje).toBeTruthy();
+      expect(mensaje.textContent).toContain('Saldo insuficiente en caja');
+      expect(mensaje.textContent).toContain('$500');
+      expect(mensaje.textContent).toContain('supera el saldo disponible');
+    });
+
+    it('NO debería mostrar mensaje de saldo insuficiente cuando saldo es suficiente', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 5000);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      fixture.detectChanges();
+
+      const mensaje = fixture.nativeElement.querySelector('.text-red-700');
+      expect(mensaje).toBeFalsy();
+    });
+
+    it('debería habilitar botón Confirmar cuando saldoInsuficienteVuelto es false', () => {
+      component.seleccionarFormaPago('divisas');
+      fixture.componentRef.setInput('saldoEnCaja', 5000);
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(5);
+      fixture.detectChanges();
+
+      const buttons = fixture.nativeElement.querySelectorAll('button');
+      const confirmBtn = Array.from(buttons).find(
+        (b) => (b as HTMLButtonElement).textContent?.includes('Confirmar'),
+      ) as HTMLButtonElement;
+      expect(confirmBtn).toBeTruthy();
+      expect(confirmBtn.disabled).toBe(false);
+    });
+  });
 });

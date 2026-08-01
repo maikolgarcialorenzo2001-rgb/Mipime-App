@@ -777,3 +777,213 @@ describe('SqliteService migration v13', () => {
     expect(createTable.length).toBe(0);
   });
 });
+
+describe('SqliteService migration v14', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  afterEach(() => {
+    mockSchemaVersion = null;
+  });
+
+  it('T2 RED: v14 debería agregar divisa_tipo a movimientos', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const alterDivisaTipo = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('movimientos') &&
+        c.query.includes('divisa_tipo'),
+    );
+    expect(alterDivisaTipo).toBeDefined();
+    expect(alterDivisaTipo!.query).toContain('divisa_tipo TEXT');
+  });
+
+  it('T2 RED: v14 debería agregar monto_divisa a movimientos', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const alterMontoDivisa = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('movimientos') &&
+        c.query.includes('monto_divisa'),
+    );
+    expect(alterMontoDivisa).toBeDefined();
+    expect(alterMontoDivisa!.query).toContain('monto_divisa REAL');
+  });
+
+  it('T2 RED: v14 debería agregar tasa_cambio a movimientos', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const alterTasaCambio = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('movimientos') &&
+        c.query.includes('tasa_cambio'),
+    );
+    expect(alterTasaCambio).toBeDefined();
+    expect(alterTasaCambio!.query).toContain('tasa_cambio REAL');
+  });
+
+  it('T2 RED: v14 debería agregar total_usd a jornadas', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const alterTotalUsd = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('jornadas') &&
+        c.query.includes('total_usd'),
+    );
+    expect(alterTotalUsd).toBeDefined();
+    expect(alterTotalUsd!.query).toContain('total_usd REAL DEFAULT 0');
+  });
+
+  it('T2 RED: v14 debería agregar total_eur a jornadas', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    const alterTotalEur = sqlCalls.find(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('jornadas') &&
+        c.query.includes('total_eur'),
+    );
+    expect(alterTotalEur).toBeDefined();
+    expect(alterTotalEur!.query).toContain('total_eur REAL DEFAULT 0');
+  });
+
+  it('T2 RED: v14 debería registrar versión 14 en schema_version', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    expect(
+      sqlCalls.some((c) =>
+        c.query.includes('INSERT INTO schema_version') &&
+        c.query.includes('VALUES (14)'),
+      ),
+    ).toBe(true);
+  });
+
+  it('T2 RED: v14 no debería ejecutarse si schema_version >= 14', async () => {
+    mockSchemaVersion = 14;
+    await service.initialize();
+
+    const alterCalls = sqlCalls.filter(
+      (c) =>
+        c.query.includes('ALTER TABLE') &&
+        c.query.includes('movimientos') &&
+        c.query.includes('divisa_tipo'),
+    );
+    expect(alterCalls.length).toBe(0);
+  });
+
+  it('T2 RED: v14 debería usar try/catch para ALTER TABLE seguros', async () => {
+    mockSchemaVersion = 13;
+    await service.initialize();
+
+    // ALTER TABLE calls should be present in the log (wrapped with try/catch in impl)
+    const movAlters = sqlCalls.filter(
+      (c) =>
+        c.query.includes('ALTER TABLE') && c.query.includes('movimientos'),
+    );
+    expect(movAlters.length).toBeGreaterThanOrEqual(3);
+
+    const jornadaAlters = sqlCalls.filter(
+      (c) =>
+        c.query.includes('ALTER TABLE') && c.query.includes('jornadas'),
+    );
+    expect(jornadaAlters.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('SqliteService persist web (T11/R9)', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  it('T11 RED: debería solicitar persist() tras initialize exitoso (R9)', async () => {
+    const persistMock = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(navigator, 'storage', {
+      value: { persist: persistMock },
+      configurable: true,
+    });
+
+    await service.initialize();
+
+    expect(persistMock).toHaveBeenCalled();
+  });
+
+  it('T11 RED: no debería lanzar si navigator.storage no está disponible (R9)', async () => {
+    Object.defineProperty(navigator, 'storage', {
+      value: undefined,
+      configurable: true,
+    });
+
+    await expect(service.initialize()).resolves.toBeUndefined();
+  });
+});

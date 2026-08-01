@@ -4,11 +4,11 @@
   (click)="onBackdropClick($event)"
 >
   <div
-    class="w-full max-w-xs rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80 safe-bottom"
+    class="w-full max-w-xs rounded-xl bg-white dark:bg-gray-900 p-5 shadow-xl dark:shadow-gray-950/80"
     (click)="$event.stopPropagation()"
   >
     <p class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ producto().nombre }}</p>
-    <p class="mb-4 text-xs text-gray-400 dark:text-gray-500">{{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
+    <p class="mb-3 text-xs text-gray-400 dark:text-gray-500">{{ producto().precio_venta | currency:'ARS':'symbol-narrow':'1.0-0' }} c/u</p>
 
     <input
       #qtyInput
@@ -17,11 +17,11 @@
       [value]="cantidad()"
       (input)="cantidad.set(+$any($event.target).value || 1)"
       (keydown)="onInputKeydown($event)"
-      class="mb-4 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 px-4 py-3 text-center text-2xl font-semibold text-gray-700 dark:text-gray-300 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors dark:bg-gray-900 placeholder-gray-400 dark:placeholder-gray-500 touch-manipulation"
+      class="mb-3 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 px-4 py-3 text-center text-2xl font-semibold text-gray-700 dark:text-gray-300 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-colors dark:bg-gray-900 placeholder-gray-400 dark:placeholder-gray-500 touch-manipulation"
     />
 
     @if (soloNumeros()) {
-      <p class="-mt-3 mb-4 text-xs text-red-500 dark:text-red-400 text-center animate-pulse">
+      <p class="-mt-2 mb-3 text-xs text-red-500 dark:text-red-400 text-center animate-pulse">
         Solo se permiten números
       </p>
     }

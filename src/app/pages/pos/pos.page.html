@@ -130,6 +130,7 @@
     [items]="cart.items()"
     [total]="cart.total()"
     [errorMessage]="ventaError()"
+    [saldoEnCaja]="_jornadaService.totalEnCaja()"
     (confirmar)="confirmarVenta($event)"
     (cancelar)="cerrarModal()"
   />

@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AppNavComponent } from './app-nav.component';
 import { AuthService } from '../../services/auth.service';
+import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
@@ -21,6 +22,8 @@ const mockJornadaAbierta: Jornada = {
   saldo_real: null,
   estado: 'abierta',
   user_cierre_id: null,
+  user_apertura_id: null,
+  total_merma: 0,
   created_at: '2026-06-05T09:00:00Z',
   updated_at: '2026-06-05T09:00:00Z',
 };
@@ -82,10 +85,20 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
   let component: AppNavComponent;
   let mockJornadaSvc: MockJornadaService;
   let mockAuth: MockAuthService;
+  let mockElectronFileSvc: {
+    isElectronPackaged: boolean;
+    saveIndividual: ReturnType<typeof vi.fn>;
+    downloadBlob: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     mockJornadaSvc = createMockJornadaService();
     mockAuth = createMockAuth(mockAdmin);
+    mockElectronFileSvc = {
+      isElectronPackaged: false,
+      saveIndividual: vi.fn().mockResolvedValue(undefined),
+      downloadBlob: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       imports: [AppNavComponent],
@@ -93,12 +106,23 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
         provideRouter(routes),
         { provide: AuthService, useValue: mockAuth },
         { provide: JornadaService, useValue: mockJornadaSvc },
+        { provide: ElectronFileService, useValue: mockElectronFileSvc },
       ],
     });
 
     fixture = TestBed.createComponent(AppNavComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  it('debería tener montoInicial default de 500', () => {
+    expect(component.montoInicial()).toBe(500);
+  });
+
+  it('debería mantener montoInicial en 500 al abrir el modal de apertura', () => {
+    component.abrirModalApertura();
+    expect(component.montoInicial()).toBe(500);
+    expect(component.showOpenModal()).toBe(true);
   });
 
   it('5.1 RED: modal de cierre debería mostrar totalEnCaja como read-only sin input de saldoReal', () => {
@@ -146,8 +170,75 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     component.confirmarCierre();
 
     // saldoReal = 5000 * 1 = 5000
-    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 5000, 1, [
+    expect(mockJornadaSvc.cerrar).toHaveBeenCalledWith(1, 1, [
       { denominacion: 5000, cantidad: 1, subtotal: 5000 },
     ]);
+  });
+
+  it('should call ElectronFileService.downloadBlob after confirmarCierre (Blob only, service ya guardó)', () => {
+    mockJornadaSvc.obtenerReporte.mockReturnValue(of({
+      id: 1,
+      jornada_id: 1,
+      content_type: 'excel',
+      content_base64: 'dGVzdEJhc2U2NA==',
+      filename: 'jornada_2026-06-05_1.xlsx',
+      created_at: '',
+    }));
+    mockElectronFileSvc.isElectronPackaged = true;
+
+    component.abrirModalCierre();
+    fixture.detectChanges();
+    component.actualizarCantidad(5000, 1);
+    component.confirmarCierre();
+
+    expect(mockElectronFileSvc.downloadBlob).toHaveBeenCalledWith(
+      'dGVzdEJhc2U2NA==',
+      'jornada_2026-06-05_1.xlsx',
+    );
+  });
+
+  it('1.3 RED: checkbox toggle shows/hides $1 and $3 denomination rows in nav modal', () => {
+    component.abrirModalCierre();
+    fixture.detectChanges();
+
+    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
+    expect(dialog).toBeTruthy();
+
+    // By default, $1 and $3 should NOT be visible
+    expect(component.denominacionesVisibles()).not.toContain(1);
+    expect(component.denominacionesVisibles()).not.toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(10);
+
+    // Click checkbox to show optional denominations
+    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    checkbox.click();
+    fixture.detectChanges();
+
+    // After clicking, $1 and $3 should be visible
+    expect(component.denominacionesVisibles()).toContain(1);
+    expect(component.denominacionesVisibles()).toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(12);
+
+    // DOM should have $1 and $3
+    expect(dialog.textContent).toContain('$1');
+    expect(dialog.textContent).toContain('$3');
+  });
+
+  it('1.3 TRIANGULATE: unchecking hides $1 and $3 again in nav modal', () => {
+    component.abrirModalCierre();
+    component.showOptionalDenoms.set(true);
+    fixture.detectChanges();
+
+    expect(component.denominacionesVisibles().length).toBe(12);
+
+    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    checkbox.click(); // toggles off
+    fixture.detectChanges();
+
+    expect(component.denominacionesVisibles()).not.toContain(1);
+    expect(component.denominacionesVisibles()).not.toContain(3);
+    expect(component.denominacionesVisibles().length).toBe(10);
   });
 });

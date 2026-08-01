@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { DATABASE } from './database';
 import { AuthService } from './auth.service';
-import type { StockMovimiento, LoteStock, ConsumoRecord } from '../models';
+import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../models';
 
 @Injectable({
   providedIn: 'root',
@@ -167,7 +167,6 @@ export class StockMovimientoService {
     jornadaId?: number,
     ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<ConsumoRecord[]> {
-    this._checkAdmin();
     const ahora = new Date().toISOString();
 
     // 1. Consume from oldest lots (FIFO) at the given location
@@ -445,20 +444,26 @@ export class StockMovimientoService {
 
   /**
    * Registra una merma (rotura/pérdida) de producto:
-   * 1. Consume stock desde los lotes más antiguos de TIENDA (FIFO)
-   * 2. Calcula costo_total = Σ(cantidad × precio_costo_real)
-   * 3. Inserta stock_movimiento con tipo='merma' y costo_total
-   * 4. Actualiza stock_shop del producto (derivado de lotes de tienda)
-   * 5. Actualiza total_merma y saldo_esperado de la jornada
+   * 1. Valida que el motivo no esté vacío
+   * 2. Consume stock desde los lotes más antiguos (FIFO) de la ubicación especificada
+   * 3. Calcula costo_total = Σ(cantidad × precio_costo_real)
+   * 4. Inserta stock_movimiento con tipo='merma' y costo_total
+   * 5. Actualiza stock de la ubicación del producto (derivado de lotes)
+   * 6. Actualiza total_merma y saldo_esperado de la jornada
+   *
+   * @param motivo Motivo de la merma — obligatorio, no puede ser vacío ni whitespace-only
    */
   async registrarMerma(
     productoId: number,
     cantidad: number,
-    motivo?: string,
+    motivo: string,
     jornadaId?: number,
     ubicacion: 'almacen' | 'shop' = 'shop',
   ): Promise<{ consumos: ConsumoRecord[]; costoTotal: number }> {
-    this._checkAdmin();
+    if (!motivo || motivo.trim().length === 0) {
+      throw new Error('El motivo es obligatorio');
+    }
+
     const ahora = new Date().toISOString();
 
     // 1. Consume from oldest lots (FIFO) at the given ubicacion
@@ -496,8 +501,8 @@ export class StockMovimientoService {
       [total, ahora, productoId],
     );
 
-    // 5. Update jornada financials (only for shop merma — jornada tracks shop P&L)
-    if (jornadaId !== undefined && ubicacion === 'shop') {
+    // 5. Update jornada financials — both shop and almacen merma affect P&L
+    if (jornadaId !== undefined) {
       await this._db.sql(
         `UPDATE jornadas
          SET total_merma = total_merma + ?,
@@ -527,6 +532,27 @@ export class StockMovimientoService {
       `SELECT * FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
        ORDER BY fecha_ingreso ASC, id ASC`,
+      [productoId],
+    );
+  }
+
+  async obtenerLotesAgrupados(
+    productoId: number,
+  ): Promise<LoteDetalle[]> {
+    return this._db.sql<LoteDetalle>(
+      `SELECT
+         MIN(id) as id,
+         producto_id,
+         SUM(cantidad) as cantidad,
+         precio_costo,
+         MIN(fecha_ingreso) as fecha_ingreso,
+         COALESCE(SUM(CASE WHEN ubicacion = 'almacen' THEN cantidad ELSE 0 END), 0) as stock_almacen,
+         COALESCE(SUM(CASE WHEN ubicacion = 'shop' THEN cantidad ELSE 0 END), 0) as stock_shop,
+         MIN(created_at) as created_at
+       FROM lotes_stock
+       WHERE producto_id = ? AND cantidad > 0
+       GROUP BY producto_id, precio_costo
+       ORDER BY MIN(fecha_ingreso) ASC`,
       [productoId],
     );
   }

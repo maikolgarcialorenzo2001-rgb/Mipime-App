@@ -23,6 +23,8 @@ const mockJornada: Jornada = {
   saldo_esperado: 5000,
   saldo_real: null,
   estado: 'abierta',
+  user_apertura_id: null,
+  total_merma: 0,
   user_cierre_id: null,
   created_at: '2026-06-05T09:00:00Z',
   updated_at: '2026-06-05T09:00:00Z',
