@@ -13,9 +13,10 @@
 > Trabajo pendiente registrado al cerrar el SDD native-db-resilience (merge a main `94bc153`).
 > Foco actual: **DESKTOP primero**, después web, build/tooling, y el botón de exportar al final.
 
-### BACKLOG-1. Título app desync (DESKTOP)
-**Contexto:** `src/index.html:5` muestra `0.0.4-beta.test` pero la versión real es `0.1.9-beta` (el instalador dice 0.1.9-beta, la ventana/tab dice la vieja).
+### ~~BACKLOG-1. Título app desync (DESKTOP)~~ ✅
+**Contexto:** `src/index.html:5` mostraba `0.0.4-beta.test` pero la versión real es `0.1.9-beta` (el instalador dice 0.1.9-beta, la ventana/tab dice la vieja).
 **Fix:** sincronizar el title con la versión real (package.json).
+**Commit:** `b19cb21` — title → `Tienda-App 0.1.10-beta` (resuelto junto al bump).
 
 ### BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)
 **Contexto:** backups nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
@@ -169,6 +170,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
 | 2026-07-31 | B4 reabrir jornada marcado ✅ (c41032b, a8c9010); backlog post-native-db-resilience agregado como Alta Prioridad; C7 al final, Pendientes otros encima | — |
+| 2026-07-31 | BACKLOG-1 (título desync) ✅ con bump a 0.1.10-beta (`b19cb21`) | `b19cb21` |
 | 2026-07-26 | P1-P4: prod-improvements-julio-2026 — jornada refresh, dark mode numbers, TTL 7d, limpieza TODO (17 tests nuevos) | — |
 | 2026-07-26 | C5: Tests de 4 componentes + B5: LoginPage tests + B6: ProductosPage tests (50 tests nuevos) | — |
 | 2026-06-24 | C10: Modo oscuro + Material Icons — 4 PRs (infra/icons/dark-nav/dark-pages) | `40d7e84`, `f5e026a`, `0f7c2ad`, `d31f1f1` |
