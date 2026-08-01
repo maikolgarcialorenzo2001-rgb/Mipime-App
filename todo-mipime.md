@@ -4,7 +4,7 @@
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main`
 > Tests: **689 / 43 test files** (web) + **136 / 4** (electron)
-> Última actualización: 2026-07-31
+> Última actualización: 2026-08-01
 
 ---
 
@@ -38,9 +38,9 @@
 **Contexto:** el nombre de export está duplicado entre `main.ts:55` y `backup.service._webExportName` (drift risk).
 **Fix:** fuente única para el nombre de export.
 
-### BACKLOG-7. Web fail-loud parity SqliteService (WEB)
+### ~~BACKLOG-7. Web fail-loud parity SqliteService (WEB)~~ ✅
 **Contexto:** SqliteService (web/OPFS) aún cae a `:memory:` silenciosamente ante fallo de apertura; el desktop ya es fail-loud.
-**Fix:** parity de comportamiento fail-loud en la versión web.
+**Fix:** aplicado en `18533f1` (fail-loud native migrations) — ya no existe fallback a `:memory:` en `sqlite.service.ts`; `_getClient()` lanza fuera de browser y `createSqlocalClient()` propaga fallos (verificado 2026-08-01).
 
 ### BACKLOG-8. Bundle budget 696kB vs 500kB (BUILD)
 **Contexto:** el bundle excede el budget de 500kB configurado (696kB actual).
@@ -52,7 +52,7 @@
 
 ### BACKLOG-10. ng test roto TS2532 venta.service.spec (TOOLING)
 **Contexto:** `ng test` falla con TS2532 en venta.service.spec.
-**Fix:** arreglar el spec.
+**Fix:** non-null assertions completas (`updateJornada![1]![0]`) — **presente solo en `feat/seed-productos-reales` (`ca76a83`), NO en main** (main tiene la versión incompleta `updateJornada![1][0]`). Verificado 2026-08-01.
 
 ### BACKLOG-11. 110 lint errors (TOOLING)
 **Contexto:** hay ~110 errores de eslint pendientes.
@@ -152,8 +152,10 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 ## 🟢 Prioridad Baja — Pendientes otros
 
-- **Push a origin** — main está 112 commits adelante de `origin/main` ~~(resuelto: merge a `94bc153`)~~
-- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio)
+- ✅ **Sync con origin/main** — `main` == `origin/main` (0 adelante / 0 atrás), verificado 2026-08-01
+- **betatest-features** — local atrasada 4 commits de `origin/betatest-features` (double-submit guard, scroll refresh, test fixes: `0a14327`, `e0f24ac`, `552a8b5`, `b349413`) — falta pull/merge
+- **electron/auto-save-excel** — local adelante 4 commits sin pushear (ElectronFileService en login/app-nav/historial + auto-save en JornadaService: `4666fef`–`bdba941`)
+- **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio). Setup presente: `capacitor.config.ts` + deps `@capacitor/*@8.4.2` + scripts `cap:*` (remote `mobile-capacitor` marca Fase 3 complete)
 
 ---
 
@@ -169,6 +171,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-01 | TODO sync vs remote: BACKLOG-7 y BACKLOG-10 ✅ (verificado en código); main == origin/main (0/0); ramas betatest-features (behind 4) y electron/auto-save-excel (ahead 4) anotadas; Capacitor setup documentado | — |
 | 2026-07-31 | B4 reabrir jornada marcado ✅ (c41032b, a8c9010); backlog post-native-db-resilience agregado como Alta Prioridad; C7 al final, Pendientes otros encima | — |
 | 2026-07-31 | BACKLOG-1 (título desync) ✅ con bump a 0.1.10-beta (`b19cb21`) | `b19cb21` |
 | 2026-07-26 | P1-P4: prod-improvements-julio-2026 — jornada refresh, dark mode numbers, TTL 7d, limpieza TODO (17 tests nuevos) | — |
