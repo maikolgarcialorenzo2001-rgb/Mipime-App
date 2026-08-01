@@ -5,6 +5,7 @@ import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
+import { APP_VERSION } from '../../version';
 
 @Component({
   selector: 'app-nav',
@@ -20,6 +21,9 @@ export class AppNavComponent {
   readonly themeService = inject(ThemeService);
 
   protected readonly auth = this._auth;
+
+  /** Versión de la app (generada desde package.json en build). */
+  readonly appVersion = APP_VERSION;
 
   readonly soloNumeros = signal(false);
 
