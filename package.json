@@ -4,9 +4,13 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "ng": "ng",
+    "prestart": "node scripts/sync-version.mjs",
     "start": "ng serve",
+    "prebuild": "node scripts/sync-version.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
+    "sync:version": "node scripts/sync-version.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
     "electron:ts": "tsc -p electron/tsconfig.json",
     "electron:rebuild": "npx @electron/rebuild -f -w better-sqlite3",
     "electron:start": "tsc -p electron/tsconfig.json && electron dist-electron/main.js",
