@@ -805,7 +805,7 @@ describe('main process', () => {
       );
     });
 
-    it('should create Tienda IPVE directory and write file from base64', async () => {
+    it('should create Tienda - App/Tienda IPVE directory and write file from base64', async () => {
       vi.resetModules();
       await import('./main');
       await flush();
@@ -822,16 +822,16 @@ describe('main process', () => {
       expect(mockAppGetPath).toHaveBeenCalledWith('documents');
       // mkdirSync called with the parent directory (path.dirname)
       expect(mockFsMkdirSync).toHaveBeenCalledWith(
-        expect.stringMatching(/Tienda IPVE.*Julio/),
+        expect.stringMatching(/Tienda - App[/\\]Tienda IPVE.*Julio/),
         { recursive: true },
       );
       expect(mockFsWriteFileSync).toHaveBeenCalledWith(
-        expect.stringMatching(/Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
+        expect.stringMatching(/Tienda - App[/\\]Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
         expect.any(Buffer),
       );
       expect(result).toEqual({
         success: true,
-        filePath: expect.stringContaining('Tienda IPVE'),
+        filePath: expect.stringMatching(/Tienda - App[/\\]Tienda IPVE/),
       });
     });
 

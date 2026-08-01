@@ -2,7 +2,7 @@
 
 ## Technical Approach
 
-Add a `file:saveFile(base64, filePath)` IPC channel that writes directly to the user's `Documents/Tienda IPVE/` directory without a dialog. A new `ElectronFileService` in the Angular layer detects environment (`window.electronAPI?.isPackaged`), constructs the correct file path per document type, and calls IPC — or falls back to browser Blob download for dev/plain-browser mode.
+Add a `file:saveFile(base64, filePath)` IPC channel that writes directly to the user's `Documents/Tienda - App/Tienda IPVE/` directory without a dialog. A new `ElectronFileService` in the Angular layer detects environment (`window.electronAPI?.isPackaged`), constructs the correct file path per document type, and calls IPC — or falls back to browser Blob download for dev/plain-browser mode.
 
 The spec's REQ-01 (environment detection) is handled via a new `app:isPackaged` IPC channel exposed as `window.electronAPI.isPackaged` using `ipcRenderer.sendSync` (runs once at preload, synchronous for the renderer).
 
@@ -122,9 +122,9 @@ class ElectronFileService {
 
 ### File path construction
 
-- **Individual**: `{documents}/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
-- **Monthly**: `{documents}/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`
-- **Range**: `{documents}/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`
+- **Individual**: `{documents}/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
+- **Monthly**: `{documents}/Tienda - App/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`
+- **Range**: `{documents}/Tienda - App/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`
 
 ## Testing Strategy
 

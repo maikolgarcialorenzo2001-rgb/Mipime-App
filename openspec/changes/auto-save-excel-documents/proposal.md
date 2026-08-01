@@ -1,7 +1,7 @@
 # SDD Proposal: auto-save-excel-documents
 
 ## Intent
-Auto-guardar los Excel generados (cierre individual, exportación mensual, exportación por rango) en la carpeta `Documents/Tienda IPVE/` del usuario sin mostrar diálogo "Guardar como".
+Auto-guardar los Excel generados (cierre individual, exportación mensual, exportación por rango) en la carpeta `Documents/Tienda - App/Tienda IPVE/` del usuario sin mostrar diálogo "Guardar como".
 
 ## Scope
 - Cierre individual (auto-cierre login + cierre manual jornada + cerrarYGuardar)
@@ -17,9 +17,9 @@ Auto-guardar los Excel generados (cierre individual, exportación mensual, expor
 
 | Type | Path | Filename |
 |------|------|----------|
-| Individual | `Documents/Tienda IPVE/{aaaa}/{mm - Mes}/` | `jornada_{YYYY-MM-DD}_{id}.xlsx` |
-| Mensual | `Documents/Tienda IPVE/` | `Jornada Completa Mes {Mes}.xlsx` |
-| Rango | `Documents/Tienda IPVE/` | `Jornada completa {dd/mm - aaaa} -- {dd/mm - aaaa}.xlsx` |
+| Individual | `Documents/Tienda - App/Tienda IPVE/{aaaa}/{mm - Mes}/` | `jornada_{YYYY-MM-DD}_{id}.xlsx` |
+| Mensual | `Documents/Tienda - App/Tienda IPVE/` | `Jornada Completa Mes {Mes}.xlsx` |
+| Rango | `Documents/Tienda - App/Tienda IPVE/` | `Jornada completa {dd/mm - aaaa} -- {dd/mm - aaaa}.xlsx` |
 
 ## Files to modify/create
 
