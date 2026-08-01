@@ -241,8 +241,8 @@ describe('VentaService', () => {
       );
       expect(updateJornada).toBeDefined();
       // [total_ventas, efectivoEnCaja, updated_at, jornada_id]
-      expect(updateJornada![1][0]).toBe(850);         // total_ventas += total
-      expect(updateJornada![1][1]).toBe(-2650);        // saldo_esperado -= vuelto
+      expect(updateJornada![1]![0]).toBe(850);         // total_ventas += total
+      expect(updateJornada![1]![1]).toBe(-2650);        // saldo_esperado -= vuelto
     });
 
     it('2.8 RED: debería sumar completacionEfectivo al saldo_esperado cuando falta', async () => {
@@ -278,8 +278,8 @@ describe('VentaService', () => {
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
       );
       expect(updateJornada).toBeDefined();
-      expect(updateJornada![1][0]).toBe(850);         // total_ventas += total
-      expect(updateJornada![1][1]).toBe(200);          // saldo_esperado += completacion
+      expect(updateJornada![1]![0]).toBe(850);         // total_ventas += total
+      expect(updateJornada![1]![1]).toBe(200);          // saldo_esperado += completacion
     });
 
     // ─── 2.9: pendiente INSERT + stock + UPDATE jornadas (incluye pendientes en saldo_esperado) ──
