@@ -103,7 +103,12 @@ export class InventarioPage implements OnInit {
   async onSubmitMovimiento(): Promise<void> {
     const action = this.selectedAction();
     if (!action) return;
+    // Re-entrancy guard: ignore accidental double-clicks while a movement is
+    // still being registered, otherwise the operation runs twice (and double
+    // stock is consumed even when it should not be).
+    if (this.procesandoMovimiento()) return;
 
+    this.procesandoMovimiento.set(true);
     this.error.set(null);
     try {
       switch (action.tipo) {
@@ -194,6 +199,8 @@ export class InventarioPage implements OnInit {
           ? e.message
           : 'Error al registrar movimiento',
       );
+    } finally {
+      this.procesandoMovimiento.set(false);
     }
   }
 
@@ -300,6 +307,7 @@ export class InventarioPage implements OnInit {
   readonly formError = signal<string | null>(null);
   readonly confirmandoEliminar = signal<number | null>(null);
   readonly procesando = signal(false);
+  readonly procesandoMovimiento = signal(false);
 
   abrirNuevoProducto(): void {
     if (!this.esAdmin()) return;

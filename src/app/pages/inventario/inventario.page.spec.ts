@@ -736,6 +736,185 @@ describe('InventarioPage', () => {
     expect(component.procesando()).toBe(false);
   });
 
+  // ── Scroll preservation ────────────────────────────────────────
+
+  it('27. keeps table mounted during refresh (scroll preservation)', async () => {
+    // Initial load resolves with 2 products.
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 2)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.loading()).toBe(false);
+
+    // Refresh with an unresolved observable: loading starts but the table
+    // must stay mounted (no spinner swap, no height collapse).
+    let resolveRefresh!: (value: Producto[]) => void;
+    mockProductoService.listar.mockReturnValue(
+      new Observable<Producto[]>((subscriber) => {
+        resolveRefresh = (value) => {
+          subscriber.next(value);
+          subscriber.complete();
+        };
+      }),
+    );
+
+    const refresh = component['loadProductos']();
+    fixture.detectChanges();
+
+    expect(component.loading()).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeFalsy();
+
+    const tbody = fixture.nativeElement.querySelector('tbody');
+    expect(tbody).toBeTruthy();
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Coca Cola');
+    expect(text).toContain('Pepsi');
+
+    // Resolve with updated data → rows reflect the changes in place.
+    resolveRefresh([
+      { ...productos[0], precio_venta: 15, stock_almacen: 120 },
+      { ...productos[1], precio_venta: 11, stock_almacen: 60 },
+    ]);
+    await refresh;
+    fixture.detectChanges();
+
+    expect(component.loading()).toBe(false);
+    const updatedText = fixture.nativeElement.textContent;
+    expect(updatedText).toContain('$15.00');
+    expect(updatedText).toContain('$11.00');
+    expect(updatedText).not.toContain('$12.00');
+    expect(updatedText).not.toContain('$10.00');
+  });
+
+  it('28. no empty-state flash during refresh with active search filter', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 2)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // Active filter matches nothing → filtered list is empty while data exists.
+    component.searchQuery.set('zzz');
+    fixture.detectChanges();
+    expect(component.filteredProductos().length).toBe(0);
+
+    let resolveRefresh!: (value: Producto[]) => void;
+    mockProductoService.listar.mockReturnValue(
+      new Observable<Producto[]>((subscriber) => {
+        resolveRefresh = (value) => {
+          subscriber.next(value);
+          subscriber.complete();
+        };
+      }),
+    );
+
+    const refresh = component['loadProductos']();
+    fixture.detectChanges();
+
+    // While loading: no empty state, spinner instead.
+    expect(component.loading()).toBe(true);
+    expect(fixture.nativeElement.querySelector('app-empty-state')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeTruthy();
+
+    // After the refresh resolves: empty state appears.
+    resolveRefresh([]);
+    await refresh;
+    fixture.detectChanges();
+
+    expect(component.loading()).toBe(false);
+    expect(fixture.nativeElement.querySelector('app-empty-state')).toBeTruthy();
+  });
+
+  // ── Double-submit guard ───────────────────────────────────────
+
+  it('29. ignores a second submit while a movement is in progress', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+
+    let resolveSalida!: () => void;
+    mockStockService.registrarSalida.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSalida = resolve;
+      }),
+    );
+
+    const first = component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    // Double-click: a second submit fires while the first is still pending.
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(1);
+
+    resolveSalida();
+    await first;
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(1);
+    // After the movement completes, the in-progress state is released.
+    expect(component.procesandoMovimiento()).toBe(false);
+  });
+
+  it('30. disables the submit button while a movement is in progress', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+
+    let resolveSalida!: () => void;
+    mockStockService.registrarSalida.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSalida = resolve;
+      }),
+    );
+
+    const first = component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const submitBtn = fixture.nativeElement.querySelector(
+      'form button[type="submit"]',
+    ) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+    expect(submitBtn.textContent).toContain('Guardando...');
+    expect(component.procesandoMovimiento()).toBe(true);
+
+    resolveSalida();
+    await first;
+    fixture.detectChanges();
+
+    // The movement completed: in-progress state released and the inline form
+    // is closed (so the button element itself is gone from the DOM).
+    expect(component.procesandoMovimiento()).toBe(false);
+    expect(component.selectedAction()).toBeNull();
+    expect(fixture.nativeElement.querySelector('form')).toBeFalsy();
+  });
+
   describe('responsive layout', () => {
     it('debería tener container con max-w-7xl', () => {
       fixture.detectChanges();

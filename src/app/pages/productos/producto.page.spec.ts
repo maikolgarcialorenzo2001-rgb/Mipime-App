@@ -117,7 +117,11 @@ describe('ProductosPage', () => {
     expect(fixture.nativeElement.textContent).toContain('No hay productos cargados');
   });
 
-  it('muestra "Cargando…" mientras carga', () => {
+  it('muestra "Cargando…" en la carga inicial con lista vacía', () => {
+    // Initial-load semantics: the full loading state only renders when the
+    // list is empty. A refresh over an already-loaded list must keep the table.
+    component.productos.set([]);
+
     let resolve!: (v: Producto[]) => void;
     vi.spyOn(productoService, 'listar').mockReturnValue(
       new Observable((sub) => {
@@ -134,6 +138,61 @@ describe('ProductosPage', () => {
     resolve([]);
     fixture.detectChanges();
     expect(component.buscando()).toBe(false);
+  });
+
+  it('mantiene la tabla montada durante un refresh (preserva scroll)', () => {
+    // beforeEach already loaded Café + Té.
+    let resolve!: (v: Producto[]) => void;
+    vi.spyOn(productoService, 'listar').mockReturnValue(
+      new Observable<Producto[]>((sub) => {
+        resolve = (v) => { sub.next(v); sub.complete(); };
+      }),
+    );
+
+    component.recargar();
+    fixture.detectChanges();
+
+    expect(component.buscando()).toBe(true);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Café');
+    expect(el.textContent).toContain('Té');
+    expect(el.textContent).not.toContain('Cargando');
+
+    // Resolve updated data → rows reflect the changes in place.
+    resolve([
+      { ...mockProductos[0], precio_venta: 550 },
+      { ...mockProductos[1], precio_venta: 400 },
+    ]);
+    fixture.detectChanges();
+
+    expect(component.buscando()).toBe(false);
+    const updatedText = fixture.nativeElement.textContent;
+    expect(updatedText).toContain('550');
+    expect(updatedText).toContain('400');
+  });
+
+  it('no muestra el estado vacío durante un refresh con lista vacía', () => {
+    component.productos.set([]);
+
+    let resolve!: (v: Producto[]) => void;
+    vi.spyOn(productoService, 'listar').mockReturnValue(
+      new Observable<Producto[]>((sub) => {
+        resolve = (v) => { sub.next(v); sub.complete(); };
+      }),
+    );
+
+    component.recargar();
+    fixture.detectChanges();
+
+    expect(component.buscando()).toBe(true);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('No hay productos cargados');
+    expect(el.textContent).toContain('Cargando');
+
+    resolve([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('No hay productos cargados');
   });
 
   it('onSearch busca productos con debounce (usa timers)', () => {
