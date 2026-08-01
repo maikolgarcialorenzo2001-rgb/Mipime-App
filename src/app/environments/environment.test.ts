@@ -3,7 +3,7 @@ export const environment = {
   dbName: 'tienda-app-test.db',
   adminUser: 'e.z',
   adminPassword: 'softwarez',
-  seedEnabled: false,
+  seedEnabled: true,
   ttlDays: 7,
   testMode: true,
 };

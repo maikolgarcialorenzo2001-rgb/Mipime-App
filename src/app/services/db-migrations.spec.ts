@@ -82,10 +82,12 @@ describe('runMigrations', () => {
     await runMigrations(exec, { seedEnabled: true });
 
     const batches = exec.productSeedBatches();
-    expect(batches.length).toBe(5);
+    // 74 productos / 10 por batch = 8 batches (el último con 4)
+    expect(batches.length).toBe(8);
     for (const batch of batches) {
-      // 8 columnas x 10 filas por batch
-      expect(batch.match(/\?/g)!.length).toBe(80);
+      // 8 columnas x 10 filas por batch (el último puede tener menos)
+      expect(batch.match(/\?/g)!.length % 8).toBe(0);
+      expect(batch.match(/\?/g)!.length).toBeLessThanOrEqual(80);
     }
     const loteSeed = exec.calls.find(
       (c) =>
@@ -154,6 +156,6 @@ describe('runMigrations', () => {
     expect(exec.versionNumbers()).toEqual([
       6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
     ]);
-    expect(exec.productSeedBatches().length).toBe(5);
+    expect(exec.productSeedBatches().length).toBe(8);
   });
 });
