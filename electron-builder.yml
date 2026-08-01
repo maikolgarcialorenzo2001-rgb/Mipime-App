@@ -21,6 +21,10 @@ asar: true
 asarUnpack:
   - "**/*.node"
 
+# better-sqlite3 ships prebuilt N-API binaries (ABI stable Node<->Electron),
+# so the node-gyp rebuild step (which requires Python) is unnecessary.
+npmRebuild: false
+
 win:
   icon: build/icon.ico
   target:
