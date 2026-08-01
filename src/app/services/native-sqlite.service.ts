@@ -4,7 +4,7 @@ import { DbStatusService } from './db-status.service';
 import { BackupService } from './backup.service';
 import { environment } from '../environments/environment';
 import { runMigrations } from './db-migrations';
-import { createSqlocalClient } from './sqlocal-client';
+import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
 
 /**
  * Implementación de `Database` sobre el proceso main vía IPC (T4, AD-1/AD-3).
@@ -16,6 +16,7 @@ import { createSqlocalClient } from './sqlocal-client';
 export class NativeSqliteService implements Database {
   private readonly _dbStatus = inject(DbStatusService);
   private readonly _backup = inject(BackupService);
+  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT_FACTORY);
 
   /** Versión cacheada del invoke app:getVersion (MINOR-5); 'unknown' si falla. */
   private _appVersion: string | null = null;
@@ -128,7 +129,7 @@ export class NativeSqliteService implements Database {
       // fallara en el renderer, getDatabaseFile() rechazaría → file:null →
       // adoptOrFresh crearía DB fresca y el flag bloquearía re-imports
       // (datos OPFS varados).
-      const client = await createSqlocalClient();
+      const client = await this._createSqlocalClient();
       // getDatabaseFile devuelve un File web; el contrato IPC pide ArrayBuffer.
       // Lectura NO destructiva (R8): OPFS queda intacto, solo VACUUM INTO.
       file = await (await client.getDatabaseFile()).arrayBuffer();

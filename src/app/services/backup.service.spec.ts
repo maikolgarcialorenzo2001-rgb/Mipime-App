@@ -1,14 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
+import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
 
-const { createSqlocalClientMock, getDatabaseFileMock } = vi.hoisted(() => ({
-  createSqlocalClientMock: vi.fn(),
-  getDatabaseFileMock: vi.fn(),
-}));
-
-vi.mock('./sqlocal-client', () => ({
-  createSqlocalClient: createSqlocalClientMock,
-}));
+// El unit-test builder prohíbe vi.mock con imports relativos; la factoría
+// SQLocal se inyecta por DI (SQLOCAL_CLIENT_FACTORY) y se mockea en TestBed.
+const createSqlocalClientMock = vi.fn();
+const getDatabaseFileMock = vi.fn();
 
 describe('BackupService', () => {
   let service: BackupService;
@@ -16,7 +13,12 @@ describe('BackupService', () => {
 
   beforeEach(() => {
     invokeMock = vi.fn().mockResolvedValue({ ok: true });
-    TestBed.configureTestingModule({ providers: [BackupService] });
+    TestBed.configureTestingModule({
+      providers: [
+        BackupService,
+        { provide: SQLOCAL_CLIENT_FACTORY, useValue: createSqlocalClientMock },
+      ],
+    });
     service = TestBed.inject(BackupService);
   });
 
@@ -77,7 +79,12 @@ describe('BackupService exportarRespaldo (T12)', () => {
 
   beforeEach(() => {
     invokeMock = vi.fn().mockResolvedValue({ ok: true });
-    TestBed.configureTestingModule({ providers: [BackupService] });
+    TestBed.configureTestingModule({
+      providers: [
+        BackupService,
+        { provide: SQLOCAL_CLIENT_FACTORY, useValue: createSqlocalClientMock },
+      ],
+    });
     service = TestBed.inject(BackupService);
     getDatabaseFileMock.mockReset();
     createSqlocalClientMock.mockReset();
@@ -123,32 +130,35 @@ describe('BackupService exportarRespaldo (T12)', () => {
       getDatabaseFile: getDatabaseFileMock,
     });
 
-    const createObjectUrlMock = vi.fn(() => 'blob:mock-export');
-    const revokeObjectUrlMock = vi.fn();
-    Object.defineProperty(URL, 'createObjectURL', {
-      value: createObjectUrlMock,
-      configurable: true,
-    });
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      value: revokeObjectUrlMock,
-      configurable: true,
-    });
+    // spyOn + mockRestore (no defineProperty global): los tests comparten el
+    // objeto URL global con otros specs en el mismo worker; restaurar evita
+    // contaminar electron-file.service.spec y otros.
+    const createObjectUrlSpy = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:mock-export');
+    const revokeObjectUrlSpy = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockReturnValue(undefined);
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {
         return undefined;
       });
 
-    const result = await service.exportarRespaldo();
+    try {
+      const result = await service.exportarRespaldo();
 
-    expect(createSqlocalClientMock).toHaveBeenCalled();
-    expect(getDatabaseFileMock).toHaveBeenCalled();
-    expect(createObjectUrlMock).toHaveBeenCalled();
-    expect(clickSpy).toHaveBeenCalled();
-    expect(revokeObjectUrlMock).toHaveBeenCalled();
-    expect(result.ok).toBe(true);
-
-    clickSpy.mockRestore();
+      expect(createSqlocalClientMock).toHaveBeenCalled();
+      expect(getDatabaseFileMock).toHaveBeenCalled();
+      expect(createObjectUrlSpy).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalled();
+      expect(revokeObjectUrlSpy).toHaveBeenCalled();
+      expect(result.ok).toBe(true);
+    } finally {
+      createObjectUrlSpy.mockRestore();
+      revokeObjectUrlSpy.mockRestore();
+      clickSpy.mockRestore();
+    }
   });
 
   it('T12 RED: web resuelve {ok:false, error} si getDatabaseFile rechaza (R6)', async () => {

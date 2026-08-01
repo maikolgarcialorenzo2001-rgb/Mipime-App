@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import { createSqlocalClient } from './sqlocal-client';
+import { Injectable, inject } from '@angular/core';
+import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
 
 export type BackupTrigger = 'open' | 'jornada-close';
 
@@ -15,6 +15,8 @@ export type BackupTrigger = 'open' | 'jornada-close';
  */
 @Injectable({ providedIn: 'root' })
 export class BackupService {
+  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT_FACTORY);
+
   async backup(trigger: BackupTrigger): Promise<void> {
     if (!window.electronAPI) {
       return; // web: no-op (AD-6)
@@ -48,7 +50,7 @@ export class BackupService {
 
     // Web (AD-6): blob download del archivo OPFS (lectura no destructiva).
     try {
-      const client = await createSqlocalClient();
+      const client = await this._createSqlocalClient();
       const file = await client.getDatabaseFile();
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
