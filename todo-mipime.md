@@ -22,21 +22,22 @@
 **Contexto:** `ng test` falla a nivel build con TS2532 en `venta.service.spec.ts` (`updateJornada![1]` bajo `noUncheckedIndexedAccess`, commit `f52caf5`). El suite verde solo corre con `npx vitest run` (`disableTypeChecking: true`). El fix existe en `feat/seed-productos-reales` (`ca76a83`) pero aún no está en `main`.
 **Fix:** mergear el fix de `venta.service.spec.ts` a `main` (viene con la branch del seed).
 
-### BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)
-**Contexto:** backups nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
-**Fix:** resolución de colisión (sufijo/secuencia) en el nombre del snapshot.
-
-> **IMPLEMENTADO** en branch `fix/desktop-resilience-backlog` (`118b224`): `timestampedSnapshotPath(dir, d)` (loop `-<n>` mientras `existsSync`) + widening `TIMESTAMPED_RE`/`whenFromName` a `(?:-\d+)?` (parsable + prunable + restorable). ✅ Electron 141 / web 695 GREEN. **⏳ PR pendiente de abrir (a pedido del usuario 2026-08-02, se deja para próxima sesión).**
+### ~~BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)~~ ✅
+**Contexto:** snapshots nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
+**Fix:** `timestampedSnapshotPath(dir, d)` (loop `-<n>` mientras `existsSync`) + widening `TIMESTAMPED_RE`/`whenFromName` a `(?:-\d+)?` (parsable + prunable + restorable). ✅ Electron 141 / web 695 GREEN. **⏳ PR pendiente de abrir (a pedido del usuario 2026-08-02, se deja para próxima sesión).**
+**Commit:** `118b224`.
 
 ### BACKLOG-3. Cascade fatal stage siempre 'open' (DESKTOP)
 **Contexto:** en la cascada de recuperación, el stage del diagnóstico fatal siempre reporta 'open' aunque el fallo ocurra en otra etapa.
-**Fix:** reportar el stage real de la cascada en los diagnósticos.
+**Fix:** `let currentStage` module-scope + `getStartupStage()` en db.ts; ambos fatales (`db.ts`, `main.ts:initialize`) leen de la misma fuente.
+**Commit:** `70d4532`.
 
 > **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`70d4532`): `let currentStage` + `getStartupStage()` en `db.ts`; ambos fatales leen de la misma fuente. ✅ **⏳ PR pendiente**.
 
 ### BACKLOG-4. postinstall electron-builder install-app-deps (DESKTOP)
-**Contexto:** el build desktop depende de `@electron/rebuild` manual; falta el `postinstall` para automatizar la reinstalación de deps nativas.
-**Fix:** agregar script `postinstall: electron-builder install-app-deps`.
+**Contexto:** el build desktop depende de `@electron/rebuild` manual; falta el `postinstall`.
+**Fix:** `"postinstall": "electron-builder install-app-deps"` en package.json (electron:rebuild intacto).
+**Commit:** `b8005e5`.
 
 > **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`b8005e5`): `"postinstall": "electron-builder install-app-deps"` (electron:rebuild intacto). ✅ **⏳ PR pendiente**.
 
@@ -163,7 +164,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 ## 🟢 Prioridad Baja — Pendientes otros
 
 - ✅ **Sync con origin/main** — `main` == `origin/main` (0 adelante / 0 atrás), verificado 2026-08-01
-- **feat/seed-productos-reales** — branch activa con 4 commits NO integrados a main (seed 74 productos reales + fix TS2532 venta spec + migración specs TestBed/DI + skip native rebuild): `358eb93`, `ca76a83`, `6bd9e31`, `1654773`. Tracking local creado 2026-08-01 — pendiente merge/PR
+- **feat/seed-productos-reales** — branch activa con 4 commits NO integrados a main (seed 74 productos reales + fix TS2532 venta spec + migración specs TestBed/DI + skip native rebuild): `358eb93`, `ca76a83`, `6bd9e31`, `1654773`. Tracking local creado 2026-08-01. **🚫 BLOQUEADA de merge hasta pasar testing correcto (decisión usuario 2026-08-01)**
 - **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio). Setup presente: `capacitor.config.ts` + deps `@capacitor/*@8.4.2` + scripts `cap:*`
 
 ---
