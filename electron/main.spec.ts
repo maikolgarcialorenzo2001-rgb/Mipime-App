@@ -125,6 +125,7 @@ const mockPruneBackups = vi.hoisted(() => vi.fn(() => []));
 const mockAdoptOrFresh = vi.hoisted(() => vi.fn(() => ({ status: 'fresh' })));
 const mockOpenNativeDb = vi.hoisted(() => vi.fn());
 const mockBackupRodanteSync = vi.hoisted(() => vi.fn());
+const mockGetStartupStage = vi.hoisted(() => vi.fn(() => 'open'));
 
 vi.mock('./db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./db')>();
@@ -137,6 +138,7 @@ vi.mock('./db', async (importOriginal) => {
     adoptOrFresh: mockAdoptOrFresh,
     openNativeDb: mockOpenNativeDb,
     backupRodanteSync: mockBackupRodanteSync,
+    getStartupStage: mockGetStartupStage,
   };
 });
 
@@ -349,6 +351,10 @@ describe('main process', () => {
       mockRunStartupSequence.mockImplementation(() => {
         throw new Error('disk failure');
       });
+      // RECOVERY RED-FLIP: the synthesized fatal MUST read the real cascade
+      // stage via getStartupStage() (single shared source), NOT a hardcoded
+      // 'open'. Mocking it to 'recover' proves the handler is not hardcoded.
+      mockGetStartupStage.mockReturnValue('recover');
 
       const handler = await getDbHandler('db:initialize');
       const result = await handler();
@@ -359,7 +365,7 @@ describe('main process', () => {
           appVersion: '1.0.0',
           platform: process.platform,
           sqliteError: 'disk failure',
-          stage: 'open',
+          stage: mockGetStartupStage(),
           backupsTried: [],
         },
       });

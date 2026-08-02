@@ -16,6 +16,7 @@ import {
   adoptOrFresh,
   timestampedBackupName,
   backupRodanteSync,
+  getStartupStage,
   DB_FILENAME,
   IMPORT_FLAG_FILENAME,
   MAX_IMPORT_BYTES,
@@ -248,7 +249,7 @@ app.whenReady().then(() => {
           appVersion: app.getVersion(),
           platform: process.platform,
           sqliteError: (err as Error).message,
-          stage: 'open',
+          stage: getStartupStage(),
           backupsTried: [],
         },
       };

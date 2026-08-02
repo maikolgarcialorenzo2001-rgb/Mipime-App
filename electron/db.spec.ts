@@ -454,7 +454,9 @@ describe('runStartupSequence', () => {
     });
 
     expect(result.status).toBe('fatal');
-    expect(result.diagnostics?.stage).toBe('open');
+    // RECOVERY RED-FLIP: cascade advanced past 'open' (recoverInPlace + rodante
+    // + timestamped all failed) → stage MUST report 'recover', not hardcoded 'open'.
+    expect(result.diagnostics?.stage).toBe('recover');
     expect(result.diagnostics?.appVersion).toBe('0.1.9-beta');
     expect(result.diagnostics?.sqliteError).toBeDefined();
     expect(result.diagnostics?.backupsTried.length).toBeGreaterThanOrEqual(3);

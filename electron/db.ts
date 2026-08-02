@@ -62,6 +62,18 @@ export interface StartupResult {
   diagnostics?: DbDiagnostics;
 }
 
+/**
+ * Etapa actual de la cascada de arranque (spec db-recovery MODIFIED):
+ * fuente ÚNICA para el diagnóstico fatal. `currentStage` avanza a medida que
+ * la cascada progresa (open → recover …) y ambos call-site (runStartupSequence
+ * fatal y el catch de db:initialize en main.ts) leen un mismo getter → no
+ * pueden divergir (BACKLOG-3).
+ */
+let currentStage: DbDiagnostics['stage'] = 'open';
+export function getStartupStage(): DbDiagnostics['stage'] {
+  return currentStage;
+}
+
 export interface StartupOptions {
   userDataPath: string;
   documentsPath: string;
@@ -378,6 +390,9 @@ export function runStartupSequence(opts: StartupOptions): StartupResult {
   }
 
   const rec = recoverInPlace(dbPath);
+  // La cascada avanzó más allá de 'open': a partir de acá el diagnóstico fatal
+  // (si todo falla) debe reportar 'recover', no el 'open' hardcodeado (BACKLOG-3).
+  currentStage = 'recover';
   if (rec.recovered) {
     return {
       status: 'restored',
@@ -406,7 +421,7 @@ export function runStartupSequence(opts: StartupOptions): StartupResult {
       appVersion: opts.appVersion,
       platform: opts.platform,
       sqliteError,
-      stage: 'open',
+      stage: getStartupStage(),
       backupsTried,
     },
   };
