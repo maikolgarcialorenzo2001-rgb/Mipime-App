@@ -14,7 +14,7 @@ import {
   backupDb,
   pruneBackups,
   adoptOrFresh,
-  timestampedBackupName,
+  timestampedSnapshotPath,
   backupRodanteSync,
   getStartupStage,
   DB_FILENAME,
@@ -383,9 +383,12 @@ app.whenReady().then(() => {
           db.close();
         }
         if (trigger === 'jornada-close') {
-          const snapshotPath = path.join(
+          // BACKLOG-2: path verificado against fs (corruptTargetFor pattern) —
+          // un segundo snapshot en el mismo minuto recibe sufijo -<n> en vez
+          // de sobreescribir el primero silenciosamente.
+          const snapshotPath = timestampedSnapshotPath(
             backupsDirFor(),
-            timestampedBackupName(new Date()),
+            new Date(),
           );
           const snapDb = openNativeDb(dbPathFor());
           try {
