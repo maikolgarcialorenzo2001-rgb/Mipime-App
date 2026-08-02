@@ -4,7 +4,7 @@
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main`
 > Tests: **697 / 43 test files** (web) + **136 / 4** (electron)
-> Última actualización: 2026-08-01
+> Última actualización: 2026-08-02
 
 ---
 
@@ -26,13 +26,19 @@
 **Contexto:** backups nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
 **Fix:** resolución de colisión (sufijo/secuencia) en el nombre del snapshot.
 
+> **IMPLEMENTADO** en branch `fix/desktop-resilience-backlog` (`118b224`): `timestampedSnapshotPath(dir, d)` (loop `-<n>` mientras `existsSync`) + widening `TIMESTAMPED_RE`/`whenFromName` a `(?:-\d+)?` (parsable + prunable + restorable). ✅ Electron 141 / web 695 GREEN. **⏳ PR pendiente de abrir (a pedido del usuario 2026-08-02, se deja para próxima sesión).**
+
 ### BACKLOG-3. Cascade fatal stage siempre 'open' (DESKTOP)
 **Contexto:** en la cascada de recuperación, el stage del diagnóstico fatal siempre reporta 'open' aunque el fallo ocurra en otra etapa.
 **Fix:** reportar el stage real de la cascada en los diagnósticos.
 
+> **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`70d4532`): `let currentStage` + `getStartupStage()` en `db.ts`; ambos fatales leen de la misma fuente. ✅ **⏳ PR pendiente**.
+
 ### BACKLOG-4. postinstall electron-builder install-app-deps (DESKTOP)
 **Contexto:** el build desktop depende de `@electron/rebuild` manual; falta el `postinstall` para automatizar la reinstalación de deps nativas.
 **Fix:** agregar script `postinstall: electron-builder install-app-deps`.
+
+> **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`b8005e5`): `"postinstall": "electron-builder install-app-deps"` (electron:rebuild intacto). ✅ **⏳ PR pendiente**.
 
 ### BACKLOG-5. revokeObjectURL timing (WEB)
 **Contexto:** en el export web, `URL.revokeObjectURL` se llama síncronamente después de `a.click()` — frágil en Safari viejo.
@@ -174,6 +180,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-02 | SDD `desktop-resilience-backlogs`: BACKLOG-2/3/4 **implementados** en `fix/desktop-resilience-backlog` (colisión snapshot + parser `(?:-\d+)?`, stage fatal real, postinstall install-app-deps). Electron 141 / web 695 GREEN. **⏳ PRs NO abiertos (decisión sesión 2026-08-02).** | `b8005e5`, `70d4532`, `118b224` |
 | 2026-08-01 | Limpieza de ramas: 11 remotes + 7 locales obsoletas eliminadas (todo contenido ya en main); `feat/seed-productos-reales` traída a local con tracking; ruta auto-save Excel unificada a `Documents/Tienda - App/Tienda IPVE` | `e6243a8`, `189e951` |
 | 2026-08-01 | TODO sync vs remote: BACKLOG-7 ✅, BACKLOG-10 revertido a pendiente (fix solo en branch); main == origin/main (0/0); ramas betatest-features (behind 4) y electron/auto-save-excel (ahead 4) anotadas; Capacitor setup documentado | — |
 | 2026-07-31 | B4 reabrir jornada marcado ✅ (c41032b, a8c9010); backlog post-native-db-resilience agregado como Alta Prioridad; C7 al final, Pendientes otros encima | — |
