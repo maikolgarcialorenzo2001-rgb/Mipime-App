@@ -2,16 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { NativeSqliteService } from './native-sqlite.service';
 import { DbStatusService } from './db-status.service';
 import { BackupService } from './backup.service';
+import { SQLOCAL_CLIENT } from './sqlocal-client';
 
-const mockGetDatabaseFile = vi.hoisted(() => vi.fn());
-const mockCreateSqlocalClient = vi.hoisted(() => vi.fn());
-
-// M1: el roundtrip construye SQLocal vía la factoría compartida
-// (sqlocal-client), NO con `new SQLocal(...)` directo: el Worker explícito
-// procesado por Vite evita NS_ERROR_CORRUPTED_CONTENT en este build.
-vi.mock('./sqlocal-client', () => ({
-  createSqlocalClient: mockCreateSqlocalClient,
-}));
+const mockGetDatabaseFile = vi.fn();
+const mockCreateSqlocalClient = vi.fn();
 
 describe('NativeSqliteService', () => {
   let service: NativeSqliteService;
@@ -46,6 +40,7 @@ describe('NativeSqliteService', () => {
         NativeSqliteService,
         DbStatusService,
         { provide: BackupService, useValue: mockBackup },
+        { provide: SQLOCAL_CLIENT, useValue: mockCreateSqlocalClient },
       ],
     });
     service = TestBed.inject(NativeSqliteService);

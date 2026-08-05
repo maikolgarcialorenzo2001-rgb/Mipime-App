@@ -1,5 +1,18 @@
 import { environment } from '../environments/environment';
+import { InjectionToken } from '@angular/core';
 import type { SQLocal } from 'sqlocal';
+
+export type SqlocalClientFactory = () => Promise<SQLocal>;
+
+/**
+ * Token de la factoría compartida de clientes SQLocal (M1). Inyectable para
+ * poder mockearla con TestBed (el sistema de unit-test de Angular no permite
+ * `vi.mock` con imports relativos). El default usa la factoría real.
+ */
+export const SQLOCAL_CLIENT = new InjectionToken<SqlocalClientFactory>(
+  'SQLocal client factory',
+  { providedIn: 'root', factory: () => createSqlocalClient },
+);
 
 /**
  * Factoría compartida de clientes SQLocal (M1). SqliteService y el roundtrip

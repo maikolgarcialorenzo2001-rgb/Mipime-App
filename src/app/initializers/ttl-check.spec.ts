@@ -1,20 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ttlCheckInitializer } from './ttl-check';
+import { environment } from '../environments/environment';
 
-const mockEnvironment = vi.hoisted(() => ({
-  testMode: true,
-  ttlDays: 7,
-}));
-
-vi.mock('../environments/environment', () => ({
-  environment: mockEnvironment,
-}));
-
+// ttl-check lee environment.testMode / ttlDays en tiempo de invocación, así que
+// mutamos el objeto real en beforeEach (el entorno de test: testMode=true).
 describe('ttlCheckInitializer', () => {
   beforeEach(() => {
     localStorage.clear();
-    mockEnvironment.testMode = true;
-    mockEnvironment.ttlDays = 7;
+    environment.testMode = true;
+    environment.ttlDays = 7;
   });
 
   it('first launch in test mode stores timestamp and returns true', async () => {
@@ -59,7 +53,7 @@ describe('ttlCheckInitializer', () => {
   });
 
   it('non-test mode returns true without touching localStorage', async () => {
-    mockEnvironment.testMode = false;
+    environment.testMode = false;
 
     const init = ttlCheckInitializer();
     const result = await init();

@@ -1,14 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
+import { SQLOCAL_CLIENT } from './sqlocal-client';
 
-const { createSqlocalClientMock, getDatabaseFileMock } = vi.hoisted(() => ({
-  createSqlocalClientMock: vi.fn(),
-  getDatabaseFileMock: vi.fn(),
-}));
-
-vi.mock('./sqlocal-client', () => ({
-  createSqlocalClient: createSqlocalClientMock,
-}));
+const createSqlocalClientMock = vi.fn();
+const getDatabaseFileMock = vi.fn();
 
 describe('BackupService', () => {
   let service: BackupService;
@@ -77,10 +72,15 @@ describe('BackupService exportarRespaldo (T12)', () => {
 
   beforeEach(() => {
     invokeMock = vi.fn().mockResolvedValue({ ok: true });
-    TestBed.configureTestingModule({ providers: [BackupService] });
-    service = TestBed.inject(BackupService);
     getDatabaseFileMock.mockReset();
     createSqlocalClientMock.mockReset();
+    TestBed.configureTestingModule({
+      providers: [
+        BackupService,
+        { provide: SQLOCAL_CLIENT, useValue: createSqlocalClientMock },
+      ],
+    });
+    service = TestBed.inject(BackupService);
   });
 
   afterEach(() => {
