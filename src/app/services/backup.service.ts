@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { SQLOCAL_CLIENT } from './sqlocal-client';
+import { exportName } from '../../../electron/export-name';
 
 export type BackupTrigger = 'open' | 'jornada-close';
 
@@ -55,7 +56,7 @@ export class BackupService {
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
       a.href = url;
-      a.download = this._webExportName(new Date());
+      a.download = exportName(new Date());
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -66,12 +67,5 @@ export class BackupService {
     } catch (err) {
       return { ok: false, error: (err as Error).message };
     }
-  }
-
-  private _webExportName(d: Date): string {
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `tienda_export_${d.getFullYear()}${p(d.getMonth() + 1)}${p(
-      d.getDate(),
-    )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
   }
 }

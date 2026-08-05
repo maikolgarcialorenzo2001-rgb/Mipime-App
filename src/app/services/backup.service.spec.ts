@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
 import { SQLOCAL_CLIENT } from './sqlocal-client';
+import { exportName } from '../../../electron/export-name';
 
 const createSqlocalClientMock = vi.fn();
 const getDatabaseFileMock = vi.fn();
@@ -168,5 +169,19 @@ describe('BackupService exportarRespaldo (T12)', () => {
     const result = await service.exportarRespaldo();
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('exportName shared helper (BACKLOG-6: single source con el desktop)', () => {
+  it('web y desktop derivan el MISMO nombre (byte-identical)', () => {
+    expect(exportName(new Date(2026, 7, 2, 14, 5))).toBe(
+      'tienda_export_20260802_1405.db',
+    );
+  });
+
+  it('zero-pad de dígitos simples (mes/día/hora/minuto)', () => {
+    expect(exportName(new Date(2026, 0, 5, 9, 3))).toBe(
+      'tienda_export_20260105_0903.db',
+    );
   });
 });

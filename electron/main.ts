@@ -21,6 +21,7 @@ import {
   IMPORT_FLAG_FILENAME,
   MAX_IMPORT_BYTES,
 } from './db';
+import { exportName } from './export-name';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -50,14 +51,6 @@ export function addIsolationHeaders(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
-}
-
-/** Nombre sugerido para export manual: tienda_export_<YYYYMMDD_HHmm>.db. */
-function exportName(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `tienda_export_${d.getFullYear()}${p(d.getMonth() + 1)}${p(
-    d.getDate(),
-  )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
 }
 
 // Rutas de la DB nativa (single source). Se invocan solo tras whenReady
