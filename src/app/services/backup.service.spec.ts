@@ -1,9 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { BackupService } from './backup.service';
-import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
+import { SQLOCAL_CLIENT } from './sqlocal-client';
+import { exportName } from '../../../electron/export-name';
 
-// El unit-test builder prohíbe vi.mock con imports relativos; la factoría
-// SQLocal se inyecta por DI (SQLOCAL_CLIENT_FACTORY) y se mockea en TestBed.
 const createSqlocalClientMock = vi.fn();
 const getDatabaseFileMock = vi.fn();
 
@@ -13,12 +12,7 @@ describe('BackupService', () => {
 
   beforeEach(() => {
     invokeMock = vi.fn().mockResolvedValue({ ok: true });
-    TestBed.configureTestingModule({
-      providers: [
-        BackupService,
-        { provide: SQLOCAL_CLIENT_FACTORY, useValue: createSqlocalClientMock },
-      ],
-    });
+    TestBed.configureTestingModule({ providers: [BackupService] });
     service = TestBed.inject(BackupService);
   });
 
@@ -79,15 +73,15 @@ describe('BackupService exportarRespaldo (T12)', () => {
 
   beforeEach(() => {
     invokeMock = vi.fn().mockResolvedValue({ ok: true });
+    getDatabaseFileMock.mockReset();
+    createSqlocalClientMock.mockReset();
     TestBed.configureTestingModule({
       providers: [
         BackupService,
-        { provide: SQLOCAL_CLIENT_FACTORY, useValue: createSqlocalClientMock },
+        { provide: SQLOCAL_CLIENT, useValue: createSqlocalClientMock },
       ],
     });
     service = TestBed.inject(BackupService);
-    getDatabaseFileMock.mockReset();
-    createSqlocalClientMock.mockReset();
   });
 
   afterEach(() => {
@@ -130,35 +124,39 @@ describe('BackupService exportarRespaldo (T12)', () => {
       getDatabaseFile: getDatabaseFileMock,
     });
 
-    // spyOn + mockRestore (no defineProperty global): los tests comparten el
-    // objeto URL global con otros specs en el mismo worker; restaurar evita
-    // contaminar electron-file.service.spec y otros.
-    const createObjectUrlSpy = vi
-      .spyOn(URL, 'createObjectURL')
-      .mockReturnValue('blob:mock-export');
-    const revokeObjectUrlSpy = vi
-      .spyOn(URL, 'revokeObjectURL')
-      .mockReturnValue(undefined);
+    const createObjectUrlMock = vi.fn(() => 'blob:mock-export');
+    const revokeObjectUrlMock = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: createObjectUrlMock,
+      configurable: true,
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: revokeObjectUrlMock,
+      configurable: true,
+    });
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {
         return undefined;
       });
 
-    try {
-      const result = await service.exportarRespaldo();
+    vi.useFakeTimers();
 
-      expect(createSqlocalClientMock).toHaveBeenCalled();
-      expect(getDatabaseFileMock).toHaveBeenCalled();
-      expect(createObjectUrlSpy).toHaveBeenCalled();
-      expect(clickSpy).toHaveBeenCalled();
-      expect(revokeObjectUrlSpy).toHaveBeenCalled();
-      expect(result.ok).toBe(true);
-    } finally {
-      createObjectUrlSpy.mockRestore();
-      revokeObjectUrlSpy.mockRestore();
-      clickSpy.mockRestore();
-    }
+    const result = await service.exportarRespaldo();
+
+    expect(createSqlocalClientMock).toHaveBeenCalled();
+    expect(getDatabaseFileMock).toHaveBeenCalled();
+    expect(createObjectUrlMock).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    // BACKLOG-5: el revoke NO es síncrono al click — el download arranca primero.
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+
+    vi.advanceTimersByTime(0);
+    expect(revokeObjectUrlMock).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+    clickSpy.mockRestore();
   });
 
   it('T12 RED: web resuelve {ok:false, error} si getDatabaseFile rechaza (R6)', async () => {
@@ -171,5 +169,19 @@ describe('BackupService exportarRespaldo (T12)', () => {
     const result = await service.exportarRespaldo();
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('exportName shared helper (BACKLOG-6: single source con el desktop)', () => {
+  it('web y desktop derivan el MISMO nombre (byte-identical)', () => {
+    expect(exportName(new Date(2026, 7, 2, 14, 5))).toBe(
+      'tienda_export_20260802_1405.db',
+    );
+  });
+
+  it('zero-pad de dígitos simples (mes/día/hora/minuto)', () => {
+    expect(exportName(new Date(2026, 0, 5, 9, 3))).toBe(
+      'tienda_export_20260105_0903.db',
+    );
   });
 });

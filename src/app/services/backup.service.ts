@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
+import { SQLOCAL_CLIENT } from './sqlocal-client';
+import { exportName } from '../../../electron/export-name';
 
 export type BackupTrigger = 'open' | 'jornada-close';
 
@@ -15,7 +16,7 @@ export type BackupTrigger = 'open' | 'jornada-close';
  */
 @Injectable({ providedIn: 'root' })
 export class BackupService {
-  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT_FACTORY);
+  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT);
 
   async backup(trigger: BackupTrigger): Promise<void> {
     if (!window.electronAPI) {
@@ -55,21 +56,16 @@ export class BackupService {
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
       a.href = url;
-      a.download = this._webExportName(new Date());
+      a.download = exportName(new Date());
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // BACKLOG-5: diferir el revoke hasta después del click (Safari viejo
+      // aborta el download si la URL se revoca en el mismo tick).
+      setTimeout(() => URL.revokeObjectURL(url), 0);
       return { ok: true };
     } catch (err) {
       return { ok: false, error: (err as Error).message };
     }
-  }
-
-  private _webExportName(d: Date): string {
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `tienda_export_${d.getFullYear()}${p(d.getMonth() + 1)}${p(
-      d.getDate(),
-    )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
   }
 }

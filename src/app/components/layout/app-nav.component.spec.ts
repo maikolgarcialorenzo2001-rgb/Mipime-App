@@ -9,6 +9,7 @@ import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
+import { APP_VERSION } from '../../version';
 
 const mockJornadaAbierta: Jornada = {
   id: 1,
@@ -240,5 +241,16 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(component.denominacionesVisibles()).not.toContain(1);
     expect(component.denominacionesVisibles()).not.toContain(3);
     expect(component.denominacionesVisibles().length).toBe(10);
+  });
+
+  it('debería renderizar el badge de versión desde APP_VERSION en la barra', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain(`v${APP_VERSION}`);
+  });
+
+  it('debería mostrar el badge de versión una sola vez (discreto, sin duplicar)', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    const occurrences = text.split(`v${APP_VERSION}`).length - 1;
+    expect(occurrences).toBe(1);
   });
 });

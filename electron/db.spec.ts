@@ -8,6 +8,7 @@ import {
   backupDb,
   pruneBackups,
   timestampedBackupName,
+  timestampedSnapshotPath,
   backupRodanteSync,
   recoverInPlace,
   runStartupSequence,
@@ -207,6 +208,58 @@ describe('timestampedBackupName', () => {
 
     expect(removed).toHaveLength(1);
     expect(removed[0]).toContain(name);
+  });
+});
+
+describe('timestampedSnapshotPath', () => {
+  it('returns the unsuffixed base path on a fresh minute (no collision)', () => {
+    const dir = tmpDir();
+    const backupsDir = path.join(dir, 'backups');
+    fs.mkdirSync(backupsDir, { recursive: true });
+
+    const snap = timestampedSnapshotPath(backupsDir, new Date(2026, 5, 2, 14, 7));
+
+    expect(snap).toBe(path.join(backupsDir, 'tienda_2026-06-02_1407.db'));
+  });
+
+  it('appends -1 then -2 for second/third same-minute snapshots (first NOT overwritten)', () => {
+    const dir = tmpDir();
+    const backupsDir = path.join(dir, 'backups');
+    fs.mkdirSync(backupsDir, { recursive: true });
+    const d = new Date(2026, 5, 2, 14, 7);
+    const base = path.join(backupsDir, 'tienda_2026-06-02_1407.db');
+
+    // 1st write occupies the base path.
+    fs.writeFileSync(base, 'x');
+    const second = timestampedSnapshotPath(backupsDir, d);
+    expect(second).toBe(path.join(backupsDir, 'tienda_2026-06-02_1407-1.db'));
+
+    // 2nd write occupies the -1 path; 3rd must land on -2.
+    fs.writeFileSync(second, 'x');
+    const third = timestampedSnapshotPath(backupsDir, d);
+    expect(third).toBe(path.join(backupsDir, 'tienda_2026-06-02_1407-2.db'));
+
+    // The original base was never overwritten by the allocator.
+    expect(fs.readFileSync(base, 'utf-8')).toBe('x');
+  });
+
+  it('produces a suffixed path that pruneBackups treats as a backup (TIMESTAMPED_RE widening)', () => {
+    const dir = tmpDir();
+    const backups = path.join(dir, 'backups');
+    fs.mkdirSync(backups, { recursive: true });
+    const base = path.join(backups, 'tienda_2026-06-02_1407.db');
+    fs.writeFileSync(base, 'x');
+    // Same-minute collision → allocator resolves to base-1 (suffix before ".db").
+    const suffixed = timestampedSnapshotPath(backups, new Date(2026, 5, 2, 14, 7));
+    expect(suffixed).toBe(`${base.slice(0, -3)}-1.db`);
+    fs.writeFileSync(suffixed, 'x');
+
+    // Retention MUST apply to the suffixed snapshot too (not leak): keep 0
+    // removes both the base and its -1 collision.
+    const removed = pruneBackups(backups, 0);
+
+    expect(removed).toContain(suffixed);
+    expect(fs.existsSync(suffixed)).toBe(false);
   });
 });
 
@@ -434,6 +487,38 @@ describe('runStartupSequence', () => {
     expect(count).toBe(8);
   });
 
+  it('restores from a suffixed timestamped snapshot (parser widening: whenFromName + TIMESTAMPED_RE)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    writeGarbage(path.join(userData, 'tienda-app.db'));
+
+    const docs = docsRoot(dir);
+    const backups = path.join(docs, 'backups');
+    fs.mkdirSync(backups, { recursive: true });
+    writeGarbage(path.join(docs, 'tienda-app.db'));
+    writeGarbage(path.join(backups, 'tienda_2026-07-31_1400.db'));
+    // Same minute as the garbage one but suffixed: only the -1 snapshot is valid.
+    createValidDb(path.join(backups, 'tienda_2026-07-30_1000-1.db'), 8, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: path.join(dir, 'docs'),
+      appVersion: '0.1.9-beta',
+      platform: 'win32',
+    });
+
+    expect(result.status).toBe('restored');
+    expect(result.restoreInfo?.from).toBe('timestamped');
+    expect(result.restoreInfo?.path).toContain('tienda_2026-07-30_1000-1.db');
+    const db = openNativeDb(path.join(userData, 'tienda-app.db'));
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM t').get() as {
+      c: number;
+    }).c;
+    db.close();
+    expect(count).toBe(8);
+  });
+
   it('returns fatal with diagnostics when every candidate fails', () => {
     const dir = tmpDir();
     const userData = path.join(dir, 'userData');
@@ -454,7 +539,9 @@ describe('runStartupSequence', () => {
     });
 
     expect(result.status).toBe('fatal');
-    expect(result.diagnostics?.stage).toBe('open');
+    // RECOVERY RED-FLIP: cascade advanced past 'open' (recoverInPlace + rodante
+    // + timestamped all failed) → stage MUST report 'recover', not hardcoded 'open'.
+    expect(result.diagnostics?.stage).toBe('recover');
     expect(result.diagnostics?.appVersion).toBe('0.1.9-beta');
     expect(result.diagnostics?.sqliteError).toBeDefined();
     expect(result.diagnostics?.backupsTried.length).toBeGreaterThanOrEqual(3);

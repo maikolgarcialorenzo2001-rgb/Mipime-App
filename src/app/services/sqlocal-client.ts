@@ -1,22 +1,17 @@
-import { InjectionToken } from '@angular/core';
 import { environment } from '../environments/environment';
+import { InjectionToken } from '@angular/core';
 import type { SQLocal } from 'sqlocal';
 
 export type SqlocalClientFactory = () => Promise<SQLocal>;
 
 /**
- * Token DI de la factoría compartida de clientes SQLocal (M1). Los servicios
- * inyectan la factoría en vez de importar la función directamente, lo que
- * permite reemplazarla con un mock en los tests vía TestBed (el unit-test
- * builder prohíbe vi.mock con imports relativos). El factory del token
- * mantiene el comportamiento de producción idéntico al import directo.
+ * Token de la factoría compartida de clientes SQLocal (M1). Inyectable para
+ * poder mockearla con TestBed (el sistema de unit-test de Angular no permite
+ * `vi.mock` con imports relativos). El default usa la factoría real.
  */
-export const SQLOCAL_CLIENT_FACTORY = new InjectionToken<SqlocalClientFactory>(
-  'SQLOCAL_CLIENT_FACTORY',
-  {
-    providedIn: 'root',
-    factory: () => createSqlocalClient,
-  },
+export const SQLOCAL_CLIENT = new InjectionToken<SqlocalClientFactory>(
+  'SQLocal client factory',
+  { providedIn: 'root', factory: () => createSqlocalClient },
 );
 
 /**

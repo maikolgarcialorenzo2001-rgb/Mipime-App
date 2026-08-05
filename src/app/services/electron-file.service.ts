@@ -16,7 +16,7 @@ export class ElectronFileService {
 
   /**
    * Guarda el Excel de cierre individual de una jornada.
-   * Path: {documents}/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx
+   * Path: {documents}/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx
    */
   async saveIndividual(base64: string, jornada: { fecha: string; id: number }): Promise<void> {
     const fecha = new Date(jornada.fecha + 'T12:00:00');
@@ -30,7 +30,7 @@ export class ElectronFileService {
 
   /**
    * Guarda el Excel de exportación mensual.
-   * Path: {documents}/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx
+   * Path: {documents}/Tienda - App/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx
    */
   async saveMonthly(base64: string, year: number, month: number): Promise<void> {
     const monthName = MONTH_NAMES[month];
@@ -40,7 +40,7 @@ export class ElectronFileService {
 
   /**
    * Guarda el Excel de exportación por rango de fechas.
-   * Path: {documents}/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx
+   * Path: {documents}/Tienda - App/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx
    */
   async saveRange(base64: string, desde: string, hasta: string): Promise<void> {
     const fmt = (iso: string) => {
@@ -92,6 +92,8 @@ export class ElectronFileService {
     a.href = url;
     a.download = fileName;
     a.click();
-    URL.revokeObjectURL(url);
+    // BACKLOG-5: diferir el revoke hasta después del click (Safari viejo
+    // aborta el download si la URL se revoca en el mismo tick).
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 }

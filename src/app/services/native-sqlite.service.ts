@@ -4,7 +4,7 @@ import { DbStatusService } from './db-status.service';
 import { BackupService } from './backup.service';
 import { environment } from '../environments/environment';
 import { runMigrations } from './db-migrations';
-import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
+import { SQLOCAL_CLIENT } from './sqlocal-client';
 
 /**
  * Implementación de `Database` sobre el proceso main vía IPC (T4, AD-1/AD-3).
@@ -16,7 +16,7 @@ import { SQLOCAL_CLIENT_FACTORY } from './sqlocal-client';
 export class NativeSqliteService implements Database {
   private readonly _dbStatus = inject(DbStatusService);
   private readonly _backup = inject(BackupService);
-  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT_FACTORY);
+  private readonly _createSqlocalClient = inject(SQLOCAL_CLIENT);
 
   /** Versión cacheada del invoke app:getVersion (MINOR-5); 'unknown' si falla. */
   private _appVersion: string | null = null;

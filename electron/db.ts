@@ -16,7 +16,8 @@ export const DB_FILENAME = 'tienda-app.db';
 export const IMPORT_FLAG_FILENAME = 'native-db-imported.flag';
 /** Tope de payload para db:import (defensa en profundidad, S2/T7). */
 export const MAX_IMPORT_BYTES = 512 * 1024 * 1024;
-const TIMESTAMPED_RE = /^tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/;
+const TIMESTAMPED_RE =
+  /^tienda_\d{4}-\d{2}-\d{2}_\d{4}(?:-\d+)?\.db$/;
 const MIN_SCHEMA_VERSION = 1;
 const MAX_SCHEMA_VERSION = 16;
 
@@ -60,6 +61,18 @@ export interface StartupResult {
   status: DbInitStatus;
   restoreInfo?: DbRestoreInfo;
   diagnostics?: DbDiagnostics;
+}
+
+/**
+ * Etapa actual de la cascada de arranque (spec db-recovery MODIFIED):
+ * fuente ÚNICA para el diagnóstico fatal. `currentStage` avanza a medida que
+ * la cascada progresa (open → recover …) y ambos call-site (runStartupSequence
+ * fatal y el catch de db:initialize en main.ts) leen un mismo getter → no
+ * pueden divergir (BACKLOG-3).
+ */
+let currentStage: DbDiagnostics['stage'] = 'open';
+export function getStartupStage(): DbDiagnostics['stage'] {
+  return currentStage;
 }
 
 export interface StartupOptions {
@@ -172,6 +185,26 @@ export function timestampedBackupName(d: Date): string {
 }
 
 /**
+ * Ruta de snapshot timestamped SEGURA ante colisiones (spec db-backup ADDED,
+ * BACKLOG-2): espeja `corruptTargetFor`. Base = `timestampedBackupName(d)`; si
+ * el path exacto ya existe, se anexa `-<n>` (n desde 1) consultando fs real
+ * hasta hallar uno libre. El sufijo `-\d+` es tolerado por TIMESTAMPED_RE /
+ * whenFromName → seguirá siendo restaurable y podado por la retención.
+ */
+export function timestampedSnapshotPath(backupsDir: string, d: Date): string {
+  const name = timestampedBackupName(d); // tienda_<YYYY-MM-DD_HHmm>.db
+  const stem = name.slice(0, -'.db'.length); // quita la extensión ".db"
+  let target = path.join(backupsDir, name);
+  let n = 1;
+  while (fs.existsSync(target)) {
+    // Sufijo ANTES de ".db" (…_1407-1.db) — compatible con TIMESTAMPED_RE
+    // / whenFromName (solo toleran `-\d+` entre HHmm y ".db").
+    target = path.join(backupsDir, `${stem}-${n++}.db`);
+  }
+  return target;
+}
+
+/**
  * Destino `<dbPath>.corrupt-<ts>` libre de colisiones: si ya existe
  * (mismo segundo), se anexa un contador.
  */
@@ -195,8 +228,8 @@ function listTimestampedBackups(backupsDir: string): string[] {
 }
 
 function whenFromName(file: string): string {
-  // tienda_2026-07-31_1430.db -> "2026-07-31 14:30"
-  const m = file.match(/^tienda_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})\.db$/);
+  // tienda_2026-07-31_1430.db / …_1430-1.db -> "2026-07-31 14:30"
+  const m = file.match(/^tienda_(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})(?:-\d+)?\.db$/);
   return m ? `${m[1]} ${m[2]}:${m[3]}` : file;
 }
 
@@ -378,6 +411,9 @@ export function runStartupSequence(opts: StartupOptions): StartupResult {
   }
 
   const rec = recoverInPlace(dbPath);
+  // La cascada avanzó más allá de 'open': a partir de acá el diagnóstico fatal
+  // (si todo falla) debe reportar 'recover', no el 'open' hardcodeado (BACKLOG-3).
+  currentStage = 'recover';
   if (rec.recovered) {
     return {
       status: 'restored',
@@ -406,7 +442,7 @@ export function runStartupSequence(opts: StartupOptions): StartupResult {
       appVersion: opts.appVersion,
       platform: opts.platform,
       sqliteError,
-      stage: 'open',
+      stage: getStartupStage(),
       backupsTried,
     },
   };

@@ -238,7 +238,7 @@ describe('VentaService', () => {
       const allCalls = vi.mocked(mockDb.sql).mock.calls;
       const updateJornada = allCalls.find(
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
-      );
+      ) as [string, unknown[]] | undefined;
       expect(updateJornada).toBeDefined();
       // [total_ventas, efectivoEnCaja, updated_at, jornada_id]
       expect(updateJornada![1]![0]).toBe(850);         // total_ventas += total
@@ -276,7 +276,7 @@ describe('VentaService', () => {
       const allCalls = vi.mocked(mockDb.sql).mock.calls;
       const updateJornada = allCalls.find(
         (c) => c[0].includes('UPDATE') && c[0].includes('jornadas'),
-      );
+      ) as [string, unknown[]] | undefined;
       expect(updateJornada).toBeDefined();
       expect(updateJornada![1]![0]).toBe(850);         // total_ventas += total
       expect(updateJornada![1]![1]).toBe(200);          // saldo_esperado += completacion

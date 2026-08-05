@@ -1,22 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ttlCheckInitializer, type TtlEnvironment } from './ttl-check';
+import { ttlCheckInitializer } from './ttl-check';
+import { environment } from '../environments/environment';
 
-// El unit-test builder prohíbe vi.mock con imports relativos; el initializer
-// acepta la config por parámetro, así que pasamos un objeto controlado.
-const mockEnvironment: TtlEnvironment = {
-  testMode: true,
-  ttlDays: 7,
-};
-
+// ttl-check lee environment.testMode / ttlDays en tiempo de invocación, así que
+// mutamos el objeto real en beforeEach (el entorno de test: testMode=true).
 describe('ttlCheckInitializer', () => {
   beforeEach(() => {
     localStorage.clear();
-    mockEnvironment.testMode = true;
-    mockEnvironment.ttlDays = 7;
+    environment.testMode = true;
+    environment.ttlDays = 7;
   });
 
   it('first launch in test mode stores timestamp and returns true', async () => {
-    const init = ttlCheckInitializer(mockEnvironment);
+    const init = ttlCheckInitializer();
     const result = await init();
 
     expect(result).toBe(true);
@@ -28,7 +24,7 @@ describe('ttlCheckInitializer', () => {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     localStorage.setItem('mipime_first_launch', threeDaysAgo);
 
-    const init = ttlCheckInitializer(mockEnvironment);
+    const init = ttlCheckInitializer();
     const result = await init();
 
     expect(result).toBe(true);
@@ -39,7 +35,7 @@ describe('ttlCheckInitializer', () => {
     const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
     localStorage.setItem('mipime_first_launch', eightDaysAgo);
 
-    const init = ttlCheckInitializer(mockEnvironment);
+    const init = ttlCheckInitializer();
     const result = await init();
 
     expect(result).toBe(true);
@@ -49,7 +45,7 @@ describe('ttlCheckInitializer', () => {
   it('corrupted stored date sets mipime_ttl_expired and returns true', async () => {
     localStorage.setItem('mipime_first_launch', 'not-a-valid-date');
 
-    const init = ttlCheckInitializer(mockEnvironment);
+    const init = ttlCheckInitializer();
     const result = await init();
 
     expect(result).toBe(true);
@@ -57,9 +53,9 @@ describe('ttlCheckInitializer', () => {
   });
 
   it('non-test mode returns true without touching localStorage', async () => {
-    mockEnvironment.testMode = false;
+    environment.testMode = false;
 
-    const init = ttlCheckInitializer(mockEnvironment);
+    const init = ttlCheckInitializer();
     const result = await init();
 
     expect(result).toBe(true);

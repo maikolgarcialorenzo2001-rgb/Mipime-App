@@ -112,7 +112,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "include": ["**/*.spec.ts"]
+            "exclude": ["src/app/environments/environment.test.ts"]
           }
         },
         "lint": {

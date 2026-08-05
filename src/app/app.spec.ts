@@ -7,6 +7,7 @@ import { hashPassword, generateSalt } from './services/hash-password';
 import { firstValueFrom } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
+import { APP_VERSION } from './version';
 
 function mockCrypto(): void {
   const subtleDigest = vi.fn().mockImplementation(
@@ -187,7 +188,7 @@ describe('App component nav', () => {
   it('debería renderizar app-db-error (y no router-outlet) cuando la DB reporta fatal', () => {
     const dbStatus = TestBed.inject(DbStatusService);
     dbStatus.setFatal({
-      appVersion: '0.1.8-beta',
+      appVersion: APP_VERSION,
       platform: 'win32',
       sqliteError: 'integrity check failed: database disk image is malformed',
       stage: 'open',
@@ -206,7 +207,7 @@ describe('App component nav', () => {
     localStorage.setItem('mipime_ttl_expired', 'true');
     const dbStatus = TestBed.inject(DbStatusService);
     dbStatus.setFatal({
-      appVersion: '0.1.8-beta',
+      appVersion: APP_VERSION,
       platform: 'win32',
       sqliteError: 'disk full',
       stage: 'open',

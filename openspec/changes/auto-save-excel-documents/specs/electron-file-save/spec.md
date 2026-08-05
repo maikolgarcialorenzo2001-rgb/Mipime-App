@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Auto-save generated Excel files to the user's `Documents/Tienda IPVE/` directory when running in a packaged Electron EXE, without showing a "Save As" dialog. In dev mode (`ng serve`), fall back to browser download (current behavior). DB storage of reports (`jornada_reportes`) is unaffected.
+Auto-save generated Excel files to the user's `Documents/Tienda - App/Tienda IPVE/` directory when running in a packaged Electron EXE, without showing a "Save As" dialog. In dev mode (`ng serve`), fall back to browser download (current behavior). DB storage of reports (`jornada_reportes`) is unaffected.
 
 ## Requirements
 
@@ -30,47 +30,47 @@ The system MUST detect whether it is running in a packaged Electron environment 
 
 ### REQ-02: Individual Close Auto-Save
 
-When a jornada is closed (auto-close on login, manual close via app-nav, or cerrarYGuardar), the system MUST save the Excel to `Documents/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx` without showing a dialog.
+When a jornada is closed (auto-close on login, manual close via app-nav, or cerrarYGuardar), the system MUST save the Excel to `Documents/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx` without showing a dialog.
 
 #### Scenario: Different user logs in → auto-close saves Excel
 
 - GIVEN there is an open jornada from another user
 - WHEN the new user logs in and auto-close triggers
-- THEN the Excel is saved to `Documents/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
+- THEN the Excel is saved to `Documents/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
 - AND no browser download dialog appears
 
 #### Scenario: Admin closes jornada manually
 
 - GIVEN an admin has an open jornada with sales, movements, and arqueo
 - WHEN the admin confirms closure via app-nav modal
-- THEN the Excel is saved to `Documents/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
+- THEN the Excel is saved to `Documents/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
 - AND no browser download dialog appears
 
 #### Scenario: cerrarYGuardar on login
 
 - GIVEN a user is on the login page and chooses "Cerrar y guardar"
 - WHEN the jornada closes successfully
-- THEN the Excel is saved to `Documents/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
+- THEN the Excel is saved to `Documents/Tienda - App/Tienda IPVE/{YYYY}/{MM - MonthName}/jornada_{YYYY-MM-DD}_{id}.xlsx`
 
 ### REQ-03: Monthly Export Auto-Save
 
-When exporting a month from historial, the system MUST save the Excel to `Documents/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`.
+When exporting a month from historial, the system MUST save the Excel to `Documents/Tienda - App/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`.
 
 #### Scenario: Export month
 
 - GIVEN the historial page shows jornadas for a specific month
 - WHEN the user clicks "Exportar mes"
-- THEN the Excel is saved to `Documents/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`
+- THEN the Excel is saved to `Documents/Tienda - App/Tienda IPVE/Jornada Completa Mes {MonthName}.xlsx`
 
 ### REQ-04: Range Export Auto-Save
 
-When exporting a date range from historial, the system MUST save the Excel to `Documents/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`.
+When exporting a date range from historial, the system MUST save the Excel to `Documents/Tienda - App/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`.
 
 #### Scenario: Export range
 
 - GIVEN the historial page has a date range selected
 - WHEN the user clicks "Exportar"
-- THEN the Excel is saved to `Documents/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`
+- THEN the Excel is saved to `Documents/Tienda - App/Tienda IPVE/Jornada completa {dd/mm - YYYY} -- {dd/mm - YYYY}.xlsx`
 
 ### REQ-05: Dev Mode Fallback
 

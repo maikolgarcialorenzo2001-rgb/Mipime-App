@@ -14,12 +14,14 @@ import {
   backupDb,
   pruneBackups,
   adoptOrFresh,
-  timestampedBackupName,
+  timestampedSnapshotPath,
   backupRodanteSync,
+  getStartupStage,
   DB_FILENAME,
   IMPORT_FLAG_FILENAME,
   MAX_IMPORT_BYTES,
 } from './db';
+import { exportName } from './export-name';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -49,14 +51,6 @@ export function addIsolationHeaders(response: Response): Response {
     statusText: response.statusText,
     headers,
   });
-}
-
-/** Nombre sugerido para export manual: tienda_export_<YYYYMMDD_HHmm>.db. */
-function exportName(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `tienda_export_${d.getFullYear()}${p(d.getMonth() + 1)}${p(
-    d.getDate(),
-  )}_${p(d.getHours())}${p(d.getMinutes())}.db`;
 }
 
 // Rutas de la DB nativa (single source). Se invocan solo tras whenReady
@@ -183,13 +177,13 @@ app.whenReady().then(() => {
     event.returnValue = app.isPackaged;
   });
 
-  // Save file to Documents/Tienda IPVE/ without user-facing dialog.
+  // Save file to Documents/Tienda - App/Tienda IPVE/ without user-facing dialog.
   // filePath is relative, e.g. "2026/07 - Julio/jornada_2026-07-28_123.xlsx".
   // base64 is the raw Excel base64 string.
   ipcMain.handle('file:saveFile', async (_event, { base64, filePath }) => {
     try {
       const documentsPath = app.getPath('documents');
-      const destDir = path.join(documentsPath, 'Tienda IPVE');
+      const destDir = path.join(documentsPath, 'Tienda - App', 'Tienda IPVE');
       const fullPath = path.join(destDir, filePath);
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, Buffer.from(base64, 'base64'));
@@ -248,7 +242,7 @@ app.whenReady().then(() => {
           appVersion: app.getVersion(),
           platform: process.platform,
           sqliteError: (err as Error).message,
-          stage: 'open',
+          stage: getStartupStage(),
           backupsTried: [],
         },
       };
@@ -382,9 +376,12 @@ app.whenReady().then(() => {
           db.close();
         }
         if (trigger === 'jornada-close') {
-          const snapshotPath = path.join(
+          // BACKLOG-2: path verificado against fs (corruptTargetFor pattern) —
+          // un segundo snapshot en el mismo minuto recibe sufijo -<n> en vez
+          // de sobreescribir el primero silenciosamente.
+          const snapshotPath = timestampedSnapshotPath(
             backupsDirFor(),
-            timestampedBackupName(new Date()),
+            new Date(),
           );
           const snapDb = openNativeDb(dbPathFor());
           try {

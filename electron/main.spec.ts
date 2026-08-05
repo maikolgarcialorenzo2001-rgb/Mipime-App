@@ -125,6 +125,7 @@ const mockPruneBackups = vi.hoisted(() => vi.fn(() => []));
 const mockAdoptOrFresh = vi.hoisted(() => vi.fn(() => ({ status: 'fresh' })));
 const mockOpenNativeDb = vi.hoisted(() => vi.fn());
 const mockBackupRodanteSync = vi.hoisted(() => vi.fn());
+const mockGetStartupStage = vi.hoisted(() => vi.fn(() => 'open'));
 
 vi.mock('./db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./db')>();
@@ -137,6 +138,7 @@ vi.mock('./db', async (importOriginal) => {
     adoptOrFresh: mockAdoptOrFresh,
     openNativeDb: mockOpenNativeDb,
     backupRodanteSync: mockBackupRodanteSync,
+    getStartupStage: mockGetStartupStage,
   };
 });
 
@@ -349,6 +351,10 @@ describe('main process', () => {
       mockRunStartupSequence.mockImplementation(() => {
         throw new Error('disk failure');
       });
+      // RECOVERY RED-FLIP: the synthesized fatal MUST read the real cascade
+      // stage via getStartupStage() (single shared source), NOT a hardcoded
+      // 'open'. Mocking it to 'recover' proves the handler is not hardcoded.
+      mockGetStartupStage.mockReturnValue('recover');
 
       const handler = await getDbHandler('db:initialize');
       const result = await handler();
@@ -359,7 +365,7 @@ describe('main process', () => {
           appVersion: '1.0.0',
           platform: process.platform,
           sqliteError: 'disk failure',
-          stage: 'open',
+          stage: mockGetStartupStage(),
           backupsTried: [],
         },
       });
@@ -571,6 +577,10 @@ describe('main process', () => {
     });
 
     it('db:backupNow with trigger jornada-close should back up rodante + timestamped + prune', async () => {
+      // Reset fs.existsSync default (a previous test leaves mockReturnValue(true)):
+      // the snapshot allocator loops while existsSync is true → must see false.
+      mockFsExistsSync.mockReturnValue(false);
+
       const handler = await getDbHandler('db:backupNow');
 
       const result = (await handler({
@@ -586,6 +596,23 @@ describe('main process', () => {
       expect(result.timestampedPath).toMatch(
         /tienda_\d{4}-\d{2}-\d{2}_\d{4}\.db$/,
       );
+    });
+
+    it('db:backupNow jornada-close returns the suffixed path when the base snapshot already exists (collision)', async () => {
+      // Base default false, then: base path exists (→ append -1), -1 does not
+      // (→ return suffixed path). BACKLOG-2.
+      mockFsExistsSync
+        .mockReturnValue(false)
+        .mockReturnValueOnce(true) // base path exists
+        .mockReturnValueOnce(false); // -1 path does not
+
+      const handler = await getDbHandler('db:backupNow');
+      const result = (await handler({
+        trigger: 'jornada-close',
+      })) as { ok: boolean; timestampedPath?: string };
+
+      expect(result.ok).toBe(true);
+      expect(result.timestampedPath).toMatch(/tienda_\d{4}-\d{2}-\d{2}_\d{4}-1\.db$/);
     });
 
     it('db:backupNow should return {ok:false, error} instead of throwing', async () => {
@@ -805,7 +832,7 @@ describe('main process', () => {
       );
     });
 
-    it('should create Tienda IPVE directory and write file from base64', async () => {
+    it('should create Tienda - App/Tienda IPVE directory and write file from base64', async () => {
       vi.resetModules();
       await import('./main');
       await flush();
@@ -822,16 +849,16 @@ describe('main process', () => {
       expect(mockAppGetPath).toHaveBeenCalledWith('documents');
       // mkdirSync called with the parent directory (path.dirname)
       expect(mockFsMkdirSync).toHaveBeenCalledWith(
-        expect.stringMatching(/Tienda IPVE.*Julio/),
+        expect.stringMatching(/Tienda - App[/\\]Tienda IPVE.*Julio/),
         { recursive: true },
       );
       expect(mockFsWriteFileSync).toHaveBeenCalledWith(
-        expect.stringMatching(/Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
+        expect.stringMatching(/Tienda - App[/\\]Tienda IPVE.*2026.*07 - Julio.*jornada_2026-07-28_123\.xlsx$/),
         expect.any(Buffer),
       );
       expect(result).toEqual({
         success: true,
-        filePath: expect.stringContaining('Tienda IPVE'),
+        filePath: expect.stringMatching(/Tienda - App[/\\]Tienda IPVE/),
       });
     });
 

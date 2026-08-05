@@ -259,7 +259,7 @@ export class JornadaService {
       totalEur: datos.totalEur,
     });
 
-    // Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    // Auto-save Excel a Documents/Tienda - App/Tienda IPVE en entorno Electron empaquetado
     if (this._electronFileService.isElectronPackaged) {
       await this._electronFileService.saveIndividual(base64, jornada);
     }
@@ -560,7 +560,7 @@ export class JornadaService {
       totalEur,
     });
 
-    // 13. Auto-save Excel a Documents/Tienda IPVE en entorno Electron empaquetado
+    // 13. Auto-save Excel a Documents/Tienda - App/Tienda IPVE en entorno Electron empaquetado
     if (this._electronFileService.isElectronPackaged) {
       await this._electronFileService.saveIndividual(base64, jornada);
     }
