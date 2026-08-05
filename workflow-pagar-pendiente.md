@@ -1,6 +1,6 @@
 # Workflow — Cambio SDD: `pagar-pendiente`
 
-> Documento de retomada. Si este cambio queda a medio hacer, leé este archivo y continuá por el próximo paso indicado en [Cómo retomar](#cómo-retomar). Los artefactos completos viven en **Engram** (topic keys abajo).
+> Documento de retomada. Si este cambio queda a medio hacer, leé este archivo y continuá por el próximo paso indicado en [Cómo retomar](#cómo-retomar). Los artefactos completos viven en **Engram** (topic keys abajo) **y en el repo** (`docs/sdd/pagar-pendiente/` — fuente limpia autoritativa).
 
 ## 1. Objetivo
 
@@ -12,20 +12,19 @@ Feature **"Cobrar Pendiente"** en el POS: cobrar pagos registrados como *pendien
 
 ## 2. Estado del flujo SDD
 
-| Fase | Estado | Artefacto (Engram topic key) |
+| Fase | Estado | Artefacto (Engram topic key / repo) |
 |---|---|---|
 | Init | ✅ | `sdd-init/mipime-cuentas` |
-| Explore | ✅ | `sdd/pagar-pendiente/explore` |
-| Propose | ✅ | `sdd/pagar-pendiente/proposal` |
-| Amendments | ✅ | `sdd/pagar-pendiente/proposal-amendments` |
-| Spec | ✅ | `sdd/pagar-pendiente/spec` |
-| Design | ✅ | `sdd/pagar-pendiente/design` |
-| Tasks | ✅ | `sdd/pagar-pendiente/tasks` |
+| Explore | ✅ | `sdd/pagar-pendiente/explore` · `docs/sdd/pagar-pendiente/01-explore.md` |
+| Propose | ✅ | `sdd/pagar-pendiente/proposal` + `proposal-amendments` · `docs/sdd/pagar-pendiente/02-proposal.md` |
+| Spec | ✅ | `sdd/pagar-pendiente/spec` · `docs/sdd/pagar-pendiente/03-spec.md` |
+| Design | ✅ | `sdd/pagar-pendiente/design` · `docs/sdd/pagar-pendiente/04-design.md` |
+| Tasks | ✅ | `sdd/pagar-pendiente/tasks` (corrupto en engram) · `docs/sdd/pagar-pendiente/05-tasks.md` ← usar ESTE |
 | Apply | 🔲 **pendiente** | `sdd/pagar-pendiente/apply-progress` |
 | Verify | 🔲 **pendiente** | `sdd/pagar-pendiente/verify-report` |
 | Archive | 🔲 **pendiente** | `sdd/pagar-pendiente/archive-report` |
 
-**Branch:** `deudas-features` (desde `main`). **Modo sesión:** interactive · **Artifact store:** engram · **Delivery:** ask-on-risk → se eligió **PRs encadenados**.
+**Branch:** `deudas-features` (desde `main`). **Modo sesión:** interactive · **Artifact store:** engram · **Delivery:** ask-on-risk → **PRs encadenados** · **Chain strategy:** `feature-branch-chain` (ELEGIDA y lockeada el 2026-08-05).
 
 ## 3. Decisiones cerradas (NO reabrir)
 
@@ -69,7 +68,7 @@ Tests: RED/GREEN en español, spec co-locado. Deps: 1→2→3; 4.3/4.4 después 
 
 ## 7. Plan de entrega — 3 PRs encadenados
 
-**Cadena pendiente de elegir** (preguntar al retomar si no se eligió): `feature-branch-chain` (deudas-features = tracker; PR1 base = tracker; PR2 base = PR1; PR3 base = PR2; solo el tracker mergea a main) **o** `stacked-to-main` (cada PR a main en orden).
+**Estrategia ELEGIDA: `feature-branch-chain`** (lockeada). `deudas-features` es el tracker que acumula la integración final; solo el tracker mergea a main. PR1 base = `deudas-features`; PR2 base = branch PR1; PR3 base = branch PR2. NO mezclar estrategias. Cada PR: tests incluidos con su código, commit por unidad de trabajo, rollback solo de código (v17 queda inerte).
 
 | PR | Base | Contenido | Líneas aprox. |
 |---|---|---|---|
