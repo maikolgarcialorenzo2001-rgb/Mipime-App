@@ -234,7 +234,41 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([1, 50, 5.00, 'almacen']),
       );
 
-      expect(mockDb.sql).toHaveBeenCalledTimes(3);
+      expect(mockDb.sql).toHaveBeenCalledTimes(4);
+    });
+
+    it('5.0 RED: debería sincronizar productos.precio_costo al nuevo lote cuando el producto estaba sin stock', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                                  // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                                  // 2: UPDATE stock_almacen
+        .mockResolvedValueOnce([])                                  // 3: INSERT lotes_stock
+        .mockResolvedValueOnce([{ precio_costo: 9 }])               // 4: SELECT next lot -> el nuevo lote es el frente FIFO
+        .mockResolvedValueOnce([]);                                 // 5: UPDATE productos.precio_costo
+
+      await service.registrarEntrada(1, 20, 9, 'Reposición');
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([9, expect.any(String), 1]),
+      );
+    });
+
+    it('5.0 RED: NO debería sobrescribir productos.precio_costo con el costo nuevo si ya existe stock anterior', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                                  // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                                  // 2: UPDATE stock_almacen
+        .mockResolvedValueOnce([])                                  // 3: INSERT lotes_stock
+        .mockResolvedValueOnce([{ precio_costo: 5 }])               // 4: SELECT next lot -> frente FIFO sigue siendo el lote viejo
+        .mockResolvedValueOnce([]);                                 // 5: UPDATE productos.precio_costo
+
+      await service.registrarEntrada(1, 20, 9, 'Reposición');
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([5, expect.any(String), 1]),
+      );
     });
 
     it('debería crear lote con ubicacion shop cuando se especifica', async () => {

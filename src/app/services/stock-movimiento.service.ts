@@ -158,6 +158,22 @@ export class StockMovimientoService {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [productoId, cantidad, precioCosto, ahora, ubicacion, ahora],
     );
+
+    // 4. Sync product precio_costo to the FIFO front lot (oldest with stock).
+    //    When the product had 0 stock, the new lot becomes the front -> cost updates.
+    //    When older lots still have stock, the front is unchanged -> cost preserved.
+    const [siguienteLote] = await this._db.sql<{ precio_costo: number }>(
+      `SELECT precio_costo FROM lotes_stock
+       WHERE producto_id = ? AND cantidad > 0
+       ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
+      [productoId],
+    );
+    if (siguienteLote) {
+      await this._db.sql(
+        'UPDATE productos SET precio_costo = ?, updated_at = ? WHERE id = ?',
+        [siguienteLote.precio_costo, ahora, productoId],
+      );
+    }
   }
 
   async registrarSalida(
