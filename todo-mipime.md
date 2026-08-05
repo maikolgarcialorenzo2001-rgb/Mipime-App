@@ -2,52 +2,48 @@
 
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
-> Branch: `main`
-> Tests: **697 / 43 test files** (web) + **136 / 4** (electron)
-> Última actualización: 2026-08-02
+> Branch: `main` (única rama — local y remota, tras limpieza 2026-08-05)
+> Tests: **Electron 141** / **web 695+** (últimas verificaciones SDD 2026-08-05; `ng test` destrabado `b21ff36`)
+> Última actualización: 2026-08-05
 
 ---
 
 ## 🔴 Alta Prioridad — Backlog SDD `native-db-resilience` (post-merge)
 
 > Trabajo pendiente registrado al cerrar el SDD native-db-resilience (merge a main `94bc153`).
-> Foco actual: **DESKTOP primero**, después web, build/tooling, y el botón de exportar al final.
+> Foco actual: **build/tooling (BACKLOG-8/9/11)** → Capacitor Fase 4 → botón de exportar (BACKLOG-12) al final. Bloque DESKTOP ✅ y bloque WEB ✅ cerrados (2026-08-05).
 
 ### ~~BACKLOG-1. Título app desync (DESKTOP)~~ ✅
 **Contexto:** `src/index.html:5` mostraba `0.0.4-beta.test` pero la versión real es `0.1.9-beta` (el instalador dice 0.1.9-beta, la ventana/tab dice la vieja).
 **Fix:** sincronizar el title con la versión real (package.json).
 **Resuelto en dos pasos:** `b19cb21` (bump manual a 0.1.10-beta) + **branch `version-sync-feature` (0.1.12-beta)**: sistema de sync automático — `package.json#version` es fuente única; `scripts/sync-version.mjs` genera `src/app/version.ts` y actualiza el `<title>`, `src/main.ts` setea `document.title` en runtime, badge `vX.Y.Z-beta` en el nav. Ya no se edita el title a mano. Ver `VERSIONING.md`.
 
-### BACKLOG-1b. `ng test` roto por TS2532 (TOOLING)
-**Contexto:** `ng test` falla a nivel build con TS2532 en `venta.service.spec.ts` (`updateJornada![1]` bajo `noUncheckedIndexedAccess`, commit `f52caf5`). El suite verde solo corre con `npx vitest run` (`disableTypeChecking: true`). El fix existe en `feat/seed-productos-reales` (`ca76a83`) pero aún no está en `main`.
-**Fix:** mergear el fix de `venta.service.spec.ts` a `main` (viene con la branch del seed).
+### ~~BACKLOG-1b. `ng test` roto por TS2532 (TOOLING)~~ ✅
+**Contexto:** `ng test` falla a nivel build con TS2532 en `venta.service.spec.ts` (`updateJornada![1]` bajo `noUncheckedIndexedAccess`, commit `f52caf5`).
+**Fix:** destrabado en `b21ff36` (Angular 21 unit-test runner) + fix non-null `![1]![0]` integrado a main vía merge del seed (`85601a7`). Verificado en main 2026-08-05.
 
 ### ~~BACKLOG-2. Colisión same-minute HHmm snapshots (DESKTOP)~~ ✅
 **Contexto:** snapshots nativos con nombre `HHmm` pueden colisionar si dos snapshots caen en el mismo minuto → se saltea un backup puntual.
-**Fix:** `timestampedSnapshotPath(dir, d)` (loop `-<n>` mientras `existsSync`) + widening `TIMESTAMPED_RE`/`whenFromName` a `(?:-\d+)?` (parsable + prunable + restorable). ✅ Electron 141 / web 695 GREEN. **⏳ PR pendiente de abrir (a pedido del usuario 2026-08-02, se deja para próxima sesión).**
-**Commit:** `118b224`.
+**Fix:** `timestampedSnapshotPath(dir, d)` (loop `-<n>` mientras `existsSync`) + widening `TIMESTAMPED_RE`/`whenFromName` a `(?:-\d+)?` (parsable + prunable + restorable). ✅ **Merged a main `7e78d67` + archivado (`d4e15f2`).** Electron 141 / web 695 GREEN.
+**Commit:** `7e78d67` (original `118b224` en branch).
 
-### BACKLOG-3. Cascade fatal stage siempre 'open' (DESKTOP)
+### ~~BACKLOG-3. Cascade fatal stage siempre 'open' (DESKTOP)~~ ✅
 **Contexto:** en la cascada de recuperación, el stage del diagnóstico fatal siempre reporta 'open' aunque el fallo ocurra en otra etapa.
-**Fix:** `let currentStage` module-scope + `getStartupStage()` en db.ts; ambos fatales (`db.ts`, `main.ts:initialize`) leen de la misma fuente.
-**Commit:** `70d4532`.
+**Fix:** `let currentStage` module-scope + `getStartupStage()` en db.ts; ambos fatales (`db.ts`, `main.ts:initialize`) leen de la misma fuente. ✅ **Merged a main `d115588` + archivado (`d4e15f2`).**
+**Commit:** `d115588` (original `70d4532` en branch).
 
-> **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`70d4532`): `let currentStage` + `getStartupStage()` en `db.ts`; ambos fatales leen de la misma fuente. ✅ **⏳ PR pendiente**.
-
-### BACKLOG-4. postinstall electron-builder install-app-deps (DESKTOP)
+### ~~BACKLOG-4. postinstall electron-builder install-app-deps (DESKTOP)~~ ✅
 **Contexto:** el build desktop depende de `@electron/rebuild` manual; falta el `postinstall`.
-**Fix:** `"postinstall": "electron-builder install-app-deps"` en package.json (electron:rebuild intacto).
-**Commit:** `b8005e5`.
+**Fix:** `"postinstall": "electron-builder install-app-deps"` en package.json (electron:rebuild intacto). ✅ **Merged a main `78806f7` + archivado (`d4e15f2`).**
+**Commit:** `78806f7` (original `b8005e5` en branch).
 
-> **IMPLEMENTADO:** branch `fix/desktop-resilience-backlog` (`b8005e5`): `"postinstall": "electron-builder install-app-deps"` (electron:rebuild intacto). ✅ **⏳ PR pendiente**.
-
-### BACKLOG-5. revokeObjectURL timing (WEB)
+### ~~BACKLOG-5. revokeObjectURL timing (WEB)~~ ✅
 **Contexto:** en el export web, `URL.revokeObjectURL` se llama síncronamente después de `a.click()` — frágil en Safari viejo.
-**Fix:** `setTimeout(0)` antes de revocar.
+**Fix:** `49b5889` difiere el revoke con `setTimeout(0)` pasado el click (SDD web-export-refactor, merged + archivado `c4fd2c3`). Verificado PASS 6/6.
 
-### BACKLOG-6. Duplicación formato `tienda_export_` (WEB/DESKTOP)
+### ~~BACKLOG-6. Duplicación formato `tienda_export_` (WEB/DESKTOP)~~ ✅
 **Contexto:** el nombre de export está duplicado entre `main.ts:55` y `backup.service._webExportName` (drift risk).
-**Fix:** fuente única para el nombre de export.
+**Fix:** `5f78cc8` fuente única vía `electron/export-name.ts` (SDD web-export-refactor, merged + archivado `c4fd2c3`). Verificado PASS 6/6.
 
 ### ~~BACKLOG-7. Web fail-loud parity SqliteService (WEB)~~ ✅
 **Contexto:** SqliteService (web/OPFS) aún cae a `:memory:` silenciosamente ante fallo de apertura; el desktop ya es fail-loud.
@@ -61,9 +57,9 @@
 **Contexto:** no hay CI que corra tests en los PRs.
 **Fix:** GitHub Actions con vitest (web) + test:electron.
 
-### BACKLOG-10. ng test roto TS2532 venta.service.spec (TOOLING)
+### ~~BACKLOG-10. ng test roto TS2532 venta.service.spec (TOOLING)~~ ✅
 **Contexto:** `ng test` falla con TS2532 en venta.service.spec.
-**Fix:** non-null assertions completas (`updateJornada![1]![0]`) — **presente solo en `feat/seed-productos-reales` (`ca76a83`), NO en main** (main tiene la versión incompleta `updateJornada![1][0]`). Verificado 2026-08-01.
+**Fix:** non-null assertions completas (`updateJornada![1]![0]`, `ca76a83`) — **integrado a main vía merge del seed (`85601a7`)** + ng test destrabado (`b21ff36`). Verificado en main 2026-08-05.
 
 ### BACKLOG-11. 110 lint errors (TOOLING)
 **Contexto:** hay ~110 errores de eslint pendientes.
@@ -163,8 +159,8 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 ## 🟢 Prioridad Baja — Pendientes otros
 
-- ✅ **Sync con origin/main** — `main` == `origin/main` (0 adelante / 0 atrás), verificado 2026-08-01
-- **feat/seed-productos-reales** — branch activa con 4 commits NO integrados a main (seed 74 productos reales + fix TS2532 venta spec + migración specs TestBed/DI + skip native rebuild): `358eb93`, `ca76a83`, `6bd9e31`, `1654773`. Tracking local creado 2026-08-01. **🚫 BLOQUEADA de merge hasta pasar testing correcto (decisión usuario 2026-08-01)**
+- ✅ **Sync con origin/main** — `main` == `origin/main` (`c6cba24`, 0 adelante / 0 atrás), verificado 2026-08-05
+- ✅ **feat/seed-productos-reales MERGED** — seed 74 productos reales + fix TS2532 venta spec + migración specs + skip native rebuild integrados a main en `85601a7` (catch-up con token canónico SQLOCAL_CLIENT). Branch eliminada en limpieza 2026-08-05 (solo queda `main`).
 - **Capacitor Fase 4** — Build APK + test en emulador (requiere Android Studio). Setup presente: `capacitor.config.ts` + deps `@capacitor/*@8.4.2` + scripts `cap:*`
 
 ---
@@ -181,6 +177,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-05 | TODO sync vs remote (post-crash VS Code): BACKLOG-1b/5/6/10 ✅, BACKLOG-2/3/4 ✅ merged+archivados, seed-productos-reales MERGED, limpieza de ramas (solo `main`), bump `0.1.13-beta` | `c6cba24` |
 | 2026-08-02 | SDD `desktop-resilience-backlogs`: BACKLOG-2/3/4 **implementados** en `fix/desktop-resilience-backlog` (colisión snapshot + parser `(?:-\d+)?`, stage fatal real, postinstall install-app-deps). Electron 141 / web 695 GREEN. **⏳ PRs NO abiertos (decisión sesión 2026-08-02).** | `b8005e5`, `70d4532`, `118b224` |
 | 2026-08-01 | Limpieza de ramas: 11 remotes + 7 locales obsoletas eliminadas (todo contenido ya en main); `feat/seed-productos-reales` traída a local con tracking; ruta auto-save Excel unificada a `Documents/Tienda - App/Tienda IPVE` | `e6243a8`, `189e951` |
 | 2026-08-01 | TODO sync vs remote: BACKLOG-7 ✅, BACKLOG-10 revertido a pendiente (fix solo en branch); main == origin/main (0/0); ramas betatest-features (behind 4) y electron/auto-save-excel (ahead 4) anotadas; Capacitor setup documentado | — |
