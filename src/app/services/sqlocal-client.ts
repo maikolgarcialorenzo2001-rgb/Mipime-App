@@ -13,7 +13,10 @@ export type SqlocalClientFactory = () => Promise<SQLocal>;
  */
 export const SQLOCAL_CLIENT_FACTORY = new InjectionToken<SqlocalClientFactory>(
   'SQLOCAL_CLIENT_FACTORY',
-  { factory: () => createSqlocalClient },
+  {
+    providedIn: 'root',
+    factory: () => createSqlocalClient,
+  },
 );
 
 /**
