@@ -139,15 +139,22 @@ describe('BackupService exportarRespaldo (T12)', () => {
         return undefined;
       });
 
+    vi.useFakeTimers();
+
     const result = await service.exportarRespaldo();
 
     expect(createSqlocalClientMock).toHaveBeenCalled();
     expect(getDatabaseFileMock).toHaveBeenCalled();
     expect(createObjectUrlMock).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
-    expect(revokeObjectUrlMock).toHaveBeenCalled();
+    // BACKLOG-5: el revoke NO es síncrono al click — el download arranca primero.
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
     expect(result.ok).toBe(true);
 
+    vi.advanceTimersByTime(0);
+    expect(revokeObjectUrlMock).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
     clickSpy.mockRestore();
   });
 

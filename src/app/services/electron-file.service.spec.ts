@@ -72,12 +72,21 @@ describe('ElectronFileService', () => {
       } as unknown as HTMLAnchorElement);
       const revokeURL = vi.spyOn(URL, 'revokeObjectURL');
 
+      vi.useFakeTimers();
+
       await service.saveIndividual('SGVsbG8=', { fecha: '2026-07-28', id: 1 });
 
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(createElement).toHaveBeenCalledWith('a');
       expect(clickMock).toHaveBeenCalledTimes(1);
+      // BACKLOG-5: el revoke NO es síncrono — se difiere al tick siguiente.
+      expect(revokeURL).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(0);
+      expect(revokeURL).toHaveBeenCalledTimes(1);
       expect(revokeURL).toHaveBeenCalledWith('blob:url');
+
+      vi.useRealTimers();
     });
   });
 

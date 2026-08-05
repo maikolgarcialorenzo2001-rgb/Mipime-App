@@ -92,6 +92,8 @@ export class ElectronFileService {
     a.href = url;
     a.download = fileName;
     a.click();
-    URL.revokeObjectURL(url);
+    // BACKLOG-5: diferir el revoke hasta después del click (Safari viejo
+    // aborta el download si la URL se revoca en el mismo tick).
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 }
