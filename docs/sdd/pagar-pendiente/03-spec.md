@@ -2,6 +2,7 @@
 
 > Artefacto de spec (2026-08-05). Guardado también en Engram (`sdd/pagar-pendiente/spec`).
 > Versión CORREGIDA: v17 (no v11). La versión de migración actual es 16.
+> **Estado: COMPLETE** (archivado 2026-08-06) — implementada y verificada PASS (45 files / 748 tests; engram `sdd/pagar-pendiente/verify-report` #509). Criterios AC1–AC11 cumplidos.
 
 ## FR-1 — Botón Cobrar Pendiente (POS)
 
@@ -88,17 +89,17 @@ Semántica: `cobro_de_venta_id` no-NULL ⇒ existe un cobro; `pagado_en` IS NULL
 
 ## Criterios de aceptación
 
-- [AC1→FR1] botón visible/deshabilitado correctamente; abre modal/vista solo cuando hay jornada abierta
-- [AC2→FR2] la lista muestra sin cobrar incl. mismo día; cobrados excluidos; fallback para comprador_nombre ausente
-- [AC3→FR3] el cobro muestra el monto completo, sin control de parcial
-- [AC4→FR5] el guard de vuelto de divisas bloquea vuelto excesivo
-- [AC5→FR4] doble cobro bloqueado (guard in-txn); el reintento falla, existe una sola fila de cobro
-- [AC6→FR4] jornada `total_ventas` / `saldo_esperado` espejados desde `VentaService._ejecutar`
-- [AC7→FR6] migración v17 idempotente; `db-migrations.spec` v1..v17 green; pendientes legacy siguen cobrables
-- [AC8→FR7] historial + Excel renderizan "Cobrar Pendiente" sin crashes en filas sin detalles; los totales incluyen el cobro
-- [AC9] todos los tests RED/GREEN en español green; sin cambios a la matemática de dinero existente
-- [AC10→FR8] botón "Ver Pendientes" deshabilitado sin jornada abierta; la lista solo-lectura muestra comprador/fecha/monto, SIN cobro/pago/selección; estado vacío mostrado
-- [AC11→FR9] el Excel diario incluye la nueva lista de pendientes (todos los sin cobrar de todas las jornadas) con comprador + fecha original + monto + antigüedad; Resumen "Pendientes del día" sin cambios; el caso cero pendientes no corrompe el reporte
+- [x] AC1→FR1 botón visible/deshabilitado correctamente; abre modal/vista solo cuando hay jornada abierta
+- [x] AC2→FR2 la lista muestra sin cobrar incl. mismo día; cobrados excluidos; fallback para comprador_nombre ausente
+- [x] AC3→FR3 el cobro muestra el monto completo, sin control de parcial
+- [x] AC4→FR5 el guard de vuelto de divisas bloquea vuelto excesivo
+- [x] AC5→FR4 doble cobro bloqueado (guard in-txn); el reintento falla, existe una sola fila de cobro
+- [x] AC6→FR4 jornada `total_ventas` / `saldo_esperado` espejados desde `VentaService._ejecutar`
+- [x] AC7→FR6 migración v17 idempotente; `db-migrations.spec` v1..v17 green; pendientes legacy siguen cobrables
+- [x] AC8→FR7 historial + Excel renderizan "Cobrar Pendiente" sin crashes en filas sin detalles; los totales incluyen el cobro
+- [x] AC9 todos los tests RED/GREEN en español green; sin cambios a la matemática de dinero existente
+- [x] AC10→FR8 botón "Ver Pendientes" deshabilitado sin jornada abierta; la lista solo-lectura muestra comprador/fecha/monto, SIN cobro/pago/selección; estado vacío mostrado
+- [x] AC11→FR9 el Excel diario incluye la nueva lista de pendientes (todos los sin cobrar de todas las jornadas) con comprador + fecha original + monto + antigüedad; Resumen "Pendientes del día" sin cambios; el caso cero pendientes no corrompe el reporte
 
 ## Fuera de scope
 

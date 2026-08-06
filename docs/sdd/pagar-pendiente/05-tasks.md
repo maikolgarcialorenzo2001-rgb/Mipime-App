@@ -58,7 +58,7 @@
 
 ## Verificación (apply PR 3)
 
-- RED: 4 nuevos tests en excel.service.spec (fila cobro ×3 + hoja acumulada ×4, 1 aprobatorio) y 3 en jornada.service.spec (cerrar + auto-close + vacío) y 2 en historial.page.spec (cobro sola + mixta) fallaron antes de la implementación con el motivo correcto (datos ausentes).
+- RED: 11 tests nuevos fallaron antes de la implementación con el motivo correcto (datos ausentes): 6 en excel.service.spec (3 fila cobro: render #42 total 2000, totalCaja+esperado 5800, Resumen 2000; 3 hoja acumulada: cross-day header/filas/Total, mixto antigüedad 0/1, cero → hoja omitida) + 3 en jornada.service.spec (cerrar pasa mapeados, auto-close, sin pendientes → []) + 2 en historial.page.spec (cobro sola + mixta).
 - GREEN: `npx vitest run src/app/services/excel.service.spec.ts src/app/services/jornada.service.spec.ts src/app/pages/historial/historial.page.spec.ts` → 3 files / 202 tests OK.
 - Suite completa: `npx vitest run` → **45 files / 748 tests PASS**.
 - 5.1 sin cambios (ver arriba).
@@ -75,3 +75,11 @@
 4. **DI edge**: `JornadaService` inyecta `CobroPendienteService` — actualizar mocks en jornada.service.spec.
 5. Strict TDD: `ng test`, tests en español con prefijos RED/GREEN; NO escribir código productivo antes de un RED fallando.
 6. **Patrón de tests ACTUALIZADO (post-rebase)**: `ng test` ya funciona (b21ff36) y el repo migró specs a **TestBed + tokens** (backup.service.spec como referencia) — `vi.mock` de imports relativos está restringido por el unit-test runner. `CobroPendienteService` inyecta `DATABASE` (no `SQLOCAL_CLIENT`), así que sigue el patrón `createMockDb()` + token DATABASE de venta.service.spec — pero verificar si el runner exige TestBed y ajustar.
+
+## Estado de entrega (archive, 2026-08-06)
+
+- **Cambio COMPLETE** — ciclo SDD cerrado (proposal → spec → design → tasks → apply → verify → archive). Verify global **PASS**: 45 files / 748 tests (`npx vitest run`).
+- **PR 1** (migración v17 + CobroPendienteService), **PR 2** (modal UI + botones POS), **PR 3** (Fase 4 Reports + Fase 5) implementados y mergeados al tracker **`deudas-features` @ `6e72afb`** (fast-forward; origin/deudas-features = 6e72afb).
+- **NO mergeado a main**: main = `d8abed2` intacto; el merge a main queda PENDIENTE de aprobación explícita del usuario (flujo feature-branch-chain lockeado).
+- 5.1 OBSOLETA sin bump (repo ya en 0.1.13-beta desde origin/main c6cba24).
+- Warnings no bloqueantes: hoja mensual por jornada no renderiza filas de cobro ni su línea Transferencias (estructura pre-existente AD-8, solo display; los totales del Resumen del Mes SÍ incluyen cobros); lint debt 5 `no-explicit-any` en excel.service.ts cobro branch (convención dominante del archivo) + 120 pre-existentes repo-wide; TDD evidence en prosa (no tabla formal por tarea) en PR 3.
