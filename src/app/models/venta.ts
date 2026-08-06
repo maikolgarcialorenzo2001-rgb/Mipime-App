@@ -12,6 +12,8 @@ export interface Venta {
   comprador_nombre?: string;
   autorizado_por?: string;
   descripcion?: string;
+  cobro_de_venta_id?: number;
+  pagado_en?: string;
   created_at: string;
 }
 
