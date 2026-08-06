@@ -1862,7 +1862,6 @@ describe('JornadaService', () => {
 });
 
 describe('Pagar Pendiente — pendientesAcumulados en el Excel del cierre (FR-9/AC11)', () => {
-    const user1: UsuarioPublico = { id: 1, nombre: 'Admin', rol: 'admin', activo: 1, created_at: '', updated_at: '' };
     const user2: UsuarioPublico = { id: 2, nombre: 'Worker', rol: 'trabajador', activo: 1, created_at: '', updated_at: '' };
     const jornadaDeUser1: Jornada = { ...mockJornada, user_apertura_id: 1 };
 
