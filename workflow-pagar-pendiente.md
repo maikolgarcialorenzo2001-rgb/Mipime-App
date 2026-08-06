@@ -20,9 +20,13 @@ Feature **"Cobrar Pendiente"** en el POS: cobrar pagos registrados como *pendien
 | Spec | ✅ | `sdd/pagar-pendiente/spec` · `docs/sdd/pagar-pendiente/03-spec.md` |
 | Design | ✅ | `sdd/pagar-pendiente/design` · `docs/sdd/pagar-pendiente/04-design.md` |
 | Tasks | ✅ | `sdd/pagar-pendiente/tasks` (corrupto en engram) · `docs/sdd/pagar-pendiente/05-tasks.md` ← usar ESTE |
-| Apply | 🔲 **pendiente** | `sdd/pagar-pendiente/apply-progress` |
-| Verify | 🔲 **pendiente** | `sdd/pagar-pendiente/verify-report` |
-| Archive | 🔲 **pendiente** | `sdd/pagar-pendiente/archive-report` |
+| Apply PR 1 | ✅ **COMPLETO** | `sdd/pagar-pendiente/apply-progress` (#507) · commits `2548776` + `22fbd63` |
+| Verify PR 1 | ✅ **PASS** | `sdd/pagar-pendiente/verify-report` (#509) · 0 CRITICAL, 0 WARNING, 5 SUGGESTIONS |
+| Apply PR 2 | 🔲 **PRÓXIMO PASO** | tareas 3.1–3.4 (modal + botones POS) |
+| Verify PR 2 | 🔲 pendiente | `sdd/pagar-pendiente/verify-report` |
+| Apply PR 3 | 🔲 pendiente | tareas 4.1–4.5 + 5.1 (OBSOLETA) |
+| Verify PR 3 | 🔲 pendiente | `sdd/pagar-pendiente/verify-report` |
+| Archive | 🔲 pendiente | `sdd/pagar-pendiente/archive-report` |
 
 **Branch:** `deudas-features` (desde `main`). **Modo sesión:** interactive · **Artifact store:** engram · **Delivery:** ask-on-risk → **PRs encadenados** · **Chain strategy:** `feature-branch-chain` (ELEGIDA y lockeada el 2026-08-05).
 
@@ -88,12 +92,18 @@ Cada PR: tests incluidos con su código, commit por unidad de trabajo, rollback 
 4. **Cierre cost fallback** — verificado seguro: cobro aporta costo 0 (correcto por decisión 3).
 5. **DI edge** — `JornadaService` inyecta `CobroPendienteService` (sin ciclo; ambos dependen solo de DATABASE). Actualizar mocks.
 
-## 9. Cómo retomar
+## 9. Cómo retomar (estado: PR 1 completado y verificado)
 
-1. `git checkout deudas-features` — el doc de retomada es ESTE archivo.
-2. Elegir **chain strategy** (si no se eligió): feature-branch-chain (recomendada) o stacked-to-main.
-3. `/sdd-continue pagar-pendiente` → fase **apply**: leer `sdd/pagar-pendiente/tasks` + `apply-progress` (si existe, MERGEAR no sobrescribir).
-4. Aplicar **PR 1** (Fase 1+2) primero, luego PR 2, PR 3.
-5. Al terminar cada PR: `/sdd-verify` y `/sdd-archive` al final.
+> Estado a 2026-08-05: **PR 1 (migración v17 + data layer) COMPLETO y VERIFIED PASS**. Los commits `2548776` + `22fbd63` están en `deudas-features` (pusheada a origin). Próximo paso: **PR 2 (Fase 3 UI)**.
 
-Strict TDD activo: `ng test` (Vitest, jsdom). **No escribir código productivo antes de un test RED.**
+1. `git checkout deudas-features && git pull` — el doc de retomada es ESTE archivo. La rama ya está pusheada a `origin` (tracker del feature-branch-chain).
+2. **Chain strategy YA elegida y lockeada**: `feature-branch-chain` (ver §2). NO re-preguntar.
+3. Leer `docs/sdd/pagar-pendiente/05-tasks.md` (fuente autoritativa de tareas) — las tareas 1.1–2.3 están marcadas `[x]`.
+4. `/sdd-continue pagar-pendiente` → fase **apply PR 2**: tareas **3.1, 3.2, 3.3, 3.4** (modal `CobroPendienteModal` + botones POS + specs). Usar `apply-progress` de engram si existe (MERGEAR, no sobrescribir).
+5. Verificar que `CobroPendienteService` (ya existente, PR 1) se consume correctamente: `listarPendientes()` para la lista, `registrarCobroPendiente()` para el cobro.
+6. Al terminar PR 2: `/sdd-verify`. Después PR 3 (Fase 4 reports + Fase 5, tarea 5.1 OBSOLETA).
+7. Al final de todo: `/sdd-archive`.
+
+**PR 1 ya NO se toca** — si una sesión sin contexto intenta "aplicar PR 1", ya está hecho y verificado.
+
+Strict TDD activo: `ng test` (Vitest, jsdom, 715 tests verdes al cierre del PR 1). **No escribir código productivo antes de un test RED.** Usar el patrón de tests TestBed+token del repo actual (backup.service.spec.ts como referencia); `CobroPendienteService` sigue el patrón `createMockDb()` + token DATABASE de venta.service.spec.ts.

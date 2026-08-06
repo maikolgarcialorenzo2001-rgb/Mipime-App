@@ -22,15 +22,15 @@
 
 ## Fase 1: Migración v17
 
-- [ ] 1.1 `db-migrations.ts`: `migrationV17()` con 2 ALTERs try/catch (`cobro_de_venta_id INTEGER REFERENCES ventas(id)`, `pagado_en TEXT`) + índice parcial + `INSERT INTO schema_version (version) VALUES (17)`; registrar `if(currentVersion<17)` [FR-6/AC7]
-- [ ] 1.2 `db-migrations.spec.ts`: arrays v1..v17 + caso de idempotencia (17 en DB ya versionada); DB legacy sigue cobrable [FR-6/AC7]
+- [x] 1.1 `db-migrations.ts`: `migrationV17()` con 2 ALTERs try/catch (`cobro_de_venta_id INTEGER REFERENCES ventas(id)`, `pagado_en TEXT`) + índice parcial + `INSERT INTO schema_version (version) VALUES (17)`; registrar `if(currentVersion<17)` [FR-6/AC7]
+- [x] 1.2 `db-migrations.spec.ts`: arrays v1..v17 + caso de idempotencia (17 en DB ya versionada); DB legacy sigue cobrable [FR-6/AC7]
 - commit: `feat(db): v17 add cobro_de_venta_id + pagado_en with partial index`
 
 ## Fase 2: Data layer
 
-- [ ] 2.1 `models/venta.ts`: agregar `cobro_de_venta_id?: number` + `pagado_en?: string` [FR-2/FR-4/AC2]
-- [ ] 2.2 NUEVO `services/cobro-pendiente.service.ts`: DTO `PendienteItem` + `listarPendientes()` (query global, sin filtro de jornada) [FR-2/AC2]; `registrarCobroPendiente()` txn (guard pagado_en, netCash efectivo/divisas/transferencia, guard saldo vuelto, INSERT RETURNING sin detalles/lotes, UPDATE marcador, UPDATE jornada, COMMIT/ROLLBACK) [FR-3/4/5/AC3-6]
-- [ ] 2.3 `cobro-pendiente.service.spec.ts`: RED/GREEN — lista incl. mismo día / excluye cobrados / vacío / fallback; txn happy path (3 forma_pago), doble-cobro throw, saldo insuficiente [FR-2-5/AC2-6]
+- [x] 2.1 `models/venta.ts`: agregar `cobro_de_venta_id?: number` + `pagado_en?: string` [FR-2/FR-4/AC2]
+- [x] 2.2 NUEVO `services/cobro-pendiente.service.ts`: DTO `PendienteItem` + `listarPendientes()` (query global, sin filtro de jornada) [FR-2/AC2]; `registrarCobroPendiente()` txn (guard pagado_en, netCash efectivo/divisas/transferencia, guard saldo vuelto, INSERT RETURNING sin detalles/lotes, UPDATE marcador, UPDATE jornada, COMMIT/ROLLBACK) [FR-3/4/5/AC3-6]
+- [x] 2.3 `cobro-pendiente.service.spec.ts`: RED/GREEN — lista incl. mismo día / excluye cobrados / vacío / fallback; txn happy path (3 forma_pago), doble-cobro throw, saldo insuficiente [FR-2-5/AC2-6]
 - commit: `feat(cobro): CobroPendienteService listar + registrar cobro en txn`
 
 ## Fase 3: UI
