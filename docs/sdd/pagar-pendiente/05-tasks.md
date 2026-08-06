@@ -35,10 +35,10 @@
 
 ## Fase 3: UI
 
-- [ ] 3.1 Crear `components/cobro-pendiente-modal/` (ts/html/css): paso lista, paso pago, computeds de divisa reusados, Cuenta Casas+Pendiente deshabilitados, input `soloLectura` con selección no-op, outputs `cobroCompletado`/`cancelar` [FR-1/3/4/5/8/AC1/3/4/10]
-- [ ] 3.2 `cobro-pendiente-modal.spec.ts`: RED/GREEN cobro + read-only sin pago + estado vacío [FR-5/8/AC1/4/10]
-- [ ] 3.3 `pos.page.ts/.html`: signal `modoPendientes`, `abrirCobroPendiente()` + `abrirVerPendientes()`, dos botones fuera del `@if` del carrito, ambos `[disabled]="sinJornada"`, mount único `[soloLectura]` [FR-1/8/AC1/10]
-- [ ] 3.4 `pos.page.spec.ts` extender: botones visibles/deshabilitados + abrir modal vs read-only [FR-1/8/AC1/10]
+- [x] 3.1 Crear `components/cobro-pendiente-modal/` (ts/html/css): paso lista, paso pago, computeds de divisa reusados, Cuenta Casas+Pendiente deshabilitados, input `soloLectura` con selección no-op, outputs `cobroCompletado`/`cancelar` [FR-1/3/4/5/8/AC1/3/4/10]
+- [x] 3.2 `cobro-pendiente-modal.spec.ts`: RED/GREEN cobro + read-only sin pago + estado vacío [FR-5/8/AC1/4/10]
+- [x] 3.3 `pos.page.ts/.html`: signal `modoPendientes`, `abrirCobroPendiente()` + `abrirVerPendientes()`, dos botones fuera del `@if` del carrito, ambos `[disabled]="sinJornada"`, mount único `[soloLectura]` [FR-1/8/AC1/10]
+- [x] 3.4 `pos.page.spec.ts` extender: botones visibles/deshabilitados + abrir modal vs read-only [FR-1/8/AC1/10]
 - commit: `feat(ui): modal Cobrar/Ver Pendientes + botones POS`
 
 ## Fase 4: Reports

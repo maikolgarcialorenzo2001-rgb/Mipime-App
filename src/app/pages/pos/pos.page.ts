@@ -7,11 +7,13 @@ import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { AuthService } from '../../services/auth.service';
+import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
 import { CheckoutModalComponent } from '../../components/checkout-modal/checkout-modal.component';
 import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
+import { CobroPendienteModalComponent } from '../../components/cobro-pendiente-modal/cobro-pendiente-modal.component';
 import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -19,7 +21,7 @@ import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [CurrencyPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -29,6 +31,7 @@ export class PosPage {
   readonly _jornadaService = inject(JornadaService);
   private readonly _ventaService = inject(VentaService);
   private readonly _cuentaCosasService = inject(CuentaCosasService);
+  private readonly _cobroPendienteService = inject(CobroPendienteService);
   private readonly _auth = inject(AuthService);
   private readonly _destroyRef = inject(DestroyRef);
 
@@ -46,6 +49,12 @@ export class PosPage {
   readonly searchError = signal<string | null>(null);
 
   readonly successMessage = signal<string | null>(null);
+
+  /** Modal de pendientes (AD-6/AD-7): un único mount, modo cobrar o ver. */
+  readonly showPendienteModal = signal(false);
+  readonly modoPendientes = signal<'cobrar' | 'ver'>('cobrar');
+  readonly pendientes = signal<PendienteItem[]>([]);
+  readonly pendientesError = signal<string | null>(null);
 
   /** Cantidad de columnas del grid, calculada una vez al inicio. */
   private _columnCount = 2;
@@ -168,6 +177,45 @@ export class PosPage {
   cerrarModal(): void {
     this.showModal.set(false);
     this.ventaError.set(null);
+  }
+
+  /** Carga la lista global de pendientes sin cobrar (AD-3). */
+  private _cargarPendientes(): void {
+    this.pendientesError.set(null);
+    this._cobroPendienteService.listarPendientes().then(
+      (pendientes) => this.pendientes.set(pendientes),
+      (err: unknown) => {
+        this.pendientes.set([]);
+        this.pendientesError.set(
+          err instanceof Error ? err.message : 'Error al cargar los pendientes',
+        );
+      },
+    );
+  }
+
+  abrirCobroPendiente(): void {
+    this.modoPendientes.set('cobrar');
+    this._cargarPendientes();
+    this.showPendienteModal.set(true);
+  }
+
+  abrirVerPendientes(): void {
+    this.modoPendientes.set('ver');
+    this._cargarPendientes();
+    this.showPendienteModal.set(true);
+  }
+
+  cerrarPendienteModal(): void {
+    this.showPendienteModal.set(false);
+    this.pendientesError.set(null);
+  }
+
+  onPendienteCobrado(): void {
+    this.showPendienteModal.set(false);
+    this._cargarPendientes();
+    this._jornadaService.refreshJornadaAbierta();
+    this.successMessage.set('¡Cobro registrado con éxito!');
+    setTimeout(() => this.successMessage.set(null), 2000);
   }
 
   confirmarVenta(payload: CheckoutPayload): void {
