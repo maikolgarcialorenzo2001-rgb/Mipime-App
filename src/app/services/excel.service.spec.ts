@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ExcelService, type JornadaReportData } from './excel.service';
+import { ExcelService, type JornadaReportData, type PendienteAcumulado } from './excel.service';
 import * as XLSX from 'xlsx';
 import type { Jornada } from '../models/jornada';
 import type { VentaConDetalles } from './excel.service';
@@ -1615,6 +1615,144 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       // Rows should show compra_divisa details
       expect(filas.some(r => r[0] === 'Compra divisa' && r[1] === 'Compra USD 100 @ 120' && r[2] === 'USD' && r[3] === 100 && r[4] === 120 && r[5] === 12000)).toBe(true);
       expect(filas.some(r => r[0] === 'Compra divisa' && r[1] === 'Compra EUR 50 @ 130' && r[2] === 'EUR' && r[3] === 50 && r[4] === 130 && r[5] === 6500)).toBe(true);
+    });
+  });
+
+  // ─── PR 3 (pagar-pendiente): fila cobro + hoja Pendientes Acumulados (FR-7/9, AC8/11) ───
+
+  describe('Pagar Pendiente — fila cobro en Excel Ventas (FR-7/AC8)', () => {
+    const ventaCobro: VentaConDetalles = {
+      id: 100,
+      jornada_id: 1,
+      fecha_hora: '2026-06-04T16:00:00',
+      total: 2000,
+      usuario_id: 1,
+      forma_pago: 'efectivo',
+      cobro_de_venta_id: 42,
+      created_at: '2026-06-04T16:00:00Z',
+      detalles: [],
+    };
+
+    it('RED: venta sin detalles se renderiza como fila única "Cobrar Pendiente #42" sin crash', () => {
+      const dataCobro: JornadaReportData = {
+        ...data,
+        ventas: [ventaCobro],
+        movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataCobro);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const fila = json.find((f) => f[0] === 'Cobrar Pendiente #42') as unknown[];
+      expect(fila).toBeTruthy();
+      expect(fila[4]).toBe(2000); // Total = total del cobro
+    });
+
+    it('RED: el total del cobro suma a totalCaja y a Total esperado del día', () => {
+      const dataCobro: JornadaReportData = {
+        ...data,
+        ventas: [...ventaConDetalles, ventaCobro],
+        movimientos,
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataCobro);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const cajaRow = json.find((f) => f[0] === 'Total de ingresos en ventas') as unknown[];
+      expect(cajaRow).toBeTruthy();
+      expect(cajaRow[4]).toBe(5800); // 3800 (ventas con detalle) + 2000 (cobro)
+
+      const esperadoRow = json.find((f) => f[0] === 'Total esperado') as unknown[];
+      expect(esperadoRow).toBeTruthy();
+      expect(esperadoRow[4]).toBe(5800);
+    });
+
+    it('RED: Resumen "Total ventas + ingresos extra" incluye el cobro como cualquier venta', () => {
+      const dataCobro: JornadaReportData = {
+        ...data,
+        ventas: [ventaCobro],
+        movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
+      };
+
+      const result = service.generarExcelJornada(dataCobro);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Total ventas + ingresos extra', 2000]);
+    });
+  });
+
+  describe('Pagar Pendiente — hoja Pendientes Acumulados (FR-9/AC11)', () => {
+    const pendientes: PendienteAcumulado[] = [
+      { id: 1, comprador: 'Ana', fechaOriginal: '2026-06-01T10:00:00Z', monto: 500, antiguedadDias: 3 },
+      { id: 2, comprador: 'Pendiente #2', fechaOriginal: '2026-06-04T09:00:00Z', monto: 1500, antiguedadDias: 0 },
+    ];
+
+    function dataConPendientes(): JornadaReportData {
+      return {
+        ...data,
+        ventas: [],
+        movimientos: [],
+        totalCosto: 0,
+        userCierreNombre: null,
+        pendientesAcumulados: pendientes,
+      };
+    }
+
+    it('RED: genera hoja "Pendientes Acumulados" con header y filas cross-day', () => {
+      const result = service.generarExcelJornada(dataConPendientes());
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).toContain('Pendientes Acumulados');
+      const sheet = workbook.Sheets['Pendientes Acumulados'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json[0]).toEqual(['Comprador', 'Fecha original', 'Monto', 'Antigüedad (días)']);
+      // Cada pendiente con su fecha original y antigüedad (días desde la venta original)
+      expect(json[1]).toEqual(['Ana', '2026-06-01T10:00:00Z', 500, 3]);
+      expect(json[2]).toEqual(['Pendiente #2', '2026-06-04T09:00:00Z', 1500, 0]);
+      // Fila total con la suma de montos (label en col A, suma en col Monto)
+      expect(json[json.length - 1]).toEqual(['Total', '', 2000, '']);
+    });
+
+    it('RED: caso mixto mismo día — antigüedad 0 en pendientes creados hoy', () => {
+      const mixto: PendienteAcumulado[] = [
+        { id: 3, comprador: 'Hoy', fechaOriginal: '2026-06-04T08:00:00Z', monto: 300, antiguedadDias: 0 },
+        { id: 1, comprador: 'Ayer', fechaOriginal: '2026-06-03T08:00:00Z', monto: 700, antiguedadDias: 1 },
+      ];
+      const dataMixto: JornadaReportData = { ...dataConPendientes(), pendientesAcumulados: mixto };
+
+      const result = service.generarExcelJornada(dataMixto);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Pendientes Acumulados'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      const filaHoy = json.find((f) => f[0] === 'Hoy') as unknown[];
+      expect(filaHoy[3]).toBe(0);
+      const filaAyer = json.find((f) => f[0] === 'Ayer') as unknown[];
+      expect(filaAyer[3]).toBe(1);
+    });
+
+    it('RED: cero pendientes → hoja omitida y Resumen "Pendientes del día" intacto', () => {
+      const dataSinPend: JornadaReportData = { ...data, pendientesAcumulados: [], totalCosto: 0, userCierreNombre: null };
+      const result = service.generarExcelJornada(dataSinPend);
+      const workbook = XLSX.read(result, { type: 'base64' });
+
+      expect(workbook.SheetNames).not.toContain('Pendientes Acumulados');
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      expect(json).toContainEqual(['Pendientes del día', 0]);
     });
   });
 });
