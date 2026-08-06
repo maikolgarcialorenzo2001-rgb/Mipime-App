@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
@@ -41,6 +41,15 @@ export class CobroPendienteModalComponent {
   readonly completacionEfectivo = signal<number | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+
+  /** Cuando el pago en divisa se vuelve suficiente, limpia la completación stale
+   * (mismo patrón que checkout-modal; evita inflar saldo_esperado con
+   * completacionEfectivo remanente). */
+  private readonly _cleanupEffect = effect(() => {
+    if (this.pagoSuficiente()) {
+      this.completacionEfectivo.set(null);
+    }
+  });
 
   readonly seleccionada = computed<PendienteItem | null>(() => {
     const id = this.selectedId();

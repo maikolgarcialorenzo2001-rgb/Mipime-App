@@ -40,6 +40,7 @@
 - [x] 3.3 `pos.page.ts/.html`: signal `modoPendientes`, `abrirCobroPendiente()` + `abrirVerPendientes()`, dos botones fuera del `@if` del carrito, ambos `[disabled]="sinJornada"`, mount único `[soloLectura]` [FR-1/8/AC1/10]
 - [x] 3.4 `pos.page.spec.ts` extender: botones visibles/deshabilitados + abrir modal vs read-only [FR-1/8/AC1/10]
 - commit: `feat(ui): modal Cobrar/Ver Pendientes + botones POS`
+- [x] verify PR 2: **PASS** (2026-08-06, 45 files / 737 tests, lint limpio). WARNING de dinero resuelto: `_cleanupEffect` replicado de checkout-modal en `cobro-pendiente-modal.component.ts` (limpia `completacionEfectivo` stale al pasar a `pagoSuficiente`, evita inflar `saldo_esperado` — AC6) + test RED/GREEN + imports no usados removidos de `pos.page.spec.ts`. Commit: `fix(ui): limpiar completación stale en modal de cobro`
 
 ## Fase 4: Reports
 

@@ -162,6 +162,27 @@ describe('CobroPendienteModalComponent', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it('RED: divisa que pasa a pagoSuficiente limpia la completación stale (AC6)', async () => {
+    listar([pendienteItem({ total: 1000 })]);
+    component.seleccionar(1);
+    component.seleccionarFormaPago('divisas');
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(1); // 700 < 1000 → falta 300
+    component.completacionEfectivo.set(300);
+    fixture.detectChanges();
+
+    expect(component.pagoSuficiente()).toBe(false);
+    expect(component.completacionEfectivo()).toBe(300);
+
+    // El cliente sube el billete: ahora 1400 >= 1000 → el pago es suficiente.
+    component.billeteRecibido.set(2);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(component.pagoSuficiente()).toBe(true);
+    expect(component.completacionEfectivo()).toBeNull();
+  });
+
   it('RED: error del servicio se muestra y no emite cobroCompletado', async () => {
     const spy = vi.fn();
     component.cobroCompletado.subscribe(spy);

@@ -7,11 +7,9 @@ import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
-import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
 import { CobroPendienteModalComponent } from '../../components/cobro-pendiente-modal/cobro-pendiente-modal.component';
-import { DATABASE, type Database } from '../../services/database';
 import type { Jornada, Producto } from '../../models';
 import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
 
@@ -44,13 +42,6 @@ const producto: Producto = {
   created_at: '',
   updated_at: '',
 };
-
-function createMockDb(): Database {
-  return {
-    sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
-    initialize: vi.fn().mockResolvedValue(undefined),
-  };
-}
 
 describe('PosPage — toast de éxito', () => {
   let fixture: ComponentFixture<PosPage>;
