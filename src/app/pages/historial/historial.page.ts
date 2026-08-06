@@ -85,6 +85,20 @@ export class HistorialPage {
       formaPago: string;
     }[] = [];
     for (const venta of data.ventas) {
+      // Venta solo-money (cobro de pendiente, FR-7/AC8): sin detalles → fila
+      // especial "Cobrar Pendiente #id" en lugar de quedar invisible en la
+      // vista previa.
+      if (venta.detalles.length === 0) {
+        items.push({
+          producto: `Cobrar Pendiente #${venta.cobro_de_venta_id ?? venta.id}`,
+          cantidad: 1,
+          precioUnitario: venta.total,
+          precioBase: null,
+          total: venta.total,
+          formaPago: venta.forma_pago ?? 'efectivo',
+        });
+        continue;
+      }
       for (const detalle of venta.detalles) {
         const info = data.productosMap?.get(detalle.producto_id);
         items.push({
