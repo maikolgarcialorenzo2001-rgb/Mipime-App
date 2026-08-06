@@ -44,17 +44,24 @@
 
 ## Fase 4: Reports
 
-- [ ] 4.1 `excel.service.ts`: special case `_agregarVentas` fila sin detalles "Cobrar Pendiente #id" + cuenta en totalCaja; exportar `PendienteAcumulado`; `JornadaReportData += pendientesAcumulados?`; `_agregarPendientesAcumulados` (header Comprador/Fecha original/Monto/Antigüedad + Total, omitir si vacío) llamado después de `_agregarVentas` [FR-7/9/AC8/11]
-- [ ] 4.2 `excel.service.spec.ts` extender: fila cobro + totales; hoja acumulada cross-day/mixto/cero [FR-7/9/AC8/11]
-- [ ] 4.3 `jornada.service.ts`: inyectar `CobroPendienteService`; `_obtenerPendientesAcumulados()`; wiring en `_ejecutarCierre` Y `autoCerrarSiOtroUsuario`; pasar al tipo datos de `_generarYGuardarExcel` [FR-9/AC11]
-- [ ] 4.4 `jornada.service.spec.ts` extender: `cerrar()` + auto-close pasan `pendientesAcumulados` capturado [FR-9/AC11]
-- [ ] 4.5 `historial.page.ts`: guard render de fila sin detalles como "Cobrar Pendiente #id" en preview [FR-7/AC8]
-- commit: `feat(report): hoja Pendientes Acumulados + fila especial Cobrar Pendiente en Excel/prevista`
+- [x] 4.1 `excel.service.ts`: special case `_agregarVentas` fila sin detalles "Cobrar Pendiente #id" + cuenta en totalCaja; exportar `PendienteAcumulado`; `JornadaReportData += pendientesAcumulados?`; `_agregarPendientesAcumulados` (header Comprador/Fecha original/Monto/Antigüedad + Total, omitir si vacío) llamado después de `_agregarVentas` [FR-7/9/AC8/11]
+- [x] 4.2 `excel.service.spec.ts` extender: fila cobro + totales; hoja acumulada cross-day/mixto/cero [FR-7/9/AC8/11]
+- [x] 4.3 `jornada.service.ts`: inyectar `CobroPendienteService`; `_obtenerPendientesAcumulados()`; wiring en `_ejecutarCierre` Y `autoCerrarSiOtroUsuario`; pasar al tipo datos de `_generarYGuardarExcel` [FR-9/AC11]
+- [x] 4.4 `jornada.service.spec.ts` extender: `cerrar()` + auto-close pasan `pendientesAcumulados` capturado [FR-9/AC11]
+- [x] 4.5 `historial.page.ts`: guard render de fila sin detalles como "Cobrar Pendiente #id" en preview [FR-7/AC8]
+- commit: `feat(report): hoja Pendientes Acumulados + fila especial Cobrar Pendiente en Excel/prevista` — hecho en 3 work-units: `746e3c8` (excel 4.1/4.2), `9091d8c` (jornada 4.3/4.4), `2c3f689` (preview 4.5)
 
 ## Fase 5: Version / integración
 
-- [ ] ~~5.1 `scripts/sync-version` → 0.1.13-beta; fix assert de versión (app.spec)~~ — **OBSOLETA**: origin/main ya está en 0.1.13-beta (rebase 2026-08-05). Evaluar bump a 0.1.14-beta si el repo lo pide, o marcar done sin cambios [AC9]
-- commit: `chore(version): bump to 0.1.14-beta` (solo si aplica)
+- [x] ~~5.1 `scripts/sync-version` → 0.1.13-beta; fix assert de versión (app.spec)~~ — **OBSOLETA, hecha sin cambios**: `package.json` y `src/app/version.ts` ya están en `0.1.13-beta` (generado por `scripts/sync-version.mjs`) y origin/main tiene `c6cba24 chore: bump version to 0.1.13-beta`; `app.spec.ts` importa `APP_VERSION` (no hardcodeado). No se bumpió a 0.1.14-beta.
+- commit: `chore(version): bump to 0.1.14-beta` (solo si aplica) — NO aplica
+
+## Verificación (apply PR 3)
+
+- RED: 4 nuevos tests en excel.service.spec (fila cobro ×3 + hoja acumulada ×4, 1 aprobatorio) y 3 en jornada.service.spec (cerrar + auto-close + vacío) y 2 en historial.page.spec (cobro sola + mixta) fallaron antes de la implementación con el motivo correcto (datos ausentes).
+- GREEN: `npx vitest run src/app/services/excel.service.spec.ts src/app/services/jornada.service.spec.ts src/app/pages/historial/historial.page.spec.ts` → 3 files / 202 tests OK.
+- Suite completa: `npx vitest run` → **45 files / 748 tests PASS**.
+- 5.1 sin cambios (ver arriba).
 
 ## Dependencias
 
