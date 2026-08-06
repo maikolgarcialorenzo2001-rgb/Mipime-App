@@ -79,7 +79,7 @@
 ## Estado de entrega (archive, 2026-08-06)
 
 - **Cambio COMPLETE** — ciclo SDD cerrado (proposal → spec → design → tasks → apply → verify → archive). Verify global **PASS**: 45 files / 748 tests (`npx vitest run`).
-- **PR 1** (migración v17 + CobroPendienteService), **PR 2** (modal UI + botones POS), **PR 3** (Fase 4 Reports + Fase 5) implementados y mergeados al tracker **`deudas-features` @ `6e72afb`** (fast-forward; origin/deudas-features = 6e72afb).
+- **PR 1** (migración v17 + CobroPendienteService), **PR 2** (modal UI + botones POS), **PR 3** (Fase 4 Reports + Fase 5) implementados y mergeados al tracker **`deudas-features`** (fast-forward). Origin/deudas-features = **`b760811`** (incluye el commit de archive `b760811` docs(sdd): archivar change pagar-pendiente).
 - **NO mergeado a main**: main = `d8abed2` intacto; el merge a main queda PENDIENTE de aprobación explícita del usuario (flujo feature-branch-chain lockeado).
 - 5.1 OBSOLETA sin bump (repo ya en 0.1.13-beta desde origin/main c6cba24).
 - Warnings no bloqueantes: hoja mensual por jornada no renderiza filas de cobro ni su línea Transferencias (estructura pre-existente AD-8, solo display; los totales del Resumen del Mes SÍ incluyen cobros); lint debt 5 `no-explicit-any` en excel.service.ts cobro branch (convención dominante del archivo) + 120 pre-existentes repo-wide; TDD evidence en prosa (no tabla formal por tarea) en PR 3.
