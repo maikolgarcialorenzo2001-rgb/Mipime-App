@@ -26,6 +26,8 @@ Feature **"Cobrar Pendiente"** en el POS: cobrar pagos registrados como *pendien
 
 **Branch:** `deudas-features` (desde `main`). **Modo sesión:** interactive · **Artifact store:** engram · **Delivery:** ask-on-risk → **PRs encadenados** · **Chain strategy:** `feature-branch-chain` (ELEGIDA y lockeada el 2026-08-05).
 
+> **2026-08-05 (post-rebase):** `deudas-features` fue rebaseada sobre `origin/main` (`d8abed2`). Trajo el seed real (74 productos), el bump a **0.1.13-beta** y el patrón de tests TestBed+token. Implicaciones: la tarea 5.1 (bump) quedó OBSOLETA; el PR 3 debe usar el patrón de test nuevo. Stash de tooling dropeado (main ya trae el skill-registry regenerado).
+
 ## 3. Decisiones cerradas (NO reabrir)
 
 1. **Sin cobro parcial** — cada pendiente se cobra completo.

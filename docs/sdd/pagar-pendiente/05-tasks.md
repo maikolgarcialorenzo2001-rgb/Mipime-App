@@ -52,8 +52,8 @@
 
 ## Fase 5: Version / integración
 
-- [ ] 5.1 `scripts/sync-version` → 0.1.13-beta; fix assert de versión (app.spec) [AC9]
-- commit: `chore(version): bump to 0.1.13-beta`
+- [ ] ~~5.1 `scripts/sync-version` → 0.1.13-beta; fix assert de versión (app.spec)~~ — **OBSOLETA**: origin/main ya está en 0.1.13-beta (rebase 2026-08-05). Evaluar bump a 0.1.14-beta si el repo lo pide, o marcar done sin cambios [AC9]
+- commit: `chore(version): bump to 0.1.14-beta` (solo si aplica)
 
 ## Dependencias
 
@@ -66,3 +66,4 @@
 3. **Sin cambios a la matemática de dinero**: solo labels/listados aditivos.
 4. **DI edge**: `JornadaService` inyecta `CobroPendienteService` — actualizar mocks en jornada.service.spec.
 5. Strict TDD: `ng test`, tests en español con prefijos RED/GREEN; NO escribir código productivo antes de un RED fallando.
+6. **Patrón de tests ACTUALIZADO (post-rebase)**: `ng test` ya funciona (b21ff36) y el repo migró specs a **TestBed + tokens** (backup.service.spec como referencia) — `vi.mock` de imports relativos está restringido por el unit-test runner. `CobroPendienteService` inyecta `DATABASE` (no `SQLOCAL_CLIENT`), así que sigue el patrón `createMockDb()` + token DATABASE de venta.service.spec — pero verificar si el runner exige TestBed y ajustar.
