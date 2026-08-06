@@ -1,8 +1,9 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { from, firstValueFrom, map, Observable, switchMap, tap } from 'rxjs';
 import { DATABASE } from './database';
-import { ExcelService, type JornadaReportData, type VentaConDetalles } from './excel.service';
+import { ExcelService, type JornadaReportData, type VentaConDetalles, type PendienteAcumulado } from './excel.service';
 import { ElectronFileService } from './electron-file.service';
+import { CobroPendienteService } from './cobro-pendiente.service';
 import type { Jornada, JornadaReporte } from '../models';
 import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
@@ -23,6 +24,7 @@ export class JornadaService {
   private readonly _electronFileService = inject(ElectronFileService);
   private readonly _productoService = inject(ProductoService);
   private readonly _backup = inject(BackupService);
+  private readonly _cobroPendienteService = inject(CobroPendienteService);
 
   /** Señal compartida de la jornada abierta actual (null si no hay). */
   readonly jornadaAbierta = signal<Jornada | null>(null);
@@ -244,6 +246,7 @@ export class JornadaService {
 
     // Generar y guardar Excel para la jornada auto-cerrada
     const datos = await this._recolectarDatosJornada(jornada.id, usuario.id);
+    const pendientesAcumulados = await this._obtenerPendientesAcumulados();
     const base64 = await this._generarYGuardarExcel(jornada, {
       ventas: datos.ventas,
       movimientos: datos.movimientos,
@@ -257,6 +260,7 @@ export class JornadaService {
       inversionPorProducto: datos.inversionPorProducto,
       totalUsd: datos.totalUsd,
       totalEur: datos.totalEur,
+      pendientesAcumulados,
     });
 
     // Auto-save Excel a Documents/Tienda - App/Tienda IPVE en entorno Electron empaquetado
@@ -318,6 +322,38 @@ export class JornadaService {
   }
 
   /**
+   * Pendientes sin cobrar de TODAS las jornadas (FR-9/AC11), mapeados al DTO
+   * `PendienteAcumulado` del Excel. Reusa `CobroPendienteService.listarPendientes`
+   * (query global `pagado_en IS NULL`) — NO es una query nueva de esta clase.
+   * `antiguedadDias` usa diferencia date-only: 0 si es del mismo día.
+   */
+  private async _obtenerPendientesAcumulados(): Promise<PendienteAcumulado[]> {
+    const items = await this._cobroPendienteService.listarPendientes();
+    const ahora = new Date();
+    const hoyMidnight = new Date(
+      ahora.getFullYear(),
+      ahora.getMonth(),
+      ahora.getDate(),
+    ).getTime();
+    return items.map((p) => {
+      const f = new Date(p.fechaHora);
+      const fechaMidnight = Number.isNaN(f.getTime())
+        ? hoyMidnight
+        : new Date(f.getFullYear(), f.getMonth(), f.getDate()).getTime();
+      return {
+        id: p.id,
+        comprador: p.compradorNombre ?? `Pendiente #${p.id}`,
+        fechaOriginal: p.fechaHora,
+        monto: p.total,
+        antiguedadDias: Math.max(
+          0,
+          Math.round((hoyMidnight - fechaMidnight) / 86_400_000),
+        ),
+      };
+    });
+  }
+
+  /**
    * Genera y guarda el Excel de una jornada (debe estar cerrada).
    * Recibe la jornada + los datos ya recolectados, genera Excel, guarda en jornada_reportes.
    * No consulta la DB — el caller pasa los datos.
@@ -337,6 +373,7 @@ export class JornadaService {
       inversionPorProducto: Map<number, number>;
       totalUsd: number;
       totalEur: number;
+      pendientesAcumulados: PendienteAcumulado[];
     },
   ): Promise<string> {
     const iso = new Date().toISOString();
@@ -355,6 +392,7 @@ export class JornadaService {
       inversionPorProducto: datos.inversionPorProducto,
       total_usd: datos.totalUsd,
       total_eur: datos.totalEur,
+      pendientesAcumulados: datos.pendientesAcumulados,
     });
 
     const filename = `jornada_${jornada.fecha}_${jornada.id}.xlsx`;
@@ -544,6 +582,9 @@ export class JornadaService {
       inversionPorProducto.set(item.producto_id, item.total_invertido);
     }
 
+    // 11.5. Obtener pendientes acumulados (FR-9/AC11): todas las jornadas, sin cobrar.
+    const pendientesAcumulados = await this._obtenerPendientesAcumulados();
+
     // 12. Generar y guardar Excel via helper reutilizable
     const base64 = await this._generarYGuardarExcel(jornada, {
       ventas: ventasConDetalles,
@@ -558,6 +599,7 @@ export class JornadaService {
       inversionPorProducto,
       totalUsd,
       totalEur,
+      pendientesAcumulados,
     });
 
     // 13. Auto-save Excel a Documents/Tienda - App/Tienda IPVE en entorno Electron empaquetado
