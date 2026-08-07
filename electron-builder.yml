@@ -62,6 +62,6 @@ linux:
 # Publish configuration for electron-updater
 publish:
   provider: github
-  owner: mipime
-  repo: mipime-cuentas
+  owner: maikolgarcialorenzo2001-rgb
+  repo: Mipime-App
   releaseType: draft
