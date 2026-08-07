@@ -9,11 +9,11 @@ directories:
   output: release
 
 # Compiled Electron sources (tsc output)
+# NOTE: dist-electron/**/* (not a per-file list) so new main-process files
+# (e.g. export-name.ts) are always packaged. A whitelist that forgets one file
+# breaks the app at runtime with "Cannot find module './<file>'".
 files:
-  - dist-electron/main.js
-  - dist-electron/preload.js
-  - dist-electron/window-state.js
-  - dist-electron/db.js
+  - dist-electron/**/*
   - dist/Mipime-Cuentas/browser/**/*
   - package.json
 
