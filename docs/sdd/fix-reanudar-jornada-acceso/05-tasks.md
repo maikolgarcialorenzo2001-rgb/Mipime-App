@@ -51,8 +51,9 @@ Chain strategy: pending
 
 ## Fase 3: Purga auto-cierre — FR-2, spec "Auto-Close REMOVED"
 
-- [ ] **3.1 (purge)** `jornada.service.ts` — ELIMINAR `autoCerrarSiOtroUsuario()` L201-273 (+ docblock) ya sin callers; `jornada.service.spec.ts` — borrar bloque `describe autoCerrarSiOtroUsuario` L1410-1953 completo.
-  - Verif: `grep -rn autoCerrarSi` → solo en openspec deltas (REMOVED); suite completa verde; UI no puede llamar a un método inexistente.
+- [x] **3.1 (purge)** `jornada.service.ts` — ELIMINAR `autoCerrarSiOtroUsuario()` L201-273 (+ docblock) ya sin callers; `jornada.service.spec.ts` — borrar bloque `describe autoCerrarSiOtroUsuario` L1410-1953 completo. (IMPLEMENTADO PR 3, rama `pr3-purga-auto-cierre` — ver apply-progress rev 3)
+  - Verif: `grep -rn autoCerrarSi` → solo en guard del mock de login (asserts NUNCA llamado) y openspec deltas (REMOVED); suite completa 45 files / 756 tests verdes (767 − 11); `tsc --noEmit` limpio. UI no puede llamar a un método inexistente.
+  - Bonus: purgado `successMessage` muerto en login (señal + template + aserción spec → DOM real). Commits: `a8ec000` + `060509b`.
 - Commit: `refactor(jornada): eliminar auto-cierre por otro usuario` (delete-heavy, sin lógica nueva)
 
 ## Fase 4: Excel "Abierta por / Cerrada por" — FR-6, AC6
