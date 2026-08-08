@@ -130,7 +130,20 @@ PR 4 NO está listo para merge: fix obligatorio de `jornada.service.ts:309-310` 
 
 ## Evidencia comandos
 
-- `npx tsc --noEmit -p tsconfig.app.json` → exit 2, `src/app/services/jornada.service.ts(310,7): error TS1117`.
+- `npx tsc --noEmit -p tsconfig.app.json` → exit 2, `src/app/services/jornada.service.ts(310,25): error TS1117` (estado PRE-fix; ver addendum abajo).
 - `npx vitest run src/app/services/jornada.service.spec.ts src/app/services/excel.service.spec.ts` → 2 files, **168 passed**.
 - `npx vitest run` → 45 files, **768 passed**.
-- `git status -sb` → `## pr4-excel` sin upstream, worktree limpio. `git log pr3-purga-auto-cierre..HEAD` → `a5dd26b` docs + `7ec8956` feat (2 commits).
+- `git status -sb` → `## pr4-excel` sin upstream, worktree limpio. `git log pr3-purga-auto-cierre..pr4-excel` → `a8f3ea3` fix + `a5dd26b` docs + `7ec8956` feat (3 commits).
+
+---
+
+## Addendum (archive, 2026-08-08): CRITICAL resuelto → PASS final
+
+El CRITICAL TS1117 (propiedad `userAperturaNombre` duplicada en `jornada.service.ts:309-310`) fue **resuelto por el commit `a8f3ea3`** `fix(jornada): eliminar userAperturaNombre duplicado que rompia el build` (se eliminó una de las dos líneas del object literal en `_generarYGuardarExcel`). Re-verificado en vivo durante archive:
+
+| Comando | Resultado |
+|---|---|
+| `npx tsc --noEmit -p tsconfig.app.json` | ✅ **exit 0** (limpio) |
+| `npx vitest run` | ✅ **45 files / 768 passed** |
+
+**Verdict final global: PASS** — los 4 slices (PR 1→PR 4) quedan verificados y verificables; `ng build` ya no se rompe por AOT. Los WARNING de indentación (14 espacios en `jornada.service.ts:566/598/854`) quedan como cosmético no bloqueante; el SUGGESTION de `formatearFecha` sin guard no-ISO queda aceptado como está.

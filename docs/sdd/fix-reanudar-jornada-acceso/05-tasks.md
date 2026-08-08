@@ -81,3 +81,16 @@ Notas de riesgo p/ el aplicador:
 3. `userCierreNombre` se mantiene en `_recolectarDatosJornada` actual — NO refactorizar el JOIN de cierre, solo AÑADIR apertura (design D4).
 4. Specs openspec deltas ya existen en `openspec/changes/fix-reanudar-jornada-acceso/specs/` — aplicador NO debe reescribirlos (archive se encarga).
 5. No usar `autoClose`/`cerrarYGuardar` con `user_apertura_id`: explícitamente `auth.usuario()?.id`.
+
+## Estado de entrega (archive, 2026-08-08)
+
+- **Cambio COMPLETE** — ciclo SDD cerrado (proposal → spec → design → tasks → apply → verify → archive). Verify global **PASS** final: 45 files / 768 tests (`npx vitest run`) + `tsc --noEmit` exit 0.
+- **PR 1** (`pr1-query-abierta`): query `obtenerAbierta()` sin filtro de fecha → `ORDER BY fecha DESC, id DESC LIMIT 1`. Commits `d8b5aec` + `4eff97d`.
+- **PR 2** (`pr2-login`): modal de reanudar para cualquier usuario + `user_cierre_id` autenticado + fecha real. Commits `efb1ee8` + `7e0e8bc`.
+- **PR 3** (`pr3-purga-auto-cierre`): eliminado `autoCerrarSiOtroUsuario()` + bloque spec + `successMessage` muerto. Commits `a8ec000` + `060509b` + `cef7666`.
+- **PR 4** (`pr4-excel`): "Abierta por A / Cerrada por B" en Excel + resolución `userAperturaNombre` en data layer. Commits `7ec8956` + `a5dd26b` + fix `a8f3ea3` (TS1117 duplicado resuelto).
+- **PRs**: #6, #7, #8, #9 creados en GitHub — feature-branch-chain sobre el tracker `fix/reanudar-jornada-acceso` (ramas `pr1-query-abierta` → `pr2-login` → `pr3-purga-auto-cierre` → `pr4-excel`).
+- **Deltas openspec archivados** → `openspec/changes/archive/2026-08-08-fix-reanudar-jornada-acceso/` y sincronizados a spec principal (`openspec/specs/{jornada-reopen,jornada-lifecycle,excel-reportes}/spec.md`).
+- **NO mergeado a main**: merge pendiente a criterio del flujo de branch (feature-branch-chain).
+- Warnings no bloqueantes: indentación 14 espacios en `jornada.service.ts:566/598/854` (cosmético); `formatearFecha` sin guard no-ISO (aceptado).
+- Archive report en Engram: `sdd/fix-reanudar-jornada-acceso/archive-report`.
