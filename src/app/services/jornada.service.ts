@@ -5,7 +5,6 @@ import { ExcelService, type JornadaReportData, type VentaConDetalles, type Pendi
 import { ElectronFileService } from './electron-file.service';
 import { CobroPendienteService } from './cobro-pendiente.service';
 import type { Jornada, JornadaReporte } from '../models';
-import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { StockMovimiento } from '../models/stock-movimiento';
@@ -189,87 +188,6 @@ export class JornadaService {
       .filter((m) => m.tipo === 'compra_divisa')
       .reduce((sum, m) => sum + m.monto, 0);
     return j.monto_inicial + totalEfectivo + totalIngresosExtra - totalGastos - totalCompraDivisa;
-  }
-
-  /**
-   * Auto-cierra la jornada abierta de hoy si fue abierta por OTRO usuario.
-   * - Sin jornada abierta → null
-   * - Mismo usuario → retorna la jornada (puede reabrir)
-   * - user_apertura_id NULL (legacy) → retorna la jornada
-   * - Otro usuario → cierra la jornada y retorna null
-   */
-  async autoCerrarSiOtroUsuario(usuario: UsuarioPublico): Promise<Jornada | null> {
-    const hoy = new Date().toISOString().split('T')[0];
-
-    const rows = await this._db.sql<Jornada>(
-      'SELECT * FROM jornadas WHERE fecha = ? AND estado = ? ORDER BY id DESC LIMIT 1',
-      [hoy, 'abierta'],
-    );
-
-    if (rows.length === 0) return null;
-
-    const jornada = rows[0];
-
-    // Legacy: no user_apertura_id → retornar (no se puede determinar dueño)
-    if (jornada.user_apertura_id === null) return jornada;
-
-    // Mismo usuario → retornar
-    if (jornada.user_apertura_id === usuario.id) return jornada;
-
-    // Distinto usuario → auto-cerrar
-    const ahora = new Date();
-    const hora = ahora.toLocaleTimeString();
-    const iso = ahora.toISOString();
-
-    // Calcular saldo_real = monto_inicial + efectivo_en_caja + total_movimientos
-    const ventasJornada = await this._db.sql<{ total: number; forma_pago: string; completacion_efectivo: number | null; monto_divisa: number | null; tasa_cambio: number | null }>(
-      'SELECT total, forma_pago, completacion_efectivo, monto_divisa, tasa_cambio FROM ventas WHERE jornada_id = ?',
-      [jornada.id],
-    );
-    const totalVentasEfectivo = ventasJornada.reduce((sum, v) => {
-      if (v.forma_pago === 'efectivo') return sum + v.total;
-      if (v.forma_pago === 'divisas') {
-        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
-        return sum + (v.completacion_efectivo ?? 0) - vuelto;
-      }
-      return sum;
-    }, 0);
-    const saldoRealCalculado = jornada.monto_inicial + totalVentasEfectivo + jornada.total_movimientos;
-
-    await this._db.sql(
-      `UPDATE jornadas
-       SET estado = 'cerrada', hora_cierre = ?, saldo_real = ?,
-           user_cierre_id = ?, updated_at = ?
-       WHERE id = ?`,
-      [hora, saldoRealCalculado, usuario.id, iso, jornada.id],
-    );
-
-    // Generar y guardar Excel para la jornada auto-cerrada
-    const datos = await this._recolectarDatosJornada(jornada.id, usuario.id);
-    const pendientesAcumulados = await this._obtenerPendientesAcumulados();
-    const base64 = await this._generarYGuardarExcel(jornada, {
-      ventas: datos.ventas,
-      movimientos: datos.movimientos,
-      stockMovimientos: datos.stockMovimientos,
-      ventaLotes: datos.ventaLotes,
-      productosMap: datos.productosMap,
-      totalCosto: datos.totalCosto,
-      userCierreNombre: datos.userCierreNombre,
-      cuentaCosas: datos.cuentaCosas,
-      arqueo: datos.arqueo,
-      inversionPorProducto: datos.inversionPorProducto,
-      totalUsd: datos.totalUsd,
-      totalEur: datos.totalEur,
-      pendientesAcumulados,
-    });
-
-    // Auto-save Excel a Documents/Tienda - App/Tienda IPVE en entorno Electron empaquetado
-    if (this._electronFileService.isElectronPackaged) {
-      await this._electronFileService.saveIndividual(base64, jornada);
-    }
-
-    this.jornadaAbierta.set(null);
-    return null;
   }
 
   /** Abre una nueva jornada con el monto inicial del día. */
