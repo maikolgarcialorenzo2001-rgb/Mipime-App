@@ -97,6 +97,10 @@ export async function runMigrations(
     await migrationV16(exec);
   }
 
+  if (currentVersion < 17) {
+    await migrationV17(exec);
+  }
+
   if (opts.seedEnabled) {
     await seedIfEmpty(exec);
   }
@@ -550,6 +554,31 @@ async function migrationV16(exec: MigrationExecutor): Promise<void> {
   } catch { /* columna ya existe */ }
 
   await exec.sql('INSERT INTO schema_version (version) VALUES (16)');
+}
+
+async function migrationV17(exec: MigrationExecutor): Promise<void> {
+  // v17: cobro de pendientes. Columnas nullable solo-aditivas (sin recreate
+  // — ventas tiene FKs desde detalle_ventas/venta_lotes). Marcadores NULL
+  // = pendiente legacy retroactivamente cobrable. Cada ALTER con try/catch
+  // por idempotencia (patrón v16).
+  try {
+    await exec.sql(
+      'ALTER TABLE ventas ADD COLUMN cobro_de_venta_id INTEGER REFERENCES ventas(id)',
+    );
+  } catch { /* columna ya existe */ }
+
+  try {
+    await exec.sql(
+      'ALTER TABLE ventas ADD COLUMN pagado_en TEXT',
+    );
+  } catch { /* columna ya existe */ }
+
+  // Índice parcial para la query de lista de pendientes
+  await exec.sql(
+    "CREATE INDEX IF NOT EXISTS idx_ventas_pendientes ON ventas(forma_pago) WHERE forma_pago='pendiente'",
+  );
+
+  await exec.sql('INSERT INTO schema_version (version) VALUES (17)');
 }
 
 async function seedIfEmpty(exec: MigrationExecutor): Promise<void> {

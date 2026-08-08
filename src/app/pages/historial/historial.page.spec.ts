@@ -604,6 +604,92 @@ describe('HistorialPage', () => {
 
       expect(component.showPreview()).toBe(false);
     });
+
+    it('4.5 RED: venta sin detalles (cobro de pendiente) aparece como fila "Cobrar Pendiente #id"', () => {
+      const dataConCobro: JornadaReportData = {
+        ...mockPreviewData,
+        ventas: [
+          {
+            id: 100,
+            jornada_id: 3,
+            fecha_hora: '2026-06-04T16:00:00',
+            total: 2000,
+            usuario_id: 1,
+            forma_pago: 'efectivo',
+            cobro_de_venta_id: 42,
+            created_at: '2026-06-04T16:00:00Z',
+            detalles: [],
+          },
+        ],
+      };
+      vi.mocked(TestBed.inject(JornadaService).obtenerDatosJornada).mockReturnValue(
+        of(dataConCobro),
+      );
+      component.verPreview(mockJornadas[0]);
+
+      expect(component.previewDetalles()).toEqual([
+        {
+          producto: 'Cobrar Pendiente #42',
+          cantidad: 1,
+          precioUnitario: 2000,
+          precioBase: null,
+          total: 2000,
+          formaPago: 'efectivo',
+        },
+      ]);
+    });
+
+    it('4.5 RED: en jornada mixta, el cobro suma su fila a las ventas con detalle', () => {
+      const dataMixta: JornadaReportData = {
+        ...mockPreviewData,
+        productosMap: new Map([[1, { nombre: 'Producto X', precio_costo: 500 }]]),
+        ventas: [
+          {
+            id: 10,
+            jornada_id: 3,
+            fecha_hora: '2026-06-04T10:00:00',
+            total: 3000,
+            usuario_id: 1,
+            forma_pago: 'efectivo',
+            created_at: '',
+            detalles: [
+              { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 1500, subtotal: 3000 },
+            ],
+          },
+          {
+            id: 100,
+            jornada_id: 3,
+            fecha_hora: '2026-06-04T16:00:00',
+            total: 2000,
+            usuario_id: 1,
+            forma_pago: 'transferencia',
+            cobro_de_venta_id: 42,
+            created_at: '',
+            detalles: [],
+          },
+        ],
+      };
+      vi.mocked(TestBed.inject(JornadaService).obtenerDatosJornada).mockReturnValue(
+        of(dataMixta),
+      );
+      component.verPreview(mockJornadas[0]);
+
+      const rows = component.previewDetalles();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toEqual({
+        producto: 'Producto X',
+        cantidad: 2,
+        precioUnitario: 1500,
+        precioBase: 500,
+        total: 3000,
+        formaPago: 'efectivo',
+      });
+      expect(rows[1]).toMatchObject({
+        producto: 'Cobrar Pendiente #42',
+        total: 2000,
+        formaPago: 'transferencia',
+      });
+    });
   });
 });
 

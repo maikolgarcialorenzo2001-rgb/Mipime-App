@@ -13,6 +13,7 @@ import type { ArqueoCajaEntry, ArqueoDbRow } from '../models';
 import { ElectronFileService } from './electron-file.service';
 import { ProductoService } from './producto.service';
 import { BackupService } from './backup.service';
+import { CobroPendienteService } from './cobro-pendiente.service';
 import type { PerProductInvestment } from '../models';
 import { of } from 'rxjs';
 
@@ -55,6 +56,9 @@ let mockElectronFileService: {
 /** Shared mock for BackupService (T8) — resets in beforeEach. */
 let mockBackup: { backup: ReturnType<typeof vi.fn> };
 
+/** Shared mock para CobroPendienteService (FR-9/AC11) — resets en beforeEach. */
+let mockCobroPendienteService: { listarPendientes: ReturnType<typeof vi.fn> };
+
 function createMockDb(): Database {
   return {
     sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
@@ -77,11 +81,16 @@ describe('JornadaService', () => {
 
     mockBackup = { backup: vi.fn().mockResolvedValue(undefined) };
 
+    mockCobroPendienteService = {
+      listarPendientes: vi.fn().mockResolvedValue([]),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         JornadaService,
         { provide: DATABASE, useValue: mockDb },
         { provide: BackupService, useValue: mockBackup },
+        { provide: CobroPendienteService, useValue: mockCobroPendienteService },
         {
           provide: ExcelService,
           useValue: {
@@ -1851,4 +1860,101 @@ describe('JornadaService', () => {
     });
   });
 });
+
+describe('Pagar Pendiente — pendientesAcumulados en el Excel del cierre (FR-9/AC11)', () => {
+    const user2: UsuarioPublico = { id: 2, nombre: 'Worker', rol: 'trabajador', activo: 1, created_at: '', updated_at: '' };
+    const jornadaDeUser1: Jornada = { ...mockJornada, user_apertura_id: 1 };
+
+    /** Misma fórmula date-only que usa _obtenerPendientesAcumulados. */
+    function antiguedadEsperada(iso: string): number {
+      const ahora = new Date();
+      const hoyMidnight = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()).getTime();
+      const f = new Date(iso);
+      const fechaMidnight = new Date(f.getFullYear(), f.getMonth(), f.getDate()).getTime();
+      return Math.max(0, Math.round((hoyMidnight - fechaMidnight) / 86_400_000));
+    }
+
+    it('4.3 RED: cerrar() pasa pendientesAcumulados mapeados (comprador + antigüedad) a ExcelService', async () => {
+      mockCobroPendienteService.listarPendientes.mockResolvedValue([
+        { id: 7, compradorNombre: 'Ana', fechaHora: '2026-06-01T10:00:00Z', total: 500, jornadaId: 1 },
+        { id: 9, compradorNombre: null, fechaHora: '2026-06-04T08:00:00Z', total: 1500, jornadaId: 1 },
+      ]);
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // ventas (sin ventas -> sin detalles/costos)
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE jornada
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Admin' }]) // user nombre
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.pendientesAcumulados).toEqual([
+        { id: 7, comprador: 'Ana', fechaOriginal: '2026-06-01T10:00:00Z', monto: 500, antiguedadDias: antiguedadEsperada('2026-06-01T10:00:00Z') },
+        { id: 9, comprador: 'Pendiente #9', fechaOriginal: '2026-06-04T08:00:00Z', monto: 1500, antiguedadDias: antiguedadEsperada('2026-06-04T08:00:00Z') },
+      ]);
+      expect(mockCobroPendienteService.listarPendientes).toHaveBeenCalledTimes(1);
+    });
+
+    it('4.3 RED: autoCerrarSiOtroUsuario también pasa pendientesAcumulados a ExcelService', async () => {
+      mockCobroPendienteService.listarPendientes.mockResolvedValue([
+        { id: 3, compradorNombre: 'Pepito', fechaHora: '2026-06-02T09:00:00Z', total: 800, jornadaId: 1 },
+      ]);
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([jornadaDeUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas (saldo)
+        .mockResolvedValueOnce([]) // UPDATE (auto-close)
+        // _recolectarDatosJornada calls
+        .mockResolvedValueOnce([]) // SELECT ventas
+        .mockResolvedValueOnce([]) // SELECT movimientos
+        .mockResolvedValueOnce([]) // SELECT stock_movimientos
+        .mockResolvedValueOnce([]) // SELECT productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
+        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
+        .mockResolvedValueOnce([]) // SELECT arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await service.autoCerrarSiOtroUsuario(user2);
+
+      expect(resultado).toBeNull();
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.pendientesAcumulados).toEqual([
+        { id: 3, comprador: 'Pepito', fechaOriginal: '2026-06-02T09:00:00Z', monto: 800, antiguedadDias: antiguedadEsperada('2026-06-02T09:00:00Z') },
+      ]);
+      expect(mockCobroPendienteService.listarPendientes).toHaveBeenCalledTimes(1);
+    });
+
+    it('4.3 RED: sin pendientes pasa pendientesAcumulados vacío (hoja omitida en Excel)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([jornadaDeUser1]) // SELECT open jornada
+        .mockResolvedValueOnce([{ total: 0, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas (saldo)
+        .mockResolvedValueOnce([]) // UPDATE (auto-close)
+        .mockResolvedValueOnce([]) // recolectar: ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // user nombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]) // arqueo_caja
+        .mockResolvedValueOnce([]); // INSERT jornada_reportes
+
+      const service = TestBed.inject(JornadaService);
+      await service.autoCerrarSiOtroUsuario(user2);
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.pendientesAcumulados).toEqual([]);
+    });
+  });
 });

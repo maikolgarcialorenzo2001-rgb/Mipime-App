@@ -20,6 +20,18 @@ export interface VentaConDetalles extends Venta {
   detalles: DetalleVenta[];
 }
 
+/**
+ * Pendiente sin cobrar (pagado_en IS NULL) de CUALQUIER jornada, listado en la
+ * hoja "Pendientes Acumulados" del Excel diario (FR-9/AC11).
+ */
+export interface PendienteAcumulado {
+  id: number;             // ventas.id original
+  comprador: string;      // comprador_nombre ?? `Pendiente #${id}`
+  fechaOriginal: string;  // fecha_hora ISO (el Excel muestra la fecha)
+  monto: number;          // total
+  antiguedadDias: number; // date-only floor((hoy - fecha)/86400000), max 0 → mismo día 0
+}
+
 export interface JornadaReportData {
   jornada: Jornada;
   ventas: VentaConDetalles[];
@@ -34,6 +46,8 @@ export interface JornadaReportData {
   inversionPorProducto?: Map<number, number>;
   total_usd?: number;
   total_eur?: number;
+  /** Pendientes sin cobrar de TODAS las jornadas (solo cierre diario, FR-9). */
+  pendientesAcumulados?: PendienteAcumulado[];
 }
 
 @Injectable({
@@ -53,6 +67,7 @@ export class ExcelService {
 
     this._agregarResumen(wb, data);
     this._agregarVentas(wb, data);
+    this._agregarPendientesAcumulados(wb, data);
     this._agregarMovimientos(wb, data);
     this._agregarArqueo(wb, data);
     this._agregarIpve(wb, data);
@@ -238,6 +253,44 @@ export class ExcelService {
     let totalPendientes = 0;
     let totalTransferencia = 0;
     for (const venta of data.ventas) {
+      // Special case (pagar-pendiente): fila de cobro SIN detalles — se reporta
+      // como "Cobrar Pendiente #<id original>" y suma a los totales del día
+      // (FR-7/AC8: sin esto el cobro no se muestra NI suma a totalCaja).
+      if (venta.detalles.length === 0) {
+        const filaCobro: unknown[] = [
+          `Cobrar Pendiente #${venta.cobro_de_venta_id ?? venta.id}`,
+          1,
+          venta.total,
+          venta.total,
+          venta.total,
+          (venta as any).forma_pago ?? 'efectivo',
+        ];
+        if (tieneDivisas) {
+          if (venta.forma_pago === 'divisas') {
+            filaCobro.push((venta as any).divisa_tipo ?? '—');
+            filaCobro.push((venta as any).monto_divisa ?? '—');
+            filaCobro.push((venta as any).tasa_cambio ?? '—');
+            filaCobro.push(venta.total);
+            filaCobro.push((venta as any).completacion_efectivo ?? '—');
+          } else {
+            filaCobro.push('', '', '', '', '');
+          }
+        }
+        if (tienePendientes) filaCobro.push(''); // el cobro nunca es pendiente
+        filas.push(filaCobro);
+
+        if (venta.forma_pago === 'pendiente') {
+          totalPendientes += venta.total;
+        } else if (venta.forma_pago === 'divisas') {
+          // divisas tracked by venta total below
+        } else if (venta.forma_pago === 'transferencia') {
+          totalTransferencia += venta.total;
+        } else {
+          totalCaja += venta.total;
+        }
+        continue;
+      }
+
       const detalleRows: unknown[][] = [];
 
       for (const detalle of venta.detalles) {
@@ -354,6 +407,33 @@ export class ExcelService {
     ws['!protect'] = {};
 
     XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
+  }
+
+  /**
+   * Hoja "Pendientes Acumulados" del Excel diario (FR-9/AC11): lista TODOS los
+   * pendientes sin cobrar (pagado_en IS NULL) de TODAS las jornadas. Se omite
+   * si no hay ninguno (convención de `_agregarArqueo` — "estado vacío u
+   * omitida"). El Resumen "Pendientes del día" sigue intacto (solo del día).
+   */
+  private _agregarPendientesAcumulados(wb: XLSX.WorkBook, data: JornadaReportData): void {
+    const pendientes = data.pendientesAcumulados;
+    if (!pendientes || pendientes.length === 0) return;
+
+    const filas: unknown[][] = [
+      ['Comprador', 'Fecha original', 'Monto', 'Antigüedad (días)'],
+    ];
+    let total = 0;
+    for (const p of pendientes) {
+      filas.push([p.comprador, p.fechaOriginal, p.monto, p.antiguedadDias]);
+      total += p.monto;
+    }
+    filas.push(['Total', '', total, '']);
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 24 }, { wch: 22 }, { wch: 14 }, { wch: 18 }];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Pendientes Acumulados');
   }
 
   /**

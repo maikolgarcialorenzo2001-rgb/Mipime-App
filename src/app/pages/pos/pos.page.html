@@ -112,6 +112,40 @@
         </button>
       </div>
     }
+
+    <!-- Pendientes: botones fuera del @if del carrito (AD-6/AD-7) -->
+    <div class="border-t border-gray-200 dark:border-gray-700 px-4 sm:px-5 py-3 sm:py-4 mt-2 sm:mt-3">
+      <div class="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          [disabled]="sinJornada"
+          class="rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+          [class]="sinJornada
+            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+            : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'"
+          (click)="abrirCobroPendiente()"
+        >
+          <span class="inline-flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-base">payments</span>
+            Cobrar Pendiente
+          </span>
+        </button>
+        <button
+          type="button"
+          [disabled]="sinJornada"
+          class="rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors"
+          [class]="sinJornada
+            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+            : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'"
+          (click)="abrirVerPendientes()"
+        >
+          <span class="inline-flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined leading-none text-base">list_alt</span>
+            Ver Pendientes
+          </span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -133,6 +167,19 @@
     [saldoEnCaja]="_jornadaService.totalEnCaja()"
     (confirmar)="confirmarVenta($event)"
     (cancelar)="cerrarModal()"
+  />
+}
+
+<!-- Modal de pendientes: mount único, modo cobrar o ver (AD-7) -->
+@if (showPendienteModal()) {
+  <app-cobro-pendiente-modal
+    [cobroPendiente]="pendientes()"
+    [saldoEnCaja]="_jornadaService.totalEnCaja()"
+    [soloLectura]="modoPendientes() === 'ver'"
+    [jornadaId]="_jornadaService.jornadaAbierta()?.id ?? 0"
+    [usuarioId]="_auth.usuario()?.id ?? 0"
+    (cobroCompletado)="onPendienteCobrado()"
+    (cancelar)="cerrarPendienteModal()"
   />
 }
 

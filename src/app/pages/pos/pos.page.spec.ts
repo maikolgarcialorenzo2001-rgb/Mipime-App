@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
 import { PosPage } from './pos.page';
 import { ProductoService } from '../../services/producto.service';
@@ -6,9 +7,9 @@ import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
-import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
-import { DATABASE, type Database } from '../../services/database';
+import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
+import { CobroPendienteModalComponent } from '../../components/cobro-pendiente-modal/cobro-pendiente-modal.component';
 import type { Jornada, Producto } from '../../models';
 import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
 
@@ -42,18 +43,12 @@ const producto: Producto = {
   updated_at: '',
 };
 
-function createMockDb(): Database {
-  return {
-    sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
-    initialize: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
 describe('PosPage — toast de éxito', () => {
   let fixture: ComponentFixture<PosPage>;
   let component: PosPage;
   let mockVentaService: { registrar: ReturnType<typeof vi.fn> };
   let mockCuentaCosasService: { registrar: ReturnType<typeof vi.fn> };
+  let mockCobroService: { listarPendientes: ReturnType<typeof vi.fn>; registrarCobroPendiente: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockVentaService = {
@@ -61,6 +56,10 @@ describe('PosPage — toast de éxito', () => {
     };
     mockCuentaCosasService = {
       registrar: vi.fn().mockResolvedValue(undefined),
+    };
+    mockCobroService = {
+      listarPendientes: vi.fn().mockResolvedValue([]),
+      registrarCobroPendiente: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -80,6 +79,7 @@ describe('PosPage — toast de éxito', () => {
             jornadaAbierta: vi.fn().mockReturnValue(mockJornada),
             jornadaCargando: vi.fn().mockReturnValue(false),
             refreshJornadaAbierta: vi.fn(),
+            totalEnCaja: vi.fn().mockReturnValue(5000),
           },
         },
         {
@@ -95,6 +95,10 @@ describe('PosPage — toast de éxito', () => {
           useValue: {
             usuario: vi.fn().mockReturnValue({ id: 1 }),
           },
+        },
+        {
+          provide: CobroPendienteService,
+          useValue: mockCobroService,
         },
       ],
     });
@@ -297,5 +301,103 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
 
     expect(jornadaService.refreshJornadaAbierta).not.toHaveBeenCalled();
+  });
+
+  // ─── 3.4 RED: botones Pendientes en POS ────────────────────────────
+
+  function textoDeBotones(): string[] {
+    return Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .map((b) => (b as HTMLButtonElement).textContent?.trim() ?? '');
+  }
+
+  it('3.4 RED: botones Cobrar Pendiente y Ver Pendientes siempre visibles (aunque el carrito esté vacío)', () => {
+    const textos = textoDeBotones();
+    expect(textos.some((t) => t.includes('Cobrar Pendiente'))).toBe(true);
+    expect(textos.some((t) => t.includes('Ver Pendientes'))).toBe(true);
+  });
+
+  it('3.4 RED: ambos botones están deshabilitados sin jornada abierta', () => {
+    const jornadaService = TestBed.inject(JornadaService);
+    vi.mocked(jornadaService.jornadaAbierta).mockReturnValue(null);
+
+    // Destruir el fixture del beforeEach y recrear: el mock ya devuelve null
+    // ANTES del primer render, evita el ExpressionChangedAfterItHasBeenCheckedError.
+    fixture.destroy();
+    fixture = TestBed.createComponent(PosPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const cobrar = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((b) => (b as HTMLButtonElement).textContent?.includes('Cobrar Pendiente')) as HTMLButtonElement;
+    const ver = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((b) => (b as HTMLButtonElement).textContent?.includes('Ver Pendientes')) as HTMLButtonElement;
+
+    expect(cobrar.disabled).toBe(true);
+    expect(ver.disabled).toBe(true);
+  });
+
+  it('3.4 RED: abrirCobroPendiente carga pendientes y abre el modal en modo cobrar', async () => {
+    const pendiente: PendienteItem = {
+      id: 1,
+      compradorNombre: 'Carlos',
+      fechaHora: '2026-08-05T10:00:00Z',
+      total: 1000,
+      jornadaId: 1,
+    };
+    mockCobroService.listarPendientes.mockResolvedValue([pendiente]);
+
+    component.abrirCobroPendiente();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(mockCobroService.listarPendientes).toHaveBeenCalled();
+    expect(component.modoPendientes()).toBe('cobrar');
+    expect(component.showPendienteModal()).toBe(true);
+    expect(component.pendientes()).toEqual([pendiente]);
+  });
+
+  it('3.4 RED: abrirVerPendientes abre el modal en modo soloLectura', () => {
+    component.abrirVerPendientes();
+
+    expect(component.modoPendientes()).toBe('ver');
+    expect(component.showPendienteModal()).toBe(true);
+  });
+
+  it('3.4 RED: el modal pendiente se monta con soloLectura cuando el modo es ver', () => {
+    component.modoPendientes.set('ver');
+    component.showPendienteModal.set(true);
+    fixture.detectChanges();
+
+    // Angular 21 no emite ng-reflect-* para signal inputs; verificamos el
+    // componente hijo directamente.
+    const modalDebug = fixture.debugElement.query(By.directive(CobroPendienteModalComponent));
+    expect(modalDebug).toBeTruthy();
+    expect(modalDebug.componentInstance.soloLectura()).toBe(true);
+  });
+
+  it('3.4 RED: cobroCompletado cierra el modal y refresca la jornada', async () => {
+    const jornadaService = TestBed.inject(JornadaService);
+    component.abrirCobroPendiente();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const modal = fixture.nativeElement.querySelector('app-cobro-pendiente-modal') as HTMLElement;
+    expect(modal).toBeTruthy();
+    modal.dispatchEvent(new CustomEvent('cobroCompletado'));
+    fixture.detectChanges();
+
+    expect(component.showPendienteModal()).toBe(false);
+    expect(jornadaService.refreshJornadaAbierta).toHaveBeenCalled();
+  });
+
+  it('3.4 RED: cancelar cierra el modal de pendientes', () => {
+    component.showPendienteModal.set(true);
+    fixture.detectChanges();
+
+    const modal = fixture.nativeElement.querySelector('app-cobro-pendiente-modal') as HTMLElement;
+    modal.dispatchEvent(new CustomEvent('cancelar'));
+    fixture.detectChanges();
+
+    expect(component.showPendienteModal()).toBe(false);
   });
 });
