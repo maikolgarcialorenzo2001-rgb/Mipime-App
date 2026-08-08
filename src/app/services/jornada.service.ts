@@ -841,14 +841,16 @@ export class JornadaService {
     ).pipe(map((rows) => rows[0] ?? null));
   }
 
-  /** Obtiene la jornada abierta del día, si existe. */
+  /**
+   * Obtiene la última jornada abierta, sin importar la fecha
+   * (detecta jornadas abiertas de días previos; entre varias,
+   * la más reciente por ORDER BY fecha DESC, id DESC LIMIT 1).
+   */
   obtenerAbierta(): Observable<Jornada | null> {
-    const hoy = new Date().toISOString().split('T')[0];
-
     return from(
       this._db.sql<Jornada>(
-        'SELECT * FROM jornadas WHERE fecha = ? AND estado = ? ORDER BY id DESC LIMIT 1',
-        [hoy, 'abierta'],
+        'SELECT * FROM jornadas WHERE estado = ? ORDER BY fecha DESC, id DESC LIMIT 1',
+        ['abierta'],
       ),
     ).pipe(map((rows) => rows[0] ?? null));
   }

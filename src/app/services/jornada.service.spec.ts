@@ -117,27 +117,64 @@ describe('JornadaService', () => {
   });
 
   describe('obtenerAbierta', () => {
+    it('FR-1: debería consultar la jornada abierta SIN filtrar por fecha (1 solo parámetro, ORDER BY fecha DESC)', async () => {
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.obtenerAbierta());
+
+      const lastCall = vi.mocked(mockDb.sql).mock.calls.at(-1)!;
+      const sql = lastCall[0] as string;
+      const params = lastCall[1] as unknown[];
+
+      expect(sql).toContain('WHERE estado = ?');
+      expect(sql).toContain('ORDER BY fecha DESC, id DESC LIMIT 1');
+      expect(sql).not.toContain('fecha = ?');
+      expect(params).toEqual(['abierta']);
+    });
+
     it('debería retornar null cuando no hay jornada abierta', async () => {
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerAbierta());
 
       expect(resultado).toBeNull();
-      expect(mockDb.sql).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT'),
-        [expect.any(String), 'abierta'],
-      );
     });
 
-    it('debería retornar la jornada abierta cuando existe', async () => {
+    it('debería detectar una jornada abierta de un día anterior (sin filtrar fecha=hoy)', async () => {
+      const jornadaAyer: Jornada = { ...mockJornada, id: 2, fecha: '2026-08-07' };
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([mockJornada]);
+        .mockResolvedValueOnce([jornadaAyer]);
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerAbierta());
 
-      expect(resultado).toEqual(mockJornada);
+      expect(resultado).toEqual(jornadaAyer);
+      expect(resultado!.fecha).toBe('2026-08-07');
       expect(resultado!.estado).toBe('abierta');
+    });
+
+    it('debería devolver la más reciente entre varias "abierta" huérfanas (07-08 vs 31-07)', async () => {
+      const vieja: Jornada = { ...mockJornada, id: 1, fecha: '2026-07-31' };
+      const reciente: Jornada = { ...mockJornada, id: 2, fecha: '2026-08-07' };
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([reciente, vieja]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerAbierta());
+
+      expect(resultado).toEqual(reciente);
+      expect(resultado!.fecha).toBe('2026-08-07');
+    });
+
+    it('debería retornar null cuando no existe ninguna jornada abierta', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerAbierta());
+
+      expect(resultado).toBeNull();
     });
 
     it('debería lanzar error si la DB falla', async () => {
@@ -148,6 +185,34 @@ describe('JornadaService', () => {
       await expect(
         firstValueFrom(service.obtenerAbierta()),
       ).rejects.toThrow('Connection error');
+    });
+  });
+
+  describe('refreshJornadaAbierta', () => {
+    it('FR-1/AC7: debería poblar jornadaAbierta y totalEnCaja con una jornada abierta de día anterior', async () => {
+      const jornadaPrevia: Jornada = { ...mockJornada, id: 9, fecha: '2026-08-07' };
+      const ventaEfect = {
+        total: 1200,
+        forma_pago: 'efectivo',
+        completacion_efectivo: null,
+        monto_divisa: null,
+        tasa_cambio: null,
+      };
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([jornadaPrevia]) // constructor: obtenerAbierta -> jornada previa
+        .mockResolvedValueOnce([ventaEfect]) // _calcularTotalEnCaja: ventas
+        .mockResolvedValueOnce([{ tipo: 'gasto', monto: 200 }]); // _calcularTotalEnCaja: movimientos
+
+      const service = TestBed.inject(JornadaService);
+
+      // totalEnCaja = 5000 (monto_inicial) + 1200 (efectivo) - 200 (gasto) = 6000
+      await vi.waitFor(() => {
+        expect(service.totalEnCaja()).toBe(6000);
+      });
+
+      expect(service.jornadaAbierta()).toEqual(jornadaPrevia);
+      expect(service.jornadaAbierta()!.fecha).toBe('2026-08-07');
+      expect(service.jornadaCargando()).toBe(false);
     });
   });
 
