@@ -3,8 +3,8 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main` (única rama — local y remota, tras limpieza 2026-08-05)
-> Tests: **Electron 141** / **web 695+** (últimas verificaciones SDD 2026-08-05; `ng test` destrabado `b21ff36`)
-> Última actualización: 2026-08-05
+> Tests: **Electron 141** / **web 768** (verificación SDD fix-reanudar-jornada-acceso 2026-08-08; `ng test` destrabado `b21ff36`)
+> Última actualización: 2026-08-08
 
 ---
 
@@ -102,6 +102,12 @@
 ### BACKLOG-12. ~~Botón UI exportarRespaldo~~ (FINAL — bien lejitos)
 **Contexto:** la función `exportarRespaldo()` existe y está testeada, pero NO tiene caller en la UI.
 **Fix:** agregar el botón en HistorialPage. **Dejado al final del flujo a pedido del usuario.**
+
+### BACKLOG-13. Limpieza de jornadas 'abierta' huérfanas (DATOS)
+**Contexto:** el bug histórico de `obtenerAbierta()` (filtrar `fecha = hoy`) permitía abrir una jornada NUEVA dejando la anterior con `estado='abierta'` sin cerrar. Fix del flujo aplicado en `fix-reanudar-jornada-acceso` (merged a main 2026-08-08, PRs #6-#10) — de ahora en más el sistema detecta la última abierta sin importar la fecha y la reanuda/cierra. PERO las BD vivas pueden tener **múltiples filas `estado='abierta'` huérfanas** (legacy).
+**Riesgo actual:** `SELECT ... ORDER BY fecha DESC, id DESC LIMIT 1` toma la más reciente — las anteriores quedan sin detectar; si una jornada vieja huérfana acumula datos, no se cierra ni reporta.
+**Fix propuesto (pendiente de diseño):** script/migración puntual que liste las `jornadas` con `estado='abierta'` sin `fecha_cierre`, permita decidir (cerrar manual con saldo real o descartar) y limpie. NO incluido en el fix de flujo — quedó **out of scope** en la proposal (decisión 2026-08-08).
+**Decisión:** pendiente de retomar con el usuario; requiere inspeccionar las BD reales antes de diseñar.
 
 ---
 
@@ -211,6 +217,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-08 | SDD `fix-reanudar-jornada-acceso` COMPLETE: reanudar jornada para cualquier user autenticado con jornada sin cerrar (hoy o anterior) — query última abierta sin fecha, elimina auto-cierre por otro user, cierre con uid autenticado, Excel "Abierta por/Cerrada por". 4 PRs encadenados + tracker→main (#6-#10). Suite web 768. BACKLOG-13 (limpieza huérfanas) agregado, out of scope del fix | merged `main` |
 | 2026-08-05 | TODO sync vs remote (post-crash VS Code): BACKLOG-1b/5/6/10 ✅, BACKLOG-2/3/4 ✅ merged+archivados, seed-productos-reales MERGED, limpieza de ramas (solo `main`), bump `0.1.13-beta`. BACKLOG-8: diagnóstico bundle real (696.90 kB) + approach A+C documentado en el item, **no implementado** (decisión usuario). BACKLOG-11: diagnóstico lint 110 errores + approach Camino A documentado en el item, **no implementado** (decisión usuario) | `c6cba24` |
 | 2026-08-02 | SDD `desktop-resilience-backlogs`: BACKLOG-2/3/4 **implementados** en `fix/desktop-resilience-backlog` (colisión snapshot + parser `(?:-\d+)?`, stage fatal real, postinstall install-app-deps). Electron 141 / web 695 GREEN. **⏳ PRs NO abiertos (decisión sesión 2026-08-02).** | `b8005e5`, `70d4532`, `118b224` |
 | 2026-08-01 | Limpieza de ramas: 11 remotes + 7 locales obsoletas eliminadas (todo contenido ya en main); `feat/seed-productos-reales` traída a local con tracking; ruta auto-save Excel unificada a `Documents/Tienda - App/Tienda IPVE` | `e6243a8`, `189e951` |
