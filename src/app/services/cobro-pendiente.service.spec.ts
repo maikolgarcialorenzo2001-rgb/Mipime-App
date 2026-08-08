@@ -60,6 +60,8 @@ describe('CobroPendienteService', () => {
         fechaHora: '2026-08-05T11:00:00Z',
         total: 500,
         jornadaId: 1,
+        autorizadoPor: null,
+        descripcion: null,
       });
       expect(items[1].fechaHora).toBe('2026-08-03T09:00:00Z');
 
@@ -101,6 +103,35 @@ describe('CobroPendienteService', () => {
       const items = await service.listarPendientes();
 
       expect(items[0].compradorNombre).toBeNull();
+    });
+
+    it('RED: mapea autorizadoPor y descripcion desde autorizado_por/descripcion y el SELECT las incluye', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([
+        { id: 8, comprador_nombre: 'María', fecha_hora: '2026-08-05T10:00:00Z', total: 1200, jornada_id: 1, autorizado_por: 'María', descripcion: 'Se lo lleva en cuenta' },
+      ]);
+
+      const items = await service.listarPendientes();
+
+      expect(items[0].autorizadoPor).toBe('María');
+      expect(items[0].descripcion).toBe('Se lo lleva en cuenta');
+
+      // el SELECT emitido incluye ambas columnas y conserva el filtro (REQ-1 + REQ-6)
+      const [query] = vi.mocked(mockDb.sql).mock.calls[0];
+      expect(String(query)).toContain('autorizado_por');
+      expect(String(query)).toContain('descripcion');
+      expect(String(query)).toContain("forma_pago = 'pendiente'");
+      expect(String(query)).toContain('pagado_en IS NULL');
+    });
+
+    it('RED: autorizado_por/descripcion null se mapean como null (detalle oculto en UI)', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([
+        { id: 9, comprador_nombre: null, fecha_hora: '2026-08-04T12:00:00Z', total: 300, jornada_id: 2, autorizado_por: null, descripcion: null },
+      ]);
+
+      const items = await service.listarPendientes();
+
+      expect(items[0].autorizadoPor).toBeNull();
+      expect(items[0].descripcion).toBeNull();
     });
   });
 

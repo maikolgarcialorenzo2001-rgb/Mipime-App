@@ -5,6 +5,8 @@ import type { Venta } from '../models';
 /**
  * DTO de un pendiente sin cobrar para la lista del POS y el Excel acumulado.
  * `compradorNombre` puede ser null: la UI muestra el fallback `Pendiente #id`.
+ * `autorizadoPor`/`descripcion` son opcionales: la UI oculta el bloque de
+ * detalle cuando ambos son null (pendientes históricos).
  */
 export interface PendienteItem {
   id: number;
@@ -12,6 +14,8 @@ export interface PendienteItem {
   fechaHora: string;
   total: number;
   jornadaId: number;
+  autorizadoPor?: string | null;
+  descripcion?: string | null;
 }
 
 /**
@@ -54,8 +58,11 @@ export class CobroPendienteService {
       fecha_hora: string;
       total: number;
       jornada_id: number;
+      autorizado_por: string | null;
+      descripcion: string | null;
     }>(
-      `SELECT id, comprador_nombre, fecha_hora, total, jornada_id
+      `SELECT id, comprador_nombre, fecha_hora, total, jornada_id,
+              autorizado_por, descripcion
        FROM ventas
        WHERE forma_pago = 'pendiente' AND pagado_en IS NULL
        ORDER BY fecha_hora DESC`,
@@ -66,6 +73,8 @@ export class CobroPendienteService {
       fechaHora: r.fecha_hora,
       total: r.total,
       jornadaId: r.jornada_id,
+      autorizadoPor: r.autorizado_por ?? null,
+      descripcion: r.descripcion ?? null,
     }));
   }
 
