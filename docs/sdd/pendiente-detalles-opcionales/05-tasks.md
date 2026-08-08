@@ -69,4 +69,4 @@ Rollback: revert display-only, sin migración ni cambios al flujo de cobro (del 
 - Commits de fixes POS asociados (cambios pre-existentes fuera del scope del change): **`b9463e0`** `fix(build): expose auth service to POS template` (TS2341) y **`a69cfd8`** `fix(ui): separate pendientes section from Cobrar button` (spacing).
 - Warning del verify resuelto e incluido en `c02f233`: `tieneDetalle()` pasó de `??` a `||` con test del caso mixto (`autorizadoPor: ''` + `descripcion: 'x'`) — el botón ya no se oculta cuando un campo vacío convive con otro con valor.
 - NO mergeado a main: el merge queda a criterio del flujo de branch de `deudas-features`.
-- constancia de entrega al commit final <<FINAL_COMMIT>>
+- constancia de entrega al commit final ea10625
