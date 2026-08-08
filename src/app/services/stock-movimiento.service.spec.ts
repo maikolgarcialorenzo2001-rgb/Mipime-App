@@ -410,6 +410,98 @@ describe('StockMovimientoService', () => {
       const consumos = await service.registrarSalida(1, 7, 'Venta');
       expect(consumos).toHaveLength(2);
     });
+
+    it('1.1 RED: con loteId consume SOLO ese lote y deja intactos los demás', async () => {
+      // Lotes de almacén: lote 1 (10u, más viejo) y lote 2 (10u, más nuevo).
+      // Con loteId=2 el consumo debe aplicar únicamente al lote 2 (NO FIFO front).
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([mockLotes[1]])               // 1: pre-check SELECT lote 2
+        .mockResolvedValueOnce([mockLotes[1]])               // 2: SELECT filtrado por id
+        .mockResolvedValueOnce([])                           // 3: UPDATE lote 2 (consume 3)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])        // 4: SELECT next lot
+        .mockResolvedValueOnce([])                           // 5: UPDATE precio_costo
+        .mockResolvedValueOnce([])                           // 6: INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 17 }])              // 7: SELECT SUM almacen (10+10-3)
+        .mockResolvedValueOnce([]);                          // 8: UPDATE stock_almacen
+
+      const consumos = await service.registrarSalida(1, 3, 'Lote', undefined, 'almacen', 2);
+
+      // Consumo único sobre el lote 2
+      expect(consumos).toHaveLength(1);
+      expect(consumos[0]).toEqual({ lote_id: 2, cantidad: 3, precio_costo_real: 8 });
+
+      // Pre-check: primera query filtra por id del lote, producto y ubicacion
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('id = ?'),
+        [2, 1, 'almacen'],
+      );
+      // SELECT de consumo filtrado por id
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('AND id = ?'),
+        [1, 'almacen', 2],
+      );
+
+      // Solo un UPDATE a lotes_stock y apunta al lote 2 (el lote 1 queda intacto)
+      const lotUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE lotes_stock'),
+      );
+      expect(lotUpdates).toHaveLength(1);
+      expect(lotUpdates[0]![1]).toEqual([3, 2]);
+
+      // Movimiento registrado tipo 'salida'
+      const insert = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO stock_movimientos'),
+      );
+      expect(insert![1]).toContain('salida');
+    });
+
+    it('1.2 RED: cantidad > lote.cantidad rechaza "Stock insuficiente" sin consumir nada', async () => {
+      // Pre-check: lote 2 con 10u < 15 requeridas → debe fallar antes de mutar
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([mockLotes[1]]);
+
+      await expect(
+        service.registrarSalida(1, 15, 'Lote', undefined, 'almacen', 2),
+      ).rejects.toThrow('Stock insuficiente');
+
+      // Sin consumo parcial: solo se ejecutó la query del pre-check (sin UPDATEs)
+      expect(mockDb.sql).toHaveBeenCalledTimes(1);
+    });
+
+    it('1.1 TRIANGULATE: loteId inexistente rechaza "Stock insuficiente" sin mutar', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // pre-check: lote no existe
+
+      await expect(
+        service.registrarSalida(1, 3, 'Lote', undefined, 'almacen', 999),
+      ).rejects.toThrow('Stock insuficiente');
+
+      expect(mockDb.sql).toHaveBeenCalledTimes(1);
+    });
+
+    it('1.1 TRIANGULATE: consume todo el lote objetivo y deja los demás intactos', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([mockLotes[1]])               // 1: pre-check SELECT lote 2
+        .mockResolvedValueOnce([mockLotes[1]])               // 2: SELECT filtrado por id
+        .mockResolvedValueOnce([])                           // 3: UPDATE lote 2 (consume 10 → 0)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])        // 4: SELECT next lot (lote 1 sigue con stock)
+        .mockResolvedValueOnce([])                           // 5: UPDATE precio_costo
+        .mockResolvedValueOnce([])                           // 6: INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 10 }])              // 7: SELECT SUM almacen (10+10-10)
+        .mockResolvedValueOnce([]);                          // 8: UPDATE stock_almacen
+
+      const consumos = await service.registrarSalida(1, 10, 'Lote', undefined, 'almacen', 2);
+
+      expect(consumos).toHaveLength(1);
+      expect(consumos[0]).toEqual({ lote_id: 2, cantidad: 10, precio_costo_real: 8 });
+
+      // Único UPDATE al lote 2; el lote 1 no se tocó
+      const lotUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE lotes_stock'),
+      );
+      expect(lotUpdates).toHaveLength(1);
+      expect(lotUpdates[0]![1]).toEqual([10, 2]);
+    });
   });
 
   describe('registrarAjuste', () => {
