@@ -42,6 +42,10 @@ export class CobroPendienteModalComponent {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
+  /** Ids de filas con el detalle expandido (D1): `Set<number>` con mutación
+   * inmutable (`new Set(...)`) para que el template reaccione. */
+  readonly detallesAbiertos = signal<Set<number>>(new Set());
+
   /** Cuando el pago en divisa se vuelve suficiente, limpia la completación stale
    * (mismo patrón que checkout-modal; evita inflar saldo_esperado con
    * completacionEfectivo remanente). */
@@ -49,6 +53,16 @@ export class CobroPendienteModalComponent {
     if (this.pagoSuficiente()) {
       this.completacionEfectivo.set(null);
     }
+  });
+
+  /** Reset defensivo (D2): el POS reemplaza la referencia del array en cada
+   * recarga (`pendientes.set(pendientes)` con array nuevo); si una fila
+   * expandida ya no existe, el estado quedaría stale. Al leer `cobroPendiente()`
+   * el effect se re-ejecuta con cada recarga. El cierre del modal destruye el
+   * componente (`@if` en pos.page.html), así que el reset es redundante ahí. */
+  private readonly _resetDetallesEffect = effect(() => {
+    this.cobroPendiente();
+    this.detallesAbiertos.set(new Set());
   });
 
   readonly seleccionada = computed<PendienteItem | null>(() => {
@@ -127,6 +141,24 @@ export class CobroPendienteModalComponent {
     if (this.soloLectura()) return; // no-op en soloLectura (AD-7/AC10)
     this.selectedId.set(id);
     this.resetearSubFormDivisa();
+  }
+
+  /** Toggle expand/collapse del detalle de una fila (D1). Mutación inmutable:
+   * siempre setea un `Set` nuevo para notificar al template. */
+  toggleDetalle(id: number): void {
+    const abiertos = new Set(this.detallesAbiertos());
+    if (abiertos.has(id)) {
+      abiertos.delete(id);
+    } else {
+      abiertos.add(id);
+    }
+    this.detallesAbiertos.set(abiertos);
+  }
+
+  /** True cuando la fila tiene algún detalle opcional (D4). `||` trata tanto
+   * null como el string vacío como sin valor (spec REQ-3/REQ-4). */
+  tieneDetalle(p: PendienteItem): boolean {
+    return !!(p.autorizadoPor || p.descripcion);
   }
 
   seleccionarFormaPago(valor: 'efectivo' | 'transferencia' | 'divisas'): void {

@@ -31,23 +31,57 @@
       <ul class="mb-4 divide-y divide-gray-100 dark:divide-gray-800 text-sm">
         @for (p of cobroPendiente(); track p.id) {
           <li
-            class="flex items-center justify-between gap-2 py-2.5 px-2 -mx-2 rounded-lg"
+            class="flex flex-col py-2.5 px-2 -mx-2 rounded-lg"
             [class.bg-blue-50]="!soloLectura() && selectedId() === p.id"
             [class.dark:bg-blue-900/20]="!soloLectura() && selectedId() === p.id"
-            [class.cursor-pointer]="!soloLectura()"
-            (click)="!soloLectura() && seleccionar(p.id)"
           >
-            <div class="min-w-0">
-              <p class="truncate font-medium text-gray-900 dark:text-gray-100">
-                {{ p.compradorNombre ?? 'Pendiente #' + p.id }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ p.fechaHora | date: 'yyyy-MM-dd' }}
-              </p>
+            <div
+              class="flex items-center justify-between gap-2"
+              [class.cursor-pointer]="!soloLectura()"
+              (click)="!soloLectura() && seleccionar(p.id)"
+            >
+              <div class="min-w-0">
+                <p class="truncate font-medium text-gray-900 dark:text-gray-100">
+                  {{ p.compradorNombre ?? 'Pendiente #' + p.id }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ p.fechaHora | date: 'yyyy-MM-dd' }}
+                </p>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <span class="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                  {{ p.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+                </span>
+                @if (tieneDetalle(p)) {
+                  <button
+                    type="button"
+                    class="flex cursor-pointer items-center gap-1 rounded-lg border border-gray-300 dark:border-gray-600 px-2.5 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    [attr.aria-expanded]="detallesAbiertos().has(p.id)"
+                    (click)="toggleDetalle(p.id); $event.stopPropagation()"
+                  >
+                    <span>{{ detallesAbiertos().has(p.id) ? 'Ocultar' : 'Ver' }}</span> detalles
+                    <span aria-hidden="true" class="text-[10px]">{{ detallesAbiertos().has(p.id) ? '▾' : '▸' }}</span>
+                  </button>
+                }
+              </div>
             </div>
-            <span class="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-              {{ p.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
-            </span>
+            <!-- Bloque de detalle read-only (REQ-2/REQ-3): labels solo con valor -->
+            @if (detallesAbiertos().has(p.id) && tieneDetalle(p)) {
+              <div class="mt-2 space-y-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs">
+                @if (p.autorizadoPor) {
+                  <p>
+                    <span class="text-gray-500 dark:text-gray-400">Autorizado por:</span>
+                    <span class="font-medium text-gray-900 dark:text-gray-100 ml-1">{{ p.autorizadoPor }}</span>
+                  </p>
+                }
+                @if (p.descripcion) {
+                  <p>
+                    <span class="text-gray-500 dark:text-gray-400">Descripción:</span>
+                    <span class="font-medium text-gray-900 dark:text-gray-100 ml-1">{{ p.descripcion }}</span>
+                  </p>
+                }
+              </div>
+            }
           </li>
         }
       </ul>

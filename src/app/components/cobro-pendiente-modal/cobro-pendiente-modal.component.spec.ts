@@ -47,6 +47,152 @@ describe('CobroPendienteModalComponent', () => {
     return Array.from(fixture.nativeElement.querySelectorAll('button'));
   }
 
+  function botonVerDetalles(): HTMLButtonElement | undefined {
+    return botones().find((b) => b.textContent?.includes('Ver detalles'));
+  }
+
+  // ── RED: detalles opcionales — botón "Ver detalles" (REQ-2..REQ-5, D2/D3) ──
+
+  it('RED: "Ver detalles" expande y colapsa el bloque con ambos campos (REQ-2/REQ-3)', () => {
+    listar([
+      pendienteItem({ id: 1, autorizadoPor: 'María', descripcion: 'Se lo lleva en cuenta' }),
+    ]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    expect(btn!.getAttribute('aria-expanded')).toBe('false');
+
+    btn!.click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Autorizado por:');
+    expect(el.textContent).toContain('María');
+    expect(el.textContent).toContain('Descripción:');
+    expect(el.textContent).toContain('Se lo lleva en cuenta');
+    expect(btn!.getAttribute('aria-expanded')).toBe('true');
+
+    // segundo click → colapsa
+    btn!.click();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Se lo lleva en cuenta');
+    expect(btn!.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('RED: solo autorizadoPor con valor no renderiza la label "Descripción" (REQ-3)', () => {
+    listar([pendienteItem({ id: 1, autorizadoPor: 'María' })]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    btn!.click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Autorizado por:');
+    expect(el.textContent).not.toContain('Descripción:');
+  });
+
+  it('RED: solo descripcion con valor no renderiza la label "Autorizado por" (REQ-3)', () => {
+    listar([pendienteItem({ id: 1, descripcion: 'Nota de prueba' })]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    btn!.click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Descripción:');
+    expect(el.textContent).toContain('Nota de prueba');
+    expect(el.textContent).not.toContain('Autorizado por:');
+  });
+
+  it('RED: fila con detalles muestra botón, fila sin detalles no (REQ-4)', () => {
+    listar([
+      pendienteItem({ id: 1, autorizadoPor: 'María' }),
+      pendienteItem({ id: 2, autorizadoPor: null, descripcion: null }),
+    ]);
+
+    // contraste: 1 botón por la fila con detalles; la histórica no lo tiene
+    const botonesDetalle = botones().filter((b) => b.textContent?.includes('Ver detalles'));
+    expect(botonesDetalle).toHaveLength(1);
+    // sin bloque vacío renderizado
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Autorizado por:');
+  });
+
+  it('RED: campos con string vacío se tratan como sin valor (REQ-4 extensión)', () => {
+    listar([
+      pendienteItem({ id: 1, descripcion: 'Nota' }),
+      pendienteItem({ id: 2, autorizadoPor: '', descripcion: '' }),
+    ]);
+
+    const botonesDetalle = botones().filter((b) => b.textContent?.includes('Ver detalles'));
+    expect(botonesDetalle).toHaveLength(1); // la fila 2 (strings vacíos) NO tiene botón
+  });
+
+  it('RED: caso mixto — autorizadoPor vacío + descripcion con valor muestra botón (REQ-3)', () => {
+    listar([
+      pendienteItem({ id: 1, autorizadoPor: '', descripcion: 'Nota' }),
+    ]);
+
+    const botonesDetalle = botones().filter((b) => b.textContent?.includes('Ver detalles'));
+    expect(botonesDetalle).toHaveLength(1); // descripcion tiene valor real -> botón presente
+  });
+
+  it('RED: soloLectura opera el toggle de detalles sin emitir cobroCompletado (REQ-5)', () => {
+    const spy = vi.fn();
+    component.cobroCompletado.subscribe(spy);
+    fixture.componentRef.setInput('soloLectura', true);
+    listar([pendienteItem({ id: 1, autorizadoPor: 'María', descripcion: 'Nota' })]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    btn!.click();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Autorizado por:');
+
+    btn!.click();
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Autorizado por:');
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(component.seleccionada()).toBeNull();
+  });
+
+  it('RED: en modo cobrar, el click en "Ver detalles" no selecciona la fila (D3)', () => {
+    listar([pendienteItem({ id: 1, autorizadoPor: 'María' })]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    btn!.click();
+    fixture.detectChanges();
+
+    expect(component.selectedId()).toBeNull();
+    expect(component.seleccionada()).toBeNull();
+    // el toggle igual corrió: el bloque quedó abierto
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Autorizado por:');
+  });
+
+  it('RED: al recargar la lista (nueva referencia), las expansiones se resetean (D2)', () => {
+    listar([pendienteItem({ id: 1, autorizadoPor: 'María' })]);
+
+    const btn = botonVerDetalles();
+    expect(btn).toBeTruthy();
+    btn!.click();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Autorizado por:');
+
+    // recarga: el POS hace pendientes.set(pendientes) con un array NUEVO
+    fixture.componentRef.setInput('cobroPendiente', [
+      pendienteItem({ id: 1, autorizadoPor: 'María' }),
+    ]);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Autorizado por:');
+    expect(botonVerDetalles()!.getAttribute('aria-expanded')).toBe('false');
+  });
+
   // ─── 3.2 RED: estado vacío ─────────────────────────────────────────
 
   it('RED: lista vacía muestra estado vacío y no permite seleccionar', () => {
