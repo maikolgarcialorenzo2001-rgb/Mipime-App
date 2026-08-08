@@ -68,7 +68,13 @@
     (keydown)="onCloseReopenKeydown($event)"
   >
     <div class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80">
-      <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Jornada del día</h3>
+      <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+        @if (jornadaPendiente(); as j) {
+          Reanudar jornada del {{ formatearFecha(j.fecha) }}
+        } @else {
+          Jornada del día
+        }
+      </h3>
 
       @if (cerrarError()) {
         <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
@@ -77,7 +83,7 @@
       }
 
       <p class="mb-6 text-gray-600 dark:text-gray-400">
-        Hay una jornada abierta de hoy. ¿Qué deseas hacer?
+        Hay una jornada sin cerrar. ¿Qué deseas hacer?
       </p>
 
       <div class="flex gap-3">

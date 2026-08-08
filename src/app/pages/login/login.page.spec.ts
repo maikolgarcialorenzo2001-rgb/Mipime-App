@@ -213,33 +213,47 @@ describe('LoginPage', () => {
   });
 
   describe('jornada en login', () => {
-    it('onSubmit: otro usuario → successMessage, descarga Excel, navega con delay', async () => {
-      authService.login.mockReturnValue(of(mockUser));
-      jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-      jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(null); // auto-cerrada
+    const mockUserB: UsuarioPublico = {
+      id: 2,
+      nombre: 'beto',
+      rol: 'trabajador',
+      activo: 1,
+      created_at: '',
+      updated_at: '',
+    };
+
+    const jornadaDeA = (overrides: Partial<Jornada> = {}): Jornada => ({
+      ...mockJornada,
+      ...overrides,
+    });
+
+    it('onSubmit: jornada de OTRO usuario → modal, sin auto-cierre, sin toast, sin navegar', async () => {
+      authService.login.mockReturnValue(of(mockUserB));
+      authService.usuario.set(mockUserB);
+      // Jornada abierta por el usuario A (id=1); se loguea B (id=2)
+      jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ user_apertura_id: 1 })));
       const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
       await component.onSubmit();
 
-      expect(component.successMessage()).toBe('Jornada anterior cerrada automáticamente ✓');
-      expect(jornadaService.obtenerReporte).toHaveBeenCalledWith(mockJornada.id);
-
-      // Antes de pasar el setTimeout → no navegó
+      expect(component.showReopenModal()).toBe(true);
+      // Nunca se auto-cierra la jornada de otro usuario
+      expect(jornadaService.autoCerrarSiOtroUsuario).not.toHaveBeenCalled();
+      // Sin toast de cierre automático
+      expect(component.successMessage()).toBeNull();
+      // No navega automáticamente
       expect(navigateSpy).not.toHaveBeenCalled();
-
-      // Avanzar el fake timer
-      vi.advanceTimersByTime(1500);
-      expect(navigateSpy).toHaveBeenCalledWith(['/pos']);
     });
 
-    it('onSubmit: mismo usuario → showReopenModal true', async () => {
+    it('onSubmit: mismo usuario → showReopenModal true (comportamiento preservado)', async () => {
       authService.login.mockReturnValue(of(mockUser));
-      jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-      jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(mockJornada); // mismo usuario
+      authService.usuario.set(mockUser);
+      jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ user_apertura_id: 1 })));
 
       await component.onSubmit();
 
       expect(component.showReopenModal()).toBe(true);
+      expect(jornadaService.autoCerrarSiOtroUsuario).not.toHaveBeenCalled();
     });
 
     it('onSubmit: sin jornada abierta → navega directo a /pos', async () => {
@@ -252,24 +266,83 @@ describe('LoginPage', () => {
       expect(navigateSpy).toHaveBeenCalledWith(['/pos']);
     });
 
-    it('cerrarYGuardar usa user_apertura_id para uid', async () => {
-      // Setup: mismo usuario → _jornadaPendiente se setea internamente
-      authService.login.mockReturnValue(of(mockUser));
-      jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-      jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(mockJornada);
-      const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    describe('cerrarYGuardar usa el usuario autenticado (FR-4)', () => {
+      it('B cierra jornada de A → cerrar(j.id, B.id), NUNCA user_apertura_id', async () => {
+        authService.login.mockReturnValue(of(mockUserB));
+        authService.usuario.set(mockUserB);
+        // Jornada de A (user_apertura_id=1), la cierra B (id=2)
+        jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ user_apertura_id: 1 })));
 
-      await component.onSubmit();
-      expect(component.showReopenModal()).toBe(true);
+        await component.onSubmit();
+        expect(component.showReopenModal()).toBe(true);
 
-      // cerrarYGuardar lee _jornadaPendiente (privado, test via side-effect)
-      component.cerrarYGuardar();
+        component.cerrarYGuardar();
 
-      // Debe llamar cerrar con uid = mockJornada.user_apertura_id (=1)
-      expect(jornadaService.cerrar).toHaveBeenCalledWith(
-        mockJornada.id,
-        mockJornada.user_apertura_id,
-      );
+        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2);
+        expect(jornadaService.cerrar).not.toHaveBeenCalledWith(
+          mockJornada.id,
+          mockJornada.user_apertura_id,
+        );
+      });
+
+      it('legacy sin apertura (NULL) → cerrar con el id del usuario autenticado', async () => {
+        authService.login.mockReturnValue(of(mockUserB));
+        authService.usuario.set(mockUserB);
+        jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ user_apertura_id: null })));
+
+        await component.onSubmit();
+
+        component.cerrarYGuardar();
+
+        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2);
+      });
+
+      it('auth.usuario() null → NO llama cerrar (aborta sin crash)', async () => {
+        authService.login.mockReturnValue(of(mockUser));
+        authService.usuario.set(null); // sin sesión activa
+        jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
+
+        await component.onSubmit();
+        expect(component.showReopenModal()).toBe(true);
+
+        component.cerrarYGuardar();
+
+        expect(jornadaService.cerrar).not.toHaveBeenCalled();
+        expect(component.cerrando()).toBe(false);
+      });
+    });
+
+    describe('modal muestra la fecha real de la jornada (FR-3)', () => {
+      it('jornada del 2026-08-07 → título "Reanudar jornada del 07-08" y copy sin "de hoy"', async () => {
+        authService.login.mockReturnValue(of(mockUserB));
+        authService.usuario.set(mockUserB);
+        jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ fecha: '2026-08-07' })));
+
+        await component.onSubmit();
+        fixture.detectChanges();
+
+        const modal = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+        expect(modal).toBeTruthy();
+        const text = modal.textContent ?? '';
+        expect(text).toContain('Reanudar jornada del 07-08');
+        expect(text).toContain('Hay una jornada sin cerrar');
+        expect(text).not.toContain('de hoy');
+      });
+
+      it('jornada del 2026-08-08 (hoy) → fecha formateada DD-MM y copy genérico', async () => {
+        authService.login.mockReturnValue(of(mockUserB));
+        authService.usuario.set(mockUserB);
+        jornadaService.obtenerAbierta.mockReturnValue(of(jornadaDeA({ fecha: '2026-08-08' })));
+
+        await component.onSubmit();
+        fixture.detectChanges();
+
+        const modal = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+        const text = modal?.textContent ?? '';
+        expect(text).toContain('Reanudar jornada del 08-08');
+        expect(text).toContain('Hay una jornada sin cerrar');
+        expect(text).not.toContain('de hoy');
+      });
     });
 
     describe('Electron auto-save', () => {
@@ -277,28 +350,6 @@ describe('LoginPage', () => {
 
       beforeEach(() => {
         electronService = TestBed.inject(ElectronFileService) as unknown as typeof electronService;
-      });
-
-      it('debería llamar ElectronFileService.downloadBlob en auto-cierre (sin importar isElectronPackaged)', async () => {
-        jornadaService.obtenerReporte.mockReturnValue(of({
-          id: 1,
-          jornada_id: 1,
-          content_type: 'excel',
-          content_base64: 'SGVsbG8=',
-          filename: 'jornada_test.xlsx',
-          created_at: '',
-        }));
-
-        authService.login.mockReturnValue(of(mockUser));
-        jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-        jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(null);
-
-        await component.onSubmit();
-
-        expect(electronService.downloadBlob).toHaveBeenCalledWith(
-          'SGVsbG8=',
-          'jornada_test.xlsx',
-        );
       });
 
       it('debería llamar ElectronFileService.downloadBlob en cerrarYGuardar', async () => {
@@ -312,8 +363,8 @@ describe('LoginPage', () => {
         }));
 
         authService.login.mockReturnValue(of(mockUser));
+        authService.usuario.set(mockUser);
         jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
-        jornadaService.autoCerrarSiOtroUsuario.mockResolvedValue(mockJornada);
 
         await component.onSubmit();
         component.cerrarYGuardar();
