@@ -117,7 +117,19 @@ export class StockMovimientoService {
       throw new Error('Stock insuficiente');
     }
 
-    // Update product precio_costo to the next available lot (FIFO front)
+    // Sync product precio_costo to the FIFO front lot (oldest with stock)
+    await this._syncPrecioCosto(productoId, new Date().toISOString());
+
+    return consumos;
+  }
+
+  /**
+   * Re-syncs productos.precio_costo to the FIFO front lot (oldest lot with
+   * stock, product-wide — no ubicacion filter). Idempotent: when the front is
+   * unchanged, the same value is rewritten. When no lot has stock, the cache
+   * is left as-is.
+   */
+  private async _syncPrecioCosto(productoId: number, ahora: string): Promise<void> {
     const [siguienteLote] = await this._db.sql<{ precio_costo: number }>(
       `SELECT precio_costo FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
@@ -127,11 +139,9 @@ export class StockMovimientoService {
     if (siguienteLote) {
       await this._db.sql(
         'UPDATE productos SET precio_costo = ?, updated_at = ? WHERE id = ?',
-        [siguienteLote.precio_costo, new Date().toISOString(), productoId],
+        [siguienteLote.precio_costo, ahora, productoId],
       );
     }
-
-    return consumos;
   }
 
   /**
@@ -183,18 +193,7 @@ export class StockMovimientoService {
     // 4. Sync product precio_costo to the FIFO front lot (oldest with stock).
     //    When the product had 0 stock, the new lot becomes the front -> cost updates.
     //    When older lots still have stock, the front is unchanged -> cost preserved.
-    const [siguienteLote] = await this._db.sql<{ precio_costo: number }>(
-      `SELECT precio_costo FROM lotes_stock
-       WHERE producto_id = ? AND cantidad > 0
-       ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
-      [productoId],
-    );
-    if (siguienteLote) {
-      await this._db.sql(
-        'UPDATE productos SET precio_costo = ?, updated_at = ? WHERE id = ?',
-        [siguienteLote.precio_costo, ahora, productoId],
-      );
-    }
+    await this._syncPrecioCosto(productoId, ahora);
   }
 
   async registrarSalida(
@@ -342,6 +341,11 @@ export class StockMovimientoService {
       );
     }
 
+    // 2b. Re-sync precio_costo AFTER inserting the shop lots: _consumirFIFO
+    //     already synced, but when the traslado consumed ALL almacen stock the
+    //     sync found no lot left. The new shop lots are now the FIFO front.
+    await this._syncPrecioCosto(productoId, ahora);
+
     // 3. Register movement
     const columnas = 'producto_id, cantidad, tipo, motivo, created_at' + (jornadaId !== undefined ? ', jornada_id' : '');
     const placeholders = '?, ?, ?, ?, ?' + (jornadaId !== undefined ? ', ?' : '');
@@ -407,6 +411,10 @@ export class StockMovimientoService {
       [nuevaCantidad, loteId],
     );
 
+    // 2b. Re-sync precio_costo: if the ajuste zeroed the front lot, the cost
+    //     advances to the next FIFO lot.
+    await this._syncPrecioCosto(productoId, ahora);
+
     // 3. Recalculate stock for this ubicacion
     const [{ total }] = await this._db.sql<{ total: number }>(
       'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes_stock WHERE producto_id = ? AND ubicacion = ?',
@@ -464,6 +472,10 @@ export class StockMovimientoService {
       'UPDATE lotes_stock SET cantidad = ?, precio_costo = ? WHERE id = ?',
       [nuevaCantidad, precioCosto, loteId],
     );
+
+    // 3b. Re-sync productos.precio_costo: the edited lot may be the FIFO front
+    //     (cost changed) or was zeroed (front advances to the next lot).
+    await this._syncPrecioCosto(productoId, ahora);
 
     // 4. Recalculate stock for this ubicacion
     const [{ total }] = await this._db.sql<{ total: number }>(
