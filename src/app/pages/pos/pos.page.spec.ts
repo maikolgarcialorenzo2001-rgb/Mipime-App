@@ -336,6 +336,30 @@ describe('PosPage — toast de éxito', () => {
     expect(ver.disabled).toBe(true);
   });
 
+  it('FR-1/AC7: con jornada abierta de un día anterior, sinJornada=false y botones habilitados', () => {
+    // Regresión fix-reanudar-jornada-acceso: obtenerAbierta() ya no filtra
+    // fecha=hoy, por lo que jornadaAbierta puede contener una jornada de días
+    // previos y el POS debe tratarla como jornada activa.
+    const jornadaPrevia: Jornada = { ...mockJornada, fecha: '2026-08-07' };
+    const jornadaService = TestBed.inject(JornadaService);
+    vi.mocked(jornadaService.jornadaAbierta).mockReturnValue(jornadaPrevia);
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(PosPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.sinJornada).toBe(false);
+
+    const cobrar = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((b) => (b as HTMLButtonElement).textContent?.includes('Cobrar Pendiente')) as HTMLButtonElement;
+    const ver = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((b) => (b as HTMLButtonElement).textContent?.includes('Ver Pendientes')) as HTMLButtonElement;
+
+    expect(cobrar.disabled).toBe(false);
+    expect(ver.disabled).toBe(false);
+  });
+
   it('3.4 RED: abrirCobroPendiente carga pendientes y abre el modal en modo cobrar', async () => {
     const pendiente: PendienteItem = {
       id: 1,
