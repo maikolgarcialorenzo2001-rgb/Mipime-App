@@ -9,7 +9,7 @@
  *
  * Node built-ins only (fs, path, url, child_process).
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -40,12 +40,16 @@ const next = bumpVersion(current);
 pkg.version = next;
 writeJson('package.json', pkg);
 
-const lock = readJson('package-lock.json');
-lock.version = next;
-if (lock.packages?.['']) {
-  lock.packages[''].version = next;
+// package-lock.json was removed from the repo (migrated to bun.lock, 2026-08-08).
+// Keep the old behavior when the lock file exists, skip it silently otherwise.
+if (existsSync(join(root, 'package-lock.json'))) {
+  const lock = readJson('package-lock.json');
+  lock.version = next;
+  if (lock.packages?.['']) {
+    lock.packages[''].version = next;
+  }
+  writeJson('package-lock.json', lock);
 }
-writeJson('package-lock.json', lock);
 
 console.log(`[bump-version] ${current} → ${next}`);
 
