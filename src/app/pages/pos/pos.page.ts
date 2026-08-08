@@ -32,7 +32,7 @@ export class PosPage {
   private readonly _ventaService = inject(VentaService);
   private readonly _cuentaCosasService = inject(CuentaCosasService);
   private readonly _cobroPendienteService = inject(CobroPendienteService);
-  private readonly _auth = inject(AuthService);
+  readonly _auth = inject(AuthService);
   private readonly _destroyRef = inject(DestroyRef);
 
   readonly cart = this._cartService;
