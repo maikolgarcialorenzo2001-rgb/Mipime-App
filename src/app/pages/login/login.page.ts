@@ -24,7 +24,6 @@ export class LoginPage {
   readonly username = signal('');
   readonly password = signal('');
   readonly loginError = signal<string | null>(null);
-  readonly successMessage = signal<string | null>(null);
   readonly cargando = signal(false);
 
   /** Modal de reapertura — se muestra para CUALQUIER usuario autenticado si hay jornada abierta */
@@ -35,7 +34,6 @@ export class LoginPage {
 
   async onSubmit(): Promise<void> {
     this.loginError.set(null);
-    this.successMessage.set(null);
     this.cargando.set(true);
 
     try {

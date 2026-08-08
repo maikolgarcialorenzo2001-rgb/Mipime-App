@@ -239,8 +239,8 @@ describe('LoginPage', () => {
       expect(component.showReopenModal()).toBe(true);
       // Nunca se auto-cierra la jornada de otro usuario
       expect(jornadaService.autoCerrarSiOtroUsuario).not.toHaveBeenCalled();
-      // Sin toast de cierre automático
-      expect(component.successMessage()).toBeNull();
+      // Sin toast de cierre automático (el toast fue eliminado junto con el auto-cierre)
+      expect(fixture.nativeElement.querySelector('.bg-green-500')).toBeNull();
       // No navega automáticamente
       expect(navigateSpy).not.toHaveBeenCalled();
     });
