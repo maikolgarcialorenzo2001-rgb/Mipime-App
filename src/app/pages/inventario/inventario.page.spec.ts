@@ -239,7 +239,8 @@ describe('InventarioPage', () => {
     const buttonArea = fixture.nativeElement.querySelector('tbody tr td:last-child');
     const buttonText = buttonArea.textContent;
     expect(buttonText).toContain('Entrada');
-    expect(buttonText).toContain('Salida');
+    expect(buttonText).toContain('Traslado');
+    expect(buttonText).not.toContain('Salida');
     expect(buttonText).toContain('Ajustar');
     expect(buttonText).not.toContain('Merma');
     expect(buttonText).toContain('A Tienda');
@@ -260,7 +261,7 @@ describe('InventarioPage', () => {
     const buttonArea = fixture.nativeElement.querySelector('tbody tr td:last-child');
     const buttonText = buttonArea.textContent;
     expect(buttonText).not.toContain('Entrada');
-    expect(buttonText).not.toContain('Salida');
+    expect(buttonText).not.toContain('Traslado');
     expect(buttonText).not.toContain('Ajustar');
     expect(buttonText).not.toContain('Merma');
     expect(buttonText).toContain('A Tienda');
@@ -336,7 +337,13 @@ describe('InventarioPage', () => {
     );
   });
 
-  it('12. calls registrarSalida on form submit (consumes from almacen)', async () => {
+  // ── Traslado (salida): ubicación de origen + lote OBLIGATORIOS (REQ-4/REQ-5) ──
+
+  it('12. RED: sin ubicación de origen el dropdown de lotes está deshabilitado y el submit no llama registrarSalida', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+    ]);
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -348,13 +355,236 @@ describe('InventarioPage', () => {
     await component.onSelectAction(1, 'salida');
     fixture.detectChanges();
 
+    // Sin ubicación: sin default y sin auto-selección de lote
+    expect(component.salidaUbicacion()).toBeNull();
+    expect(component.selectedLoteIndex()).toBeNull();
+    expect(component.lotesDeUbicacion()).toHaveLength(0);
+
+    const selects = fixture.nativeElement.querySelectorAll('form select');
+    // select[0] = ubicación, select[1] = lote (obligatorio)
+    expect(selects.length).toBe(2);
+    const loteSelect = selects[1] as HTMLSelectElement;
+    expect(loteSelect.disabled).toBe(true);
+
     component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).not.toHaveBeenCalled();
+  });
+
+  it('12.1 RED: elegir ubicación habilita el dropdown de lotes', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    await component.onSalidaUbicacionChange('shop');
+    fixture.detectChanges();
+
+    expect(component.salidaUbicacion()).toBe('shop');
+    expect(component.lotesDeUbicacion()).toHaveLength(1);
+    expect(component.lotesDeUbicacion()[0].id).toBe(43);
+
+    const loteSelect = fixture.nativeElement.querySelectorAll('form select')[1] as HTMLSelectElement;
+    expect(loteSelect.disabled).toBe(false);
+  });
+
+  it('12.2 RED: "Tienda" lista solo lotes de shop y "Almacén" solo lotes de almacén con cantidad > 0', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+      { id: 44, producto_id: 1, cantidad: 0, precio_costo: 7, fecha_ingreso: '2026-01-03T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-03T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    // Tienda → solo el lote de shop
+    await component.onSalidaUbicacionChange('shop');
+    fixture.detectChanges();
+    expect(component.lotesDeUbicacion().map((l) => l.id)).toEqual([43]);
+
+    const loteSelect = fixture.nativeElement.querySelectorAll('form select')[1] as HTMLSelectElement;
+    const optionsShop = loteSelect.querySelectorAll('option');
+    expect(optionsShop.length).toBe(2); // placeholder + Lote #1
+    expect(loteSelect.textContent).toContain('Lote #1');
+    expect(loteSelect.textContent).not.toContain('Lote #2');
+
+    // Almacén → solo el lote de almacén con stock (el 44 con 0u queda fuera)
+    await component.onSalidaUbicacionChange('almacen');
+    fixture.detectChanges();
+    expect(component.lotesDeUbicacion().map((l) => l.id)).toEqual([42]);
+    expect(loteSelect.querySelectorAll('option').length).toBe(2);
+    expect(loteSelect.textContent).not.toContain('Lote #2');
+  });
+
+  it('12.3 RED: cambiar la ubicación resetea el lote elegido y refiltra el dropdown', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    await component.onSalidaUbicacionChange('almacen');
+    fixture.detectChanges();
+    expect(component.lotesDeUbicacion().map((l) => l.id)).toEqual([42]);
+
+    component.selectedLoteIndex.set(1);
+    fixture.detectChanges();
+    expect(component.selectedLoteIndex()).toBe(1);
+
+    // Cambio a Tienda → lote reseteado y dropdown refiltrado con solo lotes de shop
+    await component.onSalidaUbicacionChange('shop');
+    fixture.detectChanges();
+    expect(component.salidaUbicacion()).toBe('shop');
+    expect(component.selectedLoteIndex()).toBeNull();
+    expect(component.lotesDeUbicacion().map((l) => l.id)).toEqual([43]);
+
+    const loteSelect = fixture.nativeElement.querySelectorAll('form select')[1] as HTMLSelectElement;
+    expect(loteSelect.textContent).not.toContain('Lote #2');
+  });
+
+  it('12.4 RED: sin lote elegido el submit no llama registrarSalida', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    await component.onSalidaUbicacionChange('almacen');
+    fixture.detectChanges();
+    // Ubicación elegida pero lote sin seleccionar (sin auto-selección)
+    expect(component.salidaUbicacion()).toBe('almacen');
+    expect(component.selectedLoteIndex()).toBeNull();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).not.toHaveBeenCalled();
+  });
+
+  it('12.5 RED: submit con ubicación + lote pasa (productoId, cantidad, motivo, undefined, ubicacion, loteId)', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    await component.onSalidaUbicacionChange('shop');
+    component.selectedLoteIndex.set(1);
+    component.movimientoCantidad.set(3);
+    component.movimientoMotivo.set('Rotura de stock');
     fixture.detectChanges();
 
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 3, undefined, undefined, 'almacen');
+    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
+      1, 3, 'Rotura de stock', undefined, 'shop', 43,
+    );
+  });
+
+  it('12.6 TRIANGULATE: submit con lote de almacén sin motivo pasa 6 argumentos y no hay fallback a 5', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    await component.onSalidaUbicacionChange('almacen');
+    component.selectedLoteIndex.set(1);
+    component.movimientoCantidad.set(4);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(1);
+    expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
+      1, 4, undefined, undefined, 'almacen', 42,
+    );
+  });
+
+  it('12.7 RED: no existe la opción "FIFO automático" en el formulario de Traslado', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 9, fecha_ingreso: '2026-01-02T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-02T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    const formText = fixture.nativeElement.querySelector('form').textContent;
+    expect(formText).not.toContain('FIFO');
+
+    // Con ubicación elegida y lotes cargados tampoco aparece
+    await component.onSalidaUbicacionChange('almacen');
+    fixture.detectChanges();
+    const formTextConUbicacion = fixture.nativeElement.querySelector('form').textContent;
+    expect(formTextConUbicacion).not.toContain('FIFO');
+    expect(formTextConUbicacion).not.toContain('sin lote');
   });
 
   it('13. calls registrarAjusteLote on form submit (with lot selected)', async () => {
@@ -833,6 +1063,9 @@ describe('InventarioPage', () => {
   // ── Double-submit guard ───────────────────────────────────────
 
   it('29. ignores a second submit while a movement is in progress', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -844,6 +1077,8 @@ describe('InventarioPage', () => {
     await component.onSelectAction(1, 'salida');
     fixture.detectChanges();
 
+    await component.onSalidaUbicacionChange('almacen');
+    component.selectedLoteIndex.set(1);
     component.movimientoCantidad.set(3);
     fixture.detectChanges();
 
@@ -873,6 +1108,9 @@ describe('InventarioPage', () => {
   });
 
   it('30. disables the submit button while a movement is in progress', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
     fixture = TestBed.createComponent(InventarioPage);
@@ -884,6 +1122,8 @@ describe('InventarioPage', () => {
     await component.onSelectAction(1, 'salida');
     fixture.detectChanges();
 
+    await component.onSalidaUbicacionChange('almacen');
+    component.selectedLoteIndex.set(1);
     component.movimientoCantidad.set(3);
     fixture.detectChanges();
 
