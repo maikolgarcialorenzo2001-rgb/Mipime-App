@@ -41,30 +41,31 @@ Chain strategy: pending
 
 ## Fase 2: Login — modal para cualquier usuario + cierre autenticado — FR-2/3/4
 
-- [ ] **2.1 (RED)** `login.page.spec.ts` — REESCRIBIR bloque actual (L216-341): (a) otras-session con mock `usuario` A → `showReopenModal()===true`; NUNCA llama `autoCerrarSiOtroUsuario`; sin toast "cerrada automáticamente"; sin `navigate`; (b) `cerrarYGuardar` llama `cerrar(j.id, mockUsuario.id)` (mock admin id=1), nunca `user_apertura_id`; legacy apertura NULL → uid autenticado; `auth.usuario()` null → NO llama `cerrar` (sin crash); (c) modal-fecha: jornada `fecha:'2026-08-07'` → título "Reanudar jornada del 07-08", copy "Hay una jornada sin cerrar", NUNCA "de hoy".
-  - Verif RED: tests fallan (firma `jornadaPendiente`/`formatearFecha` no existen; `onSubmit` aún auto-cierra).
-- [ ] **2.2 (GREEN)** `login.page.ts` — D6: `_jornadaPendiente` → `readonly jornadaPendiente = signal<Jornada \| null>(null)`; `onSubmit()`: `abierta` → `setJornadaPendiente(abierta)` + `showReopenModal.set(true)`, sin `autoCerrarSi`; `cerrarYGuardar()`: `const uid = this.auth.usuario()?.id; if (uid===undefined) return;` y `cerrar(j.id, uid)`; helper `formatearFecha(fecha): string` → `DD-MM` desde ISO.
-  - Verif: tests 2.1 verdes.
-- [ ] **2.3 (GREEN)** `login.page.html` — modal L62+: `@if (jornadaPendiente(); as j)` con título `Reanudar jornada del {{ formatearFecha(j.fecha) }}`; copy `Hay una jornada sin cerrar. ¿Qué deseas hacer?`; reemplazar texto "de hoy".
-  - Verif: modal-fecha test verd; `ng serve` compila template.
+- [x] **2.1 (RED)** `login.page.spec.ts` — REESCRIBIR bloque actual (L216-341): (a) otras-session con mock `usuario` A → `showReopenModal()===true`; NUNCA llama `autoCerrarSiOtroUsuario`; sin toast "cerrada automáticamente"; sin `navigate`; (b) `cerrarYGuardar` llama `cerrar(j.id, mockUsuario.id)` (mock admin id=1), nunca `user_apertura_id`; legacy apertura NULL → uid autenticado; `auth.usuario()` null → NO llama `cerrar` (sin crash); (c) modal-fecha: jornada `fecha:'2026-08-07'` → título "Reanudar jornada del 07-08", copy "Hay una jornada sin cerrar", NUNCA "de hoy".
+  - Verif RED: 7 fallos / 14 pasan — `autoCerrarSiOtroUsuario` llamado, `cerrar` con `user_apertura_id`, modal con copy "de hoy".
+- [x] **2.2 (GREEN)** `login.page.ts` — D6: `_jornadaPendiente` → `readonly jornadaPendiente = signal<Jornada \| null>(null)`; `onSubmit()`: `abierta` → `jornadaPendiente.set(abierta)` + `showReopenModal.set(true)`, sin `autoCerrarSi`; `cerrarYGuardar()`: `const uid = this.auth.usuario()?.id; if (uid===undefined) return;` y `cerrar(j.id, uid)`; helper `formatearFecha(fecha): string` → `DD-MM` desde ISO.
+  - Verif: 21/21 verdes en login.page.spec.ts; `tsc --noEmit` limpio.
+- [x] **2.3 (GREEN)** `login.page.html` — modal L62+: `@if (jornadaPendiente(); as j)` con título `Reanudar jornada del {{ formatearFecha(j.fecha) }}`; copy `Hay una jornada sin cerrar. ¿Qué deseas hacer?`; reemplazar texto "de hoy".
+  - Verif: modal-fecha tests verdes (fechas 07-08 y 08-08); suite completa 45 files / 767 tests.
 - commit propuesto PR 2: `fix(login): modal de reanudar para cualquier usuario con user_cierre autenticado`
 
 ## Fase 3: Purga auto-cierre — FR-2, spec "Auto-Close REMOVED"
 
-- [ ] **3.1 (purge)** `jornada.service.ts` — ELIMINAR `autoCerrarSiOtroUsuario()` L201-273 (+ docblock) ya sin callers; `jornada.service.spec.ts` — borrar bloque `describe autoCerrarSiOtroUsuario` L1410-1953 completo.
-  - Verif: `grep -rn autoCerrarSi` → solo en openspec deltas (REMOVED); suite completa verde; UI no puede llamar a un método inexistente.
+- [x] **3.1 (purge)** `jornada.service.ts` — ELIMINAR `autoCerrarSiOtroUsuario()` L201-273 (+ docblock) ya sin callers; `jornada.service.spec.ts` — borrar bloque `describe autoCerrarSiOtroUsuario` L1410-1953 completo. (IMPLEMENTADO PR 3, rama `pr3-purga-auto-cierre` — ver apply-progress rev 3)
+  - Verif: `grep -rn autoCerrarSi` → solo en guard del mock de login (asserts NUNCA llamado) y openspec deltas (REMOVED); suite completa 45 files / 756 tests verdes (767 − 11); `tsc --noEmit` limpio. UI no puede llamar a un método inexistente.
+  - Bonus: purgado `successMessage` muerto en login (señal + template + aserción spec → DOM real). Commits: `a8ec000` + `060509b`.
 - Commit: `refactor(jornada): eliminar auto-cierre por otro usuario` (delete-heavy, sin lógica nueva)
 
 ## Fase 4: Excel "Abierta por / Cerrada por" — FR-6, AC6
 
-- [ ] **4.1 (RED)** `jornada.service.spec.ts` — NUEVO: `_ejecutarCierre` y `_recolectarDatosJornada` resuelven `userAperturaNombre` ('Ana' cuando `user_apertura_id`→Ana; `null` si id inexistente o NULL), propagado a `JornadaReportData` en `_generarYGuardarExcel`/`-exportaciones`; actualizar mocks existentes de `cerrar`/`_ejecutarCierre` agregando 1 mock `SELECT nombre` (design Riesgo-2).
-  - Verif RED filas fallan.
-- [ ] **4.2 (GREEN)** `jornada.service.ts` — en `_ejecutarCierre` (junto L543-548): `SELECT nombre FROM usuarios WHERE id = ?` con `jornada.user_apertura_id`; en `_recolectarDatosJornada` (junto L764-771): `SELECT u.nombre FROM jornadas j LEFT JOIN usuarios u ON u.id = j.user_apertura_id WHERE j.id = ?`; agregar `userAperturaNombre` a los retornos/tipos y a los datos de `_generarYGuardarExcel`/`generarExportacionMensual`/`PorRango`/`obtenerDatosJornada` (L370/389/596/633/664/825/908).
+- [x] **4.1 (RED)** `jornada.service.spec.ts` — NUEVO: `_ejecutarCierre` y `_recolectarDatosJornada` resuelven `userAperturaNombre` ('Ana' cuando `user_apertura_id`→Ana; `null` si id inexistente o NULL), propagado a `JornadaReportData` en `_generarYGuardarExcel`/`-exportaciones`; actualizar mocks existentes de `cerrar`/`_ejecutarCierre` agregando 1 mock `SELECT nombre` (design Riesgo-2).
+  - Verif RED filas fallan. IMPLEMENTADO PR 4 (6 tests nuevos; el test existente de arqueo sumó 1 mock `SELECT nombre` del LEFT JOIN).
+- [x] **4.2 (GREEN)** `jornada.service.ts` — en `_ejecutarCierre` (junto L543-548): `SELECT nombre FROM usuarios WHERE id = ?` con `jornada.user_apertura_id`; en `_recolectarDatosJornada` (junto L764-771): `SELECT u.nombre FROM jornadas j LEFT JOIN usuarios u ON u.id = j.user_apertura_id WHERE j.id = ?`; agregar `userAperturaNombre` a los retornos/tipos y a los datos de `_generarYGuardarExcel`/`generarExportacionMensual`/`PorRango`/`obtenerDatosJornada` (L370/389/596/633/664/825/908).
   - Verif: 4.1 verde.
-- [ ] **4.3 (RED)** `excel.service.spec.ts` — firma: `userAperturaNombre:'Ana'` ≠ `userCierreNombre:'Beto'` → `['Abierta por','Ana']`+`['Cerrada por','Beto']`; iguales → única `['Firmado por','Beto']`; apertura NULL → `Firmado por` (back-compat). En `_agregarResumen` y `_agregarJornadaSheet`.
-  - Verif RED fails.
-- [ ] **4.4 (GREEN)** `excel.service.ts` — `JornadaReportData.userAperturaNombre?: string \| null` (JornadaReportData L41); bloques L174-176 y L591-594 pasan a condicional D5 (`if (userApertura && userCierre && distinto) → 2 filas; else if (userCierre) → Firmado por`).
-  - Verif: 4.3 verde.
+- [x] **4.3 (RED)** `excel.service.spec.ts` — firma: `userAperturaNombre:'Ana'` ≠ `userCierreNombre:'Beto'` → `['Abierta por','Ana']`+`['Cerrada por','Beto']`; iguales → única `['Firmado por','Beto']`; apertura NULL → `Firmado por` (back-compat). En `_agregarResumen` y `_agregarJornadaSheet`.
+  - Verif RED fails. (2 failed A≠B; A=B y NULL ya pasaban = back-compat)
+- [x] **4.4 (GREEN)** `excel.service.ts` — `JornadaReportData.userAperturaNombre?: string \| null` (JornadaReportData L41); bloques L174-176 y L591-594 pasan a condicional D5 (`if (userApertura && userCierre && distinto) → 2 filas; else if (userCierre) → Firmado por`).
+  - Verif: 4.3 verde. Suite completa 45 files / 768 tests verdes; `tsc --noEmit` limpio.
 - commit propuesto PR 4: `feat(excel): registrar quien abre y cierra la jornada (Abierta por/Cerrada por)`
 
 ## Verificación final / Dependencias / Notas
@@ -80,3 +81,16 @@ Notas de riesgo p/ el aplicador:
 3. `userCierreNombre` se mantiene en `_recolectarDatosJornada` actual — NO refactorizar el JOIN de cierre, solo AÑADIR apertura (design D4).
 4. Specs openspec deltas ya existen en `openspec/changes/fix-reanudar-jornada-acceso/specs/` — aplicador NO debe reescribirlos (archive se encarga).
 5. No usar `autoClose`/`cerrarYGuardar` con `user_apertura_id`: explícitamente `auth.usuario()?.id`.
+
+## Estado de entrega (archive, 2026-08-08)
+
+- **Cambio COMPLETE** — ciclo SDD cerrado (proposal → spec → design → tasks → apply → verify → archive). Verify global **PASS** final: 45 files / 768 tests (`npx vitest run`) + `tsc --noEmit` exit 0.
+- **PR 1** (`pr1-query-abierta`): query `obtenerAbierta()` sin filtro de fecha → `ORDER BY fecha DESC, id DESC LIMIT 1`. Commits `d8b5aec` + `4eff97d`.
+- **PR 2** (`pr2-login`): modal de reanudar para cualquier usuario + `user_cierre_id` autenticado + fecha real. Commits `efb1ee8` + `7e0e8bc`.
+- **PR 3** (`pr3-purga-auto-cierre`): eliminado `autoCerrarSiOtroUsuario()` + bloque spec + `successMessage` muerto. Commits `a8ec000` + `060509b` + `cef7666`.
+- **PR 4** (`pr4-excel`): "Abierta por A / Cerrada por B" en Excel + resolución `userAperturaNombre` en data layer. Commits `7ec8956` + `a5dd26b` + fix `a8f3ea3` (TS1117 duplicado resuelto).
+- **PRs**: #6, #7, #8, #9 creados en GitHub — feature-branch-chain sobre el tracker `fix/reanudar-jornada-acceso` (ramas `pr1-query-abierta` → `pr2-login` → `pr3-purga-auto-cierre` → `pr4-excel`).
+- **Deltas openspec archivados** → `openspec/changes/archive/2026-08-08-fix-reanudar-jornada-acceso/` y sincronizados a spec principal (`openspec/specs/{jornada-reopen,jornada-lifecycle,excel-reportes}/spec.md`).
+- **NO mergeado a main**: merge pendiente a criterio del flujo de branch (feature-branch-chain).
+- Warnings no bloqueantes: indentación 14 espacios en `jornada.service.ts:566/598/854` (cosmético); `formatearFecha` sin guard no-ISO (aceptado).
+- Archive report en Engram: `sdd/fix-reanudar-jornada-acceso/archive-report`.
