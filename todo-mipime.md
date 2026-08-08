@@ -105,9 +105,41 @@
 
 ### BACKLOG-13. Limpieza de jornadas 'abierta' huérfanas (DATOS)
 **Contexto:** el bug histórico de `obtenerAbierta()` (filtrar `fecha = hoy`) permitía abrir una jornada NUEVA dejando la anterior con `estado='abierta'` sin cerrar. Fix del flujo aplicado en `fix-reanudar-jornada-acceso` (merged a main 2026-08-08, PRs #6-#10) — de ahora en más el sistema detecta la última abierta sin importar la fecha y la reanuda/cierra. PERO las BD vivas pueden tener **múltiples filas `estado='abierta'` huérfanas** (legacy).
-**Riesgo actual:** `SELECT ... ORDER BY fecha DESC, id DESC LIMIT 1` toma la más reciente — las anteriores quedan sin detectar; si una jornada vieja huérfana acumula datos, no se cierra ni reporta.
-**Fix propuesto (pendiente de diseño):** script/migración puntual que liste las `jornadas` con `estado='abierta'` sin `fecha_cierre`, permita decidir (cerrar manual con saldo real o descartar) y limpie. NO incluido en el fix de flujo — quedó **out of scope** en la proposal (decisión 2026-08-08).
-**Decisión:** pendiente de retomar con el usuario; requiere inspeccionar las BD reales antes de diseñar.
+
+**Exploración SDD completa (2026-08-08, Engram `sdd/limpieza-jornadas-huerfanas/explore` #499):**
+
+**Esquema real de `jornadas`:** la columna NO es `fecha_cierre` como decía este item — es **`hora_cierre`** (TEXT nullable) + `saldo_real` (REAL nullable). Abierta = `estado='abierta'` AND `hora_cierre IS NULL` AND `saldo_real IS NULL`. Columnas: id, fecha, hora_apertura, monto_inicial, hora_cierre, total_ventas, total_movimientos (ex total_gastos v12), saldo_esperado, saldo_real, estado (CHECK abierta/cerrada), user_apertura_id, user_cierre_id, total_merma, total_usd, total_eur, created_at, updated_at.
+
+**Escenarios calculados donde puede existir una huérfana:**
+1. **Histórico (causa raíz, pre-fix)**: día X abrís y no cerrás → día X+1 `obtenerAbierta()` filtra `fecha=hoy` → no detecta la de ayer → login deja abrir NUEVA → la anterior queda 'abierta' para siempre. Multiplicable por días → N huérfanas. También el auto-cierre "otro usuario" usaba la misma query de hoy → jornadas abiertas de días previos de OTRO user tampoco se auto-cerraban.
+2. **Restauración de backup viejo**: un backup restaurable con jornadas abiertas reintroduce huérfanas.
+3. **AGUJERO POST-FIX (sigue activo)**: `abrir()` (jornada.service.ts:194) hace INSERT **sin guard en la DB** — no valida si ya existe otra `'abierta'`. El único caller (app-nav `confirmarApertura`) depende de la señal `jornadaAbierta` vía `puedeAbrir` (app-nav.component.ts:63-65). Si `refreshJornadaAbierta()` falla o tarda (jornada.service.ts:144), la señal queda `null` → UI habilita "Iniciar" → se crea una NUEVA huérfana. El modal de login solo ofrece "Reaibir" o "Cerrar y guardar" — no crea huérfanas.
+4. Múltiples abiertas previas: el `ORDER BY fecha DESC, id DESC LIMIT 1` hace invisible a las anteriores → muertas para el sistema.
+
+**Casos que NO generan huérfanas** (verificado): modal login (solo reabrir/cerrar); `cerrar()` hace UPDATE atómico a 'cerrada' antes de generar Excel → un fallo de Excel no deja abierta; `cerrarYGuardar` cierra la activa.
+
+**Hallazgos de arquitectura relacionados:**
+- **NO existe ningún `DELETE FROM` en todo el repo** ni FKs con `ON DELETE CASCADE` (ventas, movimientos, stock_movimientos, arqueo_caja, jornada_reportes, cuenta_cosas) — no hay precedente de borrado de datos.
+- `cerrar(id, userId, arqueo?)` (jornada.service.ts:220) es PÚBLICO y capaz de cerrar una jornada vieja por id (UPDATE → arqueo → Excel → jornada_reportes → backup 'jornada-close').
+- Migraciones: runner compartido `runMigrations(exec, {seedEnabled})` hasta v17; precedente de backfill v8 (lotes_stock). Tests con `FakeExecutor` (db-migrations.spec.ts).
+- ⚠️ **`electron/db.ts:22` tiene `MAX_SCHEMA_VERSION = 16` mientras las migraciones ya van a v17** — cualquier cambio de schema (v18) obliga a actualizarlo (un backup con schema 17 sería rechazado en restauración).
+- BD reales: web = `tienda-app.db` en OPFS (no visible para scripts); desktop = `<userData>/tienda-app.db` + rodante `<documents>/Tienda - App/DataBase/tienda-app.db` + backups timestamped. No hay herramientas de inspección en el repo.
+
+**Opciones evaluadas (con tradeoffs):**
+- (a) Migración automática self-healing v18 — un solo código cubre web+desktop, patrón probado; CON: no hay decisión humana y riesgo alto de cerrar la jornada legítima.
+- (b) Script manual con better-sqlite3 — control total, cumple el literal del backlog; CON: **solo llega a la BD desktop**, OPFS web inaccessible, duplica lógica del service, desacoplado de la arquitectura.
+- **(c) RECOMENDADA — utilidad admin en la app** (sección "Jornadas sin cerrar" en Admin): reusa `cerrar()`/`_ejecutarCierre` con cierre real + backup, funciona en web (OPFS) Y desktop, el usuario decide sobre datos reales, `adminGuard` ya existe, testeable con specs existentes. + **guard en `abrir()`** (si ya existe `'abierta'` en la DB → abortar) — defensa en profundidad para que el agujero post-fix no cree nuevas.
+
+**Riesgos:**
+- Pérdida de datos: sin ON DELETE CASCADE y sin precedente de borrado; "descartar" borra historial fiscal. Criterio propuesto: **cerrar SIEMPRE** (no borrar) — "descartar" solo para vueltas vacías y aún así marcarlas 'cerrada'.
+- Jornada activa: nunca incluir la devuelta por `obtenerAbierta()` en la limpieza.
+- Excel retroactivo: cerrar jornada vieja la suma al export mensual de SU mes → cambia reportes pasados. Decidir cómo exponerlo (cierre con marca "cerrada por admin" + fecha hoy).
+- `MAX_SCHEMA_VERSION=16` vs v17 real (electron/db.ts) — subir si se toca schema.
+- OPFS: scripts manuales nunca ven la BD web.
+
+**Próximo paso cuando se retome:** SDD con fase 0 de inspección read-only de las BD reales (desktop userData + rodante) para dimensionar volumen y si hay ventas/movimientos involucrados, luego proposal con opción C + regla "cerrar siempre, descartar solo vacías" y guard en `abrir()`. Decisión de negocio pendiente: ¿vuísas CON datos pueden DESCARTARSE o solo CERRARSE? (recomendación: cerrar siempre).
+
+**Decisión (2026-08-08):** exploración completada y registrada; **solución DIFERIDA** a pedido del usuario ("le daremos solución más adelante"). Pendiente de retomar con SDD. Volumen real desconocido: la fase 0 de inspección queda como primer paso obligatorio.
 
 ---
 
