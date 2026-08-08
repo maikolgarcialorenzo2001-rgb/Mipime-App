@@ -286,6 +286,7 @@ export class JornadaService {
       productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
       totalCosto: number;
       userCierreNombre: string | null;
+      userAperturaNombre: string | null;
       cuentaCosas: CuentaCosa[];
       arqueo: ArqueoCajaEntry[];
       inversionPorProducto: Map<number, number>;
@@ -304,7 +305,8 @@ export class JornadaService {
       ventaLotes: datos.ventaLotes,
       productosMap: datos.productosMap,
       totalCosto: datos.totalCosto,
-      userCierreNombre: datos.userCierreNombre,
+        userCierreNombre: datos.userCierreNombre,
+        userAperturaNombre: datos.userAperturaNombre,
       cuentaCosas: datos.cuentaCosas,
       arqueo: datos.arqueo,
       inversionPorProducto: datos.inversionPorProducto,
@@ -465,6 +467,16 @@ export class JornadaService {
     );
     const userCierreNombre = users[0]?.nombre ?? null;
 
+    // 6b. FR-6: nombre del aperturista original (solo si la jornada lo registró).
+    let userAperturaNombre: string | null = null;
+    if (jornada.user_apertura_id !== null) {
+      const apertura = await this._db.sql<{ nombre: string }>(
+        'SELECT nombre FROM usuarios WHERE id = ?',
+        [jornada.user_apertura_id],
+      );
+      userAperturaNombre = apertura[0]?.nombre ?? null;
+    }
+
     // 7. Obtener cuenta_cosas de la jornada
     const cuentaCosas = await this._db.sql<import('../models/cuenta-cosa').CuentaCosa>(
       'SELECT * FROM cuenta_cosas WHERE jornada_id = ? ORDER BY id',
@@ -512,6 +524,7 @@ export class JornadaService {
       productosMap,
       totalCosto,
       userCierreNombre,
+      userAperturaNombre,
       cuentaCosas,
       arqueo: arqueo ?? [],
       inversionPorProducto,
@@ -549,6 +562,7 @@ export class JornadaService {
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
+              userAperturaNombre: datos.userAperturaNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
               inversionPorProducto: datos.inversionPorProducto,
@@ -580,6 +594,7 @@ export class JornadaService {
         productosMap: datos.productosMap,
         totalCosto: datos.totalCosto,
         userCierreNombre: datos.userCierreNombre,
+              userAperturaNombre: datos.userAperturaNombre,
         cuentaCosas: datos.cuentaCosas,
         arqueo: datos.arqueo,
         inversionPorProducto: datos.inversionPorProducto,
@@ -601,6 +616,7 @@ export class JornadaService {
     productosMap: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>;
     totalCosto: number;
     userCierreNombre: string | null;
+    userAperturaNombre: string | null;
     cuentaCosas: import('../models/cuenta-cosa').CuentaCosa[];
     arqueo: ArqueoCajaEntry[];
     inversionPorProducto: Map<number, number>;
@@ -689,6 +705,13 @@ export class JornadaService {
       userCierreNombre = users[0]?.nombre ?? null;
     }
 
+    // 5b. FR-6: nombre del aperturista original (LEFT JOIN 1 query; null si legacy).
+    const aperturaRows = await this._db.sql<{ nombre: string | null }>(
+      'SELECT u.nombre FROM jornadas j LEFT JOIN usuarios u ON u.id = j.user_apertura_id WHERE j.id = ?',
+      [jornadaId],
+    );
+    const userAperturaNombre = aperturaRows[0]?.nombre ?? null;
+
     // 6. Obtener cuenta_cosas de la jornada
     const cuentaCosas = await this._db.sql<import('../models/cuenta-cosa').CuentaCosa>(
       'SELECT * FROM cuenta_cosas WHERE jornada_id = ? ORDER BY id',
@@ -741,6 +764,7 @@ export class JornadaService {
       productosMap,
       totalCosto,
       userCierreNombre,
+      userAperturaNombre,
       cuentaCosas,
       arqueo,
       inversionPorProducto,
@@ -826,6 +850,7 @@ export class JornadaService {
               productosMap: datos.productosMap,
               totalCosto: datos.totalCosto,
               userCierreNombre: datos.userCierreNombre,
+              userAperturaNombre: datos.userAperturaNombre,
               cuentaCosas: datos.cuentaCosas,
               arqueo: datos.arqueo,
               inversionPorProducto: datos.inversionPorProducto,
