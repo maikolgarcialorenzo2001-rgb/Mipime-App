@@ -205,6 +205,28 @@ describe('StockMovimientoService', () => {
         [1],
       );
     });
+
+    it('4.0 RED: agotar el lote del frente avanza precio_costo al siguiente lote FIFO', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockShopLotes)               // 1: SELECT lotes_stock for shop
+        .mockResolvedValueOnce([])                          // 2: UPDATE lot 3 (consume 5 de 5 -> agota el frente)
+        .mockResolvedValueOnce([])                          // 3: UPDATE lot 4 (consume 1 de 3)
+        .mockResolvedValueOnce([{ precio_costo: 8 }])       // 4: SELECT next lot -> lote 4 es el nuevo frente
+        .mockResolvedValueOnce([]);                         // 5: UPDATE productos.precio_costo
+
+      const consumos = await service._consumirFIFO(1, 6, 'shop');
+
+      expect(consumos).toHaveLength(2);
+      expect(consumos[0]).toEqual({ lote_id: 3, cantidad: 5, precio_costo_real: 5 });
+      expect(consumos[1]).toEqual({ lote_id: 4, cantidad: 1, precio_costo_real: 8 });
+
+      // El frente (lote 3, costo 5) quedó agotado -> precio_costo avanza al lote 4 (costo 8)
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([8, expect.any(String), 1]),
+      );
+    });
   });
 
   describe('registrarEntrada', () => {
@@ -410,6 +432,98 @@ describe('StockMovimientoService', () => {
       const consumos = await service.registrarSalida(1, 7, 'Venta');
       expect(consumos).toHaveLength(2);
     });
+
+    it('1.1 RED: con loteId consume SOLO ese lote y deja intactos los demás', async () => {
+      // Lotes de almacén: lote 1 (10u, más viejo) y lote 2 (10u, más nuevo).
+      // Con loteId=2 el consumo debe aplicar únicamente al lote 2 (NO FIFO front).
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([mockLotes[1]])               // 1: pre-check SELECT lote 2
+        .mockResolvedValueOnce([mockLotes[1]])               // 2: SELECT filtrado por id
+        .mockResolvedValueOnce([])                           // 3: UPDATE lote 2 (consume 3)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])        // 4: SELECT next lot
+        .mockResolvedValueOnce([])                           // 5: UPDATE precio_costo
+        .mockResolvedValueOnce([])                           // 6: INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 17 }])              // 7: SELECT SUM almacen (10+10-3)
+        .mockResolvedValueOnce([]);                          // 8: UPDATE stock_almacen
+
+      const consumos = await service.registrarSalida(1, 3, 'Lote', undefined, 'almacen', 2);
+
+      // Consumo único sobre el lote 2
+      expect(consumos).toHaveLength(1);
+      expect(consumos[0]).toEqual({ lote_id: 2, cantidad: 3, precio_costo_real: 8 });
+
+      // Pre-check: primera query filtra por id del lote, producto y ubicacion
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        1,
+        expect.stringContaining('id = ?'),
+        [2, 1, 'almacen'],
+      );
+      // SELECT de consumo filtrado por id
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('AND id = ?'),
+        [1, 'almacen', 2],
+      );
+
+      // Solo un UPDATE a lotes_stock y apunta al lote 2 (el lote 1 queda intacto)
+      const lotUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE lotes_stock'),
+      );
+      expect(lotUpdates).toHaveLength(1);
+      expect(lotUpdates[0]![1]).toEqual([3, 2]);
+
+      // Movimiento registrado tipo 'salida'
+      const insert = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO stock_movimientos'),
+      );
+      expect(insert![1]).toContain('salida');
+    });
+
+    it('1.2 RED: cantidad > lote.cantidad rechaza "Stock insuficiente" sin consumir nada', async () => {
+      // Pre-check: lote 2 con 10u < 15 requeridas → debe fallar antes de mutar
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([mockLotes[1]]);
+
+      await expect(
+        service.registrarSalida(1, 15, 'Lote', undefined, 'almacen', 2),
+      ).rejects.toThrow('Stock insuficiente');
+
+      // Sin consumo parcial: solo se ejecutó la query del pre-check (sin UPDATEs)
+      expect(mockDb.sql).toHaveBeenCalledTimes(1);
+    });
+
+    it('1.1 TRIANGULATE: loteId inexistente rechaza "Stock insuficiente" sin mutar', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValueOnce([]); // pre-check: lote no existe
+
+      await expect(
+        service.registrarSalida(1, 3, 'Lote', undefined, 'almacen', 999),
+      ).rejects.toThrow('Stock insuficiente');
+
+      expect(mockDb.sql).toHaveBeenCalledTimes(1);
+    });
+
+    it('1.1 TRIANGULATE: consume todo el lote objetivo y deja los demás intactos', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([mockLotes[1]])               // 1: pre-check SELECT lote 2
+        .mockResolvedValueOnce([mockLotes[1]])               // 2: SELECT filtrado por id
+        .mockResolvedValueOnce([])                           // 3: UPDATE lote 2 (consume 10 → 0)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])        // 4: SELECT next lot (lote 1 sigue con stock)
+        .mockResolvedValueOnce([])                           // 5: UPDATE precio_costo
+        .mockResolvedValueOnce([])                           // 6: INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 10 }])              // 7: SELECT SUM almacen (10+10-10)
+        .mockResolvedValueOnce([]);                          // 8: UPDATE stock_almacen
+
+      const consumos = await service.registrarSalida(1, 10, 'Lote', undefined, 'almacen', 2);
+
+      expect(consumos).toHaveLength(1);
+      expect(consumos[0]).toEqual({ lote_id: 2, cantidad: 10, precio_costo_real: 8 });
+
+      // Único UPDATE al lote 2; el lote 1 no se tocó
+      const lotUpdates = vi.mocked(mockDb.sql).mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE lotes_stock'),
+      );
+      expect(lotUpdates).toHaveLength(1);
+      expect(lotUpdates[0]![1]).toEqual([10, 2]);
+    });
   });
 
   describe('registrarAjuste', () => {
@@ -482,17 +596,19 @@ describe('StockMovimientoService', () => {
   describe('registrarTraslado', () => {
     it('debería consumir de almacen FIFO, crear shop lots y recalcular ambos stocks', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce(mockLotes)        // 0: SELECT lotes_stock (almacen)
-        .mockResolvedValueOnce([])                // 1: UPDATE lot 1 (consume 10)
-        .mockResolvedValueOnce([])                // 2: UPDATE lot 2 (consume 1)
-        .mockResolvedValueOnce([{ precio_costo: 8 }]) // 3: SELECT next lot
-        .mockResolvedValueOnce([])                // 4: UPDATE precio_costo
-        .mockResolvedValueOnce([])                // 5: INSERT shop lot (10u from lot1)
-        .mockResolvedValueOnce([])                // 6: INSERT shop lot (1u from lot2)
-        .mockResolvedValueOnce([])                // 7: INSERT stock_movimiento 'traslado'
-        .mockResolvedValueOnce([{ totalAlmacen: 9 }])  // 8: SELECT SUM almacen
-        .mockResolvedValueOnce([{ totalShop: 11 }])    // 9: SELECT SUM shop
-        .mockResolvedValueOnce([]);               // 10: UPDATE productos dual
+        .mockResolvedValueOnce(mockLotes)               // 0: SELECT lotes_stock (almacen)
+        .mockResolvedValueOnce([])                      // 1: UPDATE lot 1 (consume 10)
+        .mockResolvedValueOnce([])                      // 2: UPDATE lot 2 (consume 1)
+        .mockResolvedValueOnce([{ precio_costo: 8 }])   // 3: SELECT next lot (sync tras _consumirFIFO)
+        .mockResolvedValueOnce([])                      // 4: UPDATE precio_costo (sync)
+        .mockResolvedValueOnce([])                      // 5: INSERT shop lot (10u from lot1)
+        .mockResolvedValueOnce([])                      // 6: INSERT shop lot (1u from lot2)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])   // 7: SELECT next lot (re-sync tras insert shop)
+        .mockResolvedValueOnce([])                      // 8: UPDATE precio_costo (re-sync)
+        .mockResolvedValueOnce([])                      // 9: INSERT stock_movimiento 'traslado'
+        .mockResolvedValueOnce([{ totalAlmacen: 9 }])   // 10: SELECT SUM almacen
+        .mockResolvedValueOnce([{ totalShop: 11 }])     // 11: SELECT SUM shop
+        .mockResolvedValueOnce([]);                     // 12: UPDATE productos dual
 
       const consumos = await service.registrarTraslado(1, 11);
 
@@ -519,12 +635,47 @@ describe('StockMovimientoService', () => {
       );
       expect(trasladoInsert).toBeTruthy();
 
-      // Should update both stock columns (call 11, 1-indexed)
+      // Should update both stock columns (call 13, 1-indexed)
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        11,
+        13,
         expect.stringContaining('SET stock_almacen = ?, stock_shop = ?'),
         expect.arrayContaining([9, 11, expect.any(String), 1]),
       );
+    });
+
+    it('4.1 RED: re-sincroniza precio_costo cuando el traslado agota todo el stock y los lotes shop nuevos son el frente', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([mockLotes[0]])          // 1: SELECT lotes_stock (almacen) — solo un lote de 10u
+        .mockResolvedValueOnce([])                      // 2: UPDATE lot 1 (consume 10 -> 0, se agota todo)
+        .mockResolvedValueOnce([])                      // 3: SELECT next lot (sync tras _consumirFIFO) -> vacío, sin UPDATE
+        .mockResolvedValueOnce([])                      // 4: INSERT shop lot (10u from lot1, costo 5)
+        .mockResolvedValueOnce([{ precio_costo: 5 }])   // 5: SELECT next lot (re-sync) -> el lote shop nuevo es el frente
+        .mockResolvedValueOnce([])                      // 6: UPDATE productos.precio_costo = 5
+        .mockResolvedValueOnce([])                      // 7: INSERT stock_movimiento 'traslado'
+        .mockResolvedValueOnce([{ totalAlmacen: 0 }])   // 8: SELECT SUM almacen
+        .mockResolvedValueOnce([{ totalShop: 10 }])     // 9: SELECT SUM shop
+        .mockResolvedValueOnce([]);                     // 10: UPDATE productos dual
+
+      const consumos = await service.registrarTraslado(1, 10);
+
+      expect(consumos).toHaveLength(1);
+      expect(consumos[0]).toEqual({ lote_id: 1, cantidad: 10, precio_costo_real: 5 });
+
+      // El lote shop insertado es el nuevo frente FIFO -> precio_costo = costo del primer lote consumido
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        6,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([5, expect.any(String), 1]),
+      );
+
+      // El re-sync ocurre DESPUÉS de insertar el lote shop (el bug era que quedaba stale)
+      const shopInsert = vi.mocked(mockDb.sql).mock.calls.findIndex(
+        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO lotes_stock'),
+      );
+      const syncUpdate = vi.mocked(mockDb.sql).mock.calls.findIndex(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos SET precio_costo'),
+      );
+      expect(syncUpdate).toBeGreaterThan(shopInsert);
     });
 
     it('debería lanzar "Stock insuficiente" si no hay stock en almacen', async () => {
@@ -552,10 +703,12 @@ describe('StockMovimientoService', () => {
   describe('registrarAjusteLote', () => {
     it('debería actualizar un lote específico y recalcular stock de la ubicacion', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])               // INSERT stock_movimientos
-        .mockResolvedValueOnce([])               // UPDATE lot
-        .mockResolvedValueOnce([{ total: 5 }])   // SELECT SUM for shop
-        .mockResolvedValueOnce([]);              // UPDATE stock_shop
+        .mockResolvedValueOnce([])                       // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                       // 2: UPDATE lot
+        .mockResolvedValueOnce([{ precio_costo: 8 }])    // 3: SELECT next lot (sync precio_costo)
+        .mockResolvedValueOnce([])                       // 4: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 5 }])           // 5: SELECT SUM for shop
+        .mockResolvedValueOnce([]);                      // 6: UPDATE stock_shop
 
       await service.registrarAjusteLote(1, 3, 2, 'Corrección de lote', 'shop');
 
@@ -568,13 +721,13 @@ describe('StockMovimientoService', () => {
 
       // Should recalc stock_shop
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        3,
+        5,
         expect.stringContaining('SUM(cantidad)'),
         expect.arrayContaining([1, 'shop']),
       );
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        4,
+        6,
         expect.stringContaining('stock_shop'),
         expect.arrayContaining([5, expect.any(String), 1]),
       );
@@ -582,15 +735,17 @@ describe('StockMovimientoService', () => {
 
     it('debería recalcular stock_almacen cuando ubicacion=almacen', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 15 }])  // SELECT SUM for almacen
-        .mockResolvedValueOnce([]);              // UPDATE stock_almacen
+        .mockResolvedValueOnce([])                       // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                       // 2: UPDATE lot
+        .mockResolvedValueOnce([{ precio_costo: 5 }])    // 3: SELECT next lot (sync precio_costo)
+        .mockResolvedValueOnce([])                       // 4: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 15 }])          // 5: SELECT SUM for almacen
+        .mockResolvedValueOnce([]);                      // 6: UPDATE stock_almacen
 
       await service.registrarAjusteLote(1, 1, 5, 'Ajuste almacen', 'almacen');
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        4,
+        6,
         expect.stringContaining('stock_almacen'),
         expect.arrayContaining([15, expect.any(String), 1]),
       );
@@ -604,10 +759,11 @@ describe('StockMovimientoService', () => {
 
     it('debería registrar movimiento tipo ajuste', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 10 }])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([])               // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])               // 2: UPDATE lot
+        .mockResolvedValueOnce([])               // 3: SELECT next lot -> sin lotes con stock, sin UPDATE
+        .mockResolvedValueOnce([{ total: 10 }])  // 4: SELECT SUM
+        .mockResolvedValueOnce([]);              // 5: UPDATE stock
 
       await service.registrarAjusteLote(1, 1, 5, 'Ajuste', 'shop');
 
@@ -617,16 +773,37 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([1, 5, 'ajuste']),
       );
     });
+
+    it('4.2 RED: agotar el lote del frente avanza precio_costo al siguiente lote', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                       // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                       // 2: UPDATE lot (frente -> cantidad 0)
+        .mockResolvedValueOnce([{ precio_costo: 8 }])    // 3: SELECT next lot -> siguiente lote FIFO (costo 8)
+        .mockResolvedValueOnce([])                       // 4: UPDATE productos.precio_costo = 8
+        .mockResolvedValueOnce([{ total: 10 }])          // 5: SELECT SUM
+        .mockResolvedValueOnce([]);                      // 6: UPDATE stock
+
+      await service.registrarAjusteLote(1, 3, 0, 'Agotar lote frente', 'shop');
+
+      // El frente quedó en 0 -> precio_costo avanza al siguiente lote FIFO
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([8, expect.any(String), 1]),
+      );
+    });
   });
 
   describe('registrarEditar', () => {
     it('debería actualizar producto precio_venta y lote precio_costo/cantidad', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])               // INSERT stock_movimientos
-        .mockResolvedValueOnce([])               // UPDATE productos precio_venta
-        .mockResolvedValueOnce([])               // UPDATE lotes_stock cantidad + precio_costo
-        .mockResolvedValueOnce([{ total: 8 }])   // SELECT SUM for shop
-        .mockResolvedValueOnce([]);              // UPDATE stock_shop
+        .mockResolvedValueOnce([])                       // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                       // 2: UPDATE productos precio_venta
+        .mockResolvedValueOnce([])                       // 3: UPDATE lotes_stock cantidad + precio_costo
+        .mockResolvedValueOnce([{ precio_costo: 10 }])   // 4: SELECT next lot (sync precio_costo)
+        .mockResolvedValueOnce([])                       // 5: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 8 }])           // 6: SELECT SUM for shop
+        .mockResolvedValueOnce([]);                      // 7: UPDATE stock_shop
 
       await service.registrarEditar(1, 3, 'Café Premium', 15, 10, 8, 'Actualización de precios', 'shop');
 
@@ -653,10 +830,40 @@ describe('StockMovimientoService', () => {
 
       // 4. Recalc stock_shop
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        5,
+        7,
         expect.stringContaining('stock_shop'),
         expect.arrayContaining([8, expect.any(String), 1]),
       );
+    });
+
+    it('5.0 RED: debería re-sincronizar productos.precio_costo al lote del frente FIFO tras editar', async () => {
+      // Lote 1 (frente FIFO) con costo 100; la edición actualiza su precio_costo a 150.
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                      // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                      // 2: UPDATE productos nombre + precio_venta
+        .mockResolvedValueOnce([])                      // 3: UPDATE lotes_stock cantidad + precio_costo (lote -> 150)
+        .mockResolvedValueOnce([{ precio_costo: 150 }]) // 4: SELECT next lot -> el lote editado sigue siendo el frente
+        .mockResolvedValueOnce([])                      // 5: UPDATE productos.precio_costo = 150
+        .mockResolvedValueOnce([{ total: 8 }])          // 6: SELECT SUM
+        .mockResolvedValueOnce([]);                     // 7: UPDATE stock
+
+      await service.registrarEditar(1, 1, 'Café', 15, 150, 8, 'Actualización de precios', 'shop');
+
+      // El frente FIFO tiene el costo editado -> productos.precio_costo se re-sincroniza
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('UPDATE productos SET precio_costo'),
+        expect.arrayContaining([150, expect.any(String), 1]),
+      );
+
+      // El bug de cache stale es imposible: el sync ocurre DESPUÉS del UPDATE del lote
+      const lotUpdate = vi.mocked(mockDb.sql).mock.calls.findIndex(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE lotes_stock'),
+      );
+      const syncUpdate = vi.mocked(mockDb.sql).mock.calls.findIndex(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos SET precio_costo'),
+      );
+      expect(syncUpdate).toBeGreaterThan(lotUpdate);
     });
 
     it('debería rechazar motivo vacío', async () => {
@@ -681,16 +888,18 @@ describe('StockMovimientoService', () => {
 
     it('debería recalcular stock_almacen cuando ubicacion=almacen', async () => {
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ total: 20 }])
-        .mockResolvedValueOnce([]);
+        .mockResolvedValueOnce([])                      // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                      // 2: UPDATE productos precio_venta
+        .mockResolvedValueOnce([])                      // 3: UPDATE lotes_stock
+        .mockResolvedValueOnce([{ precio_costo: 6 }])   // 4: SELECT next lot (sync precio_costo)
+        .mockResolvedValueOnce([])                      // 5: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 20 }])         // 6: SELECT SUM for almacen
+        .mockResolvedValueOnce([]);                     // 7: UPDATE stock_almacen
 
       await service.registrarEditar(1, 1, 'Café', 12, 6, 20, 'Edit almacen', 'almacen');
 
       expect(mockDb.sql).toHaveBeenNthCalledWith(
-        5,
+        7,
         expect.stringContaining('stock_almacen'),
         expect.arrayContaining([20, expect.any(String), 1]),
       );

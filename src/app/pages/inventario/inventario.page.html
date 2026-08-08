@@ -85,7 +85,7 @@
                     >
                       <span class="inline-flex items-center gap-1">
                         <span class="material-symbols-outlined leading-none text-sm">remove_circle</span>
-                        Salida
+                        Traslado
                       </span>
                     </button>
                     <button
@@ -248,6 +248,37 @@
                           class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                       </div>
+                      @if (selectedAction()?.tipo === 'salida') {
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Ubicación de origen</label>
+                          <select
+                            class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                            [value]="salidaUbicacion() ?? ''"
+                            (change)="onSalidaUbicacionChange($any($event.target).value)"
+                          >
+                            <option value="" disabled>Seleccioná la ubicación…</option>
+                            <option value="shop">Tienda</option>
+                            <option value="almacen">Almacén</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Lote</label>
+                          <select
+                            class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            [value]="selectedLoteIndex() ?? ''"
+                            [disabled]="!salidaUbicacion()"
+                            (change)="selectedLoteIndex.set(toInt($any($event.target).value))"
+                          >
+                            <option value="" disabled>Seleccioná un lote…</option>
+                            @for (lote of lotesDeUbicacion(); track lote.id; let i = $index) {
+                              <option [value]="i + 1">
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
+                              </option>
+                            }
+                          </select>
+                        </div>
+                      }
                       @if (selectedAction()?.tipo === 'entrada') {
                         <div>
                           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Costo unitario ($)</label>
@@ -308,7 +339,7 @@
                       <button
                         type="submit"
                         class="bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 text-sm hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        [disabled]="procesandoMovimiento()"
+                        [disabled]="procesandoMovimiento() || (selectedAction()?.tipo === 'salida' && (salidaUbicacion() === null || selectedLoteIndex() === null))"
                       >
                         <span class="inline-flex items-center gap-1">
                           <span class="material-symbols-outlined leading-none text-sm">check</span>
@@ -319,7 +350,7 @@
                         type="button"
                         class="bg-gray-400 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded px-4 py-2 text-sm hover:bg-gray-500 dark:hover:bg-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         [disabled]="procesandoMovimiento()"
-                        (click)="selectedAction.set(null); movimientoCantidad.set(null); movimientoMotivo.set(''); selectedLoteIndex.set(null); productoLotes.set([])"
+                        (click)="selectedAction.set(null); movimientoCantidad.set(null); movimientoMotivo.set(''); selectedLoteIndex.set(null); salidaUbicacion.set(null); productoLotes.set([])"
                       >
                         <span class="inline-flex items-center gap-1">
                           <span class="material-symbols-outlined leading-none text-sm">close</span>

@@ -56,6 +56,18 @@ export class InventarioPage implements OnInit {
   readonly editarPrecioVenta = signal<number | null>(null);
   readonly editarPrecioCosto = signal<number | null>(null);
 
+  /** Ubicación de origen elegida para el Traslado (obligatoria, sin default). */
+  readonly salidaUbicacion = signal<'almacen' | 'shop' | null>(null);
+
+  /** Lotes de la ubicación elegida con stock > 0 (los únicos seleccionables en el Traslado). */
+  readonly lotesDeUbicacion = computed(() => {
+    const ubicacion = this.salidaUbicacion();
+    if (ubicacion === null) return [];
+    return this.productoLotes().filter(
+      (l) => l.ubicacion === ubicacion && l.cantidad > 0,
+    );
+  });
+
   /** Devuelve el lote actualmente seleccionado en el formulario editar. */
   get loteActual(): LoteStock | null {
     const idx = this.selectedLoteIndex();
@@ -69,6 +81,14 @@ export class InventarioPage implements OnInit {
     if (value === null || value === '') return null;
     const n = typeof value === 'number' ? value : Number(value);
     return Number.isNaN(n) ? null : n;
+  }
+
+  /** Cambia la ubicación de origen del Traslado y resetea el lote elegido. */
+  onSalidaUbicacionChange(value: string): void {
+    this.salidaUbicacion.set(
+      value === 'shop' || value === 'almacen' ? value : null,
+    );
+    this.selectedLoteIndex.set(null);
   }
 
   readonly filteredProductos = computed(() => {
@@ -121,15 +141,24 @@ export class InventarioPage implements OnInit {
           );
           break;
         }
-        case 'salida':
+        case 'salida': {
+          const ubicacion = this.salidaUbicacion();
+          const loteIndex = this.selectedLoteIndex();
+          if (ubicacion === null || loteIndex === null) {
+            this.error.set('Elegí la ubicación y el lote para el traslado');
+            return;
+          }
+          const lote = this.lotesDeUbicacion()[loteIndex - 1];
           await this.stockService.registrarSalida(
             action.productoId,
             this.movimientoCantidad() ?? 0,
             this.movimientoMotivo() || undefined,
             undefined,
-            'almacen',
+            ubicacion,
+            lote.id,
           );
           break;
+        }
         case 'ajuste': {
           const loteIndex = this.selectedLoteIndex();
           const lotes = this.productoLotes();
@@ -188,6 +217,7 @@ export class InventarioPage implements OnInit {
       this.movimientoCantidad.set(null);
       this.movimientoMotivo.set('');
       this.selectedLoteIndex.set(null);
+      this.salidaUbicacion.set(null);
       this.productoLotes.set([]);
       this.editarNombre.set('');
       this.editarPrecioVenta.set(null);
@@ -258,6 +288,7 @@ export class InventarioPage implements OnInit {
   ): Promise<void> {
     this.selectedAction.set({ productoId, tipo });
     this.selectedLoteIndex.set(null);
+    this.salidaUbicacion.set(null);
     this.movimientoCantidad.set(null);
     this.movimientoCosto.set(null);
     this.movimientoMotivo.set('');
@@ -265,7 +296,7 @@ export class InventarioPage implements OnInit {
     this.editarPrecioVenta.set(null);
     this.editarPrecioCosto.set(null);
 
-    if (tipo === 'ajuste' || tipo === 'editar') {
+    if (tipo === 'ajuste' || tipo === 'editar' || tipo === 'salida') {
       try {
         const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
         this.productoLotes.set(lotes);
@@ -277,9 +308,10 @@ export class InventarioPage implements OnInit {
           this.editarPrecioVenta.set(prod?.precio_venta ?? 0);
           this.editarPrecioCosto.set(firstLote.precio_costo);
           this.movimientoCantidad.set(firstLote.cantidad);
-        } else if (lotes.length > 0) {
+        } else if (lotes.length > 0 && tipo === 'ajuste') {
           this.selectedLoteIndex.set(1);
         }
+        // salida: sin auto-selección — el usuario elige ubicación y lote (obligatorios)
       } catch {
         this.productoLotes.set([]);
       }
