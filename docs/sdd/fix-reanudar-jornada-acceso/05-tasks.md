@@ -58,14 +58,14 @@ Chain strategy: pending
 
 ## Fase 4: Excel "Abierta por / Cerrada por" — FR-6, AC6
 
-- [ ] **4.1 (RED)** `jornada.service.spec.ts` — NUEVO: `_ejecutarCierre` y `_recolectarDatosJornada` resuelven `userAperturaNombre` ('Ana' cuando `user_apertura_id`→Ana; `null` si id inexistente o NULL), propagado a `JornadaReportData` en `_generarYGuardarExcel`/`-exportaciones`; actualizar mocks existentes de `cerrar`/`_ejecutarCierre` agregando 1 mock `SELECT nombre` (design Riesgo-2).
-  - Verif RED filas fallan.
-- [ ] **4.2 (GREEN)** `jornada.service.ts` — en `_ejecutarCierre` (junto L543-548): `SELECT nombre FROM usuarios WHERE id = ?` con `jornada.user_apertura_id`; en `_recolectarDatosJornada` (junto L764-771): `SELECT u.nombre FROM jornadas j LEFT JOIN usuarios u ON u.id = j.user_apertura_id WHERE j.id = ?`; agregar `userAperturaNombre` a los retornos/tipos y a los datos de `_generarYGuardarExcel`/`generarExportacionMensual`/`PorRango`/`obtenerDatosJornada` (L370/389/596/633/664/825/908).
+- [x] **4.1 (RED)** `jornada.service.spec.ts` — NUEVO: `_ejecutarCierre` y `_recolectarDatosJornada` resuelven `userAperturaNombre` ('Ana' cuando `user_apertura_id`→Ana; `null` si id inexistente o NULL), propagado a `JornadaReportData` en `_generarYGuardarExcel`/`-exportaciones`; actualizar mocks existentes de `cerrar`/`_ejecutarCierre` agregando 1 mock `SELECT nombre` (design Riesgo-2).
+  - Verif RED filas fallan. IMPLEMENTADO PR 4 (6 tests nuevos; el test existente de arqueo sumó 1 mock `SELECT nombre` del LEFT JOIN).
+- [x] **4.2 (GREEN)** `jornada.service.ts` — en `_ejecutarCierre` (junto L543-548): `SELECT nombre FROM usuarios WHERE id = ?` con `jornada.user_apertura_id`; en `_recolectarDatosJornada` (junto L764-771): `SELECT u.nombre FROM jornadas j LEFT JOIN usuarios u ON u.id = j.user_apertura_id WHERE j.id = ?`; agregar `userAperturaNombre` a los retornos/tipos y a los datos de `_generarYGuardarExcel`/`generarExportacionMensual`/`PorRango`/`obtenerDatosJornada` (L370/389/596/633/664/825/908).
   - Verif: 4.1 verde.
-- [ ] **4.3 (RED)** `excel.service.spec.ts` — firma: `userAperturaNombre:'Ana'` ≠ `userCierreNombre:'Beto'` → `['Abierta por','Ana']`+`['Cerrada por','Beto']`; iguales → única `['Firmado por','Beto']`; apertura NULL → `Firmado por` (back-compat). En `_agregarResumen` y `_agregarJornadaSheet`.
-  - Verif RED fails.
-- [ ] **4.4 (GREEN)** `excel.service.ts` — `JornadaReportData.userAperturaNombre?: string \| null` (JornadaReportData L41); bloques L174-176 y L591-594 pasan a condicional D5 (`if (userApertura && userCierre && distinto) → 2 filas; else if (userCierre) → Firmado por`).
-  - Verif: 4.3 verde.
+- [x] **4.3 (RED)** `excel.service.spec.ts` — firma: `userAperturaNombre:'Ana'` ≠ `userCierreNombre:'Beto'` → `['Abierta por','Ana']`+`['Cerrada por','Beto']`; iguales → única `['Firmado por','Beto']`; apertura NULL → `Firmado por` (back-compat). En `_agregarResumen` y `_agregarJornadaSheet`.
+  - Verif RED fails. (2 failed A≠B; A=B y NULL ya pasaban = back-compat)
+- [x] **4.4 (GREEN)** `excel.service.ts` — `JornadaReportData.userAperturaNombre?: string \| null` (JornadaReportData L41); bloques L174-176 y L591-594 pasan a condicional D5 (`if (userApertura && userCierre && distinto) → 2 filas; else if (userCierre) → Firmado por`).
+  - Verif: 4.3 verde. Suite completa 45 files / 768 tests verdes; `tsc --noEmit` limpio.
 - commit propuesto PR 4: `feat(excel): registrar quien abre y cierra la jornada (Abierta por/Cerrada por)`
 
 ## Verificación final / Dependencias / Notas
