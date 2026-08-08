@@ -85,4 +85,4 @@ Rollback: revert de `3f048fb` + `9f5926e` — sin migración ni datos (los movim
 - **Desviación sancionada (REQ-6)**: `stock_movimientos` no tiene columna `lote_id` (migración fuera de scope); la granularidad de lote queda en el ConsumoRecord devuelto, patrón venta→venta_lotes. Follow-up opcional: migración v18 si el negocio exige trazabilidad del lote en el historial de movimientos.
 - Verificación: 2 rondas de verify; round 1 sobre el estado pre-rework (767 tests) y round 2 **APPROVED** sobre el estado final (770/770 tests, 45 files). Build prod OK (warning preexistente 702.90 kB > 500 kB).
 - NO mergeado a main: el merge queda a criterio del flujo de branch de `feat/inventario-salida-traslado`.
-- constancia de entrega al commit final <<FINAL_COMMIT>>
+- constancia de entrega al commit final 317c75a
