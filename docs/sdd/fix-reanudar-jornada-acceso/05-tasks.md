@@ -41,12 +41,12 @@ Chain strategy: pending
 
 ## Fase 2: Login — modal para cualquier usuario + cierre autenticado — FR-2/3/4
 
-- [ ] **2.1 (RED)** `login.page.spec.ts` — REESCRIBIR bloque actual (L216-341): (a) otras-session con mock `usuario` A → `showReopenModal()===true`; NUNCA llama `autoCerrarSiOtroUsuario`; sin toast "cerrada automáticamente"; sin `navigate`; (b) `cerrarYGuardar` llama `cerrar(j.id, mockUsuario.id)` (mock admin id=1), nunca `user_apertura_id`; legacy apertura NULL → uid autenticado; `auth.usuario()` null → NO llama `cerrar` (sin crash); (c) modal-fecha: jornada `fecha:'2026-08-07'` → título "Reanudar jornada del 07-08", copy "Hay una jornada sin cerrar", NUNCA "de hoy".
-  - Verif RED: tests fallan (firma `jornadaPendiente`/`formatearFecha` no existen; `onSubmit` aún auto-cierra).
-- [ ] **2.2 (GREEN)** `login.page.ts` — D6: `_jornadaPendiente` → `readonly jornadaPendiente = signal<Jornada \| null>(null)`; `onSubmit()`: `abierta` → `setJornadaPendiente(abierta)` + `showReopenModal.set(true)`, sin `autoCerrarSi`; `cerrarYGuardar()`: `const uid = this.auth.usuario()?.id; if (uid===undefined) return;` y `cerrar(j.id, uid)`; helper `formatearFecha(fecha): string` → `DD-MM` desde ISO.
-  - Verif: tests 2.1 verdes.
-- [ ] **2.3 (GREEN)** `login.page.html` — modal L62+: `@if (jornadaPendiente(); as j)` con título `Reanudar jornada del {{ formatearFecha(j.fecha) }}`; copy `Hay una jornada sin cerrar. ¿Qué deseas hacer?`; reemplazar texto "de hoy".
-  - Verif: modal-fecha test verd; `ng serve` compila template.
+- [x] **2.1 (RED)** `login.page.spec.ts` — REESCRIBIR bloque actual (L216-341): (a) otras-session con mock `usuario` A → `showReopenModal()===true`; NUNCA llama `autoCerrarSiOtroUsuario`; sin toast "cerrada automáticamente"; sin `navigate`; (b) `cerrarYGuardar` llama `cerrar(j.id, mockUsuario.id)` (mock admin id=1), nunca `user_apertura_id`; legacy apertura NULL → uid autenticado; `auth.usuario()` null → NO llama `cerrar` (sin crash); (c) modal-fecha: jornada `fecha:'2026-08-07'` → título "Reanudar jornada del 07-08", copy "Hay una jornada sin cerrar", NUNCA "de hoy".
+  - Verif RED: 7 fallos / 14 pasan — `autoCerrarSiOtroUsuario` llamado, `cerrar` con `user_apertura_id`, modal con copy "de hoy".
+- [x] **2.2 (GREEN)** `login.page.ts` — D6: `_jornadaPendiente` → `readonly jornadaPendiente = signal<Jornada \| null>(null)`; `onSubmit()`: `abierta` → `jornadaPendiente.set(abierta)` + `showReopenModal.set(true)`, sin `autoCerrarSi`; `cerrarYGuardar()`: `const uid = this.auth.usuario()?.id; if (uid===undefined) return;` y `cerrar(j.id, uid)`; helper `formatearFecha(fecha): string` → `DD-MM` desde ISO.
+  - Verif: 21/21 verdes en login.page.spec.ts; `tsc --noEmit` limpio.
+- [x] **2.3 (GREEN)** `login.page.html` — modal L62+: `@if (jornadaPendiente(); as j)` con título `Reanudar jornada del {{ formatearFecha(j.fecha) }}`; copy `Hay una jornada sin cerrar. ¿Qué deseas hacer?`; reemplazar texto "de hoy".
+  - Verif: modal-fecha tests verdes (fechas 07-08 y 08-08); suite completa 45 files / 767 tests.
 - commit propuesto PR 2: `fix(login): modal de reanudar para cualquier usuario con user_cierre autenticado`
 
 ## Fase 3: Purga auto-cierre — FR-2, spec "Auto-Close REMOVED"
