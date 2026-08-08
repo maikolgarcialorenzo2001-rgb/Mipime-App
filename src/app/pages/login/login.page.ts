@@ -24,37 +24,26 @@ export class LoginPage {
   readonly username = signal('');
   readonly password = signal('');
   readonly loginError = signal<string | null>(null);
-  readonly successMessage = signal<string | null>(null);
   readonly cargando = signal(false);
 
-  /** Modal de reapertura — solo se muestra si hay journa del mismo usuario */
+  /** Modal de reapertura — se muestra para CUALQUIER usuario autenticado si hay jornada abierta */
   readonly showReopenModal = signal(false);
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
-  private _jornadaPendiente: Jornada | null = null;
+  readonly jornadaPendiente = signal<Jornada | null>(null);
 
   async onSubmit(): Promise<void> {
     this.loginError.set(null);
-    this.successMessage.set(null);
     this.cargando.set(true);
 
     try {
-      const user = await firstValueFrom(this.auth.login(this.username(), this.password()));
+      await firstValueFrom(this.auth.login(this.username(), this.password()));
 
-      // Si hay una jornada abierta, verificar ownership
+      // Si hay una jornada abierta (de hoy o de días previos), ofrecer reanudar
       const abierta = await firstValueFrom(this.jornadaService.obtenerAbierta());
       if (abierta) {
-        const result = await this.jornadaService.autoCerrarSiOtroUsuario(user);
-        if (result === null) {
-          // Jornada de otro usuario fue auto-cerrada → descargar Excel + toast
-          this._descargarExcel(abierta.id, abierta);
-          this.successMessage.set('Jornada anterior cerrada automáticamente ✓');
-          setTimeout(() => this.router.navigate(['/pos']), 1500);
-        } else {
-          // Jornada del MISMO usuario → modal de reapertura
-          this._jornadaPendiente = result;
-          this.showReopenModal.set(true);
-        }
+        this.jornadaPendiente.set(abierta);
+        this.showReopenModal.set(true);
       } else {
         this.router.navigate(['/pos']);
       }
@@ -68,16 +57,17 @@ export class LoginPage {
   /** Reabrir — jornada queda abierta, navegar a /pos */
   reabrirJornada(): void {
     this.showReopenModal.set(false);
-    this._jornadaPendiente = null;
+    this.jornadaPendiente.set(null);
     this.router.navigate(['/pos']);
   }
 
-  /** Cerrar y guardar — cerrar la jornada, descargar Excel, navegar a /pos */
+  /** Cerrar y guardar — cerrar la jornada con el usuario autenticado, descargar Excel, navegar a /pos */
   cerrarYGuardar(): void {
-    const j = this._jornadaPendiente;
+    const j = this.jornadaPendiente();
     if (!j) return;
 
-    const uid = j.user_apertura_id ?? 0;
+    const uid = this.auth.usuario()?.id;
+    if (uid === undefined) return; // patrón app-nav.ts:136-138 — aborta sin crash
 
     this.cerrando.set(true);
     this.cerrarError.set(null);
@@ -85,7 +75,7 @@ export class LoginPage {
     this.jornadaService.cerrar(j.id, uid).subscribe({
       next: () => {
         this.showReopenModal.set(false);
-        this._jornadaPendiente = null;
+        this.jornadaPendiente.set(null);
         this.cerrando.set(false);
         this._descargarExcel(j.id, j);
         this.router.navigate(['/pos']);
@@ -97,6 +87,12 @@ export class LoginPage {
         );
       },
     });
+  }
+
+  /** Formatea una fecha ISO (YYYY-MM-DD) como DD-MM para el modal. */
+  formatearFecha(fecha: string): string {
+    const [, mes, dia] = fecha.split('-');
+    return `${dia}-${mes}`;
   }
 
   onCloseReopenBackdrop(event: MouseEvent): void {

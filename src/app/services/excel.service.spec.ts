@@ -1755,4 +1755,107 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['Pendientes del día', 0]);
     });
   });
+
+  // ─── fix-reanudar-jornada-acceso: FR-6 — "Abierta por A / Cerrada por B" ───
+
+  describe('FR-6 — Abierta por / Cerrada por (firma condicional)', () => {
+    it('RED: A≠B — Resumen muestra "Abierta por Ana" + "Cerrada por Beto" (no "Firmado por")', () => {
+      const dataAB: JornadaReportData = {
+        ...data,
+        userAperturaNombre: 'Ana',
+        userCierreNombre: 'Beto',
+      };
+
+      const result = service.generarExcelJornada(dataAB);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Abierta por', 'Ana']);
+      expect(json).toContainEqual(['Cerrada por', 'Beto']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Firmado por')).toBe(false);
+    });
+
+    it('RED: A===B — Resumen muestra única fila "Firmado por" (igual que hoy)', () => {
+      const dataAB: JornadaReportData = {
+        ...data,
+        userAperturaNombre: 'Beto',
+        userCierreNombre: 'Beto',
+      };
+
+      const result = service.generarExcelJornada(dataAB);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Firmado por', 'Beto']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
+      expect(json.some((f) => (f as unknown[])[0] === 'Cerrada por')).toBe(false);
+    });
+
+    it('RED: apertura NULL legacy — Resumen mantiene "Firmado por" (back-compat)', () => {
+      const dataLegacy: JornadaReportData = {
+        ...data,
+        userAperturaNombre: null,
+        userCierreNombre: 'Admin',
+      };
+
+      const result = service.generarExcelJornada(dataLegacy);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Firmado por', 'Admin']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
+    });
+
+    it('RED: A≠B — hoja de jornada del Excel mensual muestra "Abierta por"/"Cerrada por"', () => {
+      const dataAB: JornadaReportData = {
+        ...data,
+        userAperturaNombre: 'Ana',
+        userCierreNombre: 'Beto',
+      };
+
+      const result = service.generarExcelMensual([dataAB]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Abierta por', 'Ana']);
+      expect(json).toContainEqual(['Cerrada por', 'Beto']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Firmado por')).toBe(false);
+    });
+
+    it('RED: A===B — hoja de jornada mantiene "Firmado por" única', () => {
+      const dataAB: JornadaReportData = {
+        ...data,
+        userAperturaNombre: 'Beto',
+        userCierreNombre: 'Beto',
+      };
+
+      const result = service.generarExcelMensual([dataAB]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Firmado por', 'Beto']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
+    });
+
+    it('RED: apertura NULL — hoja de jornada mantiene "Firmado por" (back-compat)', () => {
+      const dataLegacy: JornadaReportData = {
+        ...data,
+        userAperturaNombre: null,
+        userCierreNombre: 'Admin',
+      };
+
+      const result = service.generarExcelMensual([dataLegacy]);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['2026-06-04 (1)'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Firmado por', 'Admin']);
+      expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
+    });
+  });
 });
