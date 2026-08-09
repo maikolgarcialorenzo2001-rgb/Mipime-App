@@ -1,8 +1,12 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- el renderer (tsconfig.app.json) no incluye electron/, y los tipos IPC Palmar son globales de electron/types.d.ts (fuente única, patrón de electron-file.service.ts).
 /// <reference path="../../../electron/types.d.ts" />
 import { Injectable, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { ElectronFileService } from './electron-file.service';
 import { ExcelService } from './excel.service';
+import { ProductoService } from './producto.service';
+import type { PalmarJornadaPayload } from '../components/palmar-jornada-modal/palmar-jornada-modal.component';
+import type { Producto } from '../models';
 import type {
   PalmarHistoryEntry,
   PalmarRecord,
@@ -42,6 +46,65 @@ function semanaDe(fecha: string): { inicio: string; fin: string } {
 }
 
 /**
+ * Construye el PalmarRecord de una jornada a partir del payload del modal
+ * (PR8). Función pura: mismos inputs → mismo record (salvo `ahora`).
+ * Solo incluye productos con cantidad > 0 (regla de negocio P-FR4); el
+ * precio_costo null del catálogo se trata como 0 (mismo criterio que el
+ * modal en `invertido`). No toca la base de datos: el payload ya viene
+ * armado por el modal.
+ */
+export function construirRecordPalmar(
+  payload: PalmarJornadaPayload,
+  ahora: string = new Date().toISOString(),
+): PalmarRecord {
+  const productos = payload.productos
+    .filter((p) => p.cantidad > 0)
+    .map((p) => ({
+      nombre: p.nombre,
+      cantidad: p.cantidad,
+      precio_venta: p.precio_venta,
+      precio_costo: p.precio_costo ?? 0,
+      subtotal: p.cantidad * p.precio_venta,
+      costo_subtotal: p.cantidad * (p.precio_costo ?? 0),
+    }));
+
+  const divisa = {
+    usd: payload.divisa.usd,
+    eur: payload.divisa.eur,
+    tasa_usd: payload.divisa.tasa_usd,
+    tasa_eur: payload.divisa.tasa_eur,
+    usd_cup: payload.divisa.usd * payload.divisa.tasa_usd,
+    eur_cup: payload.divisa.eur * payload.divisa.tasa_eur,
+    divisa_cup:
+      payload.divisa.usd * payload.divisa.tasa_usd +
+      payload.divisa.eur * payload.divisa.tasa_eur,
+  };
+
+  const totalVentas = productos.reduce((sum, p) => sum + p.subtotal, 0);
+  const totalArqueo = payload.arqueo.reduce((sum, a) => sum + a.subtotal, 0);
+  const totalRecibido = totalArqueo + divisa.divisa_cup + payload.transferencia;
+  const invertido = productos.reduce((sum, p) => sum + p.costo_subtotal, 0);
+
+  return {
+    version: 1,
+    id: `palmar-${payload.fecha}`,
+    fecha: payload.fecha,
+    created_at: ahora,
+    usuario: null,
+    productos,
+    arqueo: payload.arqueo,
+    divisa,
+    transferencia: payload.transferencia,
+    total_ventas: totalVentas,
+    total_arqueo: totalArqueo,
+    total_recibido: totalRecibido,
+    invertido,
+    ganancia: totalRecibido - invertido,
+    diferencia: totalVentas - totalRecibido,
+  };
+}
+
+/**
  * Servicio de la tienda externa "Palmar" (PR6, Pana B).
  * Vive SOLO del filesystem via IPC (ElectronFileService, PR4) + ExcelService
  * (PR2): CERO escrituras a la base de datos y, salvo que un día se necesite
@@ -51,6 +114,7 @@ function semanaDe(fecha: string): { inicio: string; fin: string } {
 export class PalmarService {
   private readonly _electronFile = inject(ElectronFileService);
   private readonly _excelService = inject(ExcelService);
+  private readonly _productoService = inject(ProductoService);
 
   /**
    * Historial de jornadas Palmar. `listPalmar` ya viene ordenado por
@@ -58,6 +122,49 @@ export class PalmarService {
    */
   cargarHistorial(): Promise<PalmarHistoryEntry[]> {
     return this._electronFile.listPalmar();
+  }
+
+  /**
+   * P-FR4 (PR8): la ÚNICA lectura SQL del flujo Palmar — catálogo fresco al
+   * abrir el modal. Delega en ProductoService.listar() (SELECT, nunca writes).
+   */
+  async listarProductos(): Promise<Producto[]> {
+    return firstValueFrom(this._productoService.listar());
+  }
+
+  /**
+   * Registra una jornada Palmar (PR8): construye el PalmarRecord desde el
+   * payload del modal, recalcula el resumen semanal de la semana de su fecha
+   * INCLUYENDO la jornada nueva (todavía no está en el historial), genera el
+   * Excel y lo guarda vía IPC con el json completo. CERO escrituras a la DB.
+   */
+  async registrarJornada(payload: PalmarJornadaPayload): Promise<PalmarSaveResult> {
+    const record = construirRecordPalmar(payload);
+    const resumen = await this._conResumenIncluyendo(record);
+    const base64 = this._excelService.generarExcelPalmar(record, resumen);
+    return this._electronFile.savePalmar(
+      baseNameDesdeFecha(record.fecha),
+      base64,
+      record,
+    );
+  }
+
+  /**
+   * Resumen semanal de la semana de `record.fecha` sumando los totales de la
+   * jornada nueva: el plan quiere que la hoja Resumen refleje la semana
+   * COMPLETA, y la jornada recién creada es parte de esa semana.
+   */
+  private async _conResumenIncluyendo(record: PalmarRecord): Promise<PalmarSemanaResumen> {
+    const resumen = await this.cargarResumenSemanal(record.fecha);
+    return {
+      ...resumen,
+      totalRecibido: resumen.totalRecibido + record.total_recibido,
+      efectivo: resumen.efectivo + record.total_arqueo,
+      divisaCup: resumen.divisaCup + record.divisa.divisa_cup,
+      transferencia: resumen.transferencia + record.transferencia,
+      invertido: resumen.invertido + record.invertido,
+      ganancia: resumen.ganancia + record.ganancia,
+    };
   }
 
   /** Lee el detalle completo de una jornada; rechaza si el IPC no la devuelve. */

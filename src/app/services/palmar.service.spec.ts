@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { PalmarService } from './palmar.service';
+import { of } from 'rxjs';
+import { PalmarService, construirRecordPalmar } from './palmar.service';
 import { ElectronFileService } from './electron-file.service';
 import { ExcelService } from './excel.service';
+import { ProductoService } from './producto.service';
 import { DATABASE, type Database } from './database';
+import type { PalmarJornadaPayload } from '../components/palmar-jornada-modal/palmar-jornada-modal.component';
+import type { Producto } from '../models';
 import type {
   PalmarHistoryEntry,
   PalmarRecord,
@@ -134,6 +138,31 @@ const recordsByFile: Record<string, PalmarRecord> = {
   '28-07-2026-2.json': RECORD_D,
 };
 
+// ── Fixtures PR8 (contrato modal → service) ─────────────────────────────────
+
+const FECHA_JORNADA = '2026-07-28';
+const AHORA_FIJO = '2026-07-28T20:00:00.000Z';
+
+const CATALOGO: Producto[] = [
+  { id: 1, nombre: 'Pan casero', descripcion: null, precio_venta: 1500, precio_costo: 900, stock_almacen: 0, stock_shop: 0, created_at: '', updated_at: '' },
+];
+
+/** Payload que emite el modal (frozen contract PR6): incluye cantidad 0 y precio_costo null. */
+const PAYLOAD: PalmarJornadaPayload = {
+  fecha: FECHA_JORNADA,
+  productos: [
+    { id: 1, nombre: 'Agua 500ml', cantidad: 2, precio_venta: 50, precio_costo: 30 },
+    { id: 2, nombre: 'Café molido', cantidad: 0, precio_venta: 25, precio_costo: 10 },
+    { id: 3, nombre: 'Galleta', cantidad: 3, precio_venta: 20, precio_costo: null },
+  ],
+  arqueo: [
+    { denominacion: 100, cantidad: 1, subtotal: 100 },
+    { denominacion: 50, cantidad: 2, subtotal: 100 },
+  ],
+  divisa: { usd: 10, eur: 2, tasa_usd: 300, tasa_eur: 350 },
+  transferencia: 500,
+};
+
 // ── Suite ───────────────────────────────────────────────────────────────────
 
 describe('PalmarService', () => {
@@ -144,6 +173,7 @@ describe('PalmarService', () => {
     savePalmar: ReturnType<typeof vi.fn>;
   };
   let mockExcel: { generarExcelPalmar: ReturnType<typeof vi.fn> };
+  let mockProducto: { listar: ReturnType<typeof vi.fn> };
   let mockDb: Database;
 
   beforeEach(() => {
@@ -162,12 +192,17 @@ describe('PalmarService', () => {
       generarExcelPalmar: vi.fn().mockReturnValue('mock-excel-base64'),
     };
 
+    mockProducto = {
+      listar: vi.fn().mockReturnValue(of([])),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         PalmarService,
         { provide: DATABASE, useValue: mockDb },
         { provide: ElectronFileService, useValue: mockElectronFile },
         { provide: ExcelService, useValue: mockExcel },
+        { provide: ProductoService, useValue: mockProducto },
       ],
     });
     service = TestBed.inject(PalmarService);
@@ -356,10 +391,158 @@ describe('PalmarService', () => {
     });
   });
 
+  // ── listarProductos (PR8) ──────────────────────────────────────────────────
+
+  describe('listarProductos', () => {
+    it('delega en ProductoService.listar() (única lectura SQL fresca) y devuelve el catálogo', async () => {
+      mockProducto.listar.mockReturnValue(of(CATALOGO));
+
+      const result = await service.listarProductos();
+
+      expect(mockProducto.listar).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(CATALOGO);
+    });
+
+    it('catálogo vacío devuelve [] (el modal muestra el estado vacío)', async () => {
+      mockProducto.listar.mockReturnValue(of([]));
+
+      const result = await service.listarProductos();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── construirRecordPalmar (función pura, PR8) ─────────────────────────────
+
+  describe('construirRecordPalmar', () => {
+    it('construye el record: filtra cantidad 0, convierte divisas y calcula todos los totales', () => {
+      const record = construirRecordPalmar(PAYLOAD, AHORA_FIJO);
+
+      expect(record).toEqual({
+        version: 1,
+        id: 'palmar-2026-07-28',
+        fecha: FECHA_JORNADA,
+        created_at: AHORA_FIJO,
+        usuario: null,
+        // Solo cantidad > 0; precio_costo null → 0 (criterio del modal en invertido):
+        productos: [
+          { nombre: 'Agua 500ml', cantidad: 2, precio_venta: 50, precio_costo: 30, subtotal: 100, costo_subtotal: 60 },
+          { nombre: 'Galleta', cantidad: 3, precio_venta: 20, precio_costo: 0, subtotal: 60, costo_subtotal: 0 },
+        ],
+        arqueo: PAYLOAD.arqueo,
+        divisa: { usd: 10, eur: 2, tasa_usd: 300, tasa_eur: 350, usd_cup: 3000, eur_cup: 700, divisa_cup: 3700 },
+        transferencia: 500,
+        total_ventas: 160, // 100 + 60
+        total_arqueo: 200, // 100 + 100
+        total_recibido: 4400, // 200 + 3700 + 500
+        invertido: 60, // 2×30 + 3×0
+        ganancia: 4340, // 4400 − 60
+        diferencia: -4240, // 160 − 4400 (se muestra, nunca bloquea)
+      });
+    });
+
+    it('triangulación: todo en cero → productos [] y totales en cero (semana vacía)', () => {
+      const record = construirRecordPalmar(
+        {
+          fecha: FECHA_JORNADA,
+          productos: [{ id: 1, nombre: 'Agua 500ml', cantidad: 0, precio_venta: 50, precio_costo: 30 }],
+          arqueo: [{ denominacion: 100, cantidad: 0, subtotal: 0 }],
+          divisa: { usd: 0, eur: 0, tasa_usd: 0, tasa_eur: 0 },
+          transferencia: 0,
+        },
+        AHORA_FIJO,
+      );
+
+      expect(record.productos).toEqual([]);
+      expect(record.total_ventas).toBe(0);
+      expect(record.total_arqueo).toBe(0);
+      expect(record.total_recibido).toBe(0);
+      expect(record.invertido).toBe(0);
+      expect(record.ganancia).toBe(0);
+      expect(record.diferencia).toBe(0);
+    });
+  });
+
+  // ── registrarJornada (PR8) ─────────────────────────────────────────────────
+
+  describe('registrarJornada', () => {
+    /** Semana lunes 27 → domingo 02 con RECORD_A + RECORD_B (historial existente). */
+    function mockSemanaExistente(): void {
+      mockElectronFile.listPalmar.mockResolvedValue([ENTRY_B, ENTRY_A]);
+      mockElectronFile.readPalmar.mockImplementation(async (fileName: string) => ({
+        ok: true,
+        record: recordsByFile[fileName],
+      }));
+    }
+
+    it('construye el record, suma la jornada al resumen de su semana, genera Excel y guarda con json', async () => {
+      mockSemanaExistente();
+      mockElectronFile.savePalmar.mockResolvedValue({
+        ok: true,
+        xlsxPath: 'C:/Palmar/28-07-2026.xlsx',
+        jsonPath: 'C:/Palmar/28-07-2026.json',
+      });
+
+      const result = await service.registrarJornada(PAYLOAD);
+
+      // El Excel recibe el record y el resumen semanal que YA incluye la jornada
+      // nueva (aún no está en el historial: el plan pide que la semana lo contenga).
+      expect(mockExcel.generarExcelPalmar).toHaveBeenCalledTimes(1);
+      const [record, resumen] = mockExcel.generarExcelPalmar.mock.calls[0] as [
+        PalmarRecord,
+        PalmarSemanaResumen,
+      ];
+      expect(record.id).toBe('palmar-2026-07-28');
+      expect(record.total_recibido).toBe(4400);
+      expect(resumen).toEqual({
+        semanaInicio: '2026-07-27',
+        semanaFin: '2026-08-02',
+        // historia (RECORD_A+B) + jornada nueva:
+        totalRecibido: 3000 + 4400,
+        efectivo: 2700 + 200,
+        divisaCup: 300 + 3700,
+        transferencia: 150 + 500,
+        invertido: 1200 + 60,
+        ganancia: 1800 + 4340,
+      });
+
+      // baseName dd-mm-yyyy de la fecha del payload + json con el record completo:
+      expect(mockElectronFile.savePalmar).toHaveBeenCalledWith(
+        '28-07-2026',
+        'mock-excel-base64',
+        expect.objectContaining({
+          id: 'palmar-2026-07-28',
+          fecha: '2026-07-28',
+          total_ventas: 160,
+          total_arqueo: 200,
+          total_recibido: 4400,
+          invertido: 60,
+          ganancia: 4340,
+          diferencia: -4240,
+        }),
+      );
+      // El guardado inicial SÍ incluye el json (a diferencia del reprint, que no):
+      expect(mockElectronFile.savePalmar.mock.calls[0]).toHaveLength(3);
+      expect(result).toEqual({
+        ok: true,
+        xlsxPath: 'C:/Palmar/28-07-2026.xlsx',
+        jsonPath: 'C:/Palmar/28-07-2026.json',
+      });
+    });
+
+    it('propaga el error del filesystem si el guardado falla', async () => {
+      mockSemanaExistente();
+      mockElectronFile.savePalmar.mockRejectedValue(new Error('disco lleno'));
+
+      await expect(service.registrarJornada(PAYLOAD)).rejects.toThrow('disco lleno');
+    });
+  });
+
   // ── ZERO DB WRITES (DoD PR6) ───────────────────────────────────────────────
 
   describe('ZERO DB WRITES (DoD PR6)', () => {
     it('ejecuta todas las operaciones sin emitir NINGUNA sentencia SQL', async () => {
+      mockProducto.listar.mockReturnValue(of(CATALOGO));
       mockElectronFile.listPalmar.mockResolvedValue([ENTRY_B, ENTRY_A]);
       mockElectronFile.readPalmar.mockImplementation(async (fileName: string) => ({
         ok: true,
@@ -374,6 +557,10 @@ describe('PalmarService', () => {
       await service.verDetalle('28-07-2026.json');
       await service.volverAImprimir('28-07-2026.json');
       await service.cargarResumenSemanal('2026-07-28');
+      // PR8: la única lectura SQL del flujo es listarProductos (SELECT via
+      // ProductoService.listar), y registrarJornada NO toca la DB.
+      await service.listarProductos();
+      await service.registrarJornada(PAYLOAD);
 
       // PalmarService vive SOLO del filesystem (IPC) + ExcelService: cero
       // llamadas a sql → cero INSERT/UPDATE/DELETE (y cero lecturas).
