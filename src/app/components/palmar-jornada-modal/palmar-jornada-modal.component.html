@@ -1,0 +1,116 @@
+<div
+  class="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/40 p-4"
+  role="dialog"
+  tabindex="-1"
+  (click)="onBackdropClick($event)"
+  (keydown)="onKeydown($event)"
+>
+  <div
+    class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
+  >
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+      Registrar jornada Palmar
+    </h3>
+
+    <!-- Indicador de fase (P-FR5) -->
+    <div class="mb-4 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+      <span [class.text-blue-600]="phase() >= 1">Productos</span>
+      <span>→</span>
+      <span [class.text-blue-600]="phase() >= 2">Arqueo</span>
+      <span>→</span>
+      <span [class.text-blue-600]="phase() >= 3">Confirmación</span>
+    </div>
+
+    @if (phase() === 1) {
+      <!-- Fase 1: productos (P-FR4) -->
+      <div>
+        @if (cargandoProductos()) {
+          <p class="text-sm text-gray-500 dark:text-gray-400">Cargando productos…</p>
+        } @else if (productos().length === 0) {
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            No hay productos disponibles
+          </div>
+        } @else {
+          <div class="space-y-2 max-h-64 overflow-y-auto">
+            @for (p of productos(); track p.id) {
+              <div class="flex items-center gap-3">
+                <span class="flex-1 truncate text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ p.nombre }}
+                </span>
+                <span class="w-20 text-right text-xs text-gray-500 dark:text-gray-400">
+                  ${{ p.precio_venta.toLocaleString() }}
+                </span>
+                <input
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  [value]="p.cantidad"
+                  (input)="actualizarCantidad(p.id, +$any($event.target).value)"
+                  (keydown)="filtrarTecla($event)"
+                  class="w-20 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+                />
+              </div>
+            }
+          </div>
+          @if (soloNumeros()) {
+            <p class="text-xs text-red-500 dark:text-red-400 mt-1 animate-pulse">Solo se permiten números</p>
+          }
+        }
+
+        <div class="mt-6 flex gap-3">
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 active:scale-[0.98] transition-all touch-manipulation min-h-[48px]"
+            (click)="cerrar.emit()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">close</span>
+              Cancelar
+            </span>
+          </button>
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[48px]"
+            [disabled]="productos().length === 0"
+            (click)="siguiente()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">arrow_forward</span>
+              Continuar
+            </span>
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (phase() === 2) {
+      <!-- Fase 2: arqueo compartido (P-FR6) -->
+      <div>
+        <app-arqueo-billetes-form (arqueoChange)="onArqueoChange($event)" />
+
+        <div class="mt-6 flex gap-3">
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 active:scale-[0.98] transition-all touch-manipulation min-h-[48px]"
+            (click)="atras()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">arrow_back</span>
+              Atrás
+            </span>
+          </button>
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 active:scale-[0.98] transition-all touch-manipulation min-h-[48px]"
+            (click)="siguiente()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">arrow_forward</span>
+              Continuar
+            </span>
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
