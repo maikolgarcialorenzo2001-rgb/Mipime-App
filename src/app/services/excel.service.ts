@@ -7,6 +7,7 @@ import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { StockMovimiento } from '../models/stock-movimiento';
 import type { VentaLote } from '../models/venta-lote';
 import type { ArqueoCajaEntry } from '../models/arqueo-caja';
+import type { PalmarRecord, PalmarSemanaResumen } from '../models/palmar-jornada';
 
 export interface ProductoInfo {
   nombre: string;
@@ -30,59 +31,6 @@ export interface PendienteAcumulado {
   fechaOriginal: string;  // fecha_hora ISO (el Excel muestra la fecha)
   monto: number;          // total
   antiguedadDias: number; // date-only floor((hoy - fecha)/86400000), max 0 → mismo día 0
-}
-
-// ─── Tipos Palmar (PR2) ───
-// Reflejan `models/palmar-jornada.ts` (PR1, Pana A). Se definen localmente para
-// que PR2 sea independiente; al mergear PR1 con contenido idéntico, el merge
-// los reconcilia.
-
-export interface PalmarProductoEntry {
-  nombre: string;
-  cantidad: number;
-  precio_venta: number;
-  precio_costo: number;
-  subtotal: number;
-  costo_subtotal: number;
-}
-
-export interface PalmarDivisa {
-  usd: number;
-  eur: number;
-  tasa_usd: number;
-  tasa_eur: number;
-  usd_cup: number;
-  eur_cup: number;
-  divisa_cup: number;
-}
-
-export interface PalmarRecord {
-  version: 1;
-  id: string;
-  fecha: string;
-  created_at: string;
-  usuario: string | null;
-  productos: PalmarProductoEntry[];
-  arqueo: ArqueoCajaEntry[];
-  divisa: PalmarDivisa;
-  transferencia: number;
-  total_ventas: number;
-  total_arqueo: number;
-  total_recibido: number;
-  invertido: number;
-  ganancia: number;
-  diferencia: number;
-}
-
-export interface PalmarSemanaResumen {
-  semanaInicio: string;
-  semanaFin: string;
-  totalRecibido: number;
-  efectivo: number;
-  divisaCup: number;
-  transferencia: number;
-  invertido: number;
-  ganancia: number;
 }
 
 export interface JornadaReportData {

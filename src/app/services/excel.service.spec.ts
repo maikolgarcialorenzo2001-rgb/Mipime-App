@@ -3,9 +3,8 @@ import {
   ExcelService,
   type JornadaReportData,
   type PendienteAcumulado,
-  type PalmarRecord,
-  type PalmarSemanaResumen,
 } from './excel.service';
+import type { PalmarRecord, PalmarSemanaResumen } from '../models/palmar-jornada';
 import * as XLSX from 'xlsx';
 import type { Jornada } from '../models/jornada';
 import type { VentaConDetalles } from './excel.service';
