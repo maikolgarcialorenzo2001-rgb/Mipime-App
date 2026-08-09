@@ -1,5 +1,42 @@
 import { TestBed } from '@angular/core/testing';
 import { ElectronFileService } from './electron-file.service';
+import type { PalmarRecord } from '../models/palmar-jornada';
+
+/** Fixture mínimo pero completo de una jornada Palmar (PR4, savePalmar/readPalmar). */
+const PALMAR_RECORD_FIXTURE: PalmarRecord = {
+  version: 1,
+  id: 'palmar-2026-07-28',
+  fecha: '2026-07-28',
+  created_at: '2026-07-28T20:00:00.000Z',
+  usuario: 'Maikol',
+  productos: [
+    {
+      nombre: 'Agua 500ml',
+      cantidad: 2,
+      precio_venta: 50,
+      precio_costo: 30,
+      subtotal: 100,
+      costo_subtotal: 60,
+    },
+  ],
+  arqueo: [{ denominacion: 100, cantidad: 1, subtotal: 100 }],
+  divisa: {
+    usd: 0,
+    eur: 0,
+    tasa_usd: 0,
+    tasa_eur: 0,
+    usd_cup: 0,
+    eur_cup: 0,
+    divisa_cup: 0,
+  },
+  transferencia: 0,
+  total_ventas: 100,
+  total_arqueo: 100,
+  total_recibido: 100,
+  invertido: 60,
+  ganancia: 40,
+  diferencia: 0,
+};
 
 describe('ElectronFileService', () => {
   let service: ElectronFileService;
@@ -154,6 +191,161 @@ describe('ElectronFileService', () => {
 
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       expect(clickMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Palmar: savePalmar (PR4) ─────────────────────────────
+
+  describe('savePalmar', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it(
+      'should call file:savePalmar with baseName/base64/json when electronAPI present',
+      async () => {
+        const invokeMock = vi
+          .fn<(...args: unknown[]) => Promise<unknown>>()
+          .mockResolvedValue({
+            ok: true,
+            xlsxPath: 'C:/Users/Test/Documents/Tienda - App/Palmar/28-07-2026.xlsx',
+            jsonPath: 'C:/Users/Test/Documents/Tienda - App/Palmar/28-07-2026.json',
+          });
+        window.electronAPI = { invoke: invokeMock } as unknown as ElectronAPI;
+
+        const result = await service.savePalmar('28-07-2026', 'base64data', PALMAR_RECORD_FIXTURE);
+
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+        expect(invokeMock).toHaveBeenCalledWith('file:savePalmar', {
+          baseName: '28-07-2026',
+          base64: 'base64data',
+          json: PALMAR_RECORD_FIXTURE,
+        });
+        expect(result).toEqual({
+          ok: true,
+          xlsxPath: 'C:/Users/Test/Documents/Tienda - App/Palmar/28-07-2026.xlsx',
+          jsonPath: 'C:/Users/Test/Documents/Tienda - App/Palmar/28-07-2026.json',
+        });
+      },
+    );
+
+    it('should omit json key in reprint call (json undefined)', async () => {
+      const invokeMock = vi
+        .fn<(...args: unknown[]) => Promise<unknown>>()
+        .mockResolvedValue({ ok: true, xlsxPath: 'C:/Palmar/28-07-2026.xlsx' });
+      window.electronAPI = { invoke: invokeMock } as unknown as ElectronAPI;
+
+      const result = await service.savePalmar('28-07-2026', 'base64data');
+
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      const payload = invokeMock.mock.calls[0][1] as Record<string, unknown>;
+      expect(payload['baseName']).toBe('28-07-2026');
+      expect(payload['base64']).toBe('base64data');
+      expect(Object.prototype.hasOwnProperty.call(payload, 'json')).toBe(false);
+      expect(result).toEqual({ ok: true, xlsxPath: 'C:/Palmar/28-07-2026.xlsx' });
+    });
+
+    it('should fall back to Blob download when electronAPI is not present', async () => {
+      const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:url');
+      const clickMock = vi.fn();
+      const createElement = vi.spyOn(document, 'createElement').mockReturnValue({
+        href: '',
+        download: '',
+        click: clickMock,
+      } as unknown as HTMLAnchorElement);
+      const revokeURL = vi.spyOn(URL, 'revokeObjectURL');
+
+      vi.useFakeTimers();
+
+      const result = await service.savePalmar('28-07-2026', 'SGVsbG8=');
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(createElement).toHaveBeenCalledWith('a');
+      expect(clickMock).toHaveBeenCalledTimes(1);
+      expect(revokeURL).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(0);
+      expect(revokeURL).toHaveBeenCalledTimes(1);
+      expect(revokeURL).toHaveBeenCalledWith('blob:url');
+      expect(result).toEqual({ ok: true });
+
+      vi.useRealTimers();
+    });
+  });
+
+  // ── Palmar: listPalmar (PR4) ─────────────────────────────
+
+  describe('listPalmar', () => {
+    it('should map records from {ok, records} when electronAPI present', async () => {
+      const records = [
+        {
+          fileName: '28-07-2026.json',
+          createdAt: '2026-07-28T20:00:00.000Z',
+          totalVentas: 100,
+          totalArqueo: 100,
+          totalRecibido: 100,
+          usuario: 'Maikol',
+        },
+        {
+          fileName: '27-07-2026.json',
+          createdAt: '2026-07-27T20:00:00.000Z',
+          totalVentas: 50,
+          totalArqueo: 50,
+          totalRecibido: 50,
+          usuario: null,
+        },
+      ];
+      const invokeMock = vi
+        .fn<(...args: unknown[]) => Promise<unknown>>()
+        .mockResolvedValue({ ok: true, records });
+      window.electronAPI = { invoke: invokeMock } as unknown as ElectronAPI;
+
+      const result = await service.listPalmar();
+
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      expect(invokeMock).toHaveBeenCalledWith('file:listPalmar');
+      expect(result).toEqual(records);
+    });
+
+    it('should return [] when IPC result is !ok', async () => {
+      const invokeMock = vi
+        .fn<(...args: unknown[]) => Promise<unknown>>()
+        .mockResolvedValue({ ok: false, error: 'Palmar directory not found' });
+      window.electronAPI = { invoke: invokeMock } as unknown as ElectronAPI;
+
+      const result = await service.listPalmar();
+
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      expect(result).toEqual([]);
+    });
+
+    it('should return [] when electronAPI is not present', async () => {
+      const result = await service.listPalmar();
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ── Palmar: readPalmar (PR4) ─────────────────────────────
+
+  describe('readPalmar', () => {
+    it('should delegate with correct fileName', async () => {
+      const invokeMock = vi
+        .fn<(...args: unknown[]) => Promise<unknown>>()
+        .mockResolvedValue({ ok: true, record: PALMAR_RECORD_FIXTURE });
+      window.electronAPI = { invoke: invokeMock } as unknown as ElectronAPI;
+
+      const result = await service.readPalmar('28-07-2026.json');
+
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      expect(invokeMock).toHaveBeenCalledWith('file:readPalmar', { fileName: '28-07-2026.json' });
+      expect(result).toEqual({ ok: true, record: PALMAR_RECORD_FIXTURE });
+    });
+
+    it('should reject when electronAPI is not present', async () => {
+      await expect(service.readPalmar('28-07-2026.json')).rejects.toThrow(
+        'readPalmar requires Electron (electronAPI not available)',
+      );
     });
   });
 });
