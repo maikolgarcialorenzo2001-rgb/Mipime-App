@@ -3,9 +3,9 @@
 Registro de jornadas de la tienda externa **"Palmar"** (solo registro, cero escrituras en la base de datos).
 
 - **Rama de trabajo**: `palmar-feature`
-- **Estrategia de entrega**: `stacked-to-main` — cada PR mergea a `main` en orden (1 → 8)
+- **Estrategia de entrega**: **branch aparte** (NO mergea a `main`) — peculiaridad de la app: el concepto Palmar vive completo en su propia rama, desacoplado del ciclo de releases de main. Decisión del dueño 2026-08-09.
 - **Equipo**: Pana A (dueño) / Pana B
-- **Estado**: planificado — esperando inicio de PR1 (A) y PR2 (B)
+- **Estado**: ✅ **COMPLETA** — cadena PR1→PR8 aplicada, verificada e integrada en `palmar-feature` (no mergea a main)
 
 ## Contexto de negocio (resumen)
 
