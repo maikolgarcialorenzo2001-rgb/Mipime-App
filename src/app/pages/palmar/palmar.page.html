@@ -54,10 +54,10 @@
           @for (entry of historial(); track entry.fileName) {
             <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.fileName }}</td>
-              <td class="px-4 py-3">{{ entry.totalVentas | currency }}</td>
-              <td class="px-4 py-3">{{ entry.totalArqueo | currency }}</td>
-              <td class="px-4 py-3">{{ entry.totalRecibido | currency }}</td>
-              <td class="px-4 py-3">{{ entry.usuario ?? '—' }}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.totalVentas | currency }}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.totalArqueo | currency }}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.totalRecibido | currency }}</td>
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.usuario ?? '—' }}</td>
               <td class="px-4 py-3">
                 <div class="flex gap-2">
                   <!-- PR8: ver detalle completo del registro (verDetalle, PR6). -->
