@@ -215,3 +215,58 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(occurrences).toBe(1);
   });
 });
+
+describe('AppNavComponent - links Palmar (P-FR2, admin only)', () => {
+  let fixture: ComponentFixture<AppNavComponent>;
+
+  function setup(rol: 'admin' | 'trabajador'): void {
+    const mockAuth = createMockAuth({ ...mockAdmin, rol });
+    const mockElectronFileSvc = {
+      isElectronPackaged: false,
+      saveIndividual: vi.fn().mockResolvedValue(undefined),
+      downloadBlob: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      imports: [AppNavComponent],
+      providers: [
+        provideRouter(routes),
+        { provide: AuthService, useValue: mockAuth },
+        { provide: JornadaService, useValue: createMockJornadaService() },
+        { provide: ElectronFileService, useValue: mockElectronFileSvc },
+      ],
+    });
+
+    fixture = TestBed.createComponent(AppNavComponent);
+    fixture.detectChanges();
+  }
+
+  function palmarLinks(): HTMLAnchorElement[] {
+    const anchors = Array.from(
+      fixture.nativeElement.querySelectorAll('a'),
+    ) as HTMLAnchorElement[];
+    return anchors.filter((a) => a.textContent?.trim().includes('Palmar'));
+  }
+
+  it('admin debería ver los links Palmar de desktop y móvil apuntando a /palmar', () => {
+    setup('admin');
+
+    const links = palmarLinks();
+    expect(links.length).toBe(2);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      '/palmar',
+      '/palmar',
+    ]);
+  });
+
+  it('no-admin no debería ver los links Palmar', () => {
+    setup('trabajador');
+
+    expect(palmarLinks().length).toBe(0);
+    // Triangulación: el resto del nav sigue visible para el usuario logueado.
+    const anchors = Array.from(
+      fixture.nativeElement.querySelectorAll('a'),
+    ) as HTMLAnchorElement[];
+    expect(anchors.filter((a) => a.textContent?.includes('POS')).length).toBe(2);
+  });
+});
