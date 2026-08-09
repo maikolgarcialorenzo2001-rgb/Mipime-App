@@ -146,5 +146,5 @@ cargarResumenSemanal(fecha: string): Promise<PalmarSemanaResumen>
 | 4 | B | ⬜ Sin empezar |
 | 5 | A | ✅ Aplicado y verificado (commits `84b51f5`, `b8a5dd0`, `844a562`; 795/795 tests; PASS; cast contrato listPalmar documentado para limpiar en PR8) |
 | 6 | B | ⬜ Sin empezar |
-| 7 | A | ⬜ Sin empezar |
+| 7 | A | ✅ Aplicado y verificado (commits `a9fb82f`, `95e3a36`; 811/811 tests; PASS; token `PALMAR_JORNADA_SERVICE` mockeado, PR8 conecta con `useExisting: PalmarService`) |
 | 8 | A | ⬜ Sin empezar |
