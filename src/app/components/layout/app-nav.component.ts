@@ -4,12 +4,13 @@ import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
+import { ArqueoBilletesFormComponent } from '../arqueo-billetes-form/arqueo-billetes-form.component';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
 import { APP_VERSION } from '../../version';
 
 @Component({
   selector: 'app-nav',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, ArqueoBilletesFormComponent],
   templateUrl: './app-nav.component.html',
   styleUrl: './app-nav.component.css',
 })
@@ -38,23 +39,12 @@ export class AppNavComponent {
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
 
-  /** Denomination form */
-  readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
-  readonly arqueoForm = signal<Record<number, number>>({
-    5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-  });
-  readonly showOptionalDenoms = signal(false);
+  /** Entries de arqueo emitidos por <app-arqueo-billetes-form> (solo cantidad > 0). */
+  readonly arqueoEntries = signal<ArqueoCajaEntry[]>([]);
 
-  readonly denominacionesVisibles = computed(() =>
-    this.showOptionalDenoms()
-      ? [...this.DENOMINACIONES]
-      : this.DENOMINACIONES.filter(d => d !== 1 && d !== 3),
+  readonly arqueoTotal = computed(() =>
+    this.arqueoEntries().reduce((sum, entry) => sum + entry.subtotal, 0),
   );
-
-  readonly arqueoTotal = computed(() => {
-    const f = this.arqueoForm();
-    return this.denominacionesVisibles().reduce((sum, d) => sum + d * (f[d] ?? 0), 0);
-  });
 
   readonly diferencia = computed(() => {
     return this.jornadaService.totalEnCaja() - this.arqueoTotal();
@@ -115,15 +105,8 @@ export class AppNavComponent {
 
   abrirModalCierre(): void {
     this.cerrarError.set(null);
-    this.arqueoForm.set({
-      5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
-    });
-    this.showOptionalDenoms.set(false);
+    this.arqueoEntries.set([]);
     this.showCloseModal.set(true);
-  }
-
-  actualizarCantidad(denominacion: number, cantidad: number): void {
-    this.arqueoForm.update(f => ({ ...f, [denominacion]: cantidad }));
   }
 
   cerrarModalCierre(): void {
@@ -137,14 +120,7 @@ export class AppNavComponent {
 
     if (!j || uid === undefined) return;
 
-    // Build arqueo entries from form (only entries with cantidad > 0)
-    const entries: ArqueoCajaEntry[] = [];
-    for (const d of this.denominacionesVisibles()) {
-      const cantidad = this.arqueoForm()[d] ?? 0;
-      if (cantidad > 0) {
-        entries.push({ denominacion: d, cantidad, subtotal: d * cantidad });
-      }
-    }
+    const entries = this.arqueoEntries();
 
     if (entries.length === 0) {
       this.cerrarError.set('Ingresa la cantidad de al menos una denominación');

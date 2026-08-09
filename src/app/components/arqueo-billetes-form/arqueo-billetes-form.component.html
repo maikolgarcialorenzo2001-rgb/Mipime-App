@@ -1,0 +1,51 @@
+<div class="mb-4">
+  <div class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+    Conteo de billetes / monedas
+  </div>
+  <div class="space-y-2 max-h-64 overflow-y-auto">
+    @for (denom of denominacionesVisibles(); track denom) {
+      <div class="flex items-center gap-3">
+        <span class="w-16 text-sm font-medium text-gray-700 dark:text-gray-300">
+          ${{ denom.toLocaleString() }}
+        </span>
+        <input
+          type="number"
+          inputmode="numeric"
+          min="0"
+          [value]="arqueoForm()[denom]"
+          (input)="actualizarCantidad(denom, +$any($event.target).value)"
+          (keydown)="filtrarTecla($event)"
+          class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+        />
+        <span class="w-20 text-right text-sm text-gray-500 dark:text-gray-400">
+          ${{ (denom * arqueoForm()[denom]).toLocaleString() }}
+        </span>
+      </div>
+    }
+  </div>
+  @if (soloNumeros()) {
+    <p class="text-xs text-red-500 dark:text-red-400 mt-1 animate-pulse">Solo se permiten números</p>
+  }
+</div>
+
+<!-- Denominaciones opcionales $1 y $3 -->
+<div class="mb-3 flex items-center gap-2">
+  <input
+    type="checkbox"
+    id="show-optional-denoms"
+    [checked]="showOptionalDenoms()"
+    (change)="showOptionalDenoms.set($any($event.target).checked)"
+    class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:bg-gray-800"
+  />
+  <label for="show-optional-denoms" class="text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+    Incluir billetes de $1 y $3
+  </label>
+</div>
+
+<!-- Totales -->
+<div class="mb-4 space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
+  <div class="flex justify-between text-sm font-semibold text-gray-900 dark:text-gray-100">
+    <span>Total contado</span>
+    <span>${{ arqueoTotal().toLocaleString() }}</span>
+  </div>
+</div>

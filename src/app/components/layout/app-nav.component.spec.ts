@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { signal, type Signal, type WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AppNavComponent } from './app-nav.component';
+import { ArqueoBilletesFormComponent } from '../arqueo-billetes-form/arqueo-billetes-form.component';
 import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -164,8 +166,10 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     component.abrirModalCierre();
     fixture.detectChanges();
 
-    // Set at least one denomination so entries are non-empty
-    component.actualizarCantidad(5000, 1);
+    // Conducir el componente compartido de arqueo (extraído del app-nav)
+    const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+    expect(arqueoDebug).toBeTruthy();
+    arqueoDebug.componentInstance.actualizarCantidad(5000, 1);
     fixture.detectChanges();
 
     component.confirmarCierre();
@@ -189,58 +193,15 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
 
     component.abrirModalCierre();
     fixture.detectChanges();
-    component.actualizarCantidad(5000, 1);
+    const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+    expect(arqueoDebug).toBeTruthy();
+    arqueoDebug.componentInstance.actualizarCantidad(5000, 1);
     component.confirmarCierre();
 
     expect(mockElectronFileSvc.downloadBlob).toHaveBeenCalledWith(
       'dGVzdEJhc2U2NA==',
       'jornada_2026-06-05_1.xlsx',
     );
-  });
-
-  it('1.3 RED: checkbox toggle shows/hides $1 and $3 denomination rows in nav modal', () => {
-    component.abrirModalCierre();
-    fixture.detectChanges();
-
-    const dialog = fixture.nativeElement.querySelector('[role="dialog"]');
-    expect(dialog).toBeTruthy();
-
-    // By default, $1 and $3 should NOT be visible
-    expect(component.denominacionesVisibles()).not.toContain(1);
-    expect(component.denominacionesVisibles()).not.toContain(3);
-    expect(component.denominacionesVisibles().length).toBe(10);
-
-    // Click checkbox to show optional denominations
-    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
-    expect(checkbox).toBeTruthy();
-    checkbox.click();
-    fixture.detectChanges();
-
-    // After clicking, $1 and $3 should be visible
-    expect(component.denominacionesVisibles()).toContain(1);
-    expect(component.denominacionesVisibles()).toContain(3);
-    expect(component.denominacionesVisibles().length).toBe(12);
-
-    // DOM should have $1 and $3
-    expect(dialog.textContent).toContain('$1');
-    expect(dialog.textContent).toContain('$3');
-  });
-
-  it('1.3 TRIANGULATE: unchecking hides $1 and $3 again in nav modal', () => {
-    component.abrirModalCierre();
-    component.showOptionalDenoms.set(true);
-    fixture.detectChanges();
-
-    expect(component.denominacionesVisibles().length).toBe(12);
-
-    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
-    expect(checkbox).toBeTruthy();
-    checkbox.click(); // toggles off
-    fixture.detectChanges();
-
-    expect(component.denominacionesVisibles()).not.toContain(1);
-    expect(component.denominacionesVisibles()).not.toContain(3);
-    expect(component.denominacionesVisibles().length).toBe(10);
   });
 
   it('debería renderizar el badge de versión desde APP_VERSION en la barra', () => {
