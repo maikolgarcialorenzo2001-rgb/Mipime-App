@@ -112,5 +112,170 @@
         </div>
       </div>
     }
+
+    @if (phase() === 3) {
+      <!-- Fase 3: confirmación (P-FR7) -->
+      <div class="space-y-4">
+        <!-- Ventas vs conteo de billetes -->
+        <div class="space-y-1 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Dinero según ventas</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+              ${{ totalVentas().toLocaleString() }}
+            </span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-gray-600 dark:text-gray-400">Dinero según conteo de billetes</span>
+            <span class="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+              ${{ arqueoTotal().toLocaleString() }}
+            </span>
+          </div>
+          <div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 text-sm font-semibold">
+            <span class="text-gray-700 dark:text-gray-300">Diferencia</span>
+            <span class="tabular-nums" [class.text-green-600]="diferencia() >= 0" [class.text-red-600]="diferencia() < 0">
+              ${{ diferencia().toLocaleString() }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Divisas y transferencia -->
+        <div class="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Divisas y transferencia</p>
+
+          <div class="flex items-center gap-2">
+            <label for="usd-monto" class="w-12 text-sm text-gray-600 dark:text-gray-400">USD</label>
+            <input
+              id="usd-monto"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              [value]="usd()"
+              (input)="usd.set(parseNum($any($event.target).value))"
+              class="w-20 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+            />
+            <label for="usd-tasa" class="text-xs text-gray-500 dark:text-gray-400">tasa</label>
+            <input
+              id="usd-tasa"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              [value]="tasaUsd()"
+              (input)="tasaUsd.set(parseNum($any($event.target).value))"
+              class="w-20 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+            />
+            <span class="flex-1 text-right text-sm font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+              ${{ usdCup().toLocaleString() }}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label for="eur-monto" class="w-12 text-sm text-gray-600 dark:text-gray-400">EUR</label>
+            <input
+              id="eur-monto"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              [value]="eur()"
+              (input)="eur.set(parseNum($any($event.target).value))"
+              class="w-20 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+            />
+            <label for="eur-tasa" class="text-xs text-gray-500 dark:text-gray-400">tasa</label>
+            <input
+              id="eur-tasa"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              [value]="tasaEur()"
+              (input)="tasaEur.set(parseNum($any($event.target).value))"
+              class="w-20 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+            />
+            <span class="flex-1 text-right text-sm font-medium text-gray-900 dark:text-gray-100 tabular-nums">
+              ${{ eurCup().toLocaleString() }}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label for="transferencia-monto" class="w-12 text-sm text-gray-600 dark:text-gray-400">Transf.</label>
+            <input
+              id="transferencia-monto"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1"
+              [value]="transferencia()"
+              (input)="transferencia.set(parseNum($any($event.target).value))"
+              class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
+            />
+          </div>
+        </div>
+
+        <!-- Recibido / invertido / ganancia -->
+        <div class="space-y-1 rounded-lg border border-gray-200 dark:border-gray-700 p-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-400">Efectivo (arqueo)</span>
+            <span class="text-gray-900 dark:text-gray-100 tabular-nums">${{ arqueoTotal().toLocaleString() }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-400">Divisas (CUP)</span>
+            <span class="text-gray-900 dark:text-gray-100 tabular-nums">${{ divisaCup().toLocaleString() }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-400">Transferencia</span>
+            <span class="text-gray-900 dark:text-gray-100 tabular-nums">${{ transferencia().toLocaleString() }}</span>
+          </div>
+          <div class="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 font-semibold">
+            <span class="text-gray-900 dark:text-gray-100">Total recibido</span>
+            <span class="text-gray-900 dark:text-gray-100 tabular-nums">${{ totalRecibido().toLocaleString() }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-600 dark:text-gray-400">Invertido</span>
+            <span class="text-gray-900 dark:text-gray-100 tabular-nums">${{ invertido().toLocaleString() }}</span>
+          </div>
+          <div class="flex justify-between font-medium">
+            <span class="text-gray-700 dark:text-gray-300">Ganancia</span>
+            <span class="text-green-600 dark:text-green-400 tabular-nums">${{ ganancia().toLocaleString() }}</span>
+          </div>
+        </div>
+
+        @if (errorValidacion(); as err) {
+          <div role="alert" class="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+            {{ err }}
+          </div>
+        }
+        @if (guardarError(); as err) {
+          <div role="alert" class="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+            {{ err }}
+          </div>
+        }
+
+        <div class="flex gap-3">
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 active:scale-[0.98] transition-all touch-manipulation min-h-[48px]"
+            (click)="atras()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">arrow_back</span>
+              Atrás
+            </span>
+          </button>
+          <button
+            type="button"
+            class="flex-1 cursor-pointer rounded-lg bg-green-600 dark:bg-green-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[48px]"
+            [disabled]="guardando()"
+            (click)="guardar()"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined leading-none text-sm">save</span>
+              Guardar
+            </span>
+          </button>
+        </div>
+      </div>
+    }
   </div>
 </div>

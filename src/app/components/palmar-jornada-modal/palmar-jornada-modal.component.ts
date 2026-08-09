@@ -67,7 +67,42 @@ export class PalmarJornadaModalComponent {
 
   readonly soloNumeros = signal(false);
 
+  // ── Fase 3: divisas, transferencia y cálculos (P-FR7) ───────────────────
+
+  readonly usd = signal(0);
+  readonly eur = signal(0);
+  readonly tasaUsd = signal(0);
+  readonly tasaEur = signal(0);
+  readonly transferencia = signal(0);
+
+  readonly usdCup = computed(() => this.usd() * this.tasaUsd());
+  readonly eurCup = computed(() => this.eur() * this.tasaEur());
+  readonly divisaCup = computed(() => this.usdCup() + this.eurCup());
+
+  readonly totalVentas = computed(() =>
+    this.productos().reduce((sum, p) => sum + p.cantidad * p.precio_venta, 0),
+  );
+
+  /** Σ cantidad × precio_costo (precio_costo null → 0). */
+  readonly invertido = computed(() =>
+    this.productos().reduce((sum, p) => sum + p.cantidad * (p.precio_costo ?? 0), 0),
+  );
+
+  readonly totalRecibido = computed(() =>
+    this.arqueoTotal() + this.divisaCup() + this.transferencia(),
+  );
+
+  /** Diferencia ventas vs recibido: se muestra, NO bloquea (P-FR8). */
+  readonly diferencia = computed(() => this.totalVentas() - this.totalRecibido());
+
+  readonly ganancia = computed(() => this.totalRecibido() - this.invertido());
+
+  readonly errorValidacion = signal<string | null>(null);
+  readonly guardarError = signal<string | null>(null);
+  readonly guardando = signal(false);
+
   readonly cerrar = output();
+  readonly saved = output();
 
   constructor() {
     void this._cargarProductos();
@@ -123,7 +158,7 @@ export class PalmarJornadaModalComponent {
   }
 
   siguiente(): void {
-    if (this.phase() < 2) {
+    if (this.phase() < 3) {
       this.phase.update((p) => (p + 1) as FasePalmar);
     }
   }
@@ -132,6 +167,53 @@ export class PalmarJornadaModalComponent {
     if (this.phase() > 1) {
       this.phase.update((p) => (p - 1) as FasePalmar);
     }
+  }
+
+  /** Convierte un valor de input a número no negativo. */
+  parseNum(value: string): number {
+    const n = Number(value);
+    return Number.isNaN(n) || n < 0 ? 0 : n;
+  }
+
+  /** P-FR8: bloquea el guardado salvo ≥1 producto y ≥1 denominación con cantidad. */
+  async guardar(): Promise<void> {
+    if (this.productos().every((p) => p.cantidad <= 0)) {
+      this.errorValidacion.set('Ingresá la cantidad de al menos un producto');
+      return;
+    }
+    if (this.arqueoEntries().length === 0) {
+      this.errorValidacion.set('Ingresá el conteo de al menos una denominación');
+      return;
+    }
+
+    this.errorValidacion.set(null);
+    this.guardarError.set(null);
+    this.guardando.set(true);
+    try {
+      await this._palmar.registrarJornada(this._buildPayload());
+      this.saved.emit();
+    } catch (e) {
+      this.guardarError.set(
+        e instanceof Error ? e.message : 'Error al guardar la jornada',
+      );
+    } finally {
+      this.guardando.set(false);
+    }
+  }
+
+  private _buildPayload(): PalmarJornadaPayload {
+    return {
+      fecha: new Date().toISOString().slice(0, 10),
+      productos: this.productos().map((p) => ({ ...p })),
+      arqueo: this.arqueoEntries(),
+      divisa: {
+        usd: this.usd(),
+        eur: this.eur(),
+        tasa_usd: this.tasaUsd(),
+        tasa_eur: this.tasaEur(),
+      },
+      transferencia: this.transferencia(),
+    };
   }
 
   onBackdropClick(event: MouseEvent): void {
