@@ -1,0 +1,59 @@
+<div class="p-5 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-4 sm:space-y-6 dark:bg-gray-950 safe-top safe-bottom">
+  <div class="flex items-center justify-between flex-wrap gap-3">
+    <h1 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-200">Jornadas Palmar</h1>
+    <!-- Botón INERT: abre el modal en PR7/PR8. -->
+    <button
+      type="button"
+      class="bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors cursor-pointer"
+    >
+      <span class="inline-flex items-center gap-1.5">
+        <span class="material-symbols-outlined leading-none text-sm">storefront</span>
+        Registrar jornada palmar
+      </span>
+    </button>
+  </div>
+
+  <!-- P-FR16: el historial vive en el filesystem, solo disponible en escritorio -->
+  @if (!esEscritorio) {
+    <div class="rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+      Historial disponible solo en la app de escritorio
+    </div>
+  }
+
+  @if (error(); as err) {
+    <div class="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+      {{ err }}
+    </div>
+  }
+
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else if (historial().length === 0) {
+    <app-empty-state message="No hay jornadas registradas todavía" />
+  } @else {
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50">
+        <thead>
+          <tr class="bg-gray-100 dark:bg-gray-800 text-left text-sm font-semibold text-gray-600 dark:text-gray-400">
+            <th class="px-4 py-3">Fecha</th>
+            <th class="px-4 py-3">Ventas</th>
+            <th class="px-4 py-3">Arqueo</th>
+            <th class="px-4 py-3">Recibido</th>
+            <th class="px-4 py-3">Usuario</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of historial(); track entry.fileName) {
+            <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+              <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ entry.fileName }}</td>
+              <td class="px-4 py-3">{{ entry.totalVentas | currency }}</td>
+              <td class="px-4 py-3">{{ entry.totalArqueo | currency }}</td>
+              <td class="px-4 py-3">{{ entry.totalRecibido | currency }}</td>
+              <td class="px-4 py-3">{{ entry.usuario ?? '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>
