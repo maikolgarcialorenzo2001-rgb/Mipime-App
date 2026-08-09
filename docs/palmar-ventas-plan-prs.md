@@ -144,7 +144,7 @@ cargarResumenSemanal(fecha: string): Promise<PalmarSemanaResumen>
 | 2 | B | ⬜ Sin empezar |
 | 3 | B | ⬜ Sin empezar |
 | 4 | B | ⬜ Sin empezar |
-| 5 | A | 🔄 En curso |
+| 5 | A | ✅ Aplicado y verificado (commits `84b51f5`, `b8a5dd0`, `844a562`; 795/795 tests; PASS; cast contrato listPalmar documentado para limpiar en PR8) |
 | 6 | B | ⬜ Sin empezar |
 | 7 | A | ⬜ Sin empezar |
 | 8 | A | ⬜ Sin empezar |
