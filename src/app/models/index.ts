@@ -9,3 +9,10 @@ export type { LoteStock, LoteDetalle, ConsumoRecord } from './lote-stock';
 export type { VentaLote } from './venta-lote';
 export type { ArqueoDbRow, ArqueoCajaEntry } from './arqueo-caja';
 export type { GlobalInvestment, PerProductInvestment } from './investment-stats';
+export type {
+  PalmarProductoEntry,
+  PalmarDivisa,
+  PalmarRecord,
+  PalmarSemanaResumen,
+  PalmarHistoryEntry,
+} from './palmar-jornada';
