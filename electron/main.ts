@@ -60,6 +60,10 @@ const rodantePathFor = () =>
   path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', DB_FILENAME);
 const backupsDirFor = () =>
   path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
+// Carpeta de jornadas Palmar (PR3): Documents/Tienda - App/Palmar/.
+// Convención de la app: 'Tienda - App' con espacios (ver rodantePathFor).
+const palmarDirFor = () =>
+  path.join(app.getPath('documents'), 'Tienda - App', 'Palmar');
 
 function createMainWindow(): BrowserWindow {
   const isDev = !app.isPackaged;
@@ -192,6 +196,132 @@ app.whenReady().then(() => {
       return { success: false, error: (error as Error).message };
     }
   });
+
+  // ---- Jornadas Palmar (PR3, Pana B): IPC sobre filesystem, CERO DB ----
+  // El main es dueño del filesystem y del sufijo: el renderer nunca decide
+  // rutas finales. IPC = entrada no confiable (T7): validar payload antes
+  // de tocar el disco. Handlers NUNCA lanzan (M1): {ok:false, error}.
+
+  // Guarda una jornada: {base}.xlsx (+ {base}.json si viene json). Regla de
+  // negocio: si {base}.xlsx O {base}.json existe, usar -2, -3... (nunca
+  // sobrescribir). baseName debe ser dd-mm-yyyy.
+  ipcMain.handle(
+    'file:savePalmar',
+    (_event, payload: PalmarSavePayload | undefined) => {
+      try {
+        const baseName = payload?.baseName;
+        const base64 = payload?.base64;
+        const json = payload?.json;
+        if (
+          typeof baseName !== 'string' ||
+          !/^\d{2}-\d{2}-\d{4}$/.test(baseName)
+        ) {
+          return {
+            ok: false,
+            error: 'file:savePalmar requires baseName in dd-mm-yyyy format',
+          };
+        }
+        if (typeof base64 !== 'string' || base64.length === 0) {
+          return {
+            ok: false,
+            error: 'file:savePalmar requires a base64 payload',
+          };
+        }
+        if (
+          json !== undefined &&
+          (typeof json !== 'object' || json === null)
+        ) {
+          return {
+            ok: false,
+            error: 'file:savePalmar json must be an object',
+          };
+        }
+        const dir = palmarDirFor();
+        fs.mkdirSync(dir, { recursive: true });
+        // Sufijo: -2, -3... cuando {base}.xlsx O {base}.json ya existe.
+        let candidate = baseName;
+        for (let n = 2; ; n += 1) {
+          const baseTaken =
+            fs.existsSync(path.join(dir, `${candidate}.xlsx`)) ||
+            fs.existsSync(path.join(dir, `${candidate}.json`));
+          if (!baseTaken) break;
+          candidate = `${baseName}-${n}`;
+        }
+        const xlsxPath = path.join(dir, `${candidate}.xlsx`);
+        fs.writeFileSync(xlsxPath, Buffer.from(base64, 'base64'));
+        const result: PalmarSaveResult = { ok: true, xlsxPath };
+        if (json !== undefined) {
+          const jsonPath = path.join(dir, `${candidate}.json`);
+          fs.writeFileSync(jsonPath, JSON.stringify(json, null, 2));
+          result.jsonPath = jsonPath;
+        }
+        return result;
+      } catch (error) {
+        return { ok: false, error: (error as Error).message };
+      }
+    },
+  );
+
+  // Lista las jornadas Palmar desde el filesystem (solo .json), ordenadas
+  // por createdAt descendente. Error si la carpeta no existe.
+  ipcMain.handle('file:listPalmar', () => {
+    try {
+      const dir = palmarDirFor();
+      if (!fs.existsSync(dir)) {
+        return {
+          ok: false,
+          error: `Palmar directory not found: ${dir}`,
+        };
+      }
+      const records: PalmarHistoryEntry[] = fs
+        .readdirSync(dir)
+        .filter((fileName) => fileName.endsWith('.json'))
+        .map((fileName) => {
+          const raw = fs.readFileSync(path.join(dir, fileName), 'utf8');
+          const record = JSON.parse(raw) as PalmarRecord;
+          return {
+            fileName,
+            createdAt: record.created_at,
+            totalVentas: record.total_ventas,
+            totalArqueo: record.total_arqueo,
+            totalRecibido: record.total_recibido,
+            usuario: record.usuario ?? null,
+          };
+        })
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return { ok: true, records };
+    } catch (error) {
+      return { ok: false, error: (error as Error).message };
+    }
+  });
+
+  // Lee una jornada Palmar por fileName (basename puro terminado en .json).
+  // Rechaza path traversal: sin '/', '\' ni '..' (S1).
+  ipcMain.handle(
+    'file:readPalmar',
+    (_event, payload: PalmarReadPayload | undefined) => {
+      try {
+        const fileName = payload?.fileName;
+        if (
+          typeof fileName !== 'string' ||
+          !fileName.endsWith('.json') ||
+          fileName.includes('/') ||
+          fileName.includes('\\') ||
+          fileName.includes('..')
+        ) {
+          return {
+            ok: false,
+            error: 'file:readPalmar requires fileName to be a .json basename',
+          };
+        }
+        const fullPath = path.join(palmarDirFor(), fileName);
+        const raw = fs.readFileSync(fullPath, 'utf8');
+        return { ok: true, record: JSON.parse(raw) as PalmarRecord };
+      } catch (error) {
+        return { ok: false, error: (error as Error).message };
+      }
+    },
+  );
 
   // ---- DB nativa: contrato IPC de 5 canales (T3, AD-9) ----
   // (dbPathFor / rodantePathFor / backupsDirFor viven en scope de módulo:
