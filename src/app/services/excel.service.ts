@@ -32,6 +32,59 @@ export interface PendienteAcumulado {
   antiguedadDias: number; // date-only floor((hoy - fecha)/86400000), max 0 → mismo día 0
 }
 
+// ─── Tipos Palmar (PR2) ───
+// Reflejan `models/palmar-jornada.ts` (PR1, Pana A). Se definen localmente para
+// que PR2 sea independiente; al mergear PR1 con contenido idéntico, el merge
+// los reconcilia.
+
+export interface PalmarProductoEntry {
+  nombre: string;
+  cantidad: number;
+  precio_venta: number;
+  precio_costo: number;
+  subtotal: number;
+  costo_subtotal: number;
+}
+
+export interface PalmarDivisa {
+  usd: number;
+  eur: number;
+  tasa_usd: number;
+  tasa_eur: number;
+  usd_cup: number;
+  eur_cup: number;
+  divisa_cup: number;
+}
+
+export interface PalmarRecord {
+  version: 1;
+  id: string;
+  fecha: string;
+  created_at: string;
+  usuario: string | null;
+  productos: PalmarProductoEntry[];
+  arqueo: ArqueoCajaEntry[];
+  divisa: PalmarDivisa;
+  transferencia: number;
+  total_ventas: number;
+  total_arqueo: number;
+  total_recibido: number;
+  invertido: number;
+  ganancia: number;
+  diferencia: number;
+}
+
+export interface PalmarSemanaResumen {
+  semanaInicio: string;
+  semanaFin: string;
+  totalRecibido: number;
+  efectivo: number;
+  divisaCup: number;
+  transferencia: number;
+  invertido: number;
+  ganancia: number;
+}
+
 export interface JornadaReportData {
   jornada: Jornada;
   ventas: VentaConDetalles[];
@@ -73,6 +126,98 @@ export class ExcelService {
     this._agregarIpve(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  }
+
+  /**
+   * Genera un Excel (.xlsx) con lo REGISTRADO de la tienda externa "Palmar"
+   * (solo lectura — este método NO escribe en la base de datos):
+   * - Hoja "Resumen": totales semanales (efectivo / divisa / transferencia / invertido / ganancia)
+   * - Hoja "Arqueo": desglose por denominación del arqueo del día
+   * - Hoja "Ventas": productos vendidos (Fase 1: solo cantidad > 0)
+   *
+   * @returns string en base64 del archivo xlsx
+   */
+  generarExcelPalmar(record: PalmarRecord, resumenSemana: PalmarSemanaResumen): string {
+    const wb = XLSX.utils.book_new();
+
+    this._agregarPalmarResumen(wb, resumenSemana);
+    this._agregarPalmarArqueo(wb, record);
+    this._agregarPalmarVentas(wb, record);
+
+    return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  }
+
+  private _agregarPalmarResumen(wb: XLSX.WorkBook, resumen: PalmarSemanaResumen): void {
+    const filas: unknown[][] = [
+      ['Palmar — Resumen Semanal'],
+      [],
+      ['Semana', `${resumen.semanaInicio} → ${resumen.semanaFin}`],
+      [],
+      ['Total recibido', resumen.totalRecibido],
+      ['Efectivo', resumen.efectivo],
+      ['Divisas (CUP)', resumen.divisaCup],
+      ['Transferencia', resumen.transferencia],
+      ['Invertido', resumen.invertido],
+      ['Ganancia', resumen.ganancia],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 20 }, { wch: 20 }];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+  }
+
+  private _agregarPalmarArqueo(wb: XLSX.WorkBook, record: PalmarRecord): void {
+    const arqueo = record.arqueo;
+    if (!arqueo || arqueo.length === 0) return;
+
+    const totalArqueo = arqueo.reduce((sum, a) => sum + a.subtotal, 0);
+
+    const filas: unknown[][] = [
+      ['Arqueo de Caja'],
+      [],
+      ['Denominación', 'Cantidad', 'Subtotal'],
+    ];
+
+    for (const entry of arqueo) {
+      filas.push([`$${entry.denominacion.toLocaleString()}`, entry.cantidad, entry.subtotal]);
+    }
+
+    filas.push([]);
+    filas.push(['Total contado', '', totalArqueo]);
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 14 }];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Arqueo');
+  }
+
+  private _agregarPalmarVentas(wb: XLSX.WorkBook, record: PalmarRecord): void {
+    // Fase 1: el Excel muestra SOLO productos con cantidad > 0
+    const vendidos = record.productos.filter((p) => p.cantidad > 0);
+
+    const filas: unknown[][] = [
+      ['Producto', 'Cantidad', 'Precio venta', 'Subtotal', 'Costo', 'Invertido'],
+    ];
+
+    for (const p of vendidos) {
+      filas.push([p.nombre, p.cantidad, p.precio_venta, p.subtotal, p.precio_costo, p.costo_subtotal]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 14 },
+    ];
+    ws['!protect'] = {};
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
   }
 
   private _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): void {
