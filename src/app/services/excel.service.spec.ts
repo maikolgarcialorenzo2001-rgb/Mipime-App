@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { ExcelService, type JornadaReportData, type PendienteAcumulado } from './excel.service';
+import {
+  ExcelService,
+  type JornadaReportData,
+  type PendienteAcumulado,
+} from './excel.service';
+import type { PalmarRecord, PalmarSemanaResumen } from '../models/palmar-jornada';
 import * as XLSX from 'xlsx';
 import type { Jornada } from '../models/jornada';
 import type { VentaConDetalles } from './excel.service';
@@ -1753,6 +1758,147 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
       expect(json).toContainEqual(['Pendientes del día', 0]);
+    });
+  });
+
+  // ─── palmar-ventas PR2: Excel semanal de tienda externa "Palmar" ───
+
+  describe('generarExcelPalmar (palmar-ventas PR2)', () => {
+    const record: PalmarRecord = {
+      version: 1,
+      id: 'rec-2026-08-09',
+      fecha: '2026-08-09',
+      created_at: '2026-08-09T18:00:00Z',
+      usuario: 'Ana',
+      productos: [
+        { nombre: 'Coca-Cola 500ml', cantidad: 10, precio_venta: 200, precio_costo: 120, subtotal: 2000, costo_subtotal: 1200 },
+        { nombre: 'Agua 1L', cantidad: 5, precio_venta: 150, precio_costo: 90, subtotal: 750, costo_subtotal: 450 },
+        // Fase 1: producto con cantidad 0 NO debe aparecer en la hoja Ventas
+        { nombre: 'Chocolate', cantidad: 0, precio_venta: 100, precio_costo: 60, subtotal: 0, costo_subtotal: 0 },
+      ],
+      arqueo: [
+        { denominacion: 1000, cantidad: 5, subtotal: 5000 },
+        { denominacion: 500, cantidad: 10, subtotal: 5000 },
+        { denominacion: 200, cantidad: 25, subtotal: 5000 },
+      ],
+      divisa: { usd: 20, eur: 10, tasa_usd: 300, tasa_eur: 330, usd_cup: 6000, eur_cup: 3300, divisa_cup: 9300 },
+      transferencia: 3000,
+      total_ventas: 2750,
+      total_arqueo: 15000,
+      total_recibido: 15200,
+      invertido: 1650,
+      ganancia: 1100,
+      diferencia: -200,
+    };
+
+    const resumenSemana: PalmarSemanaResumen = {
+      semanaInicio: '2026-08-03',
+      semanaFin: '2026-08-09',
+      totalRecibido: 15200,
+      efectivo: 8000,
+      divisaCup: 4200,
+      transferencia: 3000,
+      invertido: 6000,
+      ganancia: 9200,
+    };
+
+    it('PR2 RED: devuelve base64 xlsx válido con 3 hojas Resumen, Arqueo, Ventas', () => {
+      const result = service.generarExcelPalmar(record, resumenSemana);
+
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+
+      const workbook = XLSX.read(result, { type: 'base64' });
+      expect(workbook.SheetNames).toEqual(['Resumen', 'Arqueo', 'Ventas']);
+    });
+
+    it('PR2 RED: hoja Ventas excluye productos con cantidad 0', () => {
+      const result = service.generarExcelPalmar(record, resumenSemana);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      // header + 2 productos con cantidad > 0 (Chocolate queda excluido)
+      expect(json.length).toBe(3);
+      const filas = json as unknown[][];
+      expect(filas.some((f) => f[0] === 'Coca-Cola 500ml')).toBe(true);
+      expect(filas.some((f) => f[0] === 'Agua 1L')).toBe(true);
+      expect(filas.some((f) => f[0] === 'Chocolate')).toBe(false);
+    });
+
+    it('PR2 RED: hoja Ventas muestra valores de fila (nombre, cantidad, subtotal, costo, invertido)', () => {
+      const result = service.generarExcelPalmar(record, resumenSemana);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Ventas'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+      const filas = json as unknown[][];
+
+      const cocaRow = filas.find((f) => f[0] === 'Coca-Cola 500ml') as unknown[];
+      expect(cocaRow).toBeTruthy();
+      expect(cocaRow[1]).toBe(10);   // cantidad
+      expect(cocaRow[2]).toBe(200);  // precio venta
+      expect(cocaRow[3]).toBe(2000); // subtotal
+      expect(cocaRow[4]).toBe(120);  // costo unitario (precio_costo)
+      expect(cocaRow[5]).toBe(1200); // invertido (costo_subtotal)
+
+      const aguaRow = filas.find((f) => f[0] === 'Agua 1L') as unknown[];
+      expect(aguaRow).toBeTruthy();
+      expect(aguaRow[1]).toBe(5);    // cantidad
+      expect(aguaRow[3]).toBe(750);  // subtotal
+      expect(aguaRow[5]).toBe(450);  // invertido (costo_subtotal)
+    });
+
+    it('PR2 RED: hoja Arqueo muestra denominaciones y Total contado', () => {
+      const result = service.generarExcelPalmar(record, resumenSemana);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Arqueo'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json.some((r) => r[0] === '$1,000' && r[1] === 5 && r[2] === 5000)).toBe(true);
+      expect(json.some((r) => r[0] === '$500' && r[1] === 10 && r[2] === 5000)).toBe(true);
+      expect(json.some((r) => r[0] === '$200' && r[1] === 25 && r[2] === 5000)).toBe(true);
+      expect(json).toContainEqual(['Total contado', '', 15000]);
+    });
+
+    it('PR2 RED: hoja Resumen contiene totales semanales (recibido, efectivo, divisa, transferencia, invertido, ganancia)', () => {
+      const result = service.generarExcelPalmar(record, resumenSemana);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Semana', '2026-08-03 → 2026-08-09']);
+      expect(json).toContainEqual(['Total recibido', 15200]);
+      expect(json).toContainEqual(['Efectivo', 8000]);
+      expect(json).toContainEqual(['Divisas (CUP)', 4200]);
+      expect(json).toContainEqual(['Transferencia', 3000]);
+      expect(json).toContainEqual(['Invertido', 6000]);
+      expect(json).toContainEqual(['Ganancia', 9200]);
+    });
+
+    it('PR2 RED (triangulación): Resumen con otra semana muestra otros totales', () => {
+      const otraSemana: PalmarSemanaResumen = {
+        semanaInicio: '2026-08-10',
+        semanaFin: '2026-08-16',
+        totalRecibido: 25000,
+        efectivo: 12000,
+        divisaCup: 8000,
+        transferencia: 5000,
+        invertido: 9000,
+        ganancia: 16000,
+      };
+
+      const result = service.generarExcelPalmar(record, otraSemana);
+      const workbook = XLSX.read(result, { type: 'base64' });
+      const sheet = workbook.Sheets['Resumen'];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+
+      expect(json).toContainEqual(['Semana', '2026-08-10 → 2026-08-16']);
+      expect(json).toContainEqual(['Total recibido', 25000]);
+      expect(json).toContainEqual(['Efectivo', 12000]);
+      expect(json).toContainEqual(['Divisas (CUP)', 8000]);
+      expect(json).toContainEqual(['Transferencia', 5000]);
+      expect(json).toContainEqual(['Invertido', 9000]);
+      expect(json).toContainEqual(['Ganancia', 16000]);
     });
   });
 });

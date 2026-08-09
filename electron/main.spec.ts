@@ -97,12 +97,17 @@ vi.mock('electron-updater', () => ({
 const mockFsMkdirSync = vi.hoisted(() => vi.fn());
 const mockFsWriteFileSync = vi.hoisted(() => vi.fn());
 const mockFsExistsSync = vi.hoisted(() => vi.fn(() => false));
+const mockFsReadFileSync = vi.hoisted(() =>
+  vi.fn(() => Buffer.from('mocked-content')),
+);
+const mockFsReaddirSync = vi.hoisted(() => vi.fn(() => []));
 
 vi.mock('fs', () => ({
-  readFileSync: vi.fn(() => Buffer.from('mocked-content')),
+  readFileSync: mockFsReadFileSync,
   mkdirSync: mockFsMkdirSync,
   writeFileSync: mockFsWriteFileSync,
   existsSync: mockFsExistsSync,
+  readdirSync: mockFsReaddirSync,
 }));
 
 const mockLoadWindowState = vi.hoisted(() => vi.fn(() => null));
@@ -926,6 +931,446 @@ describe('main process', () => {
 
       const writtenBuffer = mockFsWriteFileSync.mock.calls[0][1] as Buffer;
       expect(writtenBuffer.toString()).toBe('Hello World');
+    });
+  });
+
+  describe('file:savePalmar IPC handler (palmar-ventas PR3)', () => {
+    beforeEach(() => {
+      mockAppGetPath.mockReturnValue('/mock/Documents');
+      mockFsExistsSync.mockReturnValue(false);
+      mockFsReaddirSync.mockReturnValue([]);
+      mockFsReadFileSync.mockReturnValue(Buffer.from('mocked-content'));
+    });
+
+    async function getSavePalmarHandler(): Promise<
+      (args?: unknown) => Promise<unknown>
+    > {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:savePalmar',
+      )?.[1] as (event: unknown, args?: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+      return async (args?: unknown) => handler({} as never, args);
+    }
+
+    it('should register file:savePalmar IPC handler', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith(
+        'file:savePalmar',
+        expect.any(Function),
+      );
+    });
+
+    it('should reject a baseName that is not dd-mm-yyyy without writing (T7)', async () => {
+      const handler = await getSavePalmarHandler();
+
+      const result = await handler({
+        baseName: '2026-08-09',
+        base64: 'SGVsbG8gV29ybGQ=',
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('dd-mm-yyyy'),
+      });
+      expect(mockFsWriteFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should reject a missing base64 without writing', async () => {
+      const handler = await getSavePalmarHandler();
+
+      const result = await handler({ baseName: '09-08-2026' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('base64'),
+      });
+      expect(mockFsWriteFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should save xlsx and json into Documents/Tienda - App/Palmar and return both paths', async () => {
+      const handler = await getSavePalmarHandler();
+      const json = { id: 'j1', fecha: '2026-08-09' };
+
+      const result = (await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8gV29ybGQ=',
+        json,
+      })) as { ok: boolean; xlsxPath?: string; jsonPath?: string };
+
+      expect(mockAppGetPath).toHaveBeenCalledWith('documents');
+      expect(mockFsMkdirSync).toHaveBeenCalledWith(
+        expect.stringMatching(/Tienda - App[\\/]Palmar$/),
+        { recursive: true },
+      );
+      expect(mockFsWriteFileSync).toHaveBeenCalledTimes(2);
+      const [xlsxCall, jsonCall] = mockFsWriteFileSync.mock.calls;
+      expect(xlsxCall[0]).toMatch(
+        /Tienda - App[\\/]Palmar[\\/]09-08-2026\.xlsx$/,
+      );
+      expect((xlsxCall[1] as Buffer).toString()).toBe('Hello World');
+      expect(jsonCall[0]).toMatch(
+        /Tienda - App[\\/]Palmar[\\/]09-08-2026\.json$/,
+      );
+      expect(result.ok).toBe(true);
+      expect(result.xlsxPath).toMatch(/09-08-2026\.xlsx$/);
+      expect(result.jsonPath).toMatch(/09-08-2026\.json$/);
+    });
+
+    it('should save only the xlsx when json is omitted (reprint)', async () => {
+      const handler = await getSavePalmarHandler();
+
+      const result = (await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      })) as { ok: boolean; xlsxPath?: string; jsonPath?: string };
+
+      expect(mockFsWriteFileSync).toHaveBeenCalledTimes(1);
+      expect(result.ok).toBe(true);
+      expect(result.xlsxPath).toMatch(/09-08-2026\.xlsx$/);
+      expect(result.jsonPath).toBeUndefined();
+    });
+
+    it('should use suffix -2 when the base xlsx already exists (never overwrite)', async () => {
+      // existsSync: base.xlsx exists (true) → -2 candidate free (default false)
+      mockFsExistsSync.mockReturnValueOnce(true);
+
+      const handler = await getSavePalmarHandler();
+      const result = (await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      })) as { ok: boolean; xlsxPath?: string; jsonPath?: string };
+
+      expect(mockFsWriteFileSync).toHaveBeenCalledTimes(1);
+      expect(mockFsWriteFileSync.mock.calls[0][0]).toMatch(
+        /09-08-2026-2\.xlsx$/,
+      );
+      expect(result.xlsxPath).toMatch(/09-08-2026-2\.xlsx$/);
+    });
+
+    it('should use suffix -3 when both base and -2 already exist', async () => {
+      // existsSync: base true → -2 true → -3 free
+      mockFsExistsSync.mockReturnValueOnce(true).mockReturnValueOnce(true);
+
+      const handler = await getSavePalmarHandler();
+      const result = (await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      })) as { ok: boolean; xlsxPath?: string; jsonPath?: string };
+
+      expect(mockFsWriteFileSync.mock.calls[0][0]).toMatch(
+        /09-08-2026-3\.xlsx$/,
+      );
+      expect(result.xlsxPath).toMatch(/09-08-2026-3\.xlsx$/);
+    });
+
+    it('should suffix both xlsx and json together when the base json exists', async () => {
+      // existsSync: base.xlsx false, base.json true → -2 free
+      mockFsExistsSync.mockReturnValueOnce(false).mockReturnValueOnce(true);
+
+      const handler = await getSavePalmarHandler();
+      const result = (await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+        json: { id: 'j1', fecha: '2026-08-09' },
+      })) as { ok: boolean; xlsxPath?: string; jsonPath?: string };
+
+      expect(mockFsWriteFileSync).toHaveBeenCalledTimes(2);
+      expect(mockFsWriteFileSync.mock.calls[0][0]).toMatch(
+        /09-08-2026-2\.xlsx$/,
+      );
+      expect(mockFsWriteFileSync.mock.calls[1][0]).toMatch(
+        /09-08-2026-2\.json$/,
+      );
+      expect(result.xlsxPath).toMatch(/09-08-2026-2\.xlsx$/);
+      expect(result.jsonPath).toMatch(/09-08-2026-2\.json$/);
+    });
+
+    it('should never write the base path when a collision is detected (no overwrite)', async () => {
+      mockFsExistsSync.mockReturnValueOnce(true);
+
+      const handler = await getSavePalmarHandler();
+      await handler({ baseName: '09-08-2026', base64: 'SGVsbG8=' });
+
+      const written = mockFsWriteFileSync.mock.calls.map((c) => c[0]);
+      expect(written).not.toContain(
+        expect.stringMatching(/09-08-2026\.xlsx$/),
+      );
+      expect(written[0]).toMatch(/09-08-2026-2\.xlsx$/);
+    });
+
+    it('should return {ok:false, error} instead of throwing when writeFileSync fails (M1)', async () => {
+      mockFsWriteFileSync.mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+
+      const handler = await getSavePalmarHandler();
+      const result = await handler({
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      });
+
+      expect(result).toEqual({ ok: false, error: 'EACCES: permission denied' });
+    });
+  });
+
+  describe('file:listPalmar IPC handler (palmar-ventas PR3)', () => {
+    beforeEach(() => {
+      mockAppGetPath.mockReturnValue('/mock/Documents');
+      mockFsExistsSync.mockReturnValue(true);
+      mockFsReaddirSync.mockReturnValue([]);
+      mockFsReadFileSync.mockReturnValue(Buffer.from('mocked-content'));
+    });
+
+    async function getListPalmarHandler(): Promise<
+      (args?: unknown) => Promise<unknown>
+    > {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:listPalmar',
+      )?.[1] as (event: unknown, args?: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+      return async (args?: unknown) => handler({} as never, args);
+    }
+
+    it('should register file:listPalmar IPC handler', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith(
+        'file:listPalmar',
+        expect.any(Function),
+      );
+    });
+
+    it('should return {ok:false, error} when the Palmar directory is missing', async () => {
+      mockFsExistsSync.mockReturnValue(false);
+
+      const handler = await getListPalmarHandler();
+      const result = await handler();
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('Palmar'),
+      });
+      expect(mockFsReaddirSync).not.toHaveBeenCalled();
+    });
+
+    it('should list only .json files as PalmarHistoryEntry[] sorted by createdAt', async () => {
+      const record1 = {
+        id: 'j1',
+        fecha: '2026-08-09',
+        created_at: '2026-08-09T10:00:00.000Z',
+        usuario: 'Ana',
+        total_ventas: 1200,
+        total_arqueo: 1100,
+        total_recibido: 1150,
+      };
+      const record2 = {
+        id: 'j2',
+        fecha: '2026-08-10',
+        created_at: '2026-08-10T10:00:00.000Z',
+        usuario: null,
+        total_ventas: 900,
+        total_arqueo: 800,
+        total_recibido: 850,
+      };
+      const record3 = {
+        id: 'j3',
+        fecha: '2026-08-08',
+        created_at: '2026-08-08T10:00:00.000Z',
+        usuario: 'Luis',
+        total_ventas: 500,
+        total_arqueo: 450,
+        total_recibido: 470,
+      };
+      mockFsReaddirSync.mockReturnValue([
+        '09-08-2026.json',
+        'not-a-record.xlsx',
+        '10-08-2026.json',
+        '2026-08-09.json', // nombre no dd-mm-yyyy: se lista igual (list no valida nombres)
+      ]);
+      mockFsReadFileSync.mockImplementation((filePath: string) => {
+        if (filePath.endsWith('09-08-2026.json')) {
+          return JSON.stringify(record1);
+        }
+        if (filePath.endsWith('10-08-2026.json')) {
+          return JSON.stringify(record2);
+        }
+        if (filePath.endsWith('2026-08-09.json')) {
+          return JSON.stringify(record3);
+        }
+        throw new Error('ENOENT');
+      });
+
+      const handler = await getListPalmarHandler();
+      const result = (await handler()) as {
+        ok: boolean;
+        records?: Array<{
+          fileName: string;
+          createdAt: string;
+          totalVentas: number;
+          totalArqueo: number;
+          totalRecibido: number;
+          usuario: string | null;
+        }>;
+      };
+
+      expect(result.ok).toBe(true);
+      expect(result.records).toHaveLength(3);
+      expect(result.records![0]).toEqual({
+        fileName: '10-08-2026.json',
+        createdAt: '2026-08-10T10:00:00.000Z',
+        totalVentas: 900,
+        totalArqueo: 800,
+        totalRecibido: 850,
+        usuario: null,
+      });
+      expect(result.records![1]).toEqual({
+        fileName: '09-08-2026.json',
+        createdAt: '2026-08-09T10:00:00.000Z',
+        totalVentas: 1200,
+        totalArqueo: 1100,
+        totalRecibido: 1150,
+        usuario: 'Ana',
+      });
+      expect(result.records![2]).toEqual({
+        fileName: '2026-08-09.json',
+        createdAt: '2026-08-08T10:00:00.000Z',
+        totalVentas: 500,
+        totalArqueo: 450,
+        totalRecibido: 470,
+        usuario: 'Luis',
+      });
+      // el xlsx no se lista ni se lee
+      expect(mockFsReadFileSync).not.toHaveBeenCalledWith(
+        expect.stringMatching(/not-a-record\.xlsx$/),
+        'utf8',
+      );
+    });
+
+    it('should return {ok:false, error} instead of throwing on malformed json', async () => {
+      mockFsReaddirSync.mockReturnValue(['09-08-2026.json']);
+      mockFsReadFileSync.mockReturnValue('not-json{');
+
+      const handler = await getListPalmarHandler();
+      const result = await handler();
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.any(String),
+      });
+    });
+  });
+
+  describe('file:readPalmar IPC handler (palmar-ventas PR3)', () => {
+    beforeEach(() => {
+      mockAppGetPath.mockReturnValue('/mock/Documents');
+      mockFsReadFileSync.mockReturnValue(Buffer.from('mocked-content'));
+    });
+
+    async function getReadPalmarHandler(): Promise<
+      (args?: unknown) => Promise<unknown>
+    > {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+      const handler = mockIpcMainHandle.mock.calls.find(
+        ([channel]) => channel === 'file:readPalmar',
+      )?.[1] as (event: unknown, args?: unknown) => Promise<unknown>;
+      expect(handler).toBeDefined();
+      return async (args?: unknown) => handler({} as never, args);
+    }
+
+    it('should register file:readPalmar IPC handler', async () => {
+      vi.resetModules();
+      await import('./main');
+      await flush();
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith(
+        'file:readPalmar',
+        expect.any(Function),
+      );
+    });
+
+    it('should reject path traversal in fileName without reading (S1)', async () => {
+      const handler = await getReadPalmarHandler();
+
+      for (const fileName of [
+        '../secret.json',
+        '..\\secret.json',
+        'sub/dir/file.json',
+        'sub\\dir\\file.json',
+        'C:\\evil.json',
+      ]) {
+        const result = await handler({ fileName });
+        expect(result).toEqual({
+          ok: false,
+          error: expect.stringContaining('fileName'),
+        });
+      }
+      expect(mockFsReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should reject a fileName that does not end in .json', async () => {
+      const handler = await getReadPalmarHandler();
+
+      const result = await handler({ fileName: '09-08-2026.xlsx' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('.json'),
+      });
+      expect(mockFsReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should read the json file and return the parsed record', async () => {
+      const record = {
+        id: 'j1',
+        fecha: '2026-08-09',
+        created_at: '2026-08-09T10:00:00.000Z',
+        usuario: 'Ana',
+        total_ventas: 1200,
+        total_arqueo: 1100,
+        total_recibido: 1150,
+      };
+      mockFsReadFileSync.mockReturnValue(JSON.stringify(record));
+
+      const handler = await getReadPalmarHandler();
+      const result = (await handler({
+        fileName: '09-08-2026.json',
+      })) as { ok: boolean; record?: unknown };
+
+      expect(mockFsReadFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /Tienda - App[\\/]Palmar[\\/]09-08-2026\.json$/,
+        ),
+        'utf8',
+      );
+      expect(result.ok).toBe(true);
+      expect(result.record).toEqual(record);
+    });
+
+    it('should return {ok:false, error} instead of throwing when the file is missing', async () => {
+      mockFsReadFileSync.mockImplementationOnce(() => {
+        throw new Error('ENOENT: no such file');
+      });
+
+      const handler = await getReadPalmarHandler();
+      const result = await handler({ fileName: '01-01-2020.json' });
+
+      expect(result).toEqual({
+        ok: false,
+        error: expect.stringContaining('ENOENT'),
+      });
     });
   });
 

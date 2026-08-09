@@ -20,6 +20,10 @@ const VALID_INVOKE_CHANNELS: readonly string[] = [
   'db:import',
   'db:backupNow',
   'db:export',
+  // Jornadas Palmar (PR3, Pana B): filesystem, cero DB.
+  'file:savePalmar',
+  'file:listPalmar',
+  'file:readPalmar',
 ];
 
 /**

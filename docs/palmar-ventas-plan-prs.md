@@ -126,7 +126,7 @@ cargarResumenSemanal(fecha: string): Promise<PalmarSemanaResumen>
 - [ ] Tests verdes (`ng test` para Angular, `bunx vitest run --config vitest.electron.config.ts` para electron)
 - [ ] Lint limpio (`ng lint`)
 - [ ] Sin regresión: PR1 mantiene verde `app-nav.component.spec.ts` (arqueo del cierre de jornada)
-- [ ] PR6: test de cero-DB-writes (spy sobre `DATABASE`: exactamente UNA llamada SQL = `listar()`, sin INSERT/UPDATE/DELETE)
+- [ ] PR6: test de cero-DB-writes (spy sobre `DATABASE`: `sql()` NUNCA llamado — PalmarService es zero-SQL por construcción; la lectura `listar()` queda en el modal de PR7)
 - [ ] Commit por unidad de trabajo (tests con el código que verifican)
 
 ## Fuera de scope (para futuras iteraciones)
@@ -141,10 +141,10 @@ cargarResumenSemanal(fecha: string): Promise<PalmarSemanaResumen>
 | PR | Dueño | Estado |
 |---|---|---|
 | 1 | A | ✅ Aplicado y verificado (commits `a0047cd`, `72fb519`; 785/785 tests; PASS) |
-| 2 | B | ⬜ Sin empezar |
-| 3 | B | ⬜ Sin empezar |
-| 4 | B | ⬜ Sin empezar |
+| 2 | B | ✅ Aplicado y verificado (commit `c17819d`/`1910602`+`cbc4c0f`; 91/91 spec, 791/791 suite; PASS) |
+| 3 | B | ✅ Aplicado y verificado (commits `a54d18e`, `b964eeb`; 164/165 electron — 1 fallo pre-existente INTEGRATION schema; 791/791 Angular; PASS) |
+| 4 | B | ✅ Aplicado y verificado (commit `c05d967`; 799/799 suite; PASS) |
 | 5 | A | ✅ Aplicado y verificado (commits `84b51f5`, `b8a5dd0`, `844a562`; 795/795 tests; PASS; cast contrato listPalmar documentado para limpiar en PR8) |
-| 6 | B | ⬜ Sin empezar |
+| 6 | B | ✅ Aplicado y verificado (commit `cc216c7`; 812/812 suite, zero-DB-writes test PASS; PASS) |
 | 7 | A | ✅ Aplicado y verificado (commits `a9fb82f`, `95e3a36`; 811/811 tests; PASS; token `PALMAR_JORNADA_SERVICE` mockeado, PR8 conecta con `useExisting: PalmarService`) |
 | 8 | A | ⬜ Sin empezar |

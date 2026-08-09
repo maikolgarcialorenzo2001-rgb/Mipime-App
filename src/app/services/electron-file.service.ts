@@ -1,5 +1,6 @@
 /// <reference path="../../../electron/types.d.ts" />
 import { Injectable } from '@angular/core';
+import type { PalmarRecord } from '../models/palmar-jornada';
 
 /** Nombres de meses en español para los nombres de archivo. */
 const MONTH_NAMES = [
@@ -95,5 +96,59 @@ export class ElectronFileService {
     // BACKLOG-5: diferir el revoke hasta después del click (Safari viejo
     // aborta el download si la URL se revoca en el mismo tick).
     setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  // ---- Jornadas Palmar (PR4, Pana B): sobre canales IPC de PR3 ----
+  // Abstracción del renderer sobre file:savePalmar / file:listPalmar /
+  // file:readPalmar. Gate por PRESENCIA de electronAPI: en navegador plano
+  // (ng serve) no hay IPC, así que savePalmar cae al Blob fallback,
+  // listPalmar devuelve [] y readPalmar rechaza. CERO escrituras a DB.
+
+  /**
+   * Lista las jornadas Palmar desde el filesystem (solo .json), ordenadas
+   * por createdAt descendente (lo ordena main). Sin Electron: historial
+   * vacío.
+   */
+  async listPalmar(): Promise<PalmarHistoryEntry[]> {
+    const api = window.electronAPI;
+    if (!api) {
+      return [];
+    }
+    const result = (await api.invoke('file:listPalmar')) as PalmarListResult;
+    return result.ok ? (result.records ?? []) : [];
+  }
+
+  /**
+   * Lee una jornada Palmar por fileName (basename terminado en .json; la
+   * validación de path traversal la hace main). Sin Electron: rechaza.
+   */
+  async readPalmar(fileName: string): Promise<PalmarReadResult> {
+    const api = window.electronAPI;
+    if (!api) {
+      throw new Error('readPalmar requires Electron (electronAPI not available)');
+    }
+    return (await api.invoke('file:readPalmar', { fileName })) as PalmarReadResult;
+  }
+
+  /**
+   * Guarda una jornada Palmar: {base}.xlsx (+ {base}.json si viene json).
+   * En Electron delega a main (que decide sufijos -2/-3); en navegador
+   * descarga el xlsx como Blob.
+   */
+  async savePalmar(
+    baseName: string,
+    base64: string,
+    json?: PalmarRecord,
+  ): Promise<PalmarSaveResult> {
+    const api = window.electronAPI;
+    if (api) {
+      const payload: PalmarSavePayload = { baseName, base64 };
+      if (json !== undefined) {
+        payload.json = json;
+      }
+      return (await api.invoke('file:savePalmar', payload)) as PalmarSaveResult;
+    }
+    this._blobFallback(base64, `${baseName}.xlsx`);
+    return { ok: true };
   }
 }

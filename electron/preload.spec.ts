@@ -211,6 +211,40 @@ describe('preload', () => {
       expect(mockIpcInvoke).toHaveBeenCalledWith('db:export');
     });
 
+    it('should allow invoke on file:savePalmar channel', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('file:savePalmar', {
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('file:savePalmar', {
+        baseName: '09-08-2026',
+        base64: 'SGVsbG8=',
+      });
+    });
+
+    it('should allow invoke on file:listPalmar channel', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('file:listPalmar');
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('file:listPalmar');
+    });
+
+    it('should allow invoke on file:readPalmar channel', async () => {
+      const api = await getPreloadApi();
+
+      await (api.invoke as InvokeFn)('file:readPalmar', {
+        fileName: '09-08-2026.json',
+      });
+
+      expect(mockIpcInvoke).toHaveBeenCalledWith('file:readPalmar', {
+        fileName: '09-08-2026.json',
+      });
+    });
+
     it('should reject invoke on unknown channels', async () => {
       const api = await getPreloadApi();
 
