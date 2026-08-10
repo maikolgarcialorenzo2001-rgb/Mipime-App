@@ -14,7 +14,7 @@
       </div>
     </div>
   } @else if (jornadaService.jornadaAbierta(); as j) {
-    <app-jornada-summary-card [jornada]="j" [totalGastos]="totalGastos()" [isAdmin]="isAdmin" />
+    <app-jornada-summary-card [jornada]="j" [totalGastos]="totalGastos()" [totalEnCaja]="jornadaService.totalEnCaja()" [isAdmin]="isAdmin" />
 
     @if (ventasDelDia().length > 0 || movimientosDelDia().length > 0 || mermasDelDia().length > 0) {
       <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
