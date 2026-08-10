@@ -1,5 +1,11 @@
 # Proposal: Fix auto-cierre de jornada — Excel + toast + bug
 
+> **OBSOLETO (2026-08-10)** — este documento describe el plan ORIGINAL (que el
+> autocierre generara Excel). La decisión final del dueño fue ELIMINAR el
+> autocierre por completo: reanudar jornada se maneja con el modal para
+> cualquier usuario autenticado. El plan REAL está en `tasks.md`; el resultado
+> en `apply-report.md`.
+
 ## Intent
 
 Completar el flujo de auto-cierre de jornada: cuando un usuario diferente loguea y se cierra automáticamente la jornada previa, debe generarse y guardarse el Excel, y el usuario debe recibir feedback visual.

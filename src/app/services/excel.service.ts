@@ -40,6 +40,8 @@ export interface JornadaReportData {
   productosMap?: Map<number, ProductoInfo>;
   totalCosto: number;
   userCierreNombre: string | null;
+  /** FR-6: nombre del aperturista original (si la jornada lo registró). */
+  userAperturaNombre?: string | null;
   cuentaCosas?: CuentaCosa[];
   stockMovimientos?: StockMovimiento[];
   ventaLotes?: VentaLote[];
@@ -264,7 +266,10 @@ export class ExcelService {
       [],
     ];
 
-    if (data.userCierreNombre) {
+    if (data.userAperturaNombre && data.userCierreNombre && data.userAperturaNombre !== data.userCierreNombre) {
+      filas.push(['Abierta por', data.userAperturaNombre]);
+      filas.push(['Cerrada por', data.userCierreNombre]);
+    } else if (data.userCierreNombre) {
       filas.push(['Firmado por', data.userCierreNombre]);
     }
 
@@ -682,7 +687,10 @@ export class ExcelService {
       ['Total del día', totalEnCajaJ + totalTransferencia + totalDivisas],
     ];
 
-    if (data.userCierreNombre) {
+    if (data.userAperturaNombre && data.userCierreNombre && data.userAperturaNombre !== data.userCierreNombre) {
+      filas.push(['Abierta por', data.userAperturaNombre]);
+      filas.push(['Cerrada por', data.userCierreNombre]);
+    } else if (data.userCierreNombre) {
       filas.push(['Firmado por', data.userCierreNombre]);
     }
 

@@ -1,5 +1,11 @@
 # Spec: fix-auto-cierre-jornada
 
+> **OBSOLETO (2026-08-10)** — este documento describe el plan ORIGINAL (que el
+> autocierre generara Excel). La decisión final del dueño fue ELIMINAR el
+> autocierre por completo: reanudar jornada se maneja con el modal para
+> cualquier usuario autenticado. El plan REAL está en `tasks.md`; el resultado
+> en `apply-report.md`.
+
 ## About this spec
 This is a delta spec for an internal refactor. No new capabilities or spec-level changes.
 

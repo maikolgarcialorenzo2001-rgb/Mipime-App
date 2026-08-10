@@ -1,60 +1,50 @@
 # Tasks: fix-auto-cierre-jornada
 
-## Task 1: Extraer helper _generarYGuardarExcel
+> **ACTUALIZADO 2026-08-10 (apply)**: el plan original (hacer que
+> `autoCerrarSiOtroUsuario` genere Excel) quedó OBSOLETO. El bug reportado por
+> el dueño (conflicto del autocierre con la branch palmar + bug en reanudar
+> jornada) derivó en la decisión de ELIMINAR el autocierre por completo: la
+> reapertura se maneja exclusivamente con el modal "reanudar jornada" para
+> cualquier usuario autenticado (fix-reanudar-jornada-acceso, ya mergeado).
+> Las tareas a continuación reflejan el trabajo REALMENTE implementado.
+
+## Task 1: Eliminar autoCerrarSiOtroUsuario de JornadaService
 
 **Archivos**: `src/app/services/jornada.service.ts`
-**Líneas**: Extraer de _ejecutarCierre (lines ~378-402) a método privado
-**Estimado**: ~20 líneas movidas
-**Criterio**: _ejecutarCierre sigue funcionando, helper es llamable desde autoCerrarSiOtroUsuario
+**Criterio**: grep `autoCerrarSiOtroUsuario` = 0 en `src/`; el import `UsuarioPublico` desaparece
 
 ### Subtasks
-- [ ] Crear `_generarYGuardarExcel(jornadaId: number, userId: number): Promise<void>` con lógica de generación de Excel
-- [ ] _ejecutarCierre() llama al helper en vez de inline
-- [ ] 579 tests verdes después del refactor
+- [x] Remover el método `autoCerrarSiOtroUsuario(usuario: UsuarioPublico)` completo (~80 líneas: query abierta, UPDATE, generación Excel, auto-save Electron)
+- [x] Remover el import `type { UsuarioPublico }` de `../models`
+- [x] Verificar que `_generarYGuardarExcel` / `_recolectarDatosJornada` siguen intactos (los usa `_ejecutarCierre`)
 
-## Task 2: autoCerrarSiOtroUsuario genera Excel
-
-**Archivos**: `src/app/services/jornada.service.ts`
-**Líneas**: autoCerrarSiOtroUsuario ~158-168
-**Estimado**: +3 líneas
-**Criterio**: autoCerrarSiOtroUsuario genera y guarda Excel post-UPDATE
-
-### Subtasks
-- [ ] Llamar `_generarYGuardarExcel(jornada.id, usuario.id)` después del UPDATE
-- [ ] Mantener return null (login detecta auto-close)
-
-## Task 3: Login — download Excel + toast
+## Task 2: Login — flujo reanudar/cerrar sin autocierre
 
 **Archivos**: `src/app/pages/login/login.page.ts`, `src/app/pages/login/login.page.html`
-**Líneas**: onSubmit ~44-48, login.page.html ~54+
-**Estimado**: ~30 líneas
-**Criterio**: Al auto-close, Excel se descarga y toast aparece
+**Criterio**: sin llamadas a `autoCerrarSiOtroUsuario`; `cerrarYGuardar` usa `_jornadaPendiente.user_apertura_id`; modal para CUALQUIER usuario con jornada abierta
 
 ### Subtasks
-- [ ] onSubmit(): cuando autoCerrarSiOtroUsuario retorna null, llamar obtenerReporte + descargar Excel
-- [ ] Agregar toast "Jornada anterior cerrada automáticamente" con auto-dismiss
-- [ ] Remover `sessionStorage.setItem('mipime_jornada_auto_cerrada')`
+- [x] `onSubmit()`: tras login, `obtenerAbierta()` → si hay jornada, modal de reanudar; si no, navegar a `/pos`
+- [x] `cerrarYGuardar()`: `cerrar(j.id, j.user_apertura_id ?? 0)` + descargar Excel + navegar a `/pos`
+- [x] Remover `successMessage` y `sessionStorage.setItem('mipime_jornada_auto_cerrada')` (flags del autocierre viejo)
+- [x] Mantener `formatearFecha` y los guards de backdrop/Escape (debe elegir)
 
-## Task 4: Fix cerrarYGuardar uid
+## Task 3: Tests actualizados
 
-**Archivos**: `src/app/pages/login/login.page.ts`
-**Líneas**: ~73
-**Estimado**: 1 línea
-**Criterio**: cerrarYGuardar usa _jornadaPendiente.user_apertura_id
+**Archivos**: `src/app/pages/login/login.page.spec.ts`, `src/app/pages/pos/pos.page.spec.ts`, `src/app/services/jornada.service.spec.ts`
 
 ### Subtasks
-- [ ] Cambiar `jornadaService.jornadaAbierta()?.user_apertura_id` por `_jornadaPendiente.user_apertura_id`
+- [x] `login.page.spec.ts`: reescrito — sin referencias a `autoCerrarSiOtroUsuario`; tests de reanudar (mismo/otro usuario) y cerrarYGuardar con `user_apertura_id`
+- [x] `pos.page.spec.ts`: test FR-1/AC7 — jornada de día anterior tratada como activa (sinJornada=false, botones habilitados)
+- [x] `jornada.service.spec.ts`: mocks de `obtenerDatosJornada` realineados con el query LEFT JOIN usuarios (FR-6) en 2.3/2.3-empty/3.2/4.2; vars muertas removidas; `as any` → `as never`
 
-## Task 5: Tests
-
-**Archivos**: `src/app/services/jornada.service.spec.ts`, `src/app/pages/login/login.page.spec.ts`
-**Estimado**: ~30 líneas
-**Criterio**: Tests pasan para nuevo helper + auto-close con Excel
+## Task 4: Verificación
 
 ### Subtasks
-- [ ] Test: autoCerrarSiOtroUsuario genera Excel (mock ExcelService + verify insert en jornada_reportes)
-- [ ] Test: autoCerrarSiOtroUsuario con mismo usuario no genera Excel
-- [ ] Verificar 579 tests verdes
+- [x] `grep -r autoCerrarSiOtroUsuario src/` → 0 coincidencias
+- [x] `npx tsc --noEmit` → sin errores
+- [x] `eslint` en archivos tocados → limpio (0 errores en login.*, pos.page.spec, jornada.service.*)
+- [x] `bun run test` → **858/858 passed (50 files)**, sin regresión
 
 ---
 
@@ -62,7 +52,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Estimated changed lines | ~85 |
-| Files modified | 4 (jornada.service.ts, login.page.ts, login.page.html, tests) |
+| Estimated changed lines | ~450 (diff vs HEAD; incluye realineamiento de mocks heredados) |
+| Files modified | 7 (jornada.service.ts, login.page.ts/html/spec, pos.page.spec, jornada.service.spec, excel.service.ts) |
 | Chained PRs needed | No |
 | Risk level | Low |

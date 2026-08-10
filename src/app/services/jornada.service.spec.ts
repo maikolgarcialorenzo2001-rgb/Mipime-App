@@ -5,7 +5,6 @@ import { ExcelService } from './excel.service';
 import { DATABASE, type Database } from './database';
 import type { Jornada } from '../models';
 import type { Producto } from '../models';
-import type { UsuarioPublico } from '../models';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
@@ -117,27 +116,64 @@ describe('JornadaService', () => {
   });
 
   describe('obtenerAbierta', () => {
+    it('FR-1: debería consultar la jornada abierta SIN filtrar por fecha (1 solo parámetro, ORDER BY fecha DESC)', async () => {
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.obtenerAbierta());
+
+      const lastCall = vi.mocked(mockDb.sql).mock.calls.at(-1)!;
+      const sql = lastCall[0] as string;
+      const params = lastCall[1] as unknown[];
+
+      expect(sql).toContain('WHERE estado = ?');
+      expect(sql).toContain('ORDER BY fecha DESC, id DESC LIMIT 1');
+      expect(sql).not.toContain('fecha = ?');
+      expect(params).toEqual(['abierta']);
+    });
+
     it('debería retornar null cuando no hay jornada abierta', async () => {
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerAbierta());
 
       expect(resultado).toBeNull();
-      expect(mockDb.sql).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT'),
-        [expect.any(String), 'abierta'],
-      );
     });
 
-    it('debería retornar la jornada abierta cuando existe', async () => {
+    it('debería detectar una jornada abierta de un día anterior (sin filtrar fecha=hoy)', async () => {
+      const jornadaAyer: Jornada = { ...mockJornada, id: 2, fecha: '2026-08-07' };
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([mockJornada]);
+        .mockResolvedValueOnce([jornadaAyer]);
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerAbierta());
 
-      expect(resultado).toEqual(mockJornada);
+      expect(resultado).toEqual(jornadaAyer);
+      expect(resultado!.fecha).toBe('2026-08-07');
       expect(resultado!.estado).toBe('abierta');
+    });
+
+    it('debería devolver la más reciente entre varias "abierta" huérfanas (07-08 vs 31-07)', async () => {
+      const vieja: Jornada = { ...mockJornada, id: 1, fecha: '2026-07-31' };
+      const reciente: Jornada = { ...mockJornada, id: 2, fecha: '2026-08-07' };
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([reciente, vieja]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerAbierta());
+
+      expect(resultado).toEqual(reciente);
+      expect(resultado!.fecha).toBe('2026-08-07');
+    });
+
+    it('debería retornar null cuando no existe ninguna jornada abierta', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]);
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerAbierta());
+
+      expect(resultado).toBeNull();
     });
 
     it('debería lanzar error si la DB falla', async () => {
@@ -443,16 +479,6 @@ describe('JornadaService', () => {
 
   describe('cuenta_cosas en cierre', () => {
     it('3.1 RED: debería consultar cuenta_cosas y pasar CC records a ExcelService', async () => {
-      const mockVentas: Venta[] = [
-        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, usuario_id: 1, forma_pago: 'efectivo', created_at: '' },
-      ];
-      const mockDetalles: DetalleVenta[] = [
-        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
-      ];
-      const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
-        { id: 2, nombre: 'Agua 1L', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 20, stock_shop: 0, created_at: '', updated_at: '' },
-      ];
       const mockCC: CuentaCosa[] = [
         { id: 1, jornada_id: 1, producto_id: 1, cantidad: 2, descripcion: 'Retiro personal', autorizado_por: 'Juan', created_at: '' },
         { id: 2, jornada_id: 1, producto_id: 2, cantidad: 1, descripcion: null, autorizado_por: 'María', created_at: '' },
@@ -495,7 +521,7 @@ describe('JornadaService', () => {
       const service = TestBed.inject(JornadaService);
 
       await expect(
-        firstValueFrom(service.registrarMovimiento(1, 'invalido' as any, 'test', 100)),
+        firstValueFrom(service.registrarMovimiento(1, 'invalido' as never, 'test', 100)),
       ).rejects.toThrow('Tipo inválido');
     });
 
@@ -942,6 +968,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // stock_movimientos
         .mockResolvedValueOnce([]) // productos
         .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // userApertura (LEFT JOIN)
         .mockResolvedValueOnce([]) // cuenta_cosas
         .mockResolvedValueOnce([]); // arqueo_caja
 
@@ -1081,8 +1108,9 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // stock_movimientos
         .mockResolvedValueOnce([]) // productos
         .mockResolvedValueOnce([]) // user nombre (userId=1, but mock returns [])
+        .mockResolvedValueOnce([]) // userApertura (LEFT JOIN)
         .mockResolvedValueOnce([]) // cuenta_cosas
-        .mockResolvedValueOnce(mockArqueoRows); // arqueo_caja query (NEW)
+        .mockResolvedValueOnce(mockArqueoRows); // arqueo_caja query
 
       const service = TestBed.inject(JornadaService);
       const resultado = await firstValueFrom(service.obtenerDatosJornada(1, 1));
@@ -1101,6 +1129,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // stock_movimientos
         .mockResolvedValueOnce([]) // productos
         .mockResolvedValueOnce([]) // user nombre
+        .mockResolvedValueOnce([]) // userApertura (LEFT JOIN)
         .mockResolvedValueOnce([]) // cuenta_cosas
         .mockResolvedValueOnce([]); // arqueo_caja query -> empty
 
@@ -1407,204 +1436,6 @@ describe('JornadaService', () => {
     });
   });
 
-  describe('autoCerrarSiOtroUsuario', () => {
-    const mockUser1: UsuarioPublico = { id: 1, nombre: 'Admin', rol: 'admin', activo: 1, created_at: '', updated_at: '' };
-    const mockUser2: UsuarioPublico = { id: 2, nombre: 'Worker', rol: 'trabajador', activo: 1, created_at: '', updated_at: '' };
-
-    const mockJornadaUser1: Jornada = { ...mockJornada, user_apertura_id: 1 };
-    const mockJornadaLegacy: Jornada = { ...mockJornada, user_apertura_id: null };
-
-    it('debería retornar null si no hay jornada abierta', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]); // constructor: obtenerAbierta -> null
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await service.autoCerrarSiOtroUsuario(mockUser1);
-
-      expect(resultado).toBeNull();
-    });
-
-    it('debería retornar la jornada si user_apertura_id coincide (mismo usuario)', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([mockJornadaUser1]); // SELECT open jornada
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await service.autoCerrarSiOtroUsuario(mockUser1);
-
-      expect(resultado).toEqual(mockJornadaUser1);
-      expect(resultado!.user_apertura_id).toBe(1);
-    });
-
-    it('debería retornar la jornada si user_apertura_id es NULL (legacy)', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaLegacy]);
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      expect(resultado).toEqual(mockJornadaLegacy);
-      expect(resultado!.user_apertura_id).toBeNull();
-    });
-
-    it('debería cerrar la jornada si es de OTRO usuario, generar Excel, y retornar null', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
-        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada (user1)
-        .mockResolvedValueOnce([{ total: 0, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
-        .mockResolvedValueOnce([]) // UPDATE (auto-close)
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      expect(resultado).toBeNull();
-
-      // Verificar que se llamó al UPDATE para cerrar
-      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
-        (call) => typeof call[0] === 'string' && call[0].includes("estado = 'cerrada'"),
-      );
-      expect(updateCall).toBeTruthy();
-      expect(updateCall![1]).toContain(mockUser2.id); // user_cierre_id = usuario.id
-    });
-
-    it('debería calcular saldo_real = monto_inicial + efectivo + total_movimientos al auto-cerrar', async () => {
-      const mockJornadaConMovs: Jornada = { ...mockJornadaUser1, total_movimientos: 500 };
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaConMovs]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
-        .mockResolvedValueOnce([]) // UPDATE
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      const updateCall = vi.mocked(mockDb.sql).mock.calls.find(
-        (call) => typeof call[0] === 'string' && call[0].includes("estado = 'cerrada'"),
-      );
-      expect(updateCall).toBeTruthy();
-      // saldo_real = 5000 (monto_inicial) + 3000 (efectivo) + 500 (total_movimientos) = 8500
-      expect(updateCall![1]).toContain(8500); // saldo_real calculado
-    });
-
-    it('debería llamar ExcelService cuando se auto-cierra por otro usuario', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
-        .mockResolvedValueOnce([]) // UPDATE
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      // Verify ExcelService was called
-      const excelService = TestBed.inject(ExcelService);
-      expect(excelService.generarExcelJornada).toHaveBeenCalledTimes(1);
-      expect(excelService.generarExcelJornada).toHaveBeenCalledWith(
-        expect.objectContaining({
-          jornada: expect.objectContaining({ id: mockJornadaUser1.id }),
-        }),
-      );
-
-      // Verify INSERT into jornada_reportes
-      const insertCall = vi.mocked(mockDb.sql).mock.calls.find(
-        (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO jornada_reportes'),
-      );
-      expect(insertCall).toBeTruthy();
-    });
-
-    it('debería llamar ElectronFileService.saveIndividual cuando isElectronPackaged=true en auto-cierre', async () => {
-      mockElectronFileService.isElectronPackaged = true;
-
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
-        .mockResolvedValueOnce([]) // UPDATE
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledTimes(1);
-      expect(mockElectronFileService.saveIndividual).toHaveBeenCalledWith(
-        mockExcelBase64,
-        expect.objectContaining({ id: mockJornadaUser1.id }),
-      );
-    });
-
-    it('NO debería llamar ElectronFileService cuando isElectronPackaged=false en auto-cierre', async () => {
-      mockElectronFileService.isElectronPackaged = false;
-
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas
-        .mockResolvedValueOnce([]) // UPDATE
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(mockUser2);
-
-      expect(mockElectronFileService.saveIndividual).not.toHaveBeenCalled();
-    });
-
-    it('debería NO llamar ExcelService cuando es el mismo usuario', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([mockJornadaUser1]); // SELECT open jornada (same user)
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(mockUser1);
-
-      // ExcelService should NOT have been called
-      const excelService = TestBed.inject(ExcelService);
-      expect(excelService.generarExcelJornada).not.toHaveBeenCalled();
-    });
-  });
-
   describe('jornadasDelMes', () => {
     const mockJornadaJunio1: Jornada = {
       ...mockJornadaCerrada,
@@ -1801,6 +1632,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]) // stock_movimientos
         .mockResolvedValueOnce([]) // productos
         .mockResolvedValueOnce([]) // user nombre (userId=1, mock returns [])
+        .mockResolvedValueOnce([]) // userApertura (LEFT JOIN)
         .mockResolvedValueOnce([]) // cuenta_cosas
         .mockResolvedValueOnce([]); // arqueo_caja
 
@@ -1859,11 +1691,173 @@ describe('JornadaService', () => {
       expect(callArg[0].total_usd).toBe(150);
     });
   });
+
+  describe('userAperturaNombre en cierre y exportaciones (FR-6/AC6)', () => {
+    const jornadaConApertura: Jornada = {
+      ...mockJornadaCerrada,
+      user_apertura_id: 1,
+    };
+
+    // Palmar: _ejecutarCierre llama a calcularTotalMerma(id) ANTES del UPDATE;
+    // se espía a nivel prototipo (mismo patrón que describe('cerrar')) para no
+    // consumir slots de mock en cada secuencia.
+    beforeEach(() => {
+      vi.spyOn(JornadaService.prototype, 'calcularTotalMerma').mockResolvedValue(0);
+    });
+
+    it('4.1 RED: _ejecutarCierre resuelve userAperturaNombre de user_apertura_id y lo propaga al Excel', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor: obtenerAbierta -> null
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }]) // saldo_real
+        .mockResolvedValueOnce([jornadaConApertura]) // UPDATE: user_apertura_id=1
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierreNombre
+        .mockResolvedValueOnce([{ nombre: 'Ana' }]) // userAperturaNombre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.userAperturaNombre).toBe('Ana');
+      expect(callArg.userCierreNombre).toBe('Beto');
+    });
+
+    it('4.2 RED: userAperturaNombre es null si el id de apertura no existe', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([jornadaConApertura]) // UPDATE
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierre
+        .mockResolvedValueOnce([]) // userApertura -> vacío -> null
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.userAperturaNombre).toBeNull();
+    });
+
+    it('4.3 RED: legacy (user_apertura_id NULL) NO ejecuta query de apertura y deja null', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([{ monto_inicial: 5000, total_movimientos: 0 }])
+        .mockResolvedValueOnce([mockJornadaCerrada]) // UPDATE: apertura null
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierre
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // INSERT reporte
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.cerrar(1, 1));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
+      expect(callArg.userAperturaNombre).toBeNull();
+
+      // Solo la query de userCierreNombre debe haber corrido (SELECT nombre FROM usuarios)
+      const nombreQueries = vi.mocked(mockDb.sql).mock.calls.filter(
+        (c) => typeof c[0] === 'string' && c[0].includes('SELECT nombre FROM usuarios'),
+      );
+      expect(nombreQueries).toHaveLength(1);
+    });
+
+    it('4.4 RED: _recolectarDatosJornada resuelve apertura con LEFT JOIN usuarios (obtenerDatosJornada)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([]) // ventas (id 10)
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierre (userId=1)
+        .mockResolvedValueOnce([{ nombre: 'Ana' }]) // userApertura (LEFT JOIN)
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      const resultado = await firstValueFrom(service.obtenerDatosJornada(10, 1));
+
+      expect(resultado.userAperturaNombre).toBe('Ana');
+
+      const leftJoinCall = vi.mocked(mockDb.sql).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('LEFT JOIN usuarios'),
+      );
+      expect(leftJoinCall).toBeTruthy();
+      expect(leftJoinCall![1]).toEqual([10]);
+    });
+
+    it('4.5 RED: generarExportacionMensual propaga userAperturaNombre a cada JornadaReportData', async () => {
+      const junJornada: Jornada = {
+        ...mockJornadaCerrada,
+        id: 30,
+        fecha: '2026-06-08',
+        user_apertura_id: 2,
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada]) // jornadasDelMes
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierre
+        .mockResolvedValueOnce([{ nombre: 'Ana' }]) // userApertura
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg[0].userAperturaNombre).toBe('Ana');
+      expect(callArg[0].userCierreNombre).toBe('Beto');
+    });
+
+    it('4.6 RED: generarExportacionPorRango propaga userAperturaNombre', async () => {
+      const mockJornada: Jornada = {
+        ...mockJornadaCerrada,
+        id: 10,
+        fecha: '2026-07-28',
+        user_apertura_id: 2,
+      };
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([mockJornada]) // jornadasDelRango
+        .mockResolvedValueOnce([]) // ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([{ nombre: 'Beto' }]) // userCierre
+        .mockResolvedValueOnce([{ nombre: 'Ana' }]) // userApertura
+        .mockResolvedValueOnce([]) // cuenta_cosas
+        .mockResolvedValueOnce([]); // arqueo_caja
+
+      const service = TestBed.inject(JornadaService);
+      await firstValueFrom(service.generarExportacionPorRango('2026-07-01', '2026-07-31'));
+
+      const excelService = TestBed.inject(ExcelService);
+      const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
+      expect(callArg[0].userAperturaNombre).toBe('Ana');
+    });
+  });
 });
 
 describe('Pagar Pendiente — pendientesAcumulados en el Excel del cierre (FR-9/AC11)', () => {
-    const user2: UsuarioPublico = { id: 2, nombre: 'Worker', rol: 'trabajador', activo: 1, created_at: '', updated_at: '' };
-    const jornadaDeUser1: Jornada = { ...mockJornada, user_apertura_id: 1 };
 
     /** Misma fórmula date-only que usa _obtenerPendientesAcumulados. */
     function antiguedadEsperada(iso: string): number {
@@ -1902,59 +1896,5 @@ describe('Pagar Pendiente — pendientesAcumulados en el Excel del cierre (FR-9/
       expect(mockCobroPendienteService.listarPendientes).toHaveBeenCalledTimes(1);
     });
 
-    it('4.3 RED: autoCerrarSiOtroUsuario también pasa pendientesAcumulados a ExcelService', async () => {
-      mockCobroPendienteService.listarPendientes.mockResolvedValue([
-        { id: 3, compradorNombre: 'Pepito', fechaHora: '2026-06-02T09:00:00Z', total: 800, jornadaId: 1 },
-      ]);
-
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([jornadaDeUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 3000, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas (saldo)
-        .mockResolvedValueOnce([]) // UPDATE (auto-close)
-        // _recolectarDatosJornada calls
-        .mockResolvedValueOnce([]) // SELECT ventas
-        .mockResolvedValueOnce([]) // SELECT movimientos
-        .mockResolvedValueOnce([]) // SELECT stock_movimientos
-        .mockResolvedValueOnce([]) // SELECT productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // SELECT user nombre
-        .mockResolvedValueOnce([]) // SELECT cuenta_cosas
-        .mockResolvedValueOnce([]) // SELECT arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes (Excel)
-
-      const service = TestBed.inject(JornadaService);
-      const resultado = await service.autoCerrarSiOtroUsuario(user2);
-
-      expect(resultado).toBeNull();
-      const excelService = TestBed.inject(ExcelService);
-      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
-      expect(callArg.pendientesAcumulados).toEqual([
-        { id: 3, comprador: 'Pepito', fechaOriginal: '2026-06-02T09:00:00Z', monto: 800, antiguedadDias: antiguedadEsperada('2026-06-02T09:00:00Z') },
-      ]);
-      expect(mockCobroPendienteService.listarPendientes).toHaveBeenCalledTimes(1);
-    });
-
-    it('4.3 RED: sin pendientes pasa pendientesAcumulados vacío (hoja omitida en Excel)', async () => {
-      vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([]) // constructor
-        .mockResolvedValueOnce([jornadaDeUser1]) // SELECT open jornada
-        .mockResolvedValueOnce([{ total: 0, forma_pago: 'efectivo', completacion_efectivo: null, monto_divisa: null, tasa_cambio: null }]) // SELECT ventas (saldo)
-        .mockResolvedValueOnce([]) // UPDATE (auto-close)
-        .mockResolvedValueOnce([]) // recolectar: ventas
-        .mockResolvedValueOnce([]) // movimientos
-        .mockResolvedValueOnce([]) // stock_movimientos
-        .mockResolvedValueOnce([]) // productos
-        .mockResolvedValueOnce([{ nombre: 'Worker' }]) // user nombre
-        .mockResolvedValueOnce([]) // cuenta_cosas
-        .mockResolvedValueOnce([]) // arqueo_caja
-        .mockResolvedValueOnce([]); // INSERT jornada_reportes
-
-      const service = TestBed.inject(JornadaService);
-      await service.autoCerrarSiOtroUsuario(user2);
-
-      const excelService = TestBed.inject(ExcelService);
-      const callArg = vi.mocked(excelService.generarExcelJornada).mock.calls[0][0];
-      expect(callArg.pendientesAcumulados).toEqual([]);
-    });
   });
 });
