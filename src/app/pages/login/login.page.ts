@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -6,19 +6,20 @@ import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
-import type { Jornada } from '../../models';
+import { ArqueoBilletesFormComponent } from '../../components/arqueo-billetes-form/arqueo-billetes-form.component';
+import type { Jornada, ArqueoCajaEntry } from '../../models';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, ErrorAlertComponent],
+  imports: [FormsModule, ErrorAlertComponent, ArqueoBilletesFormComponent],
   templateUrl: './login.page.html',
   styleUrl: './login.page.css',
 })
 export class LoginPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly jornadaService = inject(JornadaService);
+  protected readonly jornadaService = inject(JornadaService);
   private readonly _electronFileService = inject(ElectronFileService);
 
   readonly username = signal('');
@@ -31,6 +32,20 @@ export class LoginPage {
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
   readonly jornadaPendiente = signal<Jornada | null>(null);
+
+  /** Modal de arqueo — paso intermedio entre "Cerrar y guardar" y el cierre efectivo */
+  readonly showArqueoModal = signal(false);
+
+  /** Entries de arqueo emitidos por <app-arqueo-billetes-form> (solo cantidad > 0). */
+  readonly arqueoEntries = signal<ArqueoCajaEntry[]>([]);
+
+  readonly arqueoTotal = computed(() =>
+    this.arqueoEntries().reduce((sum, entry) => sum + entry.subtotal, 0),
+  );
+
+  readonly diferencia = computed(() => {
+    return this.jornadaService.totalEnCaja() - this.arqueoTotal();
+  });
 
   async onSubmit(): Promise<void> {
     this.loginError.set(null);
@@ -61,20 +76,45 @@ export class LoginPage {
     this.router.navigate(['/pos']);
   }
 
-  /** Cerrar y guardar — cerrar la jornada con el usuario autenticado, descargar Excel, navegar a /pos */
+  /** Cerrar y guardar — abre el modal de arqueo; el cierre efectivo ocurre en confirmarArqueoYCierre */
   cerrarYGuardar(): void {
     const j = this.jornadaPendiente();
     if (!j) return;
 
+    this.cerrarError.set(null);
+    this.arqueoEntries.set([]);
+    // Refresca el totalEnCaja recalculado antes de mostrar el arqueo (en login reciente puede estar en 0)
+    this.jornadaService.refreshJornadaAbierta();
+    this.showReopenModal.set(false);
+    this.showArqueoModal.set(true);
+  }
+
+  /** Volver al modal de reapertura sin cerrar nada */
+  cancelarArqueo(): void {
+    this.showArqueoModal.set(false);
+    this.showReopenModal.set(true);
+  }
+
+  /** Confirmar arqueo y cerrar la jornada con los entries contados (patrón app-nav.confirmarCierre) */
+  confirmarArqueoYCierre(): void {
+    const j = this.jornadaPendiente();
     const uid = this.auth.usuario()?.id;
-    if (uid === undefined) return; // patrón app-nav — aborta sin crash
+
+    if (!j || uid === undefined) return;
+
+    const entries = this.arqueoEntries();
+
+    if (entries.length === 0) {
+      this.cerrarError.set('Ingresa la cantidad de al menos una denominación');
+      return;
+    }
 
     this.cerrando.set(true);
     this.cerrarError.set(null);
 
-    this.jornadaService.cerrar(j.id, uid).subscribe({
+    this.jornadaService.cerrar(j.id, uid, entries).subscribe({
       next: () => {
-        this.showReopenModal.set(false);
+        this.showArqueoModal.set(false);
         this.jornadaPendiente.set(null);
         this.cerrando.set(false);
         this._descargarExcel(j.id, j);
@@ -104,6 +144,18 @@ export class LoginPage {
   onCloseReopenKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       // No permitir cerrar con Escape — debe elegir
+    }
+  }
+
+  onCloseArqueoBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      // No permitir cerrar con click en backdrop — debe confirmar o cancelar
+    }
+  }
+
+  onCloseArqueoKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      // No permitir cerrar con Escape — debe confirmar o cancelar
     }
   }
 

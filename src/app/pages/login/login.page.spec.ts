@@ -1,10 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { signal, type WritableSignal } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { LoginPage } from './login.page';
 import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ArqueoBilletesFormComponent } from '../../components/arqueo-billetes-form/arqueo-billetes-form.component';
 import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { UsuarioPublico, Jornada } from '../../models';
@@ -51,6 +53,8 @@ describe('LoginPage', () => {
     obtenerAbierta: ReturnType<typeof vi.fn>;
     cerrar: ReturnType<typeof vi.fn>;
     obtenerReporte: ReturnType<typeof vi.fn>;
+    totalEnCaja: WritableSignal<number>;
+    refreshJornadaAbierta: ReturnType<typeof vi.fn>;
   };
   let router: Router;
 
@@ -64,6 +68,8 @@ describe('LoginPage', () => {
       obtenerAbierta: vi.fn().mockReturnValue(of(null)),
       cerrar: vi.fn().mockReturnValue(of(undefined)),
       obtenerReporte: vi.fn().mockReturnValue(of(null)),
+      totalEnCaja: signal(0),
+      refreshJornadaAbierta: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -272,7 +278,16 @@ describe('LoginPage', () => {
     });
 
     describe('cerrarYGuardar usa el usuario autenticado (FR-4)', () => {
-      it('B cierra jornada de A → cerrar(j.id, B.id), NUNCA user_apertura_id', async () => {
+      function cerrarConArqueo(): void {
+        component.cerrarYGuardar();
+        fixture.detectChanges();
+        const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+        arqueoDebug.componentInstance.actualizarCantidad(1000, 2);
+        fixture.detectChanges();
+        component.confirmarArqueoYCierre();
+      }
+
+      it('B cierra jornada de A → cerrar(j.id, B.id, entries), NUNCA user_apertura_id', async () => {
         authService.login.mockReturnValue(of(mockUserB));
         authService.usuario.set(mockUserB);
         // Jornada de A (user_apertura_id=1), la cierra B (id=2)
@@ -281,12 +296,15 @@ describe('LoginPage', () => {
         await component.onSubmit();
         expect(component.showReopenModal()).toBe(true);
 
-        component.cerrarYGuardar();
+        cerrarConArqueo();
 
-        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2);
+        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2, [
+          { denominacion: 1000, cantidad: 2, subtotal: 2000 },
+        ]);
         expect(jornadaService.cerrar).not.toHaveBeenCalledWith(
           mockJornada.id,
           mockJornada.user_apertura_id,
+          expect.anything(),
         );
       });
 
@@ -298,9 +316,11 @@ describe('LoginPage', () => {
         await component.onSubmit();
         expect(component.showReopenModal()).toBe(true);
 
-        component.cerrarYGuardar();
+        cerrarConArqueo();
 
-        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2);
+        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, 2, [
+          { denominacion: 1000, cantidad: 2, subtotal: 2000 },
+        ]);
       });
     });
 
@@ -344,7 +364,7 @@ describe('LoginPage', () => {
         electronService = TestBed.inject(ElectronFileService) as unknown as typeof electronService;
       });
 
-      it('debería llamar ElectronFileService.downloadBlob en cerrarYGuardar', async () => {
+      it('debería llamar ElectronFileService.downloadBlob al confirmar el arqueo y cerrar', async () => {
         jornadaService.obtenerReporte.mockReturnValue(of({
           id: 1,
           jornada_id: 1,
@@ -360,11 +380,129 @@ describe('LoginPage', () => {
 
         await component.onSubmit();
         component.cerrarYGuardar();
+        fixture.detectChanges();
+        const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+        arqueoDebug.componentInstance.actualizarCantidad(5000, 1);
+        component.confirmarArqueoYCierre();
 
         expect(electronService.downloadBlob).toHaveBeenCalledWith(
           'dGVzdA==',
           'jornada_test.xlsx',
         );
+      });
+    });
+
+    describe('NO → arqueo modal (cierre con conteo de billetes)', () => {
+      async function loginConJornadaPendiente(): Promise<void> {
+        authService.login.mockReturnValue(of(mockUser));
+        authService.usuario.set(mockUser);
+        jornadaService.obtenerAbierta.mockReturnValue(of(mockJornada));
+        await component.onSubmit();
+        expect(component.showReopenModal()).toBe(true);
+      }
+
+      it('cerrarYGuardar abre el modal de arqueo, NO llama cerrar y conserva la jornada pendiente', async () => {
+        await loginConJornadaPendiente();
+
+        component.cerrarYGuardar();
+
+        expect(component.showReopenModal()).toBe(false);
+        expect(component.showArqueoModal()).toBe(true);
+        expect(jornadaService.cerrar).not.toHaveBeenCalled();
+        // jornadaPendiente se conserva: hace falta id/fecha para el cierre con arqueo
+        expect(component.jornadaPendiente()?.id).toBe(mockJornada.id);
+      });
+
+      it('cancelarArqueo vuelve al modal de reapertura sin cerrar nada', async () => {
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+        expect(component.showArqueoModal()).toBe(true);
+
+        component.cancelarArqueo();
+
+        expect(component.showArqueoModal()).toBe(false);
+        expect(component.showReopenModal()).toBe(true);
+        expect(jornadaService.cerrar).not.toHaveBeenCalled();
+      });
+
+      it('confirmarArqueoYCierre sin entries muestra error y NO llama cerrar', async () => {
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+
+        component.confirmarArqueoYCierre();
+
+        expect(component.cerrarError()).toBe('Ingresa la cantidad de al menos una denominación');
+        expect(jornadaService.cerrar).not.toHaveBeenCalled();
+        expect(component.showArqueoModal()).toBe(true);
+      });
+
+      it('confirmarArqueoYCierre con entries cierra con arqueo, limpia el estado y navega a /pos', async () => {
+        const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+        fixture.detectChanges();
+
+        const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+        expect(arqueoDebug).toBeTruthy();
+        arqueoDebug.componentInstance.actualizarCantidad(5000, 1);
+        arqueoDebug.componentInstance.actualizarCantidad(2000, 2);
+        fixture.detectChanges();
+
+        component.confirmarArqueoYCierre();
+
+        expect(jornadaService.cerrar).toHaveBeenCalledWith(mockJornada.id, mockUser.id, [
+          { denominacion: 5000, cantidad: 1, subtotal: 5000 },
+          { denominacion: 2000, cantidad: 2, subtotal: 4000 },
+        ]);
+        expect(component.showArqueoModal()).toBe(false);
+        expect(component.jornadaPendiente()).toBeNull();
+        expect(navigateSpy).toHaveBeenCalledWith(['/pos']);
+      });
+
+      it('modal de arqueo muestra Total en caja y "Cuadrado" cuando el conteo coincide', async () => {
+        jornadaService.totalEnCaja.set(9000);
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+        fixture.detectChanges();
+
+        const modal = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+        expect(modal.textContent).toContain('Terminar jornada');
+        expect(modal.textContent).toContain('Total en caja');
+        expect(modal.textContent).toContain('9,000');
+
+        const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+        arqueoDebug.componentInstance.actualizarCantidad(5000, 1);
+        arqueoDebug.componentInstance.actualizarCantidad(2000, 2);
+        fixture.detectChanges();
+
+        expect(modal.textContent).toContain('Cuadrado');
+        expect(modal.textContent).toContain('$0');
+      });
+
+      it('modal de arqueo muestra "Faltante" cuando el conteo no alcanza el total en caja', async () => {
+        jornadaService.totalEnCaja.set(9000);
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+        fixture.detectChanges();
+
+        const arqueoDebug = fixture.debugElement.query(By.directive(ArqueoBilletesFormComponent));
+        arqueoDebug.componentInstance.actualizarCantidad(1000, 2);
+        fixture.detectChanges();
+
+        const modal = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+        expect(modal.textContent).toContain('Faltante');
+        expect(modal.textContent).toContain('$7,000');
+      });
+
+      it('solo un modal visible a la vez: el de reapertura no se renderiza con el de arqueo', async () => {
+        await loginConJornadaPendiente();
+        component.cerrarYGuardar();
+        fixture.detectChanges();
+
+        const dialogs = fixture.nativeElement.querySelectorAll('[role="dialog"]');
+        expect(dialogs.length).toBe(1);
+        expect(dialogs[0].textContent).toContain('Terminar jornada');
+        expect(dialogs[0].textContent).not.toContain('Hay una jornada sin cerrar');
       });
     });
 
