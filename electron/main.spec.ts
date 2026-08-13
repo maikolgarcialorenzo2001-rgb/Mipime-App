@@ -537,13 +537,13 @@ describe('main process', () => {
       expect(mockAdoptOrFresh).not.toHaveBeenCalled();
     });
 
-    it('INTEGRATION: real runMigrations a través del handler db:sql real completa V1→V16 en DB temp real (C1)', async () => {
+    it('INTEGRATION: real runMigrations a través del handler db:sql real completa V1→V17 en DB temp real (C1)', async () => {
       // C1 (CRITICAL): el runner emite BEGIN/COMMIT como llamadas separadas
       // (V3..V15). Con UNA conexión por llamada (estado previo al fix), el
       // COMMIT de V5 lanza 'cannot commit - no transaction is active' y el
       // arranque nativo fresco está garantizado en rojo. La conexión
       // persistente (semántica web con SQLocal) hace funcionar las
-      // transacciones: V1→V16 completan y schema_version queda en 16.
+      // transacciones: V1→V17 completan y schema_version queda en 17.
       mockAppGetPath.mockReturnValue(path.dirname(dbFile));
       const handler = await getDbHandler('db:sql');
 
@@ -562,7 +562,7 @@ describe('main process', () => {
       const rows = (await handler({
         query: 'SELECT MAX(version) AS version FROM schema_version',
       })) as { version: number }[];
-      expect(rows[0].version).toBe(16);
+      expect(rows[0].version).toBe(17);
     });
 
     it('db:backupNow with trigger open should back up rodante only', async () => {
