@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { Database } from './database';
+import type { Database, SqlExecutor } from './database';
 import { DbStatusService } from './db-status.service';
 import { BackupService } from './backup.service';
 import { environment } from '../environments/environment';
@@ -21,6 +21,14 @@ export class NativeSqliteService implements Database {
   /** Versión cacheada del invoke app:getVersion (MINOR-5); 'unknown' si falla. */
   private _appVersion: string | null = null;
 
+  /**
+   * Profundidad de transacciones activas (D1): > 0 significa que ya hay
+   * una transacción abierta (BEGIN raw vía sql() o una transaction()
+   * externa). En ese caso transaction() anidada hace JOIN en vez de
+   * mandar un segundo BEGIN (error en SQLite).
+   */
+  private _txnDepth = 0;
+
   private _invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
     const api = window.electronAPI;
     if (!api) {
@@ -30,7 +38,53 @@ export class NativeSqliteService implements Database {
   }
 
   async sql<T>(query: string, params?: unknown[]): Promise<T[]> {
+    // D1: tracking de BEGIN/COMMIT/ROLLBACK raw. VentaService abre la txn
+    // con 'BEGIN TRANSACTION' vía sql(); el depth permite que una
+    // transaction() anidada haga JOIN sin "transaction within a transaction".
+    const trimmed = query.trim();
+    if (/^BEGIN\b/i.test(trimmed)) {
+      this._txnDepth++;
+    } else if (/^(COMMIT|ROLLBACK)\b/i.test(trimmed)) {
+      this._txnDepth = Math.max(0, this._txnDepth - 1);
+    }
+
     return this._invoke<T[]>('db:sql', { query, params: params ?? [] });
+  }
+
+  /**
+   * Ejecuta fn en una transacción atómica (T-08): BEGIN → fn → COMMIT, y
+   * ROLLBACK ante fallo. SQLocal no existe acá: el main procesa cada
+   * sentencia sobre su conexión persistente (C1), donde BEGIN/COMMIT como
+   * llamadas separadas ya son la semántica nativa.
+   *
+   * RE-ENTRANTE (D1): si ya hay una transacción activa (_txnDepth > 0, por un
+   * BEGIN raw o por una transaction() externa), fn corre desnuda y el
+   * commit/rollback queda en manos del dueño externo.
+   */
+  async transaction<Result>(
+    fn: (tx: SqlExecutor) => Promise<Result>,
+  ): Promise<Result> {
+    if (this._txnDepth > 0) {
+      // JOIN: la conexión persistente de main ya está en transacción.
+      return fn({ sql: (q, p) => this.sql(q, p) });
+    }
+
+    this._txnDepth++;
+    try {
+      await this.sql('BEGIN TRANSACTION');
+      const result = await fn({ sql: (q, p) => this.sql(q, p) });
+      await this.sql('COMMIT');
+      return result;
+    } catch (err) {
+      // Best-effort: el main ya rollea solo si la SENTENCIA falló (C1); acá
+      // se cubre el caso en que fn rechaza sin tocar SQL (p.ej. validación).
+      // Si el ROLLBACK también falla ("no transaction is active"), se traga:
+      // el error original es el que importa.
+      await this.sql('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      this._txnDepth--;
+    }
   }
 
   async initialize(): Promise<void> {

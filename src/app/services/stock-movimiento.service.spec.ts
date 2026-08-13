@@ -1236,4 +1236,161 @@ describe('StockMovimientoService', () => {
       expect(mockDb.sql).not.toHaveBeenCalled();
     });
   });
+
+  describe('atomicidad (T-09 / FR-05 / S-03)', () => {
+    it('S-03: registrarEntrada envuelve sus escrituras en _db.transaction; fallo a mitad detiene las siguientes', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                // 1: INSERT stock_movimientos
+        .mockRejectedValueOnce(new Error('disk')); // 2: UPDATE stock_almacen FALLA
+
+      await expect(
+        service.registrarEntrada(1, 50, 5, 'Compra'),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin escrituras posteriores al fallo (nada del paso 3/4)
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+    });
+
+    it('S-03: registrarSalida con fallo a mitad no ejecuta el recálculo de stock posterior', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockShopLotes)               // 1: SELECT lotes_stock
+        .mockResolvedValueOnce([])                          // 2: UPDATE lot 3
+        .mockResolvedValueOnce([])                          // 3: UPDATE lot 4
+        .mockResolvedValueOnce([{ precio_costo: 8 }])       // 4: SELECT next lot
+        .mockResolvedValueOnce([])                          // 5: UPDATE precio_costo
+        .mockRejectedValueOnce(new Error('disk'));          // 6: INSERT stock_movimientos FALLA
+
+      await expect(
+        service.registrarSalida(1, 7, 'Venta'),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin SELECT SUM ni UPDATE stock_shop (pasos 7/8)
+      expect(mockDb.sql).toHaveBeenCalledTimes(6);
+    });
+
+    it('S-03: registrarAjuste con fallo a mitad no reemplaza los lotes', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                          // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce(mockLotes)                   // 2: SELECT lotes (avg)
+        .mockResolvedValueOnce([])                          // 3: DELETE lotes viejos
+        .mockRejectedValueOnce(new Error('disk'));          // 4: INSERT lote nuevo FALLA
+
+      await expect(
+        service.registrarAjuste(1, 12, 'Corrección'),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin UPDATE stock_almacen (paso 5)
+      expect(mockDb.sql).toHaveBeenCalledTimes(4);
+    });
+
+    it('S-03: registrarTraslado con fallo a mitad no crea lotes shop ni recalcula stocks', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockLotes)                   // 1: SELECT lotes_stock (almacen)
+        .mockRejectedValueOnce(new Error('disk'));          // 2: UPDATE lot 1 FALLA
+
+      await expect(
+        service.registrarTraslado(1, 11),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+    });
+
+    it('S-03: registrarAjusteLote con fallo a mitad no recalcula el stock de la ubicación', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                          // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                          // 2: UPDATE lote
+        .mockResolvedValueOnce([{ precio_costo: 8 }])       // 3: SELECT next lot
+        .mockRejectedValueOnce(new Error('disk'));          // 4: UPDATE productos.precio_costo FALLA
+
+      await expect(
+        service.registrarAjusteLote(1, 3, 2, 'Corrección de lote', 'shop'),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin SELECT SUM ni UPDATE stock_shop (pasos 5/6)
+      expect(mockDb.sql).toHaveBeenCalledTimes(4);
+    });
+
+    it('S-03: registrarEditar con fallo a mitad no recalcula el stock de la ubicación', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                          // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                          // 2: UPDATE productos nombre+precio_venta
+        .mockResolvedValueOnce([])                          // 3: UPDATE lotes_stock
+        .mockResolvedValueOnce([{ precio_costo: 10 }])      // 4: SELECT next lot
+        .mockRejectedValueOnce(new Error('disk'));          // 5: UPDATE productos.precio_costo FALLA
+
+      await expect(
+        service.registrarEditar(1, 3, 'Café', 15, 10, 8, 'Actualización', 'shop'),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin SELECT SUM ni UPDATE stock_shop (pasos 6/7)
+      expect(mockDb.sql).toHaveBeenCalledTimes(5);
+    });
+
+    it('S-03: registrarMerma con fallo tras el consumo no toca la jornada (sin UPDATE jornadas)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce(mockShopLotes)               // 1: SELECT lotes_stock
+        .mockResolvedValueOnce([])                          // 2: UPDATE lot 3
+        .mockResolvedValueOnce([])                          // 3: UPDATE lot 4
+        .mockResolvedValueOnce([{ precio_costo: 8 }])       // 4: SELECT next lot
+        .mockResolvedValueOnce([])                          // 5: UPDATE precio_costo
+        .mockRejectedValueOnce(new Error('disk'));          // 6: INSERT stock_movimientos FALLA
+
+      await expect(
+        service.registrarMerma(1, 7, 'Rotura', 42),
+      ).rejects.toThrow('disk');
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Sin SELECT SUM, sin UPDATE stock_shop, sin UPDATE jornadas (pasos 7-9)
+      expect(mockDb.sql).toHaveBeenCalledTimes(6);
+      const jornadaUpdate = vi.mocked(mockDb.sql).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('UPDATE jornadas'),
+      );
+      expect(jornadaUpdate).toBeUndefined();
+    });
+
+    it('S-03 TRIANGULATE: nesting venta→salida — registrarSalida dentro de BEGIN raw funciona sin cambios en venta.service', async () => {
+      // VentaService abre la txn con BEGIN raw vía sql() y la cierra con COMMIT;
+      // registrarSalida (wrap en transaction()) hace JOIN: misma conexión.
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                          // BEGIN TRANSACTION (venta)
+        .mockResolvedValueOnce(mockShopLotes)               // salida: SELECT lotes_stock
+        .mockResolvedValueOnce([])                          // UPDATE lot 3
+        .mockResolvedValueOnce([])                          // UPDATE lot 4
+        .mockResolvedValueOnce([{ precio_costo: 8 }])       // SELECT next lot
+        .mockResolvedValueOnce([])                          // UPDATE precio_costo
+        .mockResolvedValueOnce([])                          // INSERT stock_movimientos
+        .mockResolvedValueOnce([{ total: 1 }])              // SELECT SUM shop
+        .mockResolvedValueOnce([])                          // UPDATE stock_shop
+        .mockResolvedValueOnce([]);                         // COMMIT (venta)
+
+      await mockDb.sql('BEGIN TRANSACTION');
+      const consumos = await service.registrarSalida(1, 7, 'Venta');
+      await mockDb.sql('COMMIT');
+
+      expect(consumos).toHaveLength(2);
+      // El wrap usó transaction() UNA vez (JOIN re-entrante, no txn anidada)
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // La secuencia respeta el orden del dueño externo: BEGIN ... COMMIT
+      const queries = vi
+        .mocked(mockDb.sql)
+        .mock.calls.map((call) => call[0] as string);
+      expect(queries[0]).toBe('BEGIN TRANSACTION');
+      expect(queries[queries.length - 1]).toBe('COMMIT');
+    });
+
+    it('S-03 TRIANGULATE: los guards rechazan SIN abrir transacción', async () => {
+      await expect(
+        service.registrarAjuste(1, 50, ''),
+      ).rejects.toThrow('El motivo es obligatorio');
+
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+  });
 });
