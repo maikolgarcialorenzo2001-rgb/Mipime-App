@@ -1155,6 +1155,287 @@ describe('InventarioPage', () => {
     expect(fixture.nativeElement.querySelector('form')).toBeFalsy();
   });
 
+  // ── Fase 1: feedback UI (novalidate + validación visible + toast) ──
+
+  it('31. T-01: el form de movimiento tiene novalidate (sin bloqueo nativo del submit)', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    const form = fixture.nativeElement.querySelector('form') as HTMLFormElement;
+    expect(form).toBeTruthy();
+    expect(form.hasAttribute('novalidate')).toBe(true);
+  });
+
+  it('32. T-01: el campo de cantidad del editar se etiqueta "Cantidad nueva del lote" (semántica absoluta, sin "Unidades")', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    const formText = fixture.nativeElement.querySelector('form').textContent;
+    expect(formText).toContain('Cantidad nueva del lote');
+    expect(formText).not.toContain('Unidades');
+  });
+
+  it('33. S-01: Guardar sin motivo en editar muestra error visible y NO llama al servicio', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    // Valores válidos excepto motivo (vacío por default)
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+    expect(component.error()).toBe('El motivo es obligatorio');
+    const errorAlert = fixture.nativeElement.querySelector('app-error-alert');
+    expect(errorAlert).toBeTruthy();
+    expect(errorAlert.textContent).toContain('motivo');
+  });
+
+  it('34. S-02: "Cantidad nueva del lote" vacía muestra error visible y NO envía 0 (nunca zeroing silencioso)', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(null); // campo vacío
+    component.movimientoMotivo.set('Baja de stock');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+    expect(component.error()).toBe('La cantidad es obligatoria');
+    const errorAlert = fixture.nativeElement.querySelector('app-error-alert');
+    expect(errorAlert).toBeTruthy();
+    expect(errorAlert.textContent).toContain('cantidad');
+  });
+
+  it('35. T-02: Guardar sin nombre en editar muestra error visible y NO llama al servicio', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarNombre.set('   '); // whitespace-only
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Cambio de nombre');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+    expect(component.error()).toBe('El nombre del producto es obligatorio');
+  });
+
+  it('36. S-06: edición exitosa re-llama listar, refresca productos y muestra toast con el stock nuevo por ubicación', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 80, stock_shop: 7 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
+      1, 42, 'Coca Cola', 15, 10, 80, 'Actualización de precios', 'almacen',
+    );
+    // S-06: listar re-llamado y la señal productos refleja el nuevo stock
+    expect(mockProductoService.listar).toHaveBeenCalledTimes(2);
+    expect(component.productos()[0].stock_almacen).toBe(80);
+    expect(component.productos()[0].stock_shop).toBe(7);
+    // FR-03: toast post-save con stock nuevo por ubicación
+    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u · Tienda: 7 u');
+
+    const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('Stock guardado'),
+    );
+    expect(toast).toBeTruthy();
+    expect(toast!.textContent).toContain('Almacén: 80 u');
+    expect(toast!.textContent).toContain('Tienda: 7 u');
+  });
+
+  it('37. T-03: el toast se auto-oculta después de ~2.5s', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    vi.useFakeTimers();
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toContain('Stock guardado');
+
+    vi.advanceTimersByTime(2500);
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toBeNull();
+    const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('Stock guardado'),
+    );
+    expect(toastAfter).toBeFalsy();
+    vi.useRealTimers();
+  });
+
+  it('38. T-03: si el guardado falla NO se muestra toast y el error queda visible', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+    mockStockService.registrarEditar.mockRejectedValue(new Error('Error al guardar'));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toBeNull();
+    expect(component.error()).toBe('Error al guardar');
+    const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('Stock guardado'),
+    );
+    expect(toast).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('app-error-alert').textContent).toContain('Error al guardar');
+  });
+
+  it('39. S-07: producto sin lotes en editar no crashea y al guardar muestra error claro', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    // Estado vacío manejado: sin selector de lote y sin crash
+    expect(component.productoLotes()).toHaveLength(0);
+    expect(component.loteActual).toBeNull();
+    expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Sin lotes');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+    expect(component.error()).toContain('lote');
+    expect(fixture.nativeElement.querySelector('app-error-alert').textContent).toContain('lote');
+  });
+
   describe('responsive layout', () => {
     it('debería tener container con max-w-7xl', () => {
       fixture.detectChanges();

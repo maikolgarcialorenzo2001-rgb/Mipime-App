@@ -38,6 +38,8 @@ export class InventarioPage implements OnInit {
   readonly loading = signal(true);
   readonly movimientosLoading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly successMessage = signal<string | null>(null);
+  private _toastTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
     productoId: number;
@@ -120,6 +122,18 @@ export class InventarioPage implements OnInit {
     }
   }
 
+  /** Muestra un toast de éxito y lo oculta automáticamente (~2.5s). */
+  private _mostrarToast(mensaje: string): void {
+    this.successMessage.set(mensaje);
+    if (this._toastTimeout !== null) {
+      clearTimeout(this._toastTimeout);
+    }
+    this._toastTimeout = setTimeout(() => {
+      this.successMessage.set(null);
+      this._toastTimeout = null;
+    }, 2500);
+  }
+
   async onSubmitMovimiento(): Promise<void> {
     const action = this.selectedAction();
     if (!action) return;
@@ -184,6 +198,23 @@ export class InventarioPage implements OnInit {
             this.error.set('Debe seleccionar un lote');
             return;
           }
+          const nombre = this.editarNombre();
+          const motivo = this.movimientoMotivo();
+          const cantidad = this.movimientoCantidad();
+          if (!nombre.trim()) {
+            this.error.set('El nombre del producto es obligatorio');
+            return;
+          }
+          if (!motivo.trim()) {
+            this.error.set('El motivo es obligatorio');
+            return;
+          }
+          if (cantidad === null) {
+            // Decisión Fase 1: campo vacío → error visible, NUNCA zeroing
+            // silencioso (antes se enviaba 0 vía `?? 0` sin avisar al usuario).
+            this.error.set('La cantidad es obligatoria');
+            return;
+          }
           const pv = this.editarPrecioVenta();
           const pc = this.editarPrecioCosto();
           if (pv === null) {
@@ -197,11 +228,11 @@ export class InventarioPage implements OnInit {
           await this.stockService.registrarEditar(
             action.productoId,
             loteSel.id,
-            this.editarNombre(),
+            nombre,
             pv,
             pc,
-            this.movimientoCantidad() ?? 0,
-            this.movimientoMotivo(),
+            cantidad,
+            motivo,
             loteSel.ubicacion,
           );
           break;
@@ -223,6 +254,16 @@ export class InventarioPage implements OnInit {
       this.editarPrecioVenta.set(null);
       this.editarPrecioCosto.set(null);
       await this.loadProductos();
+      if (action.tipo === 'editar' && this.error() === null) {
+        const actualizado = this.productos().find(
+          (p) => p.id === action.productoId,
+        );
+        if (actualizado) {
+          this._mostrarToast(
+            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u`,
+          );
+        }
+      }
     } catch (e) {
       this.error.set(
         e instanceof Error

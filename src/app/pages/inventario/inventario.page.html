@@ -29,6 +29,13 @@
     <app-error-alert [message]="err" />
   }
 
+  <!-- Toast de éxito -->
+  @if (successMessage(); as msg) {
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none bg-green-500 dark:bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in">
+      {{ msg }}
+    </div>
+  }
+
   <!-- States: full loading state only on initial load (list empty); the table
        stays mounted during refresh so document height never collapses and the
        window scroll position survives. -->
@@ -154,6 +161,7 @@
               <tr class="bg-gray-50 dark:bg-gray-800/50">
                 <td colspan="6" class="px-4 py-3">
                   <form
+                    novalidate
                     (ngSubmit)="onSubmitMovimiento()"
                     class="flex flex-wrap items-end gap-3"
                   >
@@ -214,7 +222,7 @@
                         />
                       </div>
                       <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Unidades</label>
+                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad nueva del lote</label>
                         <input
                           type="number"
                           [(ngModel)]="movimientoCantidad"
