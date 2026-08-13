@@ -51,8 +51,13 @@ const mockShopLotes: LoteStock[] = [
 ];
 
 function createMockDb(): Database {
+  const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
   return {
-    sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
+    sql,
+    // Wrapper transparente: las sentencias de la txn pasan por el MISMO mock
+    // sql, así las cadenas mockResolvedValueOnce y las aserciones Nth se
+    // mantienen idénticas (T-10).
+    transaction: vi.fn((fn) => fn({ sql: (q: string, p?: unknown[]) => sql(q, p) })),
     initialize: vi.fn().mockResolvedValue(undefined),
   };
 }
