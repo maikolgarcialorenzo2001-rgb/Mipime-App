@@ -3,6 +3,13 @@ import { DATABASE } from './database';
 import { AuthService } from './auth.service';
 import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../models';
 
+/**
+ * Techo de stock por operación (FR-04 / D3). Las cantidades ABSOLUTAS
+ * (editar/ajuste/ajusteLote) no pueden superarlo; se valida en el servicio,
+ * no solo en la UI.
+ */
+export const MAX_STOCK_UNIDADES = 1_000_000;
+
 @Injectable({
   providedIn: 'root',
 })
@@ -18,6 +25,29 @@ export class StockMovimientoService {
     const user = this._auth.usuario();
     if (!user || user.rol !== 'admin') {
       throw new Error('Solo administradores');
+    }
+  }
+
+  /**
+   * Guard de cantidad ABSOLUTA (editar/ajuste/ajusteLote, D3): rechaza
+   * valores < 0 o > MAX_STOCK_UNIDADES ANTES de tocar la DB.
+   */
+  private _validarCantidadAbsoluta(cantidad: number): void {
+    if (cantidad < 0) {
+      throw new Error('La cantidad no puede ser negativa');
+    }
+    if (cantidad > MAX_STOCK_UNIDADES) {
+      throw new Error('La cantidad supera el máximo permitido');
+    }
+  }
+
+  /**
+   * Guard de cantidad DELTA (entrada/salida/traslado/merma, D3): rechaza
+   * valores <= 0 ANTES de tocar la DB.
+   */
+  private _validarCantidadDelta(cantidad: number): void {
+    if (cantidad <= 0) {
+      throw new Error('La cantidad debe ser mayor a cero');
     }
   }
 
@@ -92,6 +122,14 @@ export class StockMovimientoService {
       }
     }
 
+    // Pre-validación (FR-06 / D5): stock total suficiente ANTES de consumir.
+    // El throw ocurre antes de cualquier UPDATE; el INSERT del safety-net
+    // queda bajo la transacción del llamador → ROLLBACK si se lanza (D5).
+    const totalDisponible = lotes.reduce((sum, lote) => sum + lote.cantidad, 0);
+    if (totalDisponible < cantidadRequerida) {
+      throw new Error('Stock insuficiente');
+    }
+
     let restante = cantidadRequerida;
     const consumos: ConsumoRecord[] = [];
 
@@ -160,6 +198,7 @@ export class StockMovimientoService {
     ubicacion: 'almacen' | 'shop' = 'almacen',
   ): Promise<void> {
     this._checkAdmin();
+    this._validarCantidadDelta(cantidad);
     const ahora = new Date().toISOString();
 
     // 1. Register movement
@@ -204,6 +243,7 @@ export class StockMovimientoService {
     ubicacion: 'almacen' | 'shop' = 'shop',
     loteId?: number,
   ): Promise<ConsumoRecord[]> {
+    this._validarCantidadDelta(cantidad);
     const ahora = new Date().toISOString();
 
     // 1. Consume from the target lot (loteId) or from oldest lots (FIFO)
@@ -262,6 +302,7 @@ export class StockMovimientoService {
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
     }
+    this._validarCantidadAbsoluta(nuevaCantidad);
 
     const ahora = new Date().toISOString();
 
@@ -327,6 +368,7 @@ export class StockMovimientoService {
     cantidad: number,
     jornadaId?: number,
   ): Promise<ConsumoRecord[]> {
+    this._validarCantidadDelta(cantidad);
     const ahora = new Date().toISOString();
 
     // 1. Consume from almacen FIFO
@@ -392,6 +434,7 @@ export class StockMovimientoService {
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
     }
+    this._validarCantidadAbsoluta(nuevaCantidad);
 
     const ahora = new Date().toISOString();
 
@@ -451,6 +494,7 @@ export class StockMovimientoService {
     if (!nombre || nombre.trim().length === 0) {
       throw new Error('El nombre del producto es obligatorio');
     }
+    this._validarCantidadAbsoluta(nuevaCantidad);
 
     const ahora = new Date().toISOString();
 
@@ -513,6 +557,7 @@ export class StockMovimientoService {
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
     }
+    this._validarCantidadDelta(cantidad);
 
     const ahora = new Date().toISOString();
 
