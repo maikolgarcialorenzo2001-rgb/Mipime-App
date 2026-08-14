@@ -1,10 +1,10 @@
-# Proposal: lint-corrections — Eliminar deuda de lint (BACKLOG-11)
+# Proposal: lint-errors-resolution — Eliminar deuda de lint (BACKLOG-11)
 
 ## Intent
 
-Eliminar TODO el debt de lint en `src/**` (TS + templates HTML) en branch `lint-corrections` (base main `981be23`): **121 errores → 0**. Sin cambios de config de eslint (Camino B: tipar los `any`, no override). Sin feature work.
+Eliminar TODO el debt de lint en `src/**` (TS + templates HTML) en branch `lint-errors-resolution` (base main `405f0af`, 0.1.15-beta): **117 errores → 0**. Sin cambios de config de eslint (Camino B: tipar los `any`, no override). Sin feature work.
 
-> **ESTADO REAL POST-MERGE (2026-08-14)** — Esta rama fue creada sobre `981be23` con SOLO el plan (proposal+spec) y skills; la resolución de los errores **nunca se ejecutó**. Se mergeó `main` (f31c51b) y el conteo real HOY es **117 errores / 19 archivos** (no 121/21). El merge ya absorbió en main algunos fixes del plan original:
+> **HISTORIAL (2026-08-14)** — La rama original `lint-corrections` se creó sobre `981be23` con SOLO el plan (proposal+spec) y skills; la resolución de los errores **nunca se ejecutó**. Como había divergido y el conteo ya no coincidía (main avanzó con F1–F9, cuenta-casas, etc.), se descartó y se reabrió como `lint-errors-resolution` desde main actual. El plan se reusó tal cual. El merge absorbió en main algunos fixes del plan original:
 > - `array-type` en `stock-movimiento.service.ts:611` → **ya resuelto** en main (fix `(...)[]` de F4-F7) — por eso no está en el desglose real.
 > - `no-empty-function` bajó de 2 → 1 (`historial.page.spec`).
 > - `no-unused-vars` bajó de 16 → 14 (main limpió algunos).
