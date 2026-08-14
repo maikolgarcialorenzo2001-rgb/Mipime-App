@@ -1405,8 +1405,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
   // ─── PR 1: mejoras-excel-divisas ───
 
   describe('PR 1 — mejoras-excel-divisas', () => {
-    const productosConVenta: Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }> =
-      new Map([
+    const productosConVenta =
+      new Map<number, { nombre: string; precio_costo: number | null; precio_venta?: number }>([
         [1, { nombre: 'Coca-Cola 500ml', precio_costo: 400, precio_venta: 850 }],
         [2, { nombre: 'Agua 1L', precio_costo: 600, precio_venta: 1100 }],
         [3, { nombre: 'Chocolate', precio_costo: 80, precio_venta: 150 }],
