@@ -588,17 +588,12 @@ export class StockMovimientoService {
 
     const ahora = new Date().toISOString();
 
-    // F3: captura el frente FIFO resultante para informar a la UI si el lote
-    // editado quedó como frente (cache actualizado) o si el frente sigue siendo
-    // otro lote más viejo con stock (cache sin cambios, feedback claro).
-    let frontResultado: { id: number; precio_costo: number } | null = null;
-
-    // Lote sobre el que se edita. Con loteId numérico es el lote indicado;
-    // con loteId null (F8) es el "lote 0" materializado dentro de la transacción.
-    let loteActual: LoteStock | null = null;
-
-    // T-09: movimiento + UPDATEs + recálculo atómicos.
-    await this._db.transaction(async (tx) => {
+    // T-09: movimiento + UPDATEs + recálculo atómicos. El closure DEVUELVE
+    // loteActual + frontResultado (TS no puede probar asignaciones a variables
+    // capturadas dentro de un closure — ng build/tsc estricto las ve como
+    // 'never' si se leen fuera; devolver evita ese error de tipos).
+    const { loteActual, frontResultado } = await this._db.transaction(async (tx) => {
+      let loteActual: LoteStock;
       // 0. F7: leer la cantidad actual del lote para registrar el delta en el
       //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
       //    F8: con loteId null se materializa el "lote 0" — reutiliza el lote
@@ -655,7 +650,7 @@ export class StockMovimientoService {
 
       // 3b. Re-sync productos.precio_costo: the edited lot may be the FIFO front
       //     (cost changed) or was zeroed (front advances to the next lot).
-      frontResultado = await this._syncPrecioCosto(productoId, ahora, tx);
+      const frontResultado = await this._syncPrecioCosto(productoId, ahora, tx);
 
       // 4. Recalculate stock for this ubicacion
       const [{ total }] = await tx.sql<{ total: number }>(
@@ -670,10 +665,12 @@ export class StockMovimientoService {
          WHERE id = ?`,
         [total, ahora, productoId],
       );
+
+      return { loteActual, frontResultado };
     });
 
     return {
-      esFront: frontResultado?.id === loteActual?.id,
+      esFront: frontResultado?.id === loteActual.id,
       costoProducto: frontResultado?.precio_costo ?? null,
       costoEditado: precioCosto,
     };
