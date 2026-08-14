@@ -391,10 +391,12 @@ export class StockMovimientoService {
       }
 
       // 4. Update product stock (sum across both locations to set stock_almacen)
-      //    Full ajuste replaces all lots — set stock_almacen and keep stock_shop as-is
+      //    Full ajuste replaces ALL lots — the whole product stock now lives in
+      //    a single 'almacen' lot, so stock_shop must go to 0 to stay consistent
+      //    with the lots (F5: antes quedaba con el valor viejo → divergencia).
       await tx.sql(
         `UPDATE productos
-         SET stock_almacen = ?,
+         SET stock_almacen = ?, stock_shop = 0,
               updated_at = ?
          WHERE id = ?`,
         [nuevaCantidad, ahora, productoId],

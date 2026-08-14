@@ -628,6 +628,44 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([1, 80, 'ajuste', 'Corrección', 42]),
       );
     });
+
+    it('F5 RED: ajuste full con stock en ambas ubicaciones setea stock_shop = 0 (sin divergencia lote-columna)', async () => {
+      // Producto con lotes en almacén Y shop: el ajuste full borra TODOS los
+      // lotes y crea uno solo en 'almacen'. stock_shop debe quedar en 0 para
+      // que la columna refleje que ya no existen lotes shop.
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                                   // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([...mockLotes, ...mockShopLotes])     // 2: SELECT lotes (ambas ubicaciones) → promedio
+        .mockResolvedValueOnce([])                                   // 3: DELETE lotes
+        .mockResolvedValueOnce([])                                   // 4: INSERT lote 'almacen'
+        .mockResolvedValueOnce([]);                                  // 5: UPDATE productos
+
+      await service.registrarAjuste(1, 12, 'Corrección de inventario');
+
+      // Las columnas quedan consistentes con los lotes: solo existe el lote
+      // almacén nuevo → stock_almacen = 12 y stock_shop = 0.
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('SET stock_almacen = ?, stock_shop = 0'),
+        expect.arrayContaining([12, expect.any(String), 1]),
+      );
+    });
+
+    it('F5 TRIANGULATE: ajuste full a 0 también setea stock_shop = 0 (sin lote nuevo)', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                                   // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([...mockLotes, ...mockShopLotes])     // 2: SELECT lotes → promedio
+        .mockResolvedValueOnce([])                                   // 3: DELETE lotes
+        .mockResolvedValueOnce([]);                                  // 4: UPDATE productos (sin INSERT lote)
+
+      await service.registrarAjuste(1, 0, 'Agotar stock');
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining('SET stock_almacen = ?, stock_shop = 0'),
+        expect.arrayContaining([0, expect.any(String), 1]),
+      );
+    });
   });
 
   describe('registrarTraslado', () => {
