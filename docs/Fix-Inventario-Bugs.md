@@ -15,6 +15,11 @@ División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F
   - `.spec.ts`: todos agregan tests en los mismos describe blocks — mayor punto de colisión.
 - **DECISIÓN PENDIENTE (coordinar con pana)**: dónde se materializa el "lote 0" de F8 cuando el producto no tiene lote activo. Recomendación: **en el service `registrarEditar`, atómico dentro de la transacción** (UPDATE→INSERT si no existe lote), para no pisar el selector de F7 ni la validación de signo de F4.
 - **F9 es independiente** (HTML diálogo de borrado :563-591 + `ejecutarEliminar`) — cero choque con F4–F7; no espera a nadie.
+- **Sistema de branches (flujo de merge)**: pana pushea a `fix-f4-f7`; nosotros creamos `fix-f8-f9` desde `fix-inventario-bugs` y pusheamos ahí. **NOSOTROS somos los encargados de mergear una a una** en este orden:
+  1. `fix-f4-f7` → `fix-inventario-bugs` (esperar a que pana termine F4–F7; resolver conflictos acá).
+  2. `fix-inventario-bugs` → `fix-f8-f9` (rebase/merge para que F8 se apoye en F7).
+  3. Al final del plan: `fix-f8-f9` → `fix-inventario-bugs` → `main` (con el merge del SDD previo ya presente en main).
+  Cada merge se revisa con la suite completa (`bunx vitest run`) + lint de archivos tocados.
 
 ## Contexto
 
@@ -109,6 +114,14 @@ División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F
 
 ### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida — ⏳ NUESTRO (branch `fix-f8-f9`, independiente)
 
+- **Estado**: a nuestro cargo. Independiente; se puede resolver sin esperar a F4–F7.
+- **Propuesta acordada (guardada — decidir implementación cuando vayamos a resolverla)**:
+  - **NO tocar `eliminar()`** en `producto.service.ts` (zona F1 ya mergeada + posible guard admin de F6) ni `stock-movimiento.service.ts` (zona caliente F4/F5/F7).
+  - Agregar método **nuevo** en `producto.service.ts` (ej. `obtenerConteoEliminacion(id) → { movimientos, lotes, ventaLotes }`) — agregar ≠ modificar, merge trivial con F6.
+  - En `inventario.page.ts`: `confirmarEliminar(id)` carga el conteo; el diálogo muestra qué se elimina.
+  - En `inventario.page.html:563-591`: diálogo informa cantidades antes de confirmar.
+  - **Integración con F1**: si hay `detalle_ventas`/`cuenta_cosas` → mostrar que NO se puede eliminar (mismas tablas que ya bloquea F1); si no → mostrar cuántos movimientos/lotes se borran.
+
 - **Dónde**: `inventario.page.html:563-591`.
 - **Evidencia**: se borran permanentemente movimientos, lotes y `venta_lotes` del producto y se degradan reportes históricos; el diálogo solo dice "no se puede deshacer".
 - **Impacto**: BAJO (UX).
@@ -125,8 +138,8 @@ División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F
 
 1. ~~**F1 + F2**~~ — integridad de datos (pérdida de historial / bloqueo de restauración e import). ✅ RESUELTO.
 2. ~~**F3**~~ — consistencia de lo que pinta la UI y costos. ✅ RESUELTO (feedback FIFO claro).
-3. **F4–F7** — externo (branch `fix-f4-f7`). Orden de merge: F7 antes de F8.
-4. **F8–F9** — nosotros (branch `fix-f8-f9`). F9 independiente; F8 espera a F7.
+3. **F4–F7** — externo (branch `fix-f4-f7`). Orden de merge: F7 antes de F8. **Mergeamos nosotros.**
+4. **F8–F9** — nosotros (branch `fix-f8-f9`). F9 independiente (propuesta guardada arriba); F8 espera a F7.
 
 ## Referencias
 
