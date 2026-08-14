@@ -1,12 +1,8 @@
-# Jornada Reopen Specification
+# Delta for Jornada Reopen
 
-## Purpose
+## ADDED Requirements
 
-Define the behavior for reopening a jornada when a user logs in and an open jornada already exists — today's or the most recent one from any previous day. Any authenticated user (worker or admin) can resume it; the jornada owner is preserved and the closure records the CURRENT authenticated user.
-
-## Requirements
-
-### Requirement: Open jornada of any date
+### Requirement: Abierta de cualquier fecha
 
 The system MUST detect the MOST RECENT open jornada regardless of its `fecha` (`estado='abierta'`), ordering by `fecha DESC, id DESC LIMIT 1`. Detection MUST NOT filter `fecha = hoy`.
 
@@ -23,12 +19,7 @@ The system MUST detect the MOST RECENT open jornada regardless of its `fecha` (`
 - WHEN `obtenerAbierta()` is called
 - THEN it returns the one with the most recent `fecha`
 
-#### Scenario: No open jornada exists
-
-- GIVEN no jornada with `estado='abierta'` exists (any date)
-- WHEN any user logs in
-- THEN the user sees the "Iniciar día" empty state
-- AND no reopen prompt is shown
+## MODIFIED Requirements
 
 ### Requirement: User Ownership Check on Login
 
@@ -56,9 +47,16 @@ The system MUST show the reopen modal to ANY authenticated user (worker or admin
 - THEN the system MUST show a reopen prompt (modal)
 - AND the jornada MUST NOT be closed automatically
 
+#### Scenario: No open jornada exists
+
+- GIVEN no jornada with `estado='abierta'` exists (any date)
+- WHEN any user logs in
+- THEN the user sees the "Iniciar día" empty state
+- AND no reopen prompt is shown
+
 ### Requirement: Reopen Modal with the jornada's real date
 
-The system MUST display a modal when an open jornada exists, showing the jornada's real `fecha` (e.g. "Reanudar jornada del 07-08") and the copy "Hay una jornada sin cerrar". The copy MUST NOT say "de hoy".
+The system MUST display a modal when an open jornada exists, showing the journey's real `fecha` (e.g. "Reanudar jornada del 07-08") and the copy "Hay una jornada sin cerrar". The copy MUST NOT say "de hoy".
 
 (Previously: the modal title was "Jornada del día" and the copy said "Hay una jornada abierta de hoy".)
 
@@ -77,18 +75,12 @@ The system MUST display a modal when an open jornada exists, showing the jornada
 - AND the Excel report is generated (same as manual close)
 - AND the user sees the "Iniciar día" empty state
 
-### Requirement: Jornada Tracks Owner
+## REMOVED Requirements
 
-The system MUST record which user opened each jornada.
+### Requirement: Auto-Close on Different User
 
-#### Scenario: Abrir stores user_apertura_id
+(Reason: The business rule changed — the reopen modal is shown to any authenticated user, and closing a jornada is an explicit user action, never an automatic close triggered by another user's login. `autoCerrarSiOtroUsuario()` and its login flow usage are removed.)
 
-- GIVEN an admin opens a new jornada
-- WHEN `abrir(montoInicial, userId)` is called
-- THEN the jornada record MUST include `user_apertura_id = userId`
+### Requirement: Abrir without userId (backward compatibility) — retained partially
 
-#### Scenario: Abrir without userId (backward compatibility)
-
-- GIVEN `abrir(montoInicial)` is called without userId (legacy code)
-- THEN `user_apertura_id` MUST be NULL
-- AND the jornada behaves as before
+(Kept: legacy behavior remains for `abrir(monto_inicial)` with `user_apertura_id NULL`. Only the reopen-detection scope changed, not the opening semantics. See jornada-lifecycle delta.)

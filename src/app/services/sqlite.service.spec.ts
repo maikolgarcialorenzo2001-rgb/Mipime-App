@@ -27,6 +27,23 @@ class MockSQLocalClient {
     }
     return [];
   });
+
+  // Simula la semántica de client.transaction() de SQLocal 0.18: ejecuta
+  // BEGIN/COMMIT/ROLLBACK internos (registrados en sqlCalls para trazabilidad)
+  // y pasa el handle { sql } al callback.
+  transaction = vi.fn().mockImplementation(
+    async (fn: (tx: { sql: (q: string, ...p: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
+      sqlCalls.push({ query: 'BEGIN (client.transaction)', params: [] });
+      try {
+        const result = await fn({ sql: (q: string, ...p: unknown[]) => this.sql(q, ...p) });
+        sqlCalls.push({ query: 'COMMIT (client.transaction)', params: [] });
+        return result;
+      } catch (err) {
+        sqlCalls.push({ query: 'ROLLBACK (client.transaction)', params: [] });
+        throw err;
+      }
+    },
+  );
 }
 
 let mockClientInstance: MockSQLocalClient | null = null;
@@ -985,5 +1002,120 @@ describe('SqliteService persist web (T11/R9)', () => {
     });
 
     await expect(service.initialize()).resolves.toBeUndefined();
+  });
+});
+
+describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
+  let service: SqliteService;
+
+  beforeEach(() => {
+    sqlCalls.length = 0;
+    vi.clearAllMocks();
+
+    globalThis.Worker = vi.fn().mockImplementation(function () {
+      return {
+        addEventListener: vi.fn(),
+        postMessage: vi.fn(),
+        terminate: vi.fn(),
+      };
+    }) as unknown as typeof Worker;
+
+    const subtleDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: subtleDigest },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    TestBed.configureTestingModule({
+      providers: [
+        SqliteService,
+        { provide: PLATFORM_ID, useValue: 'browser' },
+      ],
+    });
+
+    service = TestBed.inject(SqliteService);
+  });
+
+  it('8.1 RED: transaction() delega en client.transaction (éxito → COMMIT)', async () => {
+    const result = await service.transaction(async (tx) => {
+      await tx.sql(
+        'INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at) VALUES (1, 10, \'entrada\', NULL, \'2026-01-01\')',
+      );
+      return 42;
+    });
+
+    expect(result).toBe(42);
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
+    // El SQL de la txn pasó por el client (handle de SQLocal)
+    expect(
+      sqlCalls.some((c) => c.query.includes('INSERT INTO stock_movimientos')),
+    ).toBe(true);
+    // Simulación del mock: commit y sin rollback
+    expect(sqlCalls.some((c) => c.query.includes('COMMIT'))).toBe(true);
+    expect(sqlCalls.some((c) => c.query.includes('ROLLBACK'))).toBe(false);
+  });
+
+  it('8.2 RED: fallo dentro de fn → ROLLBACK y transaction() rechaza (DB sin cambios)', async () => {
+    await expect(
+      service.transaction(async (tx) => {
+        await tx.sql('UPDATE productos SET stock_shop = 0 WHERE id = 1');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
+    expect(sqlCalls.some((c) => c.query.includes('ROLLBACK'))).toBe(true);
+    expect(sqlCalls.some((c) => c.query.includes('COMMIT'))).toBe(false);
+  });
+
+  it('8.3 RED: JOIN bajo BEGIN raw — sin segundo BEGIN, fn corre desnuda vía sql()', async () => {
+    await service.sql('BEGIN TRANSACTION');
+    const result = await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_shop = 5 WHERE id = 1');
+      return 'ok';
+    });
+    await service.sql('COMMIT');
+
+    expect(result).toBe('ok');
+    // JOIN: client.transaction NO se llama (evita "transaction within a transaction")
+    expect(mockClientInstance!.transaction).not.toHaveBeenCalled();
+    expect(
+      sqlCalls.some((c) => c.query.includes('UPDATE productos SET stock_shop = 5')),
+    ).toBe(true);
+  });
+
+  it('8.4 RED TRIANGULATE: JOIN anidado transaction() dentro de transaction() — client.transaction una sola vez', async () => {
+    const result = await service.transaction(async (outer) => {
+      await outer.sql('UPDATE productos SET stock_almacen = 3 WHERE id = 1');
+      return service.transaction(async (inner) => {
+        await inner.sql('UPDATE lotes_stock SET cantidad = 2 WHERE id = 1');
+        return 'inner';
+      });
+    });
+
+    expect(result).toBe('inner');
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
+    expect(
+      sqlCalls.some((c) => c.query.includes('UPDATE productos SET stock_almacen = 3')),
+    ).toBe(true);
+    expect(
+      sqlCalls.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
+    ).toBe(true);
+  });
+
+  it('8.5 RED TRIANGULATE: tras COMMIT del BEGIN raw, una transaction() nueva abre txn propia', async () => {
+    await service.sql('BEGIN TRANSACTION');
+    await service.sql('COMMIT');
+
+    await service.transaction(async (tx) => {
+      await tx.sql('SELECT 1');
+    });
+
+    // depth volvió a 0 → client.transaction se usa de nuevo (no JOIN)
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
   });
 });

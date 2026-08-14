@@ -457,3 +457,139 @@ describe('NativeSqliteService', () => {
     );
   });
 });
+
+describe('NativeSqliteService transaction (T-08 / FR-05 / D1)', () => {
+  let service: NativeSqliteService;
+  let invokeMock: ReturnType<typeof vi.fn>;
+  let mockBackup: { backup: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    // hash-password usa Web Crypto (jsdom no expone crypto.subtle.digest)
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        subtle: { digest: vi.fn().mockResolvedValue(new ArrayBuffer(32)) },
+        getRandomValues: (arr: Uint8Array) => arr,
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    invokeMock = vi.fn().mockImplementation((channel: string) => {
+      if (channel === 'db:sql') {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve({ status: 'ok' });
+    });
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      invoke: invokeMock,
+    } as unknown as ElectronAPI;
+
+    mockCreateSqlocalClient.mockResolvedValue({
+      getDatabaseFile: mockGetDatabaseFile,
+    } as never);
+
+    mockBackup = { backup: vi.fn().mockResolvedValue(undefined) };
+
+    TestBed.configureTestingModule({
+      providers: [
+        NativeSqliteService,
+        DbStatusService,
+        { provide: BackupService, useValue: mockBackup },
+        { provide: SQLOCAL_CLIENT, useValue: mockCreateSqlocalClient },
+      ],
+    });
+    service = TestBed.inject(NativeSqliteService);
+  });
+
+  afterEach(() => {
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+    vi.clearAllMocks();
+  });
+
+  /** Queries SQL enviadas a db:sql, en orden. */
+  function sqlQueries(): string[] {
+    return invokeMock.mock.calls
+      .filter(([ch]) => ch === 'db:sql')
+      .map(([, payload]) => (payload as { query: string }).query);
+  }
+
+  it('N1 RED: transaction() envía BEGIN → fn → COMMIT y devuelve el resultado', async () => {
+    const result = await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_shop = 2 WHERE id = 1');
+      return 'ok';
+    });
+
+    expect(result).toBe('ok');
+    expect(sqlQueries()).toEqual([
+      'BEGIN TRANSACTION',
+      'UPDATE productos SET stock_shop = 2 WHERE id = 1',
+      'COMMIT',
+    ]);
+  });
+
+  it('N2 RED: fallo en fn → ROLLBACK y transaction() rechaza (DB sin cambios)', async () => {
+    await expect(
+      service.transaction(async (tx) => {
+        await tx.sql('UPDATE productos SET stock_shop = 0 WHERE id = 1');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+
+    expect(sqlQueries()).toEqual([
+      'BEGIN TRANSACTION',
+      'UPDATE productos SET stock_shop = 0 WHERE id = 1',
+      'ROLLBACK',
+    ]);
+  });
+
+  it('N3 RED: JOIN bajo BEGIN raw — sin segundo BEGIN ni COMMIT propio', async () => {
+    await service.sql('BEGIN TRANSACTION');
+    const result = await service.transaction(async (tx) => {
+      await tx.sql('UPDATE lotes_stock SET cantidad = 4 WHERE id = 1');
+      return 'joined';
+    });
+    await service.sql('COMMIT');
+
+    expect(result).toBe('joined');
+    expect(sqlQueries()).toEqual([
+      'BEGIN TRANSACTION', // BEGIN raw del dueño
+      'UPDATE lotes_stock SET cantidad = 4 WHERE id = 1', // fn desnuda (JOIN)
+      'COMMIT',
+    ]);
+  });
+
+  it('N4 RED TRIANGULATE: JOIN anidado transaction() en transaction() — BEGIN/COMMIT una sola vez', async () => {
+    const result = await service.transaction(async (outer) => {
+      await outer.sql('UPDATE productos SET stock_almacen = 9 WHERE id = 1');
+      return service.transaction(async (inner) => {
+        await inner.sql('UPDATE productos SET stock_shop = 9 WHERE id = 1');
+        return 'inner';
+      });
+    });
+
+    expect(result).toBe('inner');
+    expect(sqlQueries()).toEqual([
+      'BEGIN TRANSACTION',
+      'UPDATE productos SET stock_almacen = 9 WHERE id = 1',
+      'UPDATE productos SET stock_shop = 9 WHERE id = 1',
+      'COMMIT',
+    ]);
+  });
+
+  it('N5 RED TRIANGULATE: tras COMMIT del BEGIN raw, una transaction() nueva abre txn propia', async () => {
+    await service.sql('BEGIN TRANSACTION');
+    await service.sql('COMMIT');
+
+    await service.transaction(async (tx) => {
+      await tx.sql('SELECT 1');
+    });
+
+    expect(sqlQueries()).toEqual([
+      'BEGIN TRANSACTION',
+      'COMMIT',
+      'BEGIN TRANSACTION',
+      'SELECT 1',
+      'COMMIT',
+    ]);
+  });
+});

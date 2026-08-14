@@ -8,8 +8,10 @@ import { DATABASE, type Database } from '../../services/database';
 import type { UsuarioPublico } from '../../models';
 
 function createMockDb(): Database {
+  const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
   return {
-    sql: vi.fn().mockResolvedValue([]) as unknown as Database['sql'],
+    sql,
+    transaction: vi.fn((fn) => fn({ sql: (q: string, p?: unknown[]) => sql(q, p) })),
     initialize: vi.fn().mockResolvedValue(undefined),
   };
 }
