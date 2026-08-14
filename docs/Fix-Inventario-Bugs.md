@@ -1,7 +1,20 @@
 # Fix Inventario Bugs
 
 > Plan de corrección de bugs del flujo de inventario — Mipime-App.
-> Fecha: 2026-08-14. Estado: F1 ✅ F2 ✅ F3 ✅ — F4 ⏳ en progreso (externo) — F5–F9 pendientes.
+> Fecha: 2026-08-14. Estado: F1 ✅ F2 ✅ F3 ✅ — F4–F7 ⏳ en progreso (externo) — F8 🔧 en progreso (nosotros) — F9 ⏳ pendiente (nosotros).
+
+## Coordinación de trabajo en paralelo (2026-08-14)
+
+División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F8–F9**. Para que el laburo fluya sin conflictos:
+
+- **Branches separadas**: pana trabaja en `fix-f4-f7` (desde `fix-inventario-bugs`), nosotros en `fix-f8-f9`. NO commitear directo a `fix-inventario-bugs` en paralelo; mergear secuencial.
+- **Orden de merge: F7 PRIMERO, después F8.** F8 (permitir editar sin lote activo) depende de la semántica del selector de lote que defina F7 (filtro por ubicación). Si F7 mergea primero, F8 se rebasea limpio.
+- **Zonas compartidas de máximo riesgo** (evitar pisarse):
+  - `stock-movimiento.service.ts`: F4 (`registrarEntrada`/`registrarEditar`), F5 (`registrarAjuste` :356-378), F7 (sync sin filtro de ubicación), F8 (`obtenerLotesPorProducto` :687-696 + posible `registrarEditar`).
+  - `inventario.page.ts`: F4 (case editar :218-227, guardarProducto :406-447), F7 (`onSelectAction` :340-354), F8 (case editar :193-200). **F7 y F8 tocan el mismo bloque de edición**.
+  - `.spec.ts`: todos agregan tests en los mismos describe blocks — mayor punto de colisión.
+- **DECISIÓN PENDIENTE (coordinar con pana)**: dónde se materializa el "lote 0" de F8 cuando el producto no tiene lote activo. Recomendación: **en el service `registrarEditar`, atómico dentro de la transacción** (UPDATE→INSERT si no existe lote), para no pisar el selector de F7 ni la validación de signo de F4.
+- **F9 es independiente** (HTML diálogo de borrado :563-591 + `ejecutarEliminar`) — cero choque con F4–F7; no espera a nadie.
 
 ## Contexto
 
@@ -17,12 +30,12 @@
 | F1 | P1 | producto.service.ts | ~~Eliminar producto NO atómico (4 DELETE sin transacción) + FKs solo en Electron~~ ✅ RESUELTO (`dea2405`) |
 | F2 | P1 | electron/db.ts | ~~`MAX_SCHEMA_VERSION = 16` con schema ya en v17~~ ✅ RESUELTO (`4f64930`) |
 | F3 | P2 | stock-movimiento.service.ts | ~~Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo)~~ ✅ RESUELTO — feedback FIFO claro (`21251f7`) |
-| F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo, 2026-08-14) |
-| F5 | P2 | stock-movimiento.service.ts | `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop` |
-| F6 | P3 | producto.service.ts | `crear` no atómico + CRUD sin guard admin en el servicio |
-| F7 | P3 | inventario.page.ts | Edición por lote mixto preselecciona lote viejo de cualquier ubicación |
-| F8 | P3 | inventario.page.ts | Producto con stock > 0 pero sin lotes activos no se puede editar |
-| F9 | P3 | inventario.page.html | Confirmación de borrado no informa el alcance de la pérdida |
+| F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`) |
+| F5 | P2 | stock-movimiento.service.ts | `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop` — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`) |
+| F6 | P3 | producto.service.ts | `crear` no atómico + CRUD sin guard admin en el servicio — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`) |
+| F7 | P3 | inventario.page.ts | Edición por lote mixto preselecciona lote viejo de cualquier ubicación — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`) |
+| F8 | P3 | inventario.page.ts | Producto con stock > 0 pero sin lotes activos no se puede editar — 🔧 NUESTRO (branch `fix-f8-f9`) |
+| F9 | P3 | inventario.page.html | Confirmación de borrado no informa el alcance de la pérdida — ⏳ NUESTRO (branch `fix-f8-f9`, independiente) |
 
 ## Detalle por hallazgo
 
@@ -53,9 +66,9 @@
 - **Fix**: `_syncPrecioCosto` retorna el front (`{ id, precio_costo } | null`); `registrarEditar` retorna `EdicionResultado` (`esFront`, `costoProducto`, `costoEditado`). El toast ahora comunica: si el lote editado es el front → `Precio costo: $X`; si no → `Costo del lote: $Y — Precio costo del producto sin cambios: $Z (lote más viejo con stock)`.
 - **Tests**: service spec F3 (2 nuevos, 82/82) + página spec 36b/36c (49/49). Suite completa: 848/848.
 
-### F4 — P2 · Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo)
+### F4 — P2 · Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`)
 
-- **Estado**: está siendo resuelto por un tercero (2026-08-14). **No duplicar** el trabajo; coordinar antes de tocar estos archivos.
+- **Estado**: a cargo de externo (2026-08-14). **No duplicar**. Ver sección "Coordinación de trabajo en paralelo".
 - **Dónde**: `inventario.page.ts:406-447` (`guardarProducto`: solo `=== null`), `:218-227` (editar), `stock-movimiento.service.ts:205-252` (`registrarEntrada` valida cantidad, no `precioCosto`). Los `min="0"` del HTML no aplican: form con `novalidate` y modal sin `<form>`.
 - **Evidencia**: entrada con costo −5 → lote con `precio_costo = -5` → `obtenerInversionGlobal` (`producto.service.ts:90-101`) suma `cantidad * precio_costo` → inversión negativa; COGS contaminado.
 - **Impacto**: MEDIO (integridad de costos).
@@ -75,21 +88,26 @@
 - **Impacto**: BAJO-MEDIO.
 - **Sugerencia**: envolver `crear` en transacción y agregar guard de rol en el servicio.
 
-### F7 — P3 · Semántica de edición por lote mixto persiste
+### F7 — P3 · Semántica de edición por lote mixto persiste — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`)
+
+- **Estado**: a cargo de externo (2026-08-14). **Debe mergear ANTES de F8** (F8 depende de la semántica del selector que defina F7). Ver sección "Coordinación de trabajo en paralelo".
 
 - **Dónde**: `inventario.page.ts:340-354` (preselecciona `lotes[0]`, el más viejo de CUALQUIER ubicación) + `stock-movimiento.service.ts:659-668` (sin filtro de ubicación).
 - **Evidencia**: producto con stock en ambas ubicaciones → editar el lote viejo (quizá almacén) → cambia solo esa columna; la otra queda igual (correcto en DB, confuso en pantalla). El historial además registra el absoluto como "Ajuste N" (`stock-movimiento.service.ts:534-537`), un cambio 10→3 figura como "Ajuste 3u".
 - **Impacto**: BAJO (mitigado por label "Cantidad nueva del lote" + toast, pero no resuelto).
 - **Sugerencia**: filtrar por ubicación en el selector o marcar explícitamente la ubicación del lote seleccionado.
 
-### F8 — P3 · Producto con stock > 0 pero sin lotes activos no se puede editar
+### F8 — P3 · Producto con stock > 0 pero sin lotes activos no se puede editar — 🔧 NUESTRO (branch `fix-f8-f9`)
+
+- **Estado**: a nuestro cargo. Espera a que F7 mergee primero (semántica del selector). Ver sección "Coordinación de trabajo en paralelo".
+- **Acuerdo recomendado**: materializar el "lote 0" en el service `registrarEditar`, atómico dentro de la transacción (UPDATE→INSERT si no existe lote activo), para no pisar el selector de F7 ni la validación de F4. Coordinar confirmación con externo.
 
 - **Dónde**: `inventario.page.ts:197-200` ('Debe seleccionar un lote') + filtro `cantidad > 0` (`stock-movimiento.service.ts:663-665`).
 - **Evidencia**: un lote dejado en 0 (ahora permitido: el guard absoluto acepta 0) o datos legacy → editar bloqueado (hoy con error claro, spec 39; antes bloqueo silencioso). El safety-net de `_consumirFIFO` (97-129) fabrica lotes solo en consumos, no en edición.
 - **Impacto**: BAJO (error visible, workaround: una Entrada crea lote).
 - **Sugerencia**: permitir editar producto aunque no haya lote activo (crear lote 0 si hace falta).
 
-### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida
+### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida — ⏳ NUESTRO (branch `fix-f8-f9`, independiente)
 
 - **Dónde**: `inventario.page.html:563-591`.
 - **Evidencia**: se borran permanentemente movimientos, lotes y `venta_lotes` del producto y se degradan reportes históricos; el diálogo solo dice "no se puede deshacer".
@@ -107,9 +125,8 @@
 
 1. ~~**F1 + F2**~~ — integridad de datos (pérdida de historial / bloqueo de restauración e import). ✅ RESUELTO.
 2. ~~**F3**~~ — consistencia de lo que pinta la UI y costos. ✅ RESUELTO (feedback FIFO claro).
-3. **F4** — precios/costos negativos. ⏳ EN PROGRESO (externo).
-4. **F5** — latente pero dañino si se usa.
-5. **F6–F9** — menores / UX.
+3. **F4–F7** — externo (branch `fix-f4-f7`). Orden de merge: F7 antes de F8.
+4. **F8–F9** — nosotros (branch `fix-f8-f9`). F9 independiente; F8 espera a F7.
 
 ## Referencias
 
