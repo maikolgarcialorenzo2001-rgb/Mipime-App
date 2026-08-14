@@ -112,14 +112,34 @@ export class ProductoService {
     );
   }
 
-  /** Elimina un producto y sus lotes/movimientos asociados por ID. */
+  /** Elimina un producto y sus lotes/movimientos asociados por ID.
+   *  Bloquea si el producto tiene historial (detalle_ventas o cuenta_cosas)
+   *  para no degradar reportes históricos; el borrado corre en una transacción
+   *  atómica para no dejar mitades (F1). */
   eliminar(id: number): Observable<void> {
     return from(
       (async () => {
-        await this._db.sql('DELETE FROM venta_lotes WHERE producto_id = ?', [id]);
-        await this._db.sql('DELETE FROM stock_movimientos WHERE producto_id = ?', [id]);
-        await this._db.sql('DELETE FROM lotes_stock WHERE producto_id = ?', [id]);
-        await this._db.sql('DELETE FROM productos WHERE id = ?', [id]);
+        const [ventas, cuentas] = await Promise.all([
+          this._db.sql<{ total: number }>(
+            'SELECT COUNT(*) AS total FROM detalle_ventas WHERE producto_id = ?',
+            [id],
+          ),
+          this._db.sql<{ total: number }>(
+            'SELECT COUNT(*) AS total FROM cuenta_cosas WHERE producto_id = ?',
+            [id],
+          ),
+        ]);
+        if ((ventas[0]?.total ?? 0) > 0 || (cuentas[0]?.total ?? 0) > 0) {
+          throw new Error(
+            'No se puede eliminar: el producto tiene ventas o cuenta casas asociadas',
+          );
+        }
+        await this._db.transaction(async (tx) => {
+          await tx.sql('DELETE FROM venta_lotes WHERE producto_id = ?', [id]);
+          await tx.sql('DELETE FROM stock_movimientos WHERE producto_id = ?', [id]);
+          await tx.sql('DELETE FROM lotes_stock WHERE producto_id = ?', [id]);
+          await tx.sql('DELETE FROM productos WHERE id = ?', [id]);
+        });
       })(),
     ).pipe(map(() => undefined));
   }

@@ -282,6 +282,59 @@ describe('ProductoService', () => {
         [1],
       );
     });
+
+    it('F1 RED: debería bloquear eliminación cuando el producto tiene detalle_ventas', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ total: 1 }]) // detalle_ventas
+        .mockResolvedValueOnce([{ total: 0 }]); // cuenta_cosas
+
+      const service = TestBed.inject(ProductoService);
+      await expect(firstValueFrom(service.eliminar(1))).rejects.toThrow(
+        'No se puede eliminar',
+      );
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(mockDb.sql).not.toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM productos'),
+        [1],
+      );
+    });
+
+    it('F1 RED: debería bloquear eliminación cuando el producto tiene cuenta_cosas', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ total: 0 }]) // detalle_ventas
+        .mockResolvedValueOnce([{ total: 1 }]); // cuenta_cosas
+
+      const service = TestBed.inject(ProductoService);
+      await expect(firstValueFrom(service.eliminar(1))).rejects.toThrow(
+        'No se puede eliminar',
+      );
+      expect(mockDb.transaction).not.toHaveBeenCalled();
+      expect(mockDb.sql).not.toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM productos'),
+        [1],
+      );
+    });
+
+    it('F1 RED: debería eliminar atómicamente en transaction cuando no hay historial', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ total: 0 }]) // detalle_ventas
+        .mockResolvedValueOnce([{ total: 0 }]); // cuenta_cosas
+
+      const service = TestBed.inject(ProductoService);
+      await firstValueFrom(service.eliminar(1));
+
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      // Los 4 DELETEs deben correr dentro de la transacción, en orden
+      const queries = vi.mocked(mockDb.sql).mock.calls.map((c) => String(c[0]));
+      const deleteIdx = queries
+        .map((q, i) => (q.includes('DELETE FROM') ? i : -1))
+        .filter((i) => i >= 0);
+      expect(deleteIdx).toHaveLength(4);
+      expect(queries[deleteIdx[0]]).toContain('DELETE FROM venta_lotes');
+      expect(queries[deleteIdx[1]]).toContain('DELETE FROM stock_movimientos');
+      expect(queries[deleteIdx[2]]).toContain('DELETE FROM lotes_stock');
+      expect(queries[deleteIdx[3]]).toContain('DELETE FROM productos');
+    });
   });
 
   describe('obtenerInversionGlobal', () => {
