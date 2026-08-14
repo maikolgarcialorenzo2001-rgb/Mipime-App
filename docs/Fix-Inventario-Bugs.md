@@ -1,7 +1,7 @@
 # Fix Inventario Bugs
 
 > Plan de corrección de bugs del flujo de inventario — Mipime-App.
-> Fecha: 2026-08-14. Estado: F1 ✅ F2 ✅ F3 ✅ — F4–F7 ⏳ en progreso (externo) — F8 🔧 en progreso (nosotros) — F9 ⏳ pendiente (nosotros).
+> Fecha: 2026-08-14. Estado: F1 ✅ F2 ✅ F3 ✅ — F4–F7 ✅ mergeados (externo) — F8 ✅ F9 ✅ (nosotros, branch `fix-f8-f9`). Pendiente: merge `fix-f8-f9` → `fix-inventario-bugs` → `main`.
 
 ## Coordinación de trabajo en paralelo (2026-08-14)
 
@@ -93,34 +93,34 @@ División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F
 - **Impacto**: BAJO-MEDIO.
 - **Sugerencia**: envolver `crear` en transacción y agregar guard de rol en el servicio.
 
-### F7 — P3 · Semántica de edición por lote mixto persiste — ⏳ EN PROGRESO (externo, branch `fix-f4-f7`)
+### F7 — P3 · Semántica de edición por lote mixto persiste — ✅ MERGEADO (externo, branch `fix-f4-f7`)
 
-- **Estado**: a cargo de externo (2026-08-14). **Debe mergear ANTES de F8** (F8 depende de la semántica del selector que defina F7). Ver sección "Coordinación de trabajo en paralelo".
+- **Estado**: ✅ resuelto por externo y mergeado a `fix-inventario-bugs` (commit `a3dc87d`, 2026-08-14). F8 se apoyó en su semántica del selector.
 
 - **Dónde**: `inventario.page.ts:340-354` (preselecciona `lotes[0]`, el más viejo de CUALQUIER ubicación) + `stock-movimiento.service.ts:659-668` (sin filtro de ubicación).
 - **Evidencia**: producto con stock en ambas ubicaciones → editar el lote viejo (quizá almacén) → cambia solo esa columna; la otra queda igual (correcto en DB, confuso en pantalla). El historial además registra el absoluto como "Ajuste N" (`stock-movimiento.service.ts:534-537`), un cambio 10→3 figura como "Ajuste 3u".
 - **Impacto**: BAJO (mitigado por label "Cantidad nueva del lote" + toast, pero no resuelto).
 - **Sugerencia**: filtrar por ubicación en el selector o marcar explícitamente la ubicación del lote seleccionado.
 
-### F8 — P3 · Producto con stock > 0 pero sin lotes activos no se puede editar — 🔧 NUESTRO (branch `fix-f8-f9`)
+### F8 — P3 · Producto con stock > 0 pero sin lotes activos no se puede editar — ✅ NUESTRO (branch `fix-f8-f9`, commit `5fd389d`)
 
-- **Estado**: a nuestro cargo. Espera a que F7 mergee primero (semántica del selector). Ver sección "Coordinación de trabajo en paralelo".
-- **Acuerdo recomendado**: materializar el "lote 0" en el service `registrarEditar`, atómico dentro de la transacción (UPDATE→INSERT si no existe lote activo), para no pisar el selector de F7 ni la validación de F4. Coordinar confirmación con externo.
+- **Estado**: ✅ RESUELTO (2026-08-14). `registrarEditar` acepta `loteId: number | null`; con `null` materializa el "lote 0" atómicamente dentro de la transacción (reutiliza el lote en 0 más antiguo o INSERT con cantidad 0 + `RETURNING *`), delta = nuevaCantidad - 0. La UI prellena el form con datos del producto y la ubicación sigue la semántica F7 (la de más stock, empate → almacén).
+- **Acuerdo recomendado**: implementado — el "lote 0" se materializa en el service `registrarEditar`, atómico dentro de la transacción, sin tocar el selector de F7 ni la validación de F4.
 
 - **Dónde**: `inventario.page.ts:197-200` ('Debe seleccionar un lote') + filtro `cantidad > 0` (`stock-movimiento.service.ts:663-665`).
 - **Evidencia**: un lote dejado en 0 (ahora permitido: el guard absoluto acepta 0) o datos legacy → editar bloqueado (hoy con error claro, spec 39; antes bloqueo silencioso). El safety-net de `_consumirFIFO` (97-129) fabrica lotes solo en consumos, no en edición.
 - **Impacto**: BAJO (error visible, workaround: una Entrada crea lote).
 - **Sugerencia**: permitir editar producto aunque no haya lote activo (crear lote 0 si hace falta).
 
-### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida — ⏳ NUESTRO (branch `fix-f8-f9`, independiente)
+### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida — ✅ NUESTRO (branch `fix-f8-f9`, commit `01d954c`)
 
-- **Estado**: a nuestro cargo. Independiente; se puede resolver sin esperar a F4–F7.
-- **Propuesta acordada (guardada — decidir implementación cuando vayamos a resolverla)**:
-  - **NO tocar `eliminar()`** en `producto.service.ts` (zona F1 ya mergeada + posible guard admin de F6) ni `stock-movimiento.service.ts` (zona caliente F4/F5/F7).
-  - Agregar método **nuevo** en `producto.service.ts` (ej. `obtenerConteoEliminacion(id) → { movimientos, lotes, ventaLotes }`) — agregar ≠ modificar, merge trivial con F6.
+- **Estado**: ✅ RESUELTO (2026-08-14). Nuevo `ProductoService.obtenerConteoEliminacion(id)` (5 COUNTs: ventas, cuentas, movimientos, lotes, venta_lotes); `confirmarEliminar` async carga el conteo; el diálogo informa loading → bloqueo por historial (botón deshabilitado) → cantidades exactas → fallback genérico si falla el conteo.
+- **Propuesta acordada (implementada)**:
+  - **NO se tocó `eliminar()`** en `producto.service.ts` ni `stock-movimiento.service.ts`.
+  - Método **nuevo** `obtenerConteoEliminacion(id) → { movimientos, lotes, ventaLotes, ventas, cuentas }` — agregar ≠ modificar, merge trivial con F6.
   - En `inventario.page.ts`: `confirmarEliminar(id)` carga el conteo; el diálogo muestra qué se elimina.
-  - En `inventario.page.html:563-591`: diálogo informa cantidades antes de confirmar.
-  - **Integración con F1**: si hay `detalle_ventas`/`cuenta_cosas` → mostrar que NO se puede eliminar (mismas tablas que ya bloquea F1); si no → mostrar cuántos movimientos/lotes se borran.
+  - En `inventario.page.html:563-610`: diálogo informa cantidades antes de confirmar.
+  - **Integración con F1**: si hay `detalle_ventas`/`cuenta_cosas` → muestra que NO se puede eliminar y deshabilita el botón (mismas tablas que ya bloquea F1); si no → muestra cuántos movimientos/lotes se borran. Doble guard UX en `ejecutarEliminar`.
 
 - **Dónde**: `inventario.page.html:563-591`.
 - **Evidencia**: se borran permanentemente movimientos, lotes y `venta_lotes` del producto y se degradan reportes históricos; el diálogo solo dice "no se puede deshacer".
@@ -138,8 +138,8 @@ División acordada: **externo (pana) resuelve F4–F7**; **nosotros resolvemos F
 
 1. ~~**F1 + F2**~~ — integridad de datos (pérdida de historial / bloqueo de restauración e import). ✅ RESUELTO.
 2. ~~**F3**~~ — consistencia de lo que pinta la UI y costos. ✅ RESUELTO (feedback FIFO claro).
-3. **F4–F7** — externo (branch `fix-f4-f7`). Orden de merge: F7 antes de F8. **Mergeamos nosotros.**
-4. **F8–F9** — nosotros (branch `fix-f8-f9`). F9 independiente (propuesta guardada arriba); F8 espera a F7.
+3. **F4–F7** — externo (branch `fix-f4-f7`). ✅ MERGEADO a `fix-inventario-bugs` (commit `a3dc87d`).
+4. **F8–F9** — nosotros (branch `fix-f8-f9`). ✅ RESUELTOS (commits `5fd389d`, `01d954c`, pusheados). Pendiente: merge `fix-f8-f9` → `fix-inventario-bugs` → `main`.
 
 ## Referencias
 
