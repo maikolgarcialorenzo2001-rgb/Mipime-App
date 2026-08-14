@@ -1,0 +1,115 @@
+# Fix Inventario Bugs
+
+> Plan de corrección de bugs del flujo de inventario — Mipime-App.
+> Fecha: 2026-08-14. Estado: pendiente de implementación (documento de trabajo, no spec).
+
+## Contexto
+
+- **Bug reportado por el usuario**: "al editar un producto las cantidades no se registraban y pintaba información incorrecta".
+- **Fixes aplicados ayer**: `855a838` (validación visible + toast en edición), `6c26562` (guards de cantidad + pre-validación FIFO), y `d683a41` / `7a730f3` (atomicidad de escrituras de stock).
+- **Doble check realizado**: el bug central está arreglado con tests (novalidate, validación visible, cero silencioso eliminado, pre-validación FIFO, toasts, transacciones re-entrantes). Quedan restos del síntoma original en F3 y F7.
+- **Diagnóstico previo**: `docs/investigacion-edicion-producto.md` (root causes A–F).
+
+## Resumen de hallazgos
+
+| # | Prioridad | Área | Descripción corta |
+|---|-----------|------|-------------------|
+| F1 | P1 | producto.service.ts | Eliminar producto NO atómico (4 DELETE sin transacción) + FKs solo en Electron |
+| F2 | P1 | electron/db.ts | `MAX_SCHEMA_VERSION = 16` con schema ya en v17 |
+| F3 | P2 | stock-movimiento.service.ts | Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo) |
+| F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados |
+| F5 | P2 | stock-movimiento.service.ts | `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop` |
+| F6 | P3 | producto.service.ts | `crear` no atómico + CRUD sin guard admin en el servicio |
+| F7 | P3 | inventario.page.ts | Edición por lote mixto preselecciona lote viejo de cualquier ubicación |
+| F8 | P3 | inventario.page.ts | Producto con stock > 0 pero sin lotes activos no se puede editar |
+| F9 | P3 | inventario.page.html | Confirmación de borrado no informa el alcance de la pérdida |
+
+## Detalle por hallazgo
+
+### F1 — P1 · Eliminación de producto NO atómica + FK divergente entre plataformas
+
+- **Dónde**: `src/app/services/producto.service.ts:116-125` (`eliminar`), invocado desde `ejecutarEliminar()` en `src/app/pages/inventario/inventario.page.ts:457-473`.
+- **Evidencia**: 4 DELETE en autocommit sin `transaction()`.
+  - **Electron**: `foreign_keys = ON` (`electron/db.ts:106`) → si el producto tiene `detalle_ventas`/`cuenta_cosas`, el 4º DELETE (productos) falla **después** de persistir los 3 primeros → producto vivo pero sin historial de movimientos ni lotes (pérdida silenciosa con error en pantalla).
+  - **Web (SQLocal)**: se abre la DB sin `PRAGMA foreign_keys` → el borrado pasa y quedan **huérfanos** en `detalle_ventas`/`cuenta_cosas` → historial degrada a "Producto #id" (`jornada.service.ts:105`, `historial.page.ts:103-106`) y se pierde el rastro FIFO (`venta_lotes`) de ventas pasadas.
+- **Impacto**: ALTO (pérdida de datos / reportes rotos).
+- **Sugerencia**: envolver en `transaction()` y decidir soft-delete o bloqueo si hay referencias.
+
+### F2 — P1 · `MAX_SCHEMA_VERSION = 16` con schema ya en v17
+
+- **Dónde**: `electron/db.ts:22` (const), `db-migrations.ts:559-582` (migración v17), `main.spec.ts:546` (ya espera 17).
+- **Evidencia**: `isAcceptable()` (`electron/db.ts:134-138`) rechaza todo candidato con `schemaVersion > 16`.
+  - Si la DB viva se corrompe, la cascada `recoverInPlace → tryRestore → tryRestoreFromTimestamped` descarta backups v17 válidos → `status: 'fatal'` con backups buenos disponibles.
+  - El import one-shot OPFS→native (`electron/db.ts:503-544`, `main.ts:343`) rechaza una DB web migrada a v17 → `NativeSqliteService._runImportRoundtrip` → `setFatal('import')` → primer arranque nativo con datos v17 = pantalla fatal.
+- **Nota**: el commit `e8052cf` (2026-08-13) actualizó **solo la expectativa del test** `main.spec.ts` (16→17) para que el test pasara, pero **no** la constante `MAX_SCHEMA_VERSION`. Test verde ≠ código arreglado.
+- **Impacto**: ALTO (bloquea migración/restauración del schema actual).
+- **Sugerencia**: subir `MAX_SCHEMA_VERSION` a 17 en `electron/db.ts:22` y actualizar `db.spec.ts:93`.
+
+### F3 — P2 · Editar costo de lote no-frontal no actualiza `productos.precio_costo`
+
+- **Dónde**: `stock-movimiento.service.ts:546-553` (UPDATE lote + `_syncPrecioCosto` 178-196) + `inventario.page.html:66` (columna lee el cache).
+- **Evidencia**: producto con 2 lotes (almacén viejo 10u + shop nuevo 5u); editar el lote shop y bajar su costo → `_syncPrecioCosto` selecciona el front (lote almacén) → `productos.precio_costo` no cambia → la tabla sigue pintando el costo viejo → sensación de "no se guardó". La spec solo cubre el caso front (`stock-movimiento.service.spec.ts:876`).
+- **Impacto**: MEDIO (feedback falso, resto directo del bug reportado).
+- **Sugerencia**: decidir semántica del costo cacheado y sincronizarlo también al editar lotes no-frontales.
+
+### F4 — P2 · Precios/costos negativos aceptados
+
+- **Dónde**: `inventario.page.ts:406-447` (`guardarProducto`: solo `=== null`), `:218-227` (editar), `stock-movimiento.service.ts:205-252` (`registrarEntrada` valida cantidad, no `precioCosto`). Los `min="0"` del HTML no aplican: form con `novalidate` y modal sin `<form>`.
+- **Evidencia**: entrada con costo −5 → lote con `precio_costo = -5` → `obtenerInversionGlobal` (`producto.service.ts:90-101`) suma `cantidad * precio_costo` → inversión negativa; COGS contaminado.
+- **Impacto**: MEDIO (integridad de costos).
+- **Sugerencia**: validar signo de precios/costos en UI y servicio (>= 0).
+
+### F5 — P2 · `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop`
+
+- **Dónde**: `stock-movimiento.service.ts:356-378`.
+- **Evidencia**: `DELETE FROM lotes_stock WHERE producto_id = ?` borra TODAS las ubicaciones; luego inserta UN lote 'almacen' y hace `SET stock_almacen = nuevaCantidad` sin tocar `stock_shop` → si el producto tenía stock en shop, los lotes shop desaparecen y `stock_shop` queda con valor viejo (divergencia lote↔columna). Hoy **sin caller de producción** (solo specs `stock-movimiento.service.spec.ts:575-623`), pero es API pública.
+- **Impacto**: MEDIO (latente; un futuro caller la arma).
+- **Sugerencia**: redefinir el ajuste full por ubicación o recalcular `stock_shop` consistentemente.
+
+### F6 — P3 · `crear` no atómico + CRUD sin guard admin en el servicio
+
+- **Dónde**: `producto.service.ts:44-73` (INSERT autocommit → `registrarEntrada` en txn aparte) y servicio sin `_checkAdmin` (contraste con `stock-movimiento.service.ts:24-29`).
+- **Evidencia**: si `registrarEntrada` falla, el producto ya quedó insertado → producto fantasma con error en pantalla. Y un trabajador podría crear/eliminar vía servicio saltándose la UI (los guards `esAdmin` son solo de template).
+- **Impacto**: BAJO-MEDIO.
+- **Sugerencia**: envolver `crear` en transacción y agregar guard de rol en el servicio.
+
+### F7 — P3 · Semántica de edición por lote mixto persiste
+
+- **Dónde**: `inventario.page.ts:340-354` (preselecciona `lotes[0]`, el más viejo de CUALQUIER ubicación) + `stock-movimiento.service.ts:659-668` (sin filtro de ubicación).
+- **Evidencia**: producto con stock en ambas ubicaciones → editar el lote viejo (quizá almacén) → cambia solo esa columna; la otra queda igual (correcto en DB, confuso en pantalla). El historial además registra el absoluto como "Ajuste N" (`stock-movimiento.service.ts:534-537`), un cambio 10→3 figura como "Ajuste 3u".
+- **Impacto**: BAJO (mitigado por label "Cantidad nueva del lote" + toast, pero no resuelto).
+- **Sugerencia**: filtrar por ubicación en el selector o marcar explícitamente la ubicación del lote seleccionado.
+
+### F8 — P3 · Producto con stock > 0 pero sin lotes activos no se puede editar
+
+- **Dónde**: `inventario.page.ts:197-200` ('Debe seleccionar un lote') + filtro `cantidad > 0` (`stock-movimiento.service.ts:663-665`).
+- **Evidencia**: un lote dejado en 0 (ahora permitido: el guard absoluto acepta 0) o datos legacy → editar bloqueado (hoy con error claro, spec 39; antes bloqueo silencioso). El safety-net de `_consumirFIFO` (97-129) fabrica lotes solo en consumos, no en edición.
+- **Impacto**: BAJO (error visible, workaround: una Entrada crea lote).
+- **Sugerencia**: permitir editar producto aunque no haya lote activo (crear lote 0 si hace falta).
+
+### F9 — P3 · Confirmación de borrado no informa el alcance de la pérdida
+
+- **Dónde**: `inventario.page.html:563-591`.
+- **Evidencia**: se borran permanentemente movimientos, lotes y `venta_lotes` del producto y se degradan reportes históricos; el diálogo solo dice "no se puede deshacer".
+- **Impacto**: BAJO (UX).
+- **Sugerencia**: informar qué se elimina (cantidad de movimientos/lotes/referencias) antes de confirmar.
+
+## Lo que SÍ está bien (verificado, no tocar)
+
+- **Atomicidad**: todas las escrituras de stock corren en `transaction()` re-entrante (JOIN para `VentaService`/`CuentaCosasService` con BEGIN raw), con tests S-03 de "fallo a mitad" por operación (`stock-movimiento.service.spec.ts:1241-1387`).
+- **Pre-validación FIFO sin consumo parcial** (S-04) y **guards de cantidad** (S-05) cubiertos con tests.
+- **Traslado/salida/merma sin `_checkAdmin` es INTENCIONAL**: los specs lo fijan explícitamente (`stock-movimiento.service.spec.ts:117, 728`).
+- El flujo de edición tiene re-entrancy guard anti doble-click (`inventario.page.ts:143`).
+
+## Priorización sugerida
+
+1. **F1 + F2** — integridad de datos (pérdida de historial / bloqueo de restauración e import).
+2. **F3 + F4** — consistencia de lo que pinta la UI y costos.
+3. **F5** — latente pero dañino si se usa.
+4. **F6–F9** — menores / UX.
+
+## Referencias
+
+- Commits de fix previo: `855a838`, `6c26562`, `d683a41`, `7a730f3`, `e8052cf`.
+- Diagnóstico: `docs/investigacion-edicion-producto.md`.
+- Archivos clave: `src/app/services/producto.service.ts`, `src/app/services/stock-movimiento.service.ts`, `src/app/pages/inventario/inventario.page.ts/.html`, `electron/db.ts`, `src/app/services/db-migrations.ts`.
