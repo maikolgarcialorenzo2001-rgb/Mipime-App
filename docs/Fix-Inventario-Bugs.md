@@ -1,7 +1,7 @@
 # Fix Inventario Bugs
 
 > Plan de corrección de bugs del flujo de inventario — Mipime-App.
-> Fecha: 2026-08-14. Estado: pendiente de implementación (documento de trabajo, no spec).
+> Fecha: 2026-08-14. Estado: F1 ✅ F2 ✅ F3 ✅ — F4 ⏳ en progreso (externo) — F5–F9 pendientes.
 
 ## Contexto
 
@@ -14,10 +14,10 @@
 
 | # | Prioridad | Área | Descripción corta |
 |---|-----------|------|-------------------|
-| F1 | P1 | producto.service.ts | Eliminar producto NO atómico (4 DELETE sin transacción) + FKs solo en Electron |
-| F2 | P1 | electron/db.ts | `MAX_SCHEMA_VERSION = 16` con schema ya en v17 |
-| F3 | P2 | stock-movimiento.service.ts | ~~Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo)~~ ✅ RESUELTO — feedback FIFO claro |
-| F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados |
+| F1 | P1 | producto.service.ts | ~~Eliminar producto NO atómico (4 DELETE sin transacción) + FKs solo en Electron~~ ✅ RESUELTO (`dea2405`) |
+| F2 | P1 | electron/db.ts | ~~`MAX_SCHEMA_VERSION = 16` con schema ya en v17~~ ✅ RESUELTO (`4f64930`) |
+| F3 | P2 | stock-movimiento.service.ts | ~~Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo)~~ ✅ RESUELTO — feedback FIFO claro (`21251f7`) |
+| F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo, 2026-08-14) |
 | F5 | P2 | stock-movimiento.service.ts | `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop` |
 | F6 | P3 | producto.service.ts | `crear` no atómico + CRUD sin guard admin en el servicio |
 | F7 | P3 | inventario.page.ts | Edición por lote mixto preselecciona lote viejo de cualquier ubicación |
@@ -53,8 +53,9 @@
 - **Fix**: `_syncPrecioCosto` retorna el front (`{ id, precio_costo } | null`); `registrarEditar` retorna `EdicionResultado` (`esFront`, `costoProducto`, `costoEditado`). El toast ahora comunica: si el lote editado es el front → `Precio costo: $X`; si no → `Costo del lote: $Y — Precio costo del producto sin cambios: $Z (lote más viejo con stock)`.
 - **Tests**: service spec F3 (2 nuevos, 82/82) + página spec 36b/36c (49/49). Suite completa: 848/848.
 
-### F4 — P2 · Precios/costos negativos aceptados
+### F4 — P2 · Precios/costos negativos aceptados — ⏳ EN PROGRESO (externo)
 
+- **Estado**: está siendo resuelto por un tercero (2026-08-14). **No duplicar** el trabajo; coordinar antes de tocar estos archivos.
 - **Dónde**: `inventario.page.ts:406-447` (`guardarProducto`: solo `=== null`), `:218-227` (editar), `stock-movimiento.service.ts:205-252` (`registrarEntrada` valida cantidad, no `precioCosto`). Los `min="0"` del HTML no aplican: form con `novalidate` y modal sin `<form>`.
 - **Evidencia**: entrada con costo −5 → lote con `precio_costo = -5` → `obtenerInversionGlobal` (`producto.service.ts:90-101`) suma `cantidad * precio_costo` → inversión negativa; COGS contaminado.
 - **Impacto**: MEDIO (integridad de costos).
@@ -104,13 +105,15 @@
 
 ## Priorización sugerida
 
-1. **F1 + F2** — integridad de datos (pérdida de historial / bloqueo de restauración e import).
-2. **F3 + F4** — consistencia de lo que pinta la UI y costos.
-3. **F5** — latente pero dañino si se usa.
-4. **F6–F9** — menores / UX.
+1. ~~**F1 + F2**~~ — integridad de datos (pérdida de historial / bloqueo de restauración e import). ✅ RESUELTO.
+2. ~~**F3**~~ — consistencia de lo que pinta la UI y costos. ✅ RESUELTO (feedback FIFO claro).
+3. **F4** — precios/costos negativos. ⏳ EN PROGRESO (externo).
+4. **F5** — latente pero dañino si se usa.
+5. **F6–F9** — menores / UX.
 
 ## Referencias
 
 - Commits de fix previo: `855a838`, `6c26562`, `d683a41`, `7a730f3`, `e8052cf`.
+- Commits del plan F1–F3 (branch `fix-inventario-bugs`): `dea2405`, `4f64930`, `21251f7`.
 - Diagnóstico: `docs/investigacion-edicion-producto.md`.
 - Archivos clave: `src/app/services/producto.service.ts`, `src/app/services/stock-movimiento.service.ts`, `src/app/pages/inventario/inventario.page.ts/.html`, `electron/db.ts`, `src/app/services/db-migrations.ts`.
