@@ -558,10 +558,16 @@ export class StockMovimientoService {
   /**
    * Edita precio_venta del producto y precio_costo/cantidad de un lote específico.
    * Admin-only.
+   *
+   * F8: cuando `loteId` es null (producto con stock > 0 en columnas pero sin
+   * ningún lote con `cantidad > 0` — selector sin lotes), materializa el "lote 0"
+   * ATOMICO dentro de la misma transacción: reutiliza el lote existente con
+   * `cantidad = 0` más antiguo o, si no existe, lo crea (INSERT con cantidad 0).
+   * El delta del movimiento se calcula contra ese lote materializado.
    */
   async registrarEditar(
     productoId: number,
-    loteId: number,
+    loteId: number | null,
     nombre: string,
     precioVenta: number,
     precioCosto: number,
@@ -587,16 +593,44 @@ export class StockMovimientoService {
     // otro lote más viejo con stock (cache sin cambios, feedback claro).
     let frontResultado: { id: number; precio_costo: number } | null = null;
 
+    // Lote sobre el que se edita. Con loteId numérico es el lote indicado;
+    // con loteId null (F8) es el "lote 0" materializado dentro de la transacción.
+    let loteActual: LoteStock | null = null;
+
     // T-09: movimiento + UPDATEs + recálculo atómicos.
     await this._db.transaction(async (tx) => {
       // 0. F7: leer la cantidad actual del lote para registrar el delta en el
       //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
-      const [loteActual] = await tx.sql<LoteStock>(
-        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
-        [loteId, productoId],
-      );
-      if (!loteActual) {
-        throw new Error('El lote no existe');
+      //    F8: con loteId null se materializa el "lote 0" — reutiliza el lote
+      //    existente en 0 más antiguo o lo crea (UPDATE→INSERT), sin pisar el
+      //    selector de F7 ni la validación de signo de F4.
+      if (loteId !== null) {
+        const [lote] = await tx.sql<LoteStock>(
+          'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+          [loteId, productoId],
+        );
+        if (!lote) {
+          throw new Error('El lote no existe');
+        }
+        loteActual = lote;
+      } else {
+        const [loteCero] = await tx.sql<LoteStock>(
+          `SELECT * FROM lotes_stock
+           WHERE producto_id = ? AND cantidad = 0
+           ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
+          [productoId],
+        );
+        if (loteCero) {
+          loteActual = loteCero;
+        } else {
+          const [nuevoLote] = await tx.sql<LoteStock>(
+            `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+             VALUES (?, 0, ?, ?, ?, ?)
+             RETURNING *`,
+            [productoId, precioCosto, ahora, ubicacion, ahora],
+          );
+          loteActual = nuevoLote;
+        }
       }
       const delta = nuevaCantidad - loteActual.cantidad;
 
@@ -616,7 +650,7 @@ export class StockMovimientoService {
       // 3. Update the specific lot (cantidad and precio_costo)
       await tx.sql(
         'UPDATE lotes_stock SET cantidad = ?, precio_costo = ? WHERE id = ?',
-        [nuevaCantidad, precioCosto, loteId],
+        [nuevaCantidad, precioCosto, loteActual.id],
       );
 
       // 3b. Re-sync productos.precio_costo: the edited lot may be the FIFO front
@@ -639,7 +673,7 @@ export class StockMovimientoService {
     });
 
     return {
-      esFront: frontResultado?.id === loteId,
+      esFront: frontResultado?.id === loteActual?.id,
       costoProducto: frontResultado?.precio_costo ?? null,
       costoEditado: precioCosto,
     };

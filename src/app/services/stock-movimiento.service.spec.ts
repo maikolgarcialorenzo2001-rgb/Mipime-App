@@ -1082,6 +1082,70 @@ describe('StockMovimientoService', () => {
         expect.arrayContaining([20, expect.any(String), 1]),
       );
     });
+
+    it('F8 A: loteId null sin lote en 0 crea el lote 0 y registra delta = nuevaCantidad', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // 1: SELECT lote en 0 -> vacío (INSERT path)
+        .mockResolvedValueOnce([{ id: 99, cantidad: 0, precio_costo: 10, fecha_ingreso: '2026-08-14T00:00:00Z', ubicacion: 'shop', created_at: '2026-08-14T00:00:00Z' }]) // 2: INSERT lote 0 RETURNING *
+        .mockResolvedValueOnce([]) // 3: INSERT stock_movimientos
+        .mockResolvedValueOnce([]) // 4: UPDATE productos
+        .mockResolvedValueOnce([]) // 5: UPDATE lotes_stock
+        .mockResolvedValueOnce([{ id: 99, precio_costo: 10 }]) // 6: SELECT next lot (sync) -> lote creado es frente
+        .mockResolvedValueOnce([]) // 7: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 8 }]) // 8: SELECT SUM
+        .mockResolvedValueOnce([]); // 9: UPDATE stock
+
+      const result = await service.registrarEditar(1, null, 'Café', 15, 10, 8, 'Edición sin lote', 'shop');
+
+      // F8: el lote 0 se materializa con cantidad 0 hardcodeada en VALUES (INSERT dentro de la txn)
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('INSERT INTO lotes_stock'),
+        expect.arrayContaining([1, 10, expect.any(String), 'shop', expect.any(String)]),
+      );
+      // El movimiento registra el delta contra el lote 0: nuevaCantidad - 0
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        3,
+        expect.stringContaining('INSERT INTO stock_movimientos'),
+        expect.arrayContaining([1, 8, 'ajuste']),
+      );
+      // El UPDATE del lote apunta al lote 0 creado
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        5,
+        expect.stringContaining('UPDATE lotes_stock SET cantidad = ?, precio_costo = ?'),
+        [8, 10, 99],
+      );
+      expect(result.esFront).toBe(true);
+      expect(result.costoProducto).toBe(10);
+      expect(result.costoEditado).toBe(10);
+    });
+
+    it('F8 B: loteId null con lote en 0 existente lo reutiliza y registra delta = nuevaCantidad - 0', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ id: 7, cantidad: 0, precio_costo: 10, ubicacion: 'shop' }]) // 1: SELECT lote en 0 -> reutiliza
+        .mockResolvedValueOnce([]) // 2: INSERT stock_movimientos
+        .mockResolvedValueOnce([]) // 3: UPDATE productos
+        .mockResolvedValueOnce([]) // 4: UPDATE lotes_stock
+        .mockResolvedValueOnce([{ id: 7, precio_costo: 10 }]) // 5: SELECT next lot (sync)
+        .mockResolvedValueOnce([]) // 6: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 8 }]) // 7: SELECT SUM
+        .mockResolvedValueOnce([]); // 8: UPDATE stock
+
+      const result = await service.registrarEditar(1, null, 'Café', 15, 10, 8, 'Edición sin lote', 'shop');
+
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('INSERT INTO stock_movimientos'),
+        expect.arrayContaining([1, 8, 'ajuste']),
+      );
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        4,
+        expect.stringContaining('UPDATE lotes_stock SET cantidad = ?, precio_costo = ?'),
+        [8, 10, 7],
+      );
+      expect(result.esFront).toBe(true);
+      expect(result.costoProducto).toBe(10);
+    });
   });
 
   describe('registrarMerma', () => {

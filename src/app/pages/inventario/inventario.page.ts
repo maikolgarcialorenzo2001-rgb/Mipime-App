@@ -202,10 +202,6 @@ export class InventarioPage implements OnInit {
           const loteIdx = this.selectedLoteIndex();
           const productoLotes = this.productoLotes();
           const loteSel = productoLotes[loteIdx !== null ? loteIdx - 1 : -1];
-          if (!loteSel) {
-            this.error.set('Debe seleccionar un lote');
-            return;
-          }
           const nombre = this.editarNombre();
           const motivo = this.movimientoMotivo();
           const cantidad = this.movimientoCantidad();
@@ -242,15 +238,27 @@ export class InventarioPage implements OnInit {
             this.error.set('El costo no puede ser negativo');
             return;
           }
+          const prod = this.productos().find((p) => p.id === action.productoId);
+          // F8: sin lote activo (producto sin lotes con cantidad > 0) se guarda
+          // con loteId null y el service materializa el "lote 0". La ubicación
+          // sigue la misma semántica que la preselección de F7: la ubicación
+          // con más stock (empate → almacén).
+          const loteId = loteSel ? loteSel.id : null;
+          const ubicacion =
+            loteSel
+              ? loteSel.ubicacion
+              : (prod?.stock_almacen ?? 0) >= (prod?.stock_shop ?? 0)
+                ? 'almacen'
+                : 'shop';
           edicionResult = await this.stockService.registrarEditar(
             action.productoId,
-            loteSel.id,
+            loteId,
             nombre,
             pv,
             pc,
             cantidad,
             motivo,
-            loteSel.ubicacion,
+            ubicacion,
           );
           break;
         }
@@ -388,6 +396,19 @@ export class InventarioPage implements OnInit {
           this.movimientoCantidad.set(loteInicial?.cantidad ?? 0);
         } else if (lotes.length > 0 && tipo === 'ajuste') {
           this.selectedLoteIndex.set(1);
+        } else if (lotes.length === 0 && tipo === 'editar') {
+          // F8: producto con stock > 0 en columnas pero sin NINGÚN lote con
+          // cantidad > 0 (selector sin opciones). El form se prellena con los
+          // datos del producto y se guarda con loteId null: el service
+          // materializa el "lote 0" de forma atómica en su transacción.
+          const prod = this.productos().find((p) => p.id === productoId);
+          if (prod) {
+            this.editarNombre.set(prod.nombre);
+            this.editarPrecioVenta.set(prod.precio_venta);
+            this.editarPrecioCosto.set(prod.precio_costo);
+            this.movimientoCantidad.set(0);
+          }
+          this.selectedLoteIndex.set(null);
         }
         // salida: sin auto-selección — el usuario elige ubicación y lote (obligatorios)
       } catch {

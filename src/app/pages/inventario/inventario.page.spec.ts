@@ -1738,7 +1738,7 @@ describe('InventarioPage', () => {
     expect(fixture.nativeElement.querySelector('app-error-alert').textContent).toContain('Error al guardar');
   });
 
-  it('39. S-07: producto sin lotes en editar no crashea y al guardar muestra error claro', async () => {
+  it('39. F8: producto sin lotes en editar materializa lote 0 y guarda (loteId null)', async () => {
     mockStockService.obtenerLotesPorProducto.mockResolvedValue([]);
     mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
 
@@ -1751,9 +1751,14 @@ describe('InventarioPage', () => {
     await component.onSelectAction(1, 'editar');
     fixture.detectChanges();
 
-    // Estado vacío manejado: sin selector de lote y sin crash
+    // F8: sin selector de lote y sin crash; el form se prellena con datos del producto
     expect(component.productoLotes()).toHaveLength(0);
     expect(component.loteActual).toBeNull();
+    expect(component.selectedLoteIndex()).toBeNull();
+    expect(component.editarNombre()).toBe('Coca Cola');
+    expect(component.editarPrecioVenta()).toBe(12);
+    expect(component.editarPrecioCosto()).toBe(8);
+    expect(component.movimientoCantidad()).toBe(0);
     expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
 
     component.editarPrecioVenta.set(15);
@@ -1765,9 +1770,33 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
-    expect(component.error()).toContain('lote');
-    expect(fixture.nativeElement.querySelector('app-error-alert').textContent).toContain('lote');
+    // F8: se llama registrarEditar con loteId null y la ubicación con más stock (almacén)
+    expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
+      1, null, 'Coca Cola', 15, 10, 80, 'Sin lotes', 'almacen',
+    );
+    expect(component.error()).toBeNull();
+    expect(component.successMessage()).toContain('Stock guardado');
+  });
+
+  it('39b. F8: onSelectAction en editar con lotes vacíos prellena nombre/precios del producto y selectedLoteIndex null', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    expect(component.productoLotes()).toHaveLength(0);
+    expect(component.selectedLoteIndex()).toBeNull();
+    expect(component.editarNombre()).toBe(productos[0].nombre);
+    expect(component.editarPrecioVenta()).toBe(productos[0].precio_venta);
+    expect(component.editarPrecioCosto()).toBe(productos[0].precio_costo);
+    expect(component.movimientoCantidad()).toBe(0);
   });
 
   describe('responsive layout', () => {
