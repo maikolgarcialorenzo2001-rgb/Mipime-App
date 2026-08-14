@@ -648,6 +648,24 @@ describe('adoptOrFresh', () => {
 });
 
 describe('importDbFile', () => {
+  it('F2 RED: importa y acepta una DB v17 (schema actual) sin fallar', () => {
+    const dir = tmpDir();
+    const dbPath = path.join(dir, 'tienda-app.db');
+    const flagPath = path.join(dir, 'native-db-imported.flag');
+    const srcPath = path.join(dir, 'opfs-v17.db');
+    createValidDb(srcPath, 5, 17);
+    const data = fs.readFileSync(srcPath);
+
+    const result = importDbFile(data, dbPath, flagPath, '0.1.9-beta');
+
+    expect(result.ok).toBe(true);
+    expect(fs.existsSync(dbPath)).toBe(true);
+    expect(fs.existsSync(flagPath)).toBe(true);
+    const db = openNativeDb(dbPath);
+    expect(validateDb(db).schemaVersion).toBe(17);
+    db.close();
+  });
+
   it('writes the flag only after a successful import and validation', () => {
     const dir = tmpDir();
     const dbPath = path.join(dir, 'tienda-app.db');

@@ -19,7 +19,7 @@ export const MAX_IMPORT_BYTES = 512 * 1024 * 1024;
 const TIMESTAMPED_RE =
   /^tienda_\d{4}-\d{2}-\d{2}_\d{4}(?:-\d+)?\.db$/;
 const MIN_SCHEMA_VERSION = 1;
-const MAX_SCHEMA_VERSION = 16;
+const MAX_SCHEMA_VERSION = 17;
 
 export interface DbValidation {
   ok: boolean;
