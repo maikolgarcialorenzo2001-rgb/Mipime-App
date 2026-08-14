@@ -551,7 +551,7 @@ describe('JornadaService', () => {
       const service = TestBed.inject(JornadaService);
 
       await expect(
-        firstValueFrom(service.registrarMovimiento(1, 'invalido' as any, 'test', 100)),
+        firstValueFrom(service.registrarMovimiento(1, 'invalido' as 'gasto' | 'ingreso_extra' | 'compra_divisa', 'test', 100)),
       ).rejects.toThrow('Tipo inválido');
     });
 

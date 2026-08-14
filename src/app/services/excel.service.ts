@@ -107,8 +107,8 @@ export class ExcelService {
     const totalEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
       if (v.forma_pago === 'divisas') {
-        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
-        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
       }
       return sum;
     }, 0);
@@ -127,9 +127,9 @@ export class ExcelService {
     const ventasDivisas = ventas.filter((v) => v.forma_pago === 'divisas');
     const divisaPorTipo = new Map<string, { monto: number; tasa: number }>();
     for (const v of ventasDivisas) {
-      const tipo = (v as any).divisa_tipo ?? '—';
-      const monto = (v as any).monto_divisa ?? 0;
-      const tasa = (v as any).tasa_cambio ?? 0;
+      const tipo = v.divisa_tipo ?? '—';
+      const monto = v.monto_divisa ?? 0;
+      const tasa = v.tasa_cambio ?? 0;
       const existing = divisaPorTipo.get(tipo);
       if (existing) {
         existing.monto += monto;
@@ -200,8 +200,8 @@ export class ExcelService {
       filas.push(['Origen de divisas']);
       for (const tipo of tiposDivisa) {
         const deVentas = ventas
-          .filter(v => (v as any).divisa_tipo === tipo)
-          .reduce((s, v) => s + ((v as any).monto_divisa ?? 0), 0);
+          .filter(v => v.divisa_tipo === tipo)
+          .reduce((s, v) => s + (v.monto_divisa ?? 0), 0);
         const deCompra = data.movimientos
           .filter(m => m.tipo === 'compra_divisa' && m.divisa_tipo === tipo)
           .reduce((s, m) => s + (m.monto_divisa ?? 0), 0);
@@ -268,15 +268,15 @@ export class ExcelService {
           venta.total,
           venta.total,
           venta.total,
-          (venta as any).forma_pago ?? 'efectivo',
+          venta.forma_pago ?? 'efectivo',
         ];
         if (tieneDivisas) {
           if (venta.forma_pago === 'divisas') {
-            filaCobro.push((venta as any).divisa_tipo ?? '—');
-            filaCobro.push((venta as any).monto_divisa ?? '—');
-            filaCobro.push((venta as any).tasa_cambio ?? '—');
+            filaCobro.push(venta.divisa_tipo ?? '—');
+            filaCobro.push(venta.monto_divisa ?? '—');
+            filaCobro.push(venta.tasa_cambio ?? '—');
             filaCobro.push(venta.total);
-            filaCobro.push((venta as any).completacion_efectivo ?? '—');
+            filaCobro.push(venta.completacion_efectivo ?? '—');
           } else {
             filaCobro.push('', '', '', '', '');
           }
@@ -308,23 +308,23 @@ export class ExcelService {
           detalle.precio_unitario,
           precioVenta,
           detalle.subtotal,
-          (venta as any).forma_pago ?? 'efectivo',
+          venta.forma_pago ?? 'efectivo',
         ];
         // Columnas condicionales
         if (tieneDivisas) {
           if (venta.forma_pago === 'divisas') {
-            fila.push((venta as any).divisa_tipo ?? '—');
-            fila.push((venta as any).monto_divisa ?? '—');
-            fila.push((venta as any).tasa_cambio ?? '—');
+            fila.push(venta.divisa_tipo ?? '—');
+            fila.push(venta.monto_divisa ?? '—');
+            fila.push(venta.tasa_cambio ?? '—');
             fila.push(venta.total);
-            fila.push((venta as any).completacion_efectivo ?? '—');
+            fila.push(venta.completacion_efectivo ?? '—');
           } else {
             fila.push('', '', '', '', '');
           }
         }
         if (tienePendientes) {
           if (venta.forma_pago === 'pendiente') {
-            fila.push((venta as any).comprador_nombre ?? '—');
+            fila.push(venta.comprador_nombre ?? '—');
           } else {
             fila.push('');
           }
@@ -478,8 +478,8 @@ export class ExcelService {
       s + d.ventas.reduce((ss, v) => {
         if (v.forma_pago === 'efectivo') return ss + v.total;
         if (v.forma_pago === 'divisas') {
-          const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
-          return ss + ((v as any).completacion_efectivo ?? 0) - vuelto;
+          const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+          return ss + (v.completacion_efectivo ?? 0) - vuelto;
         }
         return ss;
       }, 0),
@@ -543,8 +543,8 @@ export class ExcelService {
     const totalEfectivo = data.ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
       if (v.forma_pago === 'divisas') {
-        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
-        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
       }
       return sum;
     }, 0);
@@ -616,7 +616,7 @@ export class ExcelService {
           detalle.cantidad,
           detalle.precio_unitario,
           detalle.subtotal,
-          (venta as any).forma_pago ?? 'efectivo',
+          venta.forma_pago ?? 'efectivo',
         ]);
 
         // Desglose de lotes para este detalle
@@ -769,8 +769,8 @@ export class ExcelService {
     const totalEfectivo = ventas.reduce((sum, v) => {
       if (v.forma_pago === 'efectivo') return sum + v.total;
       if (v.forma_pago === 'divisas') {
-        const vuelto = Math.max(0, ((v as any).monto_divisa ?? 0) * ((v as any).tasa_cambio ?? 0) - v.total);
-        return sum + ((v as any).completacion_efectivo ?? 0) - vuelto;
+        const vuelto = Math.max(0, (v.monto_divisa ?? 0) * (v.tasa_cambio ?? 0) - v.total);
+        return sum + (v.completacion_efectivo ?? 0) - vuelto;
       }
       return sum;
     }, 0);

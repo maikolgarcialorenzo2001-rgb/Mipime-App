@@ -6,6 +6,7 @@ import type { VentaConDetalles } from './excel.service';
 import type { Movimiento } from '../models/movimiento';
 import type { CuentaCosa } from '../models/cuenta-cosa';
 import type { StockMovimiento } from '../models/stock-movimiento';
+import type { VentaLote } from '../models/venta-lote';
 import type { ArqueoCajaEntry } from '../models/arqueo-caja';
 
 describe('ExcelService', () => {
@@ -1413,7 +1414,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       ]);
 
     it('PR1 RED: header debe incluir columna "Precio venta" entre Precio unitario y Total', () => {
-      const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta as any, totalCosto: 0, userCierreNombre: null };
+      const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta, totalCosto: 0, userCierreNombre: null };
       const result = service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
@@ -1428,7 +1429,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
 
     it('PR1 RED: detalle debe mostrar precio_venta del producto en columna 3', () => {
-      const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta as any, totalCosto: 0, userCierreNombre: null };
+      const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta, totalCosto: 0, userCierreNombre: null };
       const result = service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
@@ -1445,7 +1446,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const dataSinPV: JornadaReportData = {
         ...data,
         ventas: [ventaConDetalles[0]],
-        productosMap: pmap as any,
+        productosMap: pmap,
         totalCosto: 0,
         userCierreNombre: null,
       };
@@ -1482,7 +1483,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
 
     it('PR1 RED: multi-lot debe mostrar desglose por lote + fila de subtotal del producto', () => {
-      const ventaLotes: any[] = [
+      const ventaLotes: VentaLote[] = [
         { id: 1, venta_id: 1, lote_id: 10, producto_id: 1, cantidad: 2, precio_costo_real: 400, created_at: '' },
         { id: 2, venta_id: 1, lote_id: 11, producto_id: 1, cantidad: 3, precio_costo_real: 400, created_at: '' },
       ];
@@ -1499,7 +1500,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         }],
         movimientos: [],
         ventaLotes,
-        productosMap: pmap as any,
+        productosMap: pmap,
         totalCosto: 0,
         userCierreNombre: null,
       };
@@ -1518,7 +1519,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
 
     it('PR1 RED: multi-item + multi-lot combinados deben mostrar ambos subtotales', () => {
-      const ventaLotes: any[] = [
+      const ventaLotes: VentaLote[] = [
         { id: 1, venta_id: 2, lote_id: 20, producto_id: 1, cantidad: 1, precio_costo_real: 400, created_at: '' },
         { id: 2, venta_id: 2, lote_id: 21, producto_id: 1, cantidad: 1, precio_costo_real: 400, created_at: '' },
       ];
@@ -1527,7 +1528,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         [2, { nombre: 'Agua 1L', precio_costo: 600, precio_venta: 1100 }],
         [3, { nombre: 'Chocolate', precio_costo: 80, precio_venta: 150 }],
       ]);
-      const dataMix: JornadaReportData = { ...data, ventaLotes, productosMap: pmap as any, totalCosto: 0, userCierreNombre: null };
+      const dataMix: JornadaReportData = { ...data, ventaLotes, productosMap: pmap, totalCosto: 0, userCierreNombre: null };
       const result = service.generarExcelJornada(dataMix);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
@@ -1571,7 +1572,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     it('Resumen debe mostrar USD/EUR de ventas y de compra separados', () => {
       const dataDivisa: JornadaReportData = {
         ...data,
-        ventas: [ventaDivisaUSD as any],
+        ventas: [ventaDivisaUSD as VentaConDetalles],
         movimientos: [movCompraUSD, movCompraEUR],
         totalCosto: 0,
         userCierreNombre: null,

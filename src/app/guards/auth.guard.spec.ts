@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { type UrlTree } from '@angular/router';
+import { type ActivatedRouteSnapshot, type RouterStateSnapshot, type UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { DATABASE, type Database } from '../services/database';
 import { hashPassword, generateSalt } from '../services/hash-password';
@@ -87,14 +87,14 @@ describe('authGuard', () => {
   it('debería retornar true si el usuario está logueado', async () => {
     await setupLoggedInUser();
     const result = TestBed.runInInjectionContext(() =>
-      authGuard({} as any, {} as any),
+      authGuard({} as unknown as ActivatedRouteSnapshot, {} as unknown as RouterStateSnapshot),
     );
     expect(result).toBe(true);
   });
 
   it('debería redirigir a /login si no hay sesión', () => {
     const result = TestBed.runInInjectionContext(() =>
-      authGuard({} as any, {} as any),
+      authGuard({} as unknown as ActivatedRouteSnapshot, {} as unknown as RouterStateSnapshot),
     ) as UrlTree;
 
     expect(result.toString()).toBe('/login');
@@ -123,7 +123,7 @@ describe('adminGuard', () => {
   it('debería retornar true si el usuario es admin', async () => {
     await setupLoggedInUser();
     const result = TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
+      adminGuard({} as unknown as ActivatedRouteSnapshot, {} as unknown as RouterStateSnapshot),
     );
     expect(result).toBe(true);
   });
@@ -141,7 +141,7 @@ describe('adminGuard', () => {
     await firstValueFrom(auth.login('worker', 'pass123'));
 
     const result = TestBed.runInInjectionContext(() =>
-      adminGuard({} as any, {} as any),
+      adminGuard({} as unknown as ActivatedRouteSnapshot, {} as unknown as RouterStateSnapshot),
     ) as UrlTree;
 
     expect(result.toString()).toBe('/');
