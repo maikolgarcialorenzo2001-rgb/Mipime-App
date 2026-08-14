@@ -147,10 +147,15 @@ export class InventarioPage implements OnInit {
     try {
       switch (action.tipo) {
         case 'entrada': {
+          const costo = this.movimientoCosto();
+          if (costo !== null && !(costo >= 0)) {
+            this.error.set('El costo no puede ser negativo');
+            return;
+          }
           await this.stockService.registrarEntrada(
             action.productoId,
             this.movimientoCantidad() ?? 0,
-            this.movimientoCosto() ?? 0,
+            costo ?? 0,
             this.movimientoMotivo() || undefined,
           );
           break;
@@ -223,6 +228,14 @@ export class InventarioPage implements OnInit {
           }
           if (pc === null) {
             this.error.set('El precio de costo es obligatorio');
+            return;
+          }
+          if (!(pv >= 0)) {
+            this.error.set('El precio de venta no puede ser negativo');
+            return;
+          }
+          if (!(pc >= 0)) {
+            this.error.set('El costo no puede ser negativo');
             return;
           }
           await this.stockService.registrarEditar(
@@ -420,6 +433,16 @@ export class InventarioPage implements OnInit {
     }
     if (this.formUnidades() === null) {
       this.formError.set('Las unidades son obligatorias');
+      return;
+    }
+    // F4: feedback temprano de precios/costos negativos (NaN-safe) antes de
+    // llamar al servicio. El 0 es válido.
+    if (!(this.formCosto()! >= 0)) {
+      this.formError.set('El costo no puede ser negativo');
+      return;
+    }
+    if (!(this.formPrecioVenta()! >= 0)) {
+      this.formError.set('El precio de venta no puede ser negativo');
       return;
     }
 

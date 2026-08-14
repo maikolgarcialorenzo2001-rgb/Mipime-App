@@ -337,6 +337,54 @@ describe('InventarioPage', () => {
     );
   });
 
+  it('RED: entrada con costo negativo muestra error y no llama registrarEntrada', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'entrada');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(5);
+    component.movimientoCosto.set(-5);
+    component.movimientoMotivo.set('Repo');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('El costo no puede ser negativo');
+    expect(mockStockService.registrarEntrada).not.toHaveBeenCalled();
+  });
+
+  it('entrada con costo vacío mapea a 0 y llama registrarEntrada', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'entrada');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(5);
+    // movimientoCosto queda null (campo vacío) → debe mapear a 0
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEntrada).toHaveBeenCalledWith(
+      1, 5, 0, undefined,
+    );
+  });
+
   // ── Traslado (salida): ubicación de origen + lote OBLIGATORIOS (REQ-4/REQ-5) ──
 
   it('12. RED: sin ubicación de origen el dropdown de lotes está deshabilitado y el submit no llama registrarSalida', async () => {
@@ -837,6 +885,81 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
+  it('RED: guardarProducto con costo negativo muestra formError y no llama crear', async () => {
+    await setupLoaded();
+
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+
+    component.formNombre.set('Test');
+    component.formCosto.set(-5);
+    component.formPrecioVenta.set(500);
+    component.formUnidades.set(10);
+    fixture.detectChanges();
+
+    await component.guardarProducto();
+    fixture.detectChanges();
+
+    expect(component.formError()).toBe('El costo no puede ser negativo');
+    expect(mockProductoService.crear).not.toHaveBeenCalled();
+  });
+
+  it('RED: guardarProducto con precio de venta negativo muestra formError y no llama crear', async () => {
+    await setupLoaded();
+
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+
+    component.formNombre.set('Test');
+    component.formCosto.set(200);
+    component.formPrecioVenta.set(-5);
+    component.formUnidades.set(10);
+    fixture.detectChanges();
+
+    await component.guardarProducto();
+    fixture.detectChanges();
+
+    expect(component.formError()).toBe('El precio de venta no puede ser negativo');
+    expect(mockProductoService.crear).not.toHaveBeenCalled();
+  });
+
+  it('guardarProducto con precios en 0 procede a crear', async () => {
+    const productoCreado: Producto = {
+      id: 100,
+      nombre: 'Gratis',
+      descripcion: null,
+      precio_venta: 0,
+      precio_costo: 0,
+      stock_almacen: 10,
+      stock_shop: 0,
+      created_at: '2026-07-23T19:00:00Z',
+      updated_at: '2026-07-23T19:00:00Z',
+    };
+    mockProductoService.crear.mockReturnValue(of(productoCreado));
+
+    await setupLoaded();
+
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+
+    component.formNombre.set('Gratis');
+    component.formCosto.set(0);
+    component.formPrecioVenta.set(0);
+    component.formUnidades.set(10);
+    fixture.detectChanges();
+
+    await component.guardarProducto();
+    fixture.detectChanges();
+
+    expect(mockProductoService.crear).toHaveBeenCalledWith({
+      nombre: 'Gratis',
+      precio_costo: 0,
+      precio_venta: 0,
+      stock_almacen: 10,
+    });
+    expect(component.showProductoModal()).toBe(false);
+  });
+
   it('22. calls registrarEditar on inline editar form submit', async () => {
     const lotesMock = [
       { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
@@ -864,6 +987,94 @@ describe('InventarioPage', () => {
 
     expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
       1, 42, 'Coca Cola', 15, 10, 80, 'Actualización de precios', 'almacen',
+    );
+  });
+
+  it('RED: editar inline con precio de venta negativo muestra error y no llama registrarEditar', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(-5);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('El precio de venta no puede ser negativo');
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+  });
+
+  it('RED: editar inline con costo negativo muestra error y no llama registrarEditar', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(-5);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('El costo no puede ser negativo');
+    expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
+  });
+
+  it('editar inline con precios en 0 procede a registrarEditar', async () => {
+    const lotesMock = [
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(0);
+    component.editarPrecioCosto.set(0);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(mockStockService.registrarEditar).toHaveBeenCalledWith(
+      1, 42, 'Coca Cola', 0, 0, 80, 'Actualización de precios', 'almacen',
     );
   });
 
