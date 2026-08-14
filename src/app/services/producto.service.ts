@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { from, map, Observable, switchMap, of } from 'rxjs';
+import { from, map, Observable, switchMap, of, throwError } from 'rxjs';
 import { DATABASE } from './database';
 import { StockMovimientoService } from './stock-movimiento.service';
 import type { Producto } from '../models';
@@ -48,6 +48,14 @@ export class ProductoService {
     precio_venta: number;
     stock_almacen: number;
   }): Observable<Producto> {
+    // F4: guard de precios ANTES del INSERT. `!(v >= 0)` es NaN-safe y deja
+    // pasar el 0 (regalos/costo 0 legítimo) y null (columna nullable legacy).
+    if (!(data.precio_costo >= 0)) {
+      return throwError(() => new Error('El costo no puede ser negativo'));
+    }
+    if (!(data.precio_venta >= 0)) {
+      return throwError(() => new Error('El precio de venta no puede ser negativo'));
+    }
     const ahora = new Date().toISOString();
     return from(
       this._db.sql<Producto>(
@@ -77,6 +85,13 @@ export class ProductoService {
     id: number,
     data: { nombre: string; precio_costo: number; precio_venta: number },
   ): Observable<Producto> {
+    // F4: guard de precios ANTES del UPDATE (mismo criterio que `crear`).
+    if (!(data.precio_costo >= 0)) {
+      return throwError(() => new Error('El costo no puede ser negativo'));
+    }
+    if (!(data.precio_venta >= 0)) {
+      return throwError(() => new Error('El precio de venta no puede ser negativo'));
+    }
     const ahora = new Date().toISOString();
     return from(
       this._db.sql<Producto>(

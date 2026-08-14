@@ -229,6 +229,88 @@ describe('ProductoService', () => {
 
       expect(mockStockMovimiento.registrarEntrada).not.toHaveBeenCalled();
     });
+
+    it('RED: crear con costo negativo rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: -5,
+            precio_venta: 100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: crear con precio de venta negativo rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: 10,
+            precio_venta: -100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: crear con precio NaN rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: NaN,
+            precio_venta: 100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('crear con precios en 0 procede al INSERT', async () => {
+      const nuevoProducto: Producto = {
+        id: 7,
+        nombre: 'Gratis',
+        descripcion: null,
+        precio_venta: 0,
+        precio_costo: 0,
+        stock_almacen: 0,
+        stock_shop: 0,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.crear({
+          nombre: 'Gratis',
+          precio_costo: 0,
+          precio_venta: 0,
+          stock_almacen: 0,
+        }),
+      );
+
+      expect(resultado).toEqual(nuevoProducto);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO productos'),
+        expect.arrayContaining(['Gratis', null, 0, 0]),
+      );
+    });
   });
 
   describe('actualizar', () => {
@@ -265,6 +347,84 @@ describe('ProductoService', () => {
           900,
           1,
         ]),
+      );
+    });
+
+    it('RED: actualizar con precio de venta negativo rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: -1,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: actualizar con costo negativo rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: -5,
+            precio_venta: 10,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: actualizar con precio NaN rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: NaN,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('actualizar con precios en 0 procede al UPDATE', async () => {
+      const productoActualizado: Producto = {
+        id: 1,
+        nombre: 'Gratis',
+        descripcion: null,
+        precio_venta: 0,
+        precio_costo: 0,
+        stock_almacen: 50,
+        stock_shop: 0,
+        created_at: '2026-06-02T22:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([productoActualizado]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.actualizar(1, {
+          nombre: 'Gratis',
+          precio_costo: 0,
+          precio_venta: 0,
+        }),
+      );
+
+      expect(resultado).toEqual(productoActualizado);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE productos'),
+        expect.arrayContaining(['Gratis', 0, 0, 1]),
       );
     });
   });
