@@ -473,6 +473,12 @@ export class InventarioPage implements OnInit {
     this.procesando.set(false);
   }
 
+  onOverlayKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.cerrarModal();
+    }
+  }
+
   async guardarProducto(): Promise<void> {
     if (!this.esAdmin()) return;
     // Validate required fields

@@ -86,7 +86,7 @@
               </td>
               @if (esAdmin()) {
                 <td class="px-6 py-4 font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                  {{ p.precio_costo != null ? (p.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0') : '--' }}
+                  {{ p.precio_costo !== null ? (p.precio_costo | currency:'ARS':'symbol-narrow':'1.0-0') : '--' }}
                 </td>
               }
               <td class="px-6 py-4">
@@ -140,8 +140,9 @@
                   }
                   <form (ngSubmit)="onSubmitMerma()" class="flex flex-wrap items-end gap-3">
                     <div>
-                      <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad</label>
+                      <label [attr.for]="'merma-cantidad-' + p.id" class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Cantidad</label>
                       <input
+                        [attr.id]="'merma-cantidad-' + p.id"
                         type="number"
                         [(ngModel)]="mermaCantidad"
                         name="mermaCantidad"
@@ -152,8 +153,9 @@
                       />
                     </div>
                     <div>
-                      <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Motivo</label>
+                      <label [attr.for]="'merma-motivo-' + p.id" class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Motivo</label>
                       <input
+                        [attr.id]="'merma-motivo-' + p.id"
                         [(ngModel)]="mermaMotivo"
                         name="mermaMotivo"
                         placeholder="Motivo"
@@ -162,8 +164,9 @@
                     </div>
                     @if (esAdmin()) {
                       <div>
-                        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Ubicación</label>
+                        <label [attr.for]="'merma-ubicacion-' + p.id" class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Ubicación</label>
                         <select
+                          [attr.id]="'merma-ubicacion-' + p.id"
                           class="border rounded px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
                           [(ngModel)]="mermaUbicacion"
                           name="mermaUbicacion"

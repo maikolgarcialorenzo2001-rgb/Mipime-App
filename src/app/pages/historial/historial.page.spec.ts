@@ -552,7 +552,8 @@ describe('HistorialPage', () => {
       const service = TestBed.inject(JornadaService);
       // Usamos un observable que nunca completa para simular carga
       vi.mocked(service.obtenerDatosJornada).mockReturnValue(
-        // eslint-disable-next-line @typescript-eslint/no-empty-function — intencional: observable que nunca emite
+        // intencional: observable que nunca emite
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
         new Observable(() => {}),
       );
 
