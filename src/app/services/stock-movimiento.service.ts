@@ -491,9 +491,20 @@ export class StockMovimientoService {
 
     // T-09: movimiento + UPDATE lote + recálculo atómicos.
     await this._db.transaction(async (tx) => {
-      // 1. Register movement
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      const [loteActual] = await tx.sql<LoteStock>(
+        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+        [loteId, productoId],
+      );
+      if (!loteActual) {
+        throw new Error('El lote no existe');
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       const columnas = 'producto_id, cantidad, tipo, motivo, created_at';
-      const params: unknown[] = [productoId, nuevaCantidad, 'ajuste', motivo, ahora];
+      const params: unknown[] = [productoId, delta, 'ajuste', motivo, ahora];
 
       await tx.sql(
         `INSERT INTO stock_movimientos (${columnas})
@@ -556,11 +567,22 @@ export class StockMovimientoService {
 
     // T-09: movimiento + UPDATEs + recálculo atómicos.
     await this._db.transaction(async (tx) => {
-      // 1. Register movement
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      const [loteActual] = await tx.sql<LoteStock>(
+        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+        [loteId, productoId],
+      );
+      if (!loteActual) {
+        throw new Error('El lote no existe');
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       await tx.sql(
         `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
          VALUES (?, ?, ?, ?, ?)`,
-        [productoId, nuevaCantidad, 'ajuste', motivo, ahora],
+        [productoId, delta, 'ajuste', motivo, ahora],
       );
 
       // 2. Update product (nombre + precio_venta)

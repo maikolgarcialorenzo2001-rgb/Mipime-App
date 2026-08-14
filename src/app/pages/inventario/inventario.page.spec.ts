@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
-import { InventarioPage } from './inventario.page';
+import { InventarioPage, elegirLoteInicialEdicion } from './inventario.page';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
@@ -832,6 +832,53 @@ describe('InventarioPage', () => {
     expect(component.movimientoCantidad()).toBe(100);
   });
 
+  it('F7 RED: editar con lotes mixtos preselecciona el frente de la ubicación principal (almacen)', async () => {
+    const lotesMock = [
+      { id: 43, producto_id: 1, cantidad: 12, precio_costo: 11, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'shop', created_at: '2026-01-01T00:00:00Z' },
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-02-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-02-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    // El lote 43 (shop) es el más viejo global, pero la ubicación principal es
+    // almacen (stock 100 > 10): se preselecciona el frente de almacen (lote 42).
+    expect(component.selectedLoteIndex()).toBe(2);
+    expect(component.editarPrecioCosto()).toBe(8);
+    expect(component.movimientoCantidad()).toBe(100);
+  });
+
+  it('F7 RED: editar con stock principal en shop preselecciona el frente de shop', async () => {
+    const productoShop = { ...productos[0], id: 1, stock_almacen: 5, stock_shop: 50 };
+    const lotesMock = [
+      { id: 41, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 44, producto_id: 1, cantidad: 20, precio_costo: 9, fecha_ingreso: '2026-02-01T00:00:00Z', ubicacion: 'shop', created_at: '2026-02-01T00:00:00Z' },
+    ];
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue(lotesMock);
+    mockProductoService.listar.mockReturnValue(of([productoShop]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    expect(component.selectedLoteIndex()).toBe(2);
+    expect(component.editarPrecioCosto()).toBe(9);
+    expect(component.movimientoCantidad()).toBe(20);
+  });
+
   it('20. validation rejects empty fields', async () => {
     await setupLoaded();
 
@@ -1652,6 +1699,61 @@ describe('InventarioPage', () => {
       fixture.detectChanges();
       const container = fixture.nativeElement.querySelector('.max-w-7xl');
       expect(container).toBeTruthy();
+    });
+  });
+
+  describe('elegirLoteInicialEdicion (F7: preselección por ubicación)', () => {
+    const lotes = (
+      datos: { id: number; ubicacion: 'almacen' | 'shop' }[],
+    ) =>
+      datos.map((l) => ({
+        id: l.id,
+        producto_id: 1,
+        cantidad: 10,
+        precio_costo: 8,
+        fecha_ingreso: '2026-01-01T00:00:00Z',
+        ubicacion: l.ubicacion,
+        created_at: '2026-01-01T00:00:00Z',
+      }));
+
+    it('devuelve el frente de la ubicación con más stock cuando hay lotes mixtos', () => {
+      const resultado = elegirLoteInicialEdicion(
+        lotes([{ id: 43, ubicacion: 'shop' }, { id: 42, ubicacion: 'almacen' }]),
+        100,
+        10,
+      );
+      expect(resultado?.id).toBe(42);
+    });
+
+    it('devuelve el frente de shop cuando el stock principal está en shop', () => {
+      const resultado = elegirLoteInicialEdicion(
+        lotes([{ id: 41, ubicacion: 'almacen' }, { id: 44, ubicacion: 'shop' }]),
+        5,
+        50,
+      );
+      expect(resultado?.id).toBe(44);
+    });
+
+    it('empata a almacen cuando el stock es igual en ambas ubicaciones', () => {
+      const resultado = elegirLoteInicialEdicion(
+        lotes([{ id: 43, ubicacion: 'shop' }, { id: 42, ubicacion: 'almacen' }]),
+        10,
+        10,
+      );
+      expect(resultado?.id).toBe(42);
+    });
+
+    it('cae al frente FIFO global si la ubicación principal no tiene lotes', () => {
+      const resultado = elegirLoteInicialEdicion(
+        lotes([{ id: 44, ubicacion: 'shop' }]),
+        100,
+        10,
+      );
+      expect(resultado?.id).toBe(44);
+    });
+
+    it('devuelve null sin lotes', () => {
+      expect(elegirLoteInicialEdicion([], 100, 10)).toBeNull();
     });
   });
 });
