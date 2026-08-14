@@ -1237,6 +1237,86 @@ describe('StockMovimientoService', () => {
     });
   });
 
+  describe('guards de precio/costo no negativo (F4 / S-05 espejo)', () => {
+    it('registrarEntrada con precioCosto negativo rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEntrada(1, 5, -5, 'Repo'),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEntrada con precioCosto NaN rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEntrada(1, 5, NaN, 'Repo'),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEntrada con precioCosto 0 aceptado y persiste lote con costo 0', async () => {
+      await expect(
+        service.registrarEntrada(1, 5, 0, 'Repo'),
+      ).resolves.toBeUndefined();
+
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO lotes_stock'),
+        expect.arrayContaining([1, 5, 0]),
+      );
+    });
+
+    it('registrarEditar con precioVenta negativo rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEditar(1, 3, 'Café', -5, 10, 5, 'Motivo', 'shop'),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEditar con precioCosto negativo rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEditar(1, 3, 'Café', 15, -5, 5, 'Motivo', 'shop'),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEditar con precioVenta NaN rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEditar(1, 3, 'Café', NaN, 10, 5, 'Motivo', 'shop'),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEditar con precioCosto NaN rechaza sin tocar la DB', async () => {
+      await expect(
+        service.registrarEditar(1, 3, 'Café', 15, NaN, 5, 'Motivo', 'shop'),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('registrarEditar con precioVenta 0 y precioCosto 0 aceptado y persiste UPDATE', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                       // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                       // 2: UPDATE productos nombre+precio_venta
+        .mockResolvedValueOnce([])                       // 3: UPDATE lotes_stock
+        .mockResolvedValueOnce([])                       // 4: SELECT next lot (sync: no hay)
+        .mockResolvedValueOnce([{ total: 5 }])           // 5: SELECT SUM (recálculo)
+        .mockResolvedValueOnce([]);                      // 6: UPDATE stock_shop
+
+      await expect(
+        service.registrarEditar(1, 3, 'Café', 0, 0, 5, 'Motivo', 'shop'),
+      ).resolves.toBeUndefined();
+
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE productos SET nombre = ?'),
+        expect.arrayContaining(['Café', 0]),
+      );
+    });
+  });
+
   describe('atomicidad (T-09 / FR-05 / S-03)', () => {
     it('S-03: registrarEntrada envuelve sus escrituras en _db.transaction; fallo a mitad detiene las siguientes', async () => {
       vi.mocked(mockDb.sql)
