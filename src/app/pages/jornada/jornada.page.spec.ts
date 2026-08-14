@@ -9,6 +9,7 @@ import type { Jornada, StockMovimiento } from '../../models';
 import type { UsuarioPublico } from '../../models';
 import type { Movimiento } from '../../models/movimiento';
 import type { Venta } from '../../models/venta';
+import type { CuentaCosa } from '../../models/cuenta-cosa';
 
 function createMockDb(): Database {
   const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
@@ -555,6 +556,91 @@ describe('JornadaPage', () => {
 
       const texto = fixture.nativeElement.textContent;
       expect(texto).toContain('—');
+    });
+  });
+
+  describe('tabla diaria con cuenta casas', () => {
+    let fixture: ComponentFixture<JornadaPage>;
+    let component: JornadaPage;
+    let mockDb: Database;
+
+    beforeEach(() => {
+      mockDb = createMockDb();
+      TestBed.configureTestingModule({
+        imports: [JornadaPage],
+        providers: [
+          {
+            provide: JornadaService,
+            useValue: createMockJornadaService({
+              jornadaAbierta: mockJornadaAbierta,
+              jornadaCargando: false,
+              obtenerAbierta: () => of(mockJornadaAbierta),
+            }),
+          },
+          { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+          { provide: DATABASE, useValue: mockDb },
+        ],
+      });
+
+      fixture = TestBed.createComponent(JornadaPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('6.1 RED: debería mostrar bloque "Cuenta Casas del día" con 5 columnas en orden cronológico', () => {
+      const cuentasMock: CuentaCosa[] = [
+        { id: 1, jornada_id: 1, producto_id: 1, cantidad: 2, descripcion: 'Retiro familiar', autorizado_por: 'María', created_at: '2026-06-04T08:00:00Z' },
+        { id: 2, jornada_id: 1, producto_id: 2, cantidad: 3, descripcion: 'Encargo', autorizado_por: 'Juan', created_at: '2026-06-04T09:00:00Z' },
+      ];
+      component.productosMap.set(new Map([[1, 'Café'], [2, 'Pan']]));
+      component.cuentasCosasDelDia.set(cuentasMock);
+      fixture.detectChanges();
+
+      const texto = fixture.nativeElement.textContent;
+      expect(texto).toContain('Cuenta Casas del día');
+      expect(texto).toContain('Café');
+      expect(texto).toContain('2');
+      expect(texto).toContain('Retiro familiar');
+      expect(texto).toContain('María');
+      expect(texto).toContain('Pan');
+      expect(texto).toContain('3');
+      expect(texto).toContain('Encargo');
+      expect(texto).toContain('Juan');
+
+      // 5 columnas: Producto, Cantidad, Descripción, Autorizado por, Hora
+      const ths = fixture.nativeElement.querySelectorAll('thead tr th');
+      const headers = Array.from(ths).map((th) => (th as HTMLElement).textContent?.trim());
+      expect(headers).toContain('Producto');
+      expect(headers).toContain('Cantidad');
+      expect(headers).toContain('Descripción');
+      expect(headers).toContain('Autorizado por');
+      expect(headers).toContain('Hora');
+    });
+
+    it('6.1 RED: debería ocultar bloque cuando no hay cuenta casas', () => {
+      component.ventasDelDia.set([]);
+      component.movimientosDelDia.set([]);
+      component.mermasDelDia.set([]);
+      component.cuentasCosasDelDia.set([]);
+      fixture.detectChanges();
+
+      const allH4 = fixture.nativeElement.querySelectorAll('h4');
+      const ccHeader = Array.from(allH4).find(
+        (h) => (h as HTMLElement).textContent?.includes('Cuenta Casas del día'),
+      );
+      expect(ccHeader).toBeFalsy();
+    });
+
+    it('6.1 RED: debería resolver nombre de producto vía productosMap (fallback #id)', () => {
+      const cuentasMock: CuentaCosa[] = [
+        { id: 1, jornada_id: 1, producto_id: 99, cantidad: 1, descripcion: null, autorizado_por: 'María', created_at: '2026-06-04T08:00:00Z' },
+      ];
+      component.productosMap.set(new Map());
+      component.cuentasCosasDelDia.set(cuentasMock);
+      fixture.detectChanges();
+
+      const texto = fixture.nativeElement.textContent;
+      expect(texto).toContain('#99');
     });
   });
 });
