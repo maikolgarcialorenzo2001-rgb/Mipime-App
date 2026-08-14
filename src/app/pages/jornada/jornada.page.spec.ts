@@ -7,8 +7,6 @@ import { AuthService } from '../../services/auth.service';
 import { DATABASE, type Database } from '../../services/database';
 import type { Jornada, StockMovimiento } from '../../models';
 import type { UsuarioPublico } from '../../models';
-import type { Movimiento } from '../../models/movimiento';
-import type { Venta } from '../../models/venta';
 import type { CuentaCosa } from '../../models/cuenta-cosa';
 
 function createMockDb(): Database {
@@ -258,7 +256,7 @@ describe('JornadaPage', () => {
 
     it('4.1 RED: debería limpiar form y refrescar jornada tras registro exitoso', () => {
       const refreshSpy = vi.fn();
-      (TestBed.inject(JornadaService) as any).refreshJornadaAbierta = refreshSpy;
+      (TestBed.inject(JornadaService) as unknown as MockJornadaService).refreshJornadaAbierta = refreshSpy;
 
       component.tipo.set('gasto');
       component.descripcion.set('Luz');
