@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { ProductoService } from '../../services/producto.service';
-import { StockMovimientoService } from '../../services/stock-movimiento.service';
+import { StockMovimientoService, type EdicionResultado } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
@@ -144,13 +144,21 @@ export class InventarioPage implements OnInit {
 
     this.procesandoMovimiento.set(true);
     this.error.set(null);
+    // F3: resultado de registrarEditar para comunicar si el lote editado quedó
+    // como frente FIFO (cache actualizado) o si el frente sigue siendo otro lote.
+    let edicionResult: EdicionResultado | null = null;
     try {
       switch (action.tipo) {
         case 'entrada': {
+          const costo = this.movimientoCosto();
+          if (costo !== null && !(costo >= 0)) {
+            this.error.set('El costo no puede ser negativo');
+            return;
+          }
           await this.stockService.registrarEntrada(
             action.productoId,
             this.movimientoCantidad() ?? 0,
-            this.movimientoCosto() ?? 0,
+            costo ?? 0,
             this.movimientoMotivo() || undefined,
           );
           break;
@@ -194,10 +202,6 @@ export class InventarioPage implements OnInit {
           const loteIdx = this.selectedLoteIndex();
           const productoLotes = this.productoLotes();
           const loteSel = productoLotes[loteIdx !== null ? loteIdx - 1 : -1];
-          if (!loteSel) {
-            this.error.set('Debe seleccionar un lote');
-            return;
-          }
           const nombre = this.editarNombre();
           const motivo = this.movimientoMotivo();
           const cantidad = this.movimientoCantidad();
@@ -225,15 +229,36 @@ export class InventarioPage implements OnInit {
             this.error.set('El precio de costo es obligatorio');
             return;
           }
-          await this.stockService.registrarEditar(
+          // F4: guards de signo en la UI (el form usa novalidate).
+          if (!(pv >= 0)) {
+            this.error.set('El precio de venta no puede ser negativo');
+            return;
+          }
+          if (!(pc >= 0)) {
+            this.error.set('El costo no puede ser negativo');
+            return;
+          }
+          const prod = this.productos().find((p) => p.id === action.productoId);
+          // F8: sin lote activo (producto sin lotes con cantidad > 0) se guarda
+          // con loteId null y el service materializa el "lote 0". La ubicación
+          // sigue la misma semántica que la preselección de F7: la ubicación
+          // con más stock (empate → almacén).
+          const loteId = loteSel ? loteSel.id : null;
+          const ubicacion =
+            loteSel
+              ? loteSel.ubicacion
+              : (prod?.stock_almacen ?? 0) >= (prod?.stock_shop ?? 0)
+                ? 'almacen'
+                : 'shop';
+          edicionResult = await this.stockService.registrarEditar(
             action.productoId,
-            loteSel.id,
+            loteId,
             nombre,
             pv,
             pc,
             cantidad,
             motivo,
-            loteSel.ubicacion,
+            ubicacion,
           );
           break;
         }
@@ -259,8 +284,22 @@ export class InventarioPage implements OnInit {
           (p) => p.id === action.productoId,
         );
         if (actualizado) {
+          // F3: feedback claro del precio costo. Cuando el lote editado es el
+          // frente FIFO, productos.precio_costo se actualizó. Cuando no lo es,
+          // el costo quedó guardado en el lote pero la columna muestra el costo
+          // del lote más viejo con stock (semántica FIFO) — se comunica para que
+          // no parezca que "no se guardó".
+          let costoMsg = '';
+          if (edicionResult) {
+            const costoProducto = edicionResult.costoProducto?.toFixed(2) ?? '—';
+            if (edicionResult.esFront) {
+              costoMsg = ` · Precio costo: $${costoProducto}`;
+            } else {
+              costoMsg = ` · Costo del lote: $${edicionResult.costoEditado.toFixed(2)} — Precio costo del producto sin cambios: $${costoProducto} (lote más viejo con stock)`;
+            }
+          }
           this._mostrarToast(
-            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u`,
+            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u${costoMsg}`,
           );
         }
       }
@@ -342,15 +381,34 @@ export class InventarioPage implements OnInit {
         const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
         this.productoLotes.set(lotes);
         if (lotes.length > 0 && tipo === 'editar') {
-          this.selectedLoteIndex.set(1);
-          const firstLote = lotes[0];
           const prod = this.productos().find((p) => p.id === productoId);
+          const loteInicial = elegirLoteInicialEdicion(
+            lotes,
+            prod?.stock_almacen ?? 0,
+            prod?.stock_shop ?? 0,
+          );
+          this.selectedLoteIndex.set(
+            loteInicial ? lotes.indexOf(loteInicial) + 1 : 1,
+          );
           this.editarNombre.set(prod?.nombre ?? '');
           this.editarPrecioVenta.set(prod?.precio_venta ?? 0);
-          this.editarPrecioCosto.set(firstLote.precio_costo);
-          this.movimientoCantidad.set(firstLote.cantidad);
+          this.editarPrecioCosto.set(loteInicial?.precio_costo ?? 0);
+          this.movimientoCantidad.set(loteInicial?.cantidad ?? 0);
         } else if (lotes.length > 0 && tipo === 'ajuste') {
           this.selectedLoteIndex.set(1);
+        } else if (lotes.length === 0 && tipo === 'editar') {
+          // F8: producto con stock > 0 en columnas pero sin NINGÚN lote con
+          // cantidad > 0 (selector sin opciones). El form se prellena con los
+          // datos del producto y se guarda con loteId null: el service
+          // materializa el "lote 0" de forma atómica en su transacción.
+          const prod = this.productos().find((p) => p.id === productoId);
+          if (prod) {
+            this.editarNombre.set(prod.nombre);
+            this.editarPrecioVenta.set(prod.precio_venta);
+            this.editarPrecioCosto.set(prod.precio_costo);
+            this.movimientoCantidad.set(0);
+          }
+          this.selectedLoteIndex.set(null);
         }
         // salida: sin auto-selección — el usuario elige ubicación y lote (obligatorios)
       } catch {
@@ -381,6 +439,18 @@ export class InventarioPage implements OnInit {
   readonly confirmandoEliminar = signal<number | null>(null);
   readonly procesando = signal(false);
   readonly procesandoMovimiento = signal(false);
+
+  /** Conteo de lo que se eliminaría al borrar el producto (F9): movimientos,
+   *  lotes, venta_lotes y bloqueos por historial (ventas/cuenta_cosas). null
+   *  mientras no se cargó o si falló el conteo (fallback genérico en el HTML). */
+  readonly eliminarConteo = signal<{
+    movimientos: number;
+    lotes: number;
+    ventaLotes: number;
+    ventas: number;
+    cuentas: number;
+  } | null>(null);
+  readonly eliminarConteoLoading = signal(false);
 
   abrirNuevoProducto(): void {
     if (!this.esAdmin()) return;
@@ -422,6 +492,16 @@ export class InventarioPage implements OnInit {
       this.formError.set('Las unidades son obligatorias');
       return;
     }
+    // F4: feedback temprano de precios/costos negativos (NaN-safe) antes de
+    // llamar al servicio. El 0 es válido.
+    if (!(this.formCosto()! >= 0)) {
+      this.formError.set('El costo no puede ser negativo');
+      return;
+    }
+    if (!(this.formPrecioVenta()! >= 0)) {
+      this.formError.set('El precio de venta no puede ser negativo');
+      return;
+    }
 
     this.procesando.set(true);
     this.formError.set(null);
@@ -446,17 +526,44 @@ export class InventarioPage implements OnInit {
     }
   }
 
-  confirmarEliminar(id: number): void {
+  async confirmarEliminar(id: number): Promise<void> {
     this.confirmandoEliminar.set(id);
+    this.eliminarConteo.set(null);
+    this.eliminarConteoLoading.set(true);
+    try {
+      this.eliminarConteo.set(
+        await firstValueFrom(this.productoService.obtenerConteoEliminacion(id)),
+      );
+    } catch {
+      // Fallback genérico en el HTML: no se pudo calcular el alcance, se
+      // conserva el comportamiento previo (confirmar sin detalle).
+      this.eliminarConteo.set(null);
+    } finally {
+      this.eliminarConteoLoading.set(false);
+    }
   }
 
   cancelarEliminar(): void {
     this.confirmandoEliminar.set(null);
+    this.eliminarConteo.set(null);
+    this.eliminarConteoLoading.set(false);
   }
 
   async ejecutarEliminar(): Promise<void> {
     const id = this.confirmandoEliminar();
     if (id === null) return;
+
+    // F9: doble guard de UX — el servicio igual bloquea ventas/cuentas (F1),
+    // pero no dejamos intentar borrar un producto que sabemos que no se puede.
+    if (
+      (this.eliminarConteo()?.ventas ?? 0) > 0 ||
+      (this.eliminarConteo()?.cuentas ?? 0) > 0
+    ) {
+      this.error.set(
+        'No se puede eliminar: el producto tiene ventas o cuenta casas asociadas',
+      );
+      return;
+    }
 
     this.procesando.set(true);
     try {
@@ -471,4 +578,25 @@ export class InventarioPage implements OnInit {
       this.procesando.set(false);
     }
   }
+}
+
+/**
+ * F7: elige el lote inicial del formulario "Editar" filtrando por la ubicación
+ * donde el producto concentra su stock:
+ * - si hay stock en ambas ubicaciones, la principal es la de mayor stock
+ *   (empate → 'almacen', la ubicación primaria de la app);
+ * - si la ubicación principal no tiene lotes (dato legacy divergente), cae al
+ *   frente FIFO global.
+ */
+export function elegirLoteInicialEdicion(
+  lotes: LoteStock[],
+  stockAlmacen: number,
+  stockShop: number,
+): LoteStock | null {
+  if (lotes.length === 0) return null;
+  const ubicacionPrincipal: 'almacen' | 'shop' =
+    stockAlmacen >= stockShop ? 'almacen' : 'shop';
+  return (
+    lotes.find((l) => l.ubicacion === ubicacionPrincipal) ?? lotes[0]
+  );
 }

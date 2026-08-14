@@ -229,14 +229,16 @@ export class PosPage {
     let obs: Observable<unknown>;
 
     if (payload.formaPago === 'cuenta_cosas') {
-      // Cuenta Casas usa su propio servicio (no toca jornadas)
-      const productoId = items[0]?.producto.id;
-      const cantidad = items.reduce((sum, item) => sum + item.cantidad, 0);
+      // Cuenta Casas usa su propio servicio (no toca jornadas).
+      // Un item por producto: cada producto recibe su propia fila y salida de stock.
+      if (items.length === 0) return;
       obs = from(
-        this._cuentaCosasService.registrar(
+        this._cuentaCosasService.registrarLote(
           jId,
-          productoId,
-          cantidad,
+          items.map((item) => ({
+            productoId: item.producto.id,
+            cantidad: item.cantidad,
+          })),
           payload.descripcion ?? null,
           payload.autorizadoPor ?? '',
         ).then(() => ({})),

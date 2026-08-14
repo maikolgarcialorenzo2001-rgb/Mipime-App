@@ -43,11 +43,26 @@ const producto: Producto = {
   updated_at: '',
 };
 
+const productoB: Producto = {
+  id: 2,
+  nombre: 'Test Producto B',
+  descripcion: null,
+  precio_venta: 200,
+  precio_costo: null,
+  stock_almacen: 100,
+  stock_shop: 50,
+  created_at: '',
+  updated_at: '',
+};
+
 describe('PosPage — toast de éxito', () => {
   let fixture: ComponentFixture<PosPage>;
   let component: PosPage;
   let mockVentaService: { registrar: ReturnType<typeof vi.fn> };
-  let mockCuentaCosasService: { registrar: ReturnType<typeof vi.fn> };
+  let mockCuentaCosasService: {
+    registrar: ReturnType<typeof vi.fn>;
+    registrarLote: ReturnType<typeof vi.fn>;
+  };
   let mockCobroService: { listarPendientes: ReturnType<typeof vi.fn>; registrarCobroPendiente: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -56,6 +71,7 @@ describe('PosPage — toast de éxito', () => {
     };
     mockCuentaCosasService = {
       registrar: vi.fn().mockResolvedValue(undefined),
+      registrarLote: vi.fn().mockResolvedValue(undefined),
     };
     mockCobroService = {
       listarPendientes: vi.fn().mockResolvedValue([]),
@@ -235,9 +251,10 @@ describe('PosPage — toast de éxito', () => {
     expect(mockCuentaCosasService.registrar).not.toHaveBeenCalled();
   });
 
-  it('2.11 RED: debería llamar a CuentaCosasService.registrar cuando formaPago=cuenta_cosas', () => {
+  it('2.11 RED: debería llamar a CuentaCosasService.registrarLote con un item por producto', () => {
     const cart = TestBed.inject(CartService);
-    cart.agregar(producto);
+    cart.agregar(producto, 2);
+    cart.agregar(productoB, 3);
 
     const payload: CheckoutPayload = {
       formaPago: 'cuenta_cosas',
@@ -247,15 +264,24 @@ describe('PosPage — toast de éxito', () => {
 
     component.confirmarVenta(payload);
 
-    expect(mockCuentaCosasService.registrar).toHaveBeenCalled();
+    expect(mockCuentaCosasService.registrarLote).toHaveBeenCalledWith(
+      1,                                                       // jornadaId
+      [
+        { productoId: 1, cantidad: 2 },                        // primer producto
+        { productoId: 2, cantidad: 3 },                        // segundo producto
+      ],
+      'Retiro familiar',                                       // descripcion
+      'María',                                                 // autorizadoPor
+    );
+    expect(mockCuentaCosasService.registrar).not.toHaveBeenCalled();
     expect(mockVentaService.registrar).not.toHaveBeenCalled();
   });
 
-  it('2.11 RED: debería llamar a CuentaCosasService.registrar con jornadaId, productoId y cantidad', () => {
+  it('2.11 RED: producto único en carrito debería llamar a registrarLote con batch de 1', () => {
     const cart = TestBed.inject(CartService);
-    cart.agregar(producto);
+    cart.agregar(producto, 2);
 
-    mockCuentaCosasService.registrar.mockResolvedValue(undefined);
+    mockCuentaCosasService.registrarLote.mockResolvedValue(undefined);
 
     const payload: CheckoutPayload = {
       formaPago: 'cuenta_cosas',
@@ -264,13 +290,25 @@ describe('PosPage — toast de éxito', () => {
 
     component.confirmarVenta(payload);
 
-    expect(mockCuentaCosasService.registrar).toHaveBeenCalledWith(
-      1,                       // jornadaId
-      1,                       // productoId (first item)
-      1,                       // cantidad (total items qty)
-      null,                    // descripcion
-      'María',                 // autorizadoPor
+    expect(mockCuentaCosasService.registrarLote).toHaveBeenCalledWith(
+      1,
+      [{ productoId: 1, cantidad: 2 }],
+      null,
+      'María',
     );
+    expect(mockCuentaCosasService.registrar).not.toHaveBeenCalled();
+  });
+
+  it('2.11 RED: carrito vacío no debería llamar a ningún servicio', () => {
+    const payload: CheckoutPayload = {
+      formaPago: 'cuenta_cosas',
+      autorizadoPor: 'María',
+    };
+
+    component.confirmarVenta(payload);
+
+    expect(mockCuentaCosasService.registrarLote).not.toHaveBeenCalled();
+    expect(mockCuentaCosasService.registrar).not.toHaveBeenCalled();
     expect(mockVentaService.registrar).not.toHaveBeenCalled();
   });
 

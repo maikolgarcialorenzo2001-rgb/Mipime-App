@@ -10,6 +10,21 @@ import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../
  */
 export const MAX_STOCK_UNIDADES = 1_000_000;
 
+/**
+ * Resultado de registrarEditar: permite a la UI informar si el lote editado
+ * quedó como frente FIFO (el cache productos.precio_costo cambió) o si el
+ * frente sigue siendo otro lote más viejo (F3 — feedback claro en vez de
+ * "no se guardó").
+ */
+export interface EdicionResultado {
+  /** true si el lote editado es el frente FIFO tras la edición (cache actualizado a costoEditado). */
+  esFront: boolean;
+  /** productos.precio_costo resultante (costo del frente FIFO), o null si no hay lotes con stock. */
+  costoProducto: number | null;
+  /** precio_costo que quedó en el lote editado. */
+  costoEditado: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -48,6 +63,28 @@ export class StockMovimientoService {
   private _validarCantidadDelta(cantidad: number): void {
     if (cantidad <= 0) {
       throw new Error('La cantidad debe ser mayor a cero');
+    }
+  }
+
+  /**
+   * Guard de precio de venta (F4): rechaza valores < 0 o NaN ANTES de tocar
+   * la DB. El 0 es válido. `!(v >= 0)` es NaN-safe (`NaN < 0` es false) y
+   * deja pasar null (null >= 0 es true en JS; columna nullable legacy).
+   */
+  private _validarPrecioVenta(precioVenta: number): void {
+    if (!(precioVenta >= 0)) {
+      throw new Error('El precio de venta no puede ser negativo');
+    }
+  }
+
+  /**
+   * Guard de costo (F4): rechaza valores < 0 o NaN ANTES de tocar la DB.
+   * El 0 es válido (regalos / costo 0 legítimo). Mismo criterio NaN-safe
+   * que `_validarPrecioVenta`.
+   */
+  private _validarPrecioCosto(precioCosto: number): void {
+    if (!(precioCosto >= 0)) {
+      throw new Error('El costo no puede ser negativo');
     }
   }
 
@@ -171,7 +208,8 @@ export class StockMovimientoService {
    * Re-syncs productos.precio_costo to the FIFO front lot (oldest lot with
    * stock, product-wide — no ubicacion filter). Idempotent: when the front is
    * unchanged, the same value is rewritten. When no lot has stock, the cache
-   * is left as-is.
+   * is left as-is. Returns the front lot (id + costo) so callers can report
+   * whether an edited lot became the front (F3).
    *
    * T-09: recibe el executor de la transacción activa (tx); sin tx usa `this._db`.
    */
@@ -179,10 +217,10 @@ export class StockMovimientoService {
     productoId: number,
     ahora: string,
     tx?: SqlExecutor,
-  ): Promise<void> {
+  ): Promise<{ id: number; precio_costo: number } | null> {
     const db: SqlExecutor = tx ?? this._db;
-    const [siguienteLote] = await db.sql<{ precio_costo: number }>(
-      `SELECT precio_costo FROM lotes_stock
+    const [siguienteLote] = await db.sql<{ id: number; precio_costo: number }>(
+      `SELECT id, precio_costo FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
        ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
       [productoId],
@@ -193,6 +231,7 @@ export class StockMovimientoService {
         [siguienteLote.precio_costo, ahora, productoId],
       );
     }
+    return siguienteLote ?? null;
   }
 
   /**
@@ -212,6 +251,7 @@ export class StockMovimientoService {
   ): Promise<void> {
     this._checkAdmin();
     this._validarCantidadDelta(cantidad);
+    this._validarPrecioCosto(precioCosto);
     const ahora = new Date().toISOString();
 
     // T-09: las 4 escrituras corren atómicas (BEGIN/COMMIT del adapter).
@@ -368,10 +408,12 @@ export class StockMovimientoService {
       }
 
       // 4. Update product stock (sum across both locations to set stock_almacen)
-      //    Full ajuste replaces all lots — set stock_almacen and keep stock_shop as-is
+      //    Full ajuste replaces ALL lots — the whole product stock now lives in
+      //    a single 'almacen' lot, so stock_shop must go to 0 to stay consistent
+      //    with the lots (F5: antes quedaba con el valor viejo → divergencia).
       await tx.sql(
         `UPDATE productos
-         SET stock_almacen = ?,
+         SET stock_almacen = ?, stock_shop = 0,
               updated_at = ?
          WHERE id = ?`,
         [nuevaCantidad, ahora, productoId],
@@ -466,9 +508,20 @@ export class StockMovimientoService {
 
     // T-09: movimiento + UPDATE lote + recálculo atómicos.
     await this._db.transaction(async (tx) => {
-      // 1. Register movement
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      const [loteActual] = await tx.sql<LoteStock>(
+        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+        [loteId, productoId],
+      );
+      if (!loteActual) {
+        throw new Error('El lote no existe');
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       const columnas = 'producto_id, cantidad, tipo, motivo, created_at';
-      const params: unknown[] = [productoId, nuevaCantidad, 'ajuste', motivo, ahora];
+      const params: unknown[] = [productoId, delta, 'ajuste', motivo, ahora];
 
       await tx.sql(
         `INSERT INTO stock_movimientos (${columnas})
@@ -505,17 +558,23 @@ export class StockMovimientoService {
   /**
    * Edita precio_venta del producto y precio_costo/cantidad de un lote específico.
    * Admin-only.
+   *
+   * F8: cuando `loteId` es null (producto con stock > 0 en columnas pero sin
+   * ningún lote con `cantidad > 0` — selector sin lotes), materializa el "lote 0"
+   * ATOMICO dentro de la misma transacción: reutiliza el lote existente con
+   * `cantidad = 0` más antiguo o, si no existe, lo crea (INSERT con cantidad 0).
+   * El delta del movimiento se calcula contra ese lote materializado.
    */
   async registrarEditar(
     productoId: number,
-    loteId: number,
+    loteId: number | null,
     nombre: string,
     precioVenta: number,
     precioCosto: number,
     nuevaCantidad: number,
     motivo: string,
     ubicacion: 'almacen' | 'shop',
-  ): Promise<void> {
+  ): Promise<EdicionResultado> {
     this._checkAdmin();
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
@@ -524,16 +583,57 @@ export class StockMovimientoService {
       throw new Error('El nombre del producto es obligatorio');
     }
     this._validarCantidadAbsoluta(nuevaCantidad);
+    this._validarPrecioVenta(precioVenta);
+    this._validarPrecioCosto(precioCosto);
 
     const ahora = new Date().toISOString();
 
-    // T-09: movimiento + UPDATEs + recálculo atómicos.
-    await this._db.transaction(async (tx) => {
-      // 1. Register movement
+    // T-09: movimiento + UPDATEs + recálculo atómicos. El closure DEVUELVE
+    // loteActual + frontResultado (TS no puede probar asignaciones a variables
+    // capturadas dentro de un closure — ng build/tsc estricto las ve como
+    // 'never' si se leen fuera; devolver evita ese error de tipos).
+    const { loteActual, frontResultado } = await this._db.transaction(async (tx) => {
+      let loteActual: LoteStock;
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      //    F8: con loteId null se materializa el "lote 0" — reutiliza el lote
+      //    existente en 0 más antiguo o lo crea (UPDATE→INSERT), sin pisar el
+      //    selector de F7 ni la validación de signo de F4.
+      if (loteId !== null) {
+        const [lote] = await tx.sql<LoteStock>(
+          'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+          [loteId, productoId],
+        );
+        if (!lote) {
+          throw new Error('El lote no existe');
+        }
+        loteActual = lote;
+      } else {
+        const [loteCero] = await tx.sql<LoteStock>(
+          `SELECT * FROM lotes_stock
+           WHERE producto_id = ? AND cantidad = 0
+           ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
+          [productoId],
+        );
+        if (loteCero) {
+          loteActual = loteCero;
+        } else {
+          const [nuevoLote] = await tx.sql<LoteStock>(
+            `INSERT INTO lotes_stock (producto_id, cantidad, precio_costo, fecha_ingreso, ubicacion, created_at)
+             VALUES (?, 0, ?, ?, ?, ?)
+             RETURNING *`,
+            [productoId, precioCosto, ahora, ubicacion, ahora],
+          );
+          loteActual = nuevoLote;
+        }
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       await tx.sql(
         `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
          VALUES (?, ?, ?, ?, ?)`,
-        [productoId, nuevaCantidad, 'ajuste', motivo, ahora],
+        [productoId, delta, 'ajuste', motivo, ahora],
       );
 
       // 2. Update product (nombre + precio_venta)
@@ -545,12 +645,12 @@ export class StockMovimientoService {
       // 3. Update the specific lot (cantidad and precio_costo)
       await tx.sql(
         'UPDATE lotes_stock SET cantidad = ?, precio_costo = ? WHERE id = ?',
-        [nuevaCantidad, precioCosto, loteId],
+        [nuevaCantidad, precioCosto, loteActual.id],
       );
 
       // 3b. Re-sync productos.precio_costo: the edited lot may be the FIFO front
       //     (cost changed) or was zeroed (front advances to the next lot).
-      await this._syncPrecioCosto(productoId, ahora, tx);
+      const frontResultado = await this._syncPrecioCosto(productoId, ahora, tx);
 
       // 4. Recalculate stock for this ubicacion
       const [{ total }] = await tx.sql<{ total: number }>(
@@ -565,7 +665,15 @@ export class StockMovimientoService {
          WHERE id = ?`,
         [total, ahora, productoId],
       );
+
+      return { loteActual, frontResultado };
     });
+
+    return {
+      esFront: frontResultado?.id === loteActual.id,
+      costoProducto: frontResultado?.precio_costo ?? null,
+      costoEditado: precioCosto,
+    };
   }
 
   /**
@@ -689,7 +797,7 @@ export class StockMovimientoService {
   }
 
   async obtenerHistorial(): Promise<
-    Array<StockMovimiento & { nombre: string }>
+    (StockMovimiento & { nombre: string })[]
   > {
     return this._db.sql<StockMovimiento & { nombre: string }>(
       `SELECT sm.*, p.nombre
