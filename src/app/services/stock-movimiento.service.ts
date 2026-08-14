@@ -67,6 +67,28 @@ export class StockMovimientoService {
   }
 
   /**
+   * Guard de precio de venta (F4): rechaza valores < 0 o NaN ANTES de tocar
+   * la DB. El 0 es válido. `!(v >= 0)` es NaN-safe (`NaN < 0` es false) y
+   * deja pasar null (null >= 0 es true en JS; columna nullable legacy).
+   */
+  private _validarPrecioVenta(precioVenta: number): void {
+    if (!(precioVenta >= 0)) {
+      throw new Error('El precio de venta no puede ser negativo');
+    }
+  }
+
+  /**
+   * Guard de costo (F4): rechaza valores < 0 o NaN ANTES de tocar la DB.
+   * El 0 es válido (regalos / costo 0 legítimo). Mismo criterio NaN-safe
+   * que `_validarPrecioVenta`.
+   */
+  private _validarPrecioCosto(precioCosto: number): void {
+    if (!(precioCosto >= 0)) {
+      throw new Error('El costo no puede ser negativo');
+    }
+  }
+
+  /**
    * Consume stock from the oldest lots (FIFO) filtered by location.
    * When loteId is provided, consumes ONLY from that specific lot
    * (validated up-front; throws before mutating anything if insufficient).
@@ -229,6 +251,7 @@ export class StockMovimientoService {
   ): Promise<void> {
     this._checkAdmin();
     this._validarCantidadDelta(cantidad);
+    this._validarPrecioCosto(precioCosto);
     const ahora = new Date().toISOString();
 
     // T-09: las 4 escrituras corren atómicas (BEGIN/COMMIT del adapter).
@@ -385,10 +408,12 @@ export class StockMovimientoService {
       }
 
       // 4. Update product stock (sum across both locations to set stock_almacen)
-      //    Full ajuste replaces all lots — set stock_almacen and keep stock_shop as-is
+      //    Full ajuste replaces ALL lots — the whole product stock now lives in
+      //    a single 'almacen' lot, so stock_shop must go to 0 to stay consistent
+      //    with the lots (F5: antes quedaba con el valor viejo → divergencia).
       await tx.sql(
         `UPDATE productos
-         SET stock_almacen = ?,
+         SET stock_almacen = ?, stock_shop = 0,
               updated_at = ?
          WHERE id = ?`,
         [nuevaCantidad, ahora, productoId],
@@ -483,9 +508,20 @@ export class StockMovimientoService {
 
     // T-09: movimiento + UPDATE lote + recálculo atómicos.
     await this._db.transaction(async (tx) => {
-      // 1. Register movement
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      const [loteActual] = await tx.sql<LoteStock>(
+        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+        [loteId, productoId],
+      );
+      if (!loteActual) {
+        throw new Error('El lote no existe');
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       const columnas = 'producto_id, cantidad, tipo, motivo, created_at';
-      const params: unknown[] = [productoId, nuevaCantidad, 'ajuste', motivo, ahora];
+      const params: unknown[] = [productoId, delta, 'ajuste', motivo, ahora];
 
       await tx.sql(
         `INSERT INTO stock_movimientos (${columnas})
@@ -541,6 +577,8 @@ export class StockMovimientoService {
       throw new Error('El nombre del producto es obligatorio');
     }
     this._validarCantidadAbsoluta(nuevaCantidad);
+    this._validarPrecioVenta(precioVenta);
+    this._validarPrecioCosto(precioCosto);
 
     const ahora = new Date().toISOString();
 
@@ -551,11 +589,22 @@ export class StockMovimientoService {
 
     // T-09: movimiento + UPDATEs + recálculo atómicos.
     await this._db.transaction(async (tx) => {
-      // 1. Register movement
+      // 0. F7: leer la cantidad actual del lote para registrar el delta en el
+      //    movimiento (un cambio 10→3 debe figurar como "Ajuste -7u", no "Ajuste 3u").
+      const [loteActual] = await tx.sql<LoteStock>(
+        'SELECT * FROM lotes_stock WHERE id = ? AND producto_id = ?',
+        [loteId, productoId],
+      );
+      if (!loteActual) {
+        throw new Error('El lote no existe');
+      }
+      const delta = nuevaCantidad - loteActual.cantidad;
+
+      // 1. Register movement (delta, not absolute)
       await tx.sql(
         `INSERT INTO stock_movimientos (producto_id, cantidad, tipo, motivo, created_at)
          VALUES (?, ?, ?, ?, ?)`,
-        [productoId, nuevaCantidad, 'ajuste', motivo, ahora],
+        [productoId, delta, 'ajuste', motivo, ahora],
       );
 
       // 2. Update product (nombre + precio_venta)
@@ -717,7 +766,7 @@ export class StockMovimientoService {
   }
 
   async obtenerHistorial(): Promise<
-    Array<StockMovimiento & { nombre: string }>
+    (StockMovimiento & { nombre: string })[]
   > {
     return this._db.sql<StockMovimiento & { nombre: string }>(
       `SELECT sm.*, p.nombre

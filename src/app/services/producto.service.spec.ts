@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { ProductoService } from './producto.service';
 import { StockMovimientoService } from './stock-movimiento.service';
+import { AuthService } from './auth.service';
 import { DATABASE, type Database } from './database';
 import type { Producto } from '../models';
 
@@ -50,18 +51,25 @@ function createMockDb(): Database {
   };
 }
 
+function createMockAuth(): { usuario: ReturnType<typeof vi.fn> } {
+  return { usuario: vi.fn().mockReturnValue({ rol: 'admin' }) };
+}
+
 describe('ProductoService', () => {
   let mockDb: Database;
+  let mockAuth: ReturnType<typeof createMockAuth>;
   let mockStockMovimiento: { registrarEntrada: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockDb = createMockDb();
+    mockAuth = createMockAuth();
     mockStockMovimiento = { registrarEntrada: vi.fn().mockResolvedValue(undefined) };
 
     TestBed.configureTestingModule({
       providers: [
         ProductoService,
         { provide: DATABASE, useValue: mockDb },
+        { provide: AuthService, useValue: mockAuth },
         { provide: StockMovimientoService, useValue: mockStockMovimiento },
       ],
     });
@@ -229,6 +237,188 @@ describe('ProductoService', () => {
 
       expect(mockStockMovimiento.registrarEntrada).not.toHaveBeenCalled();
     });
+
+    it('RED: crear con costo negativo rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: -5,
+            precio_venta: 100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: crear con precio de venta negativo rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: 10,
+            precio_venta: -100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: crear con precio NaN rechaza sin INSERT', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Negativo',
+            precio_costo: NaN,
+            precio_venta: 100,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('crear con precios en 0 procede al INSERT', async () => {
+      const nuevoProducto: Producto = {
+        id: 7,
+        nombre: 'Gratis',
+        descripcion: null,
+        precio_venta: 0,
+        precio_costo: 0,
+        stock_almacen: 0,
+        stock_shop: 0,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.crear({
+          nombre: 'Gratis',
+          precio_costo: 0,
+          precio_venta: 0,
+          stock_almacen: 0,
+        }),
+      );
+
+      expect(resultado).toEqual(nuevoProducto);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO productos'),
+        expect.arrayContaining(['Gratis', null, 0, 0]),
+      );
+    });
+
+    it('R1 RED: si registrarEntrada falla, crear rechaza y el INSERT corre dentro de transaction() (rollback del adapter, sin producto fantasma)', async () => {
+      const nuevoProducto: Producto = {
+        id: 8,
+        nombre: 'Con Stock',
+        descripcion: null,
+        precio_venta: 500,
+        precio_costo: 300,
+        stock_almacen: 5,
+        stock_shop: 0,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+      mockStockMovimiento.registrarEntrada.mockRejectedValue(
+        new Error('La cantidad debe ser mayor a cero'),
+      );
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'Con Stock',
+            precio_costo: 300,
+            precio_venta: 500,
+            stock_almacen: 5,
+          }),
+        ),
+      ).rejects.toThrow('La cantidad debe ser mayor a cero');
+
+      // El INSERT no queda huérfano: corre dentro de la MISMA transacción que
+      // registrarEntrada; el ROLLBACK del adapter lo descarta (contrato T-08).
+      expect(mockDb.transaction).toHaveBeenCalled();
+      expect(mockStockMovimiento.registrarEntrada).toHaveBeenCalledWith(8, 5, 300);
+    });
+
+    it('R1 TRIANGULATE: crear con stock corre INSERT y registrarEntrada dentro de UNA sola transacción', async () => {
+      const nuevoProducto: Producto = {
+        id: 9,
+        nombre: 'Con Stock',
+        descripcion: null,
+        precio_venta: 500,
+        precio_costo: 300,
+        stock_almacen: 5,
+        stock_shop: 0,
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.crear({
+          nombre: 'Con Stock',
+          precio_costo: 300,
+          precio_venta: 500,
+          stock_almacen: 5,
+        }),
+      );
+
+      expect(resultado.id).toBe(9);
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockStockMovimiento.registrarEntrada).toHaveBeenCalledWith(9, 5, 300);
+    });
+
+    it('R2 RED: crear con usuario no-admin rechaza con "Solo administradores" sin tocar la DB', async () => {
+      mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'X',
+            precio_costo: 100,
+            precio_venta: 200,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('R2 TRIANGULATE: crear sin usuario logueado rechaza con "Solo administradores" sin tocar la DB', async () => {
+      mockAuth.usuario.mockReturnValue(null);
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(
+          service.crear({
+            nombre: 'X',
+            precio_costo: 100,
+            precio_venta: 200,
+            stock_almacen: 0,
+          }),
+        ),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
   });
 
   describe('actualizar', () => {
@@ -267,6 +457,118 @@ describe('ProductoService', () => {
         ]),
       );
     });
+
+    it('RED: actualizar con precio de venta negativo rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: -1,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: actualizar con costo negativo rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: -5,
+            precio_venta: 10,
+          }),
+        ),
+      ).rejects.toThrow('El costo no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('RED: actualizar con precio NaN rechaza sin UPDATE', async () => {
+      const service = TestBed.inject(ProductoService);
+
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: NaN,
+          }),
+        ),
+      ).rejects.toThrow('El precio de venta no puede ser negativo');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('actualizar con precios en 0 procede al UPDATE', async () => {
+      const productoActualizado: Producto = {
+        id: 1,
+        nombre: 'Gratis',
+        descripcion: null,
+        precio_venta: 0,
+        precio_costo: 0,
+        stock_almacen: 50,
+        stock_shop: 0,
+        created_at: '2026-06-02T22:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([productoActualizado]);
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.actualizar(1, {
+          nombre: 'Gratis',
+          precio_costo: 0,
+          precio_venta: 0,
+        }),
+      );
+
+      expect(resultado).toEqual(productoActualizado);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE productos'),
+        expect.arrayContaining(['Gratis', 0, 0, 1]),
+      );
+    });
+
+    it('R4 RED: actualizar con usuario no-admin rechaza con "Solo administradores" sin UPDATE', async () => {
+      mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: 20,
+          }),
+        ),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('R4 TRIANGULATE: actualizar sin usuario logueado rechaza con "Solo administradores" sin UPDATE', async () => {
+      mockAuth.usuario.mockReturnValue(null);
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(
+          service.actualizar(1, {
+            nombre: 'X',
+            precio_costo: 10,
+            precio_venta: 20,
+          }),
+        ),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
   });
 
   describe('eliminar', () => {
@@ -281,6 +583,28 @@ describe('ProductoService', () => {
         expect.stringContaining('DELETE FROM productos'),
         [1],
       );
+    });
+
+    it('R3 RED: eliminar con usuario no-admin rechaza con "Solo administradores" sin borrar', async () => {
+      mockAuth.usuario.mockReturnValue({ rol: 'trabajador' });
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(service.eliminar(1)),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+
+    it('R3 TRIANGULATE: eliminar sin usuario logueado rechaza con "Solo administradores" sin borrar', async () => {
+      mockAuth.usuario.mockReturnValue(null);
+
+      const service = TestBed.inject(ProductoService);
+      await expect(
+        firstValueFrom(service.eliminar(1)),
+      ).rejects.toThrow('Solo administradores');
+
+      expect(mockDb.sql).not.toHaveBeenCalled();
     });
 
     it('F1 RED: debería bloquear eliminación cuando el producto tiene detalle_ventas', async () => {

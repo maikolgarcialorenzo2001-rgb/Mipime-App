@@ -150,10 +150,15 @@ export class InventarioPage implements OnInit {
     try {
       switch (action.tipo) {
         case 'entrada': {
+          const costo = this.movimientoCosto();
+          if (costo !== null && !(costo >= 0)) {
+            this.error.set('El costo no puede ser negativo');
+            return;
+          }
           await this.stockService.registrarEntrada(
             action.productoId,
             this.movimientoCantidad() ?? 0,
-            this.movimientoCosto() ?? 0,
+            costo ?? 0,
             this.movimientoMotivo() || undefined,
           );
           break;
@@ -226,6 +231,15 @@ export class InventarioPage implements OnInit {
           }
           if (pc === null) {
             this.error.set('El precio de costo es obligatorio');
+            return;
+          }
+          // F4: guards de signo en la UI (el form usa novalidate).
+          if (!(pv >= 0)) {
+            this.error.set('El precio de venta no puede ser negativo');
+            return;
+          }
+          if (!(pc >= 0)) {
+            this.error.set('El costo no puede ser negativo');
             return;
           }
           edicionResult = await this.stockService.registrarEditar(
@@ -359,13 +373,19 @@ export class InventarioPage implements OnInit {
         const lotes = await this.stockService.obtenerLotesPorProducto(productoId);
         this.productoLotes.set(lotes);
         if (lotes.length > 0 && tipo === 'editar') {
-          this.selectedLoteIndex.set(1);
-          const firstLote = lotes[0];
           const prod = this.productos().find((p) => p.id === productoId);
+          const loteInicial = elegirLoteInicialEdicion(
+            lotes,
+            prod?.stock_almacen ?? 0,
+            prod?.stock_shop ?? 0,
+          );
+          this.selectedLoteIndex.set(
+            loteInicial ? lotes.indexOf(loteInicial) + 1 : 1,
+          );
           this.editarNombre.set(prod?.nombre ?? '');
           this.editarPrecioVenta.set(prod?.precio_venta ?? 0);
-          this.editarPrecioCosto.set(firstLote.precio_costo);
-          this.movimientoCantidad.set(firstLote.cantidad);
+          this.editarPrecioCosto.set(loteInicial?.precio_costo ?? 0);
+          this.movimientoCantidad.set(loteInicial?.cantidad ?? 0);
         } else if (lotes.length > 0 && tipo === 'ajuste') {
           this.selectedLoteIndex.set(1);
         }
@@ -439,6 +459,16 @@ export class InventarioPage implements OnInit {
       this.formError.set('Las unidades son obligatorias');
       return;
     }
+    // F4: feedback temprano de precios/costos negativos (NaN-safe) antes de
+    // llamar al servicio. El 0 es válido.
+    if (!(this.formCosto()! >= 0)) {
+      this.formError.set('El costo no puede ser negativo');
+      return;
+    }
+    if (!(this.formPrecioVenta()! >= 0)) {
+      this.formError.set('El precio de venta no puede ser negativo');
+      return;
+    }
 
     this.procesando.set(true);
     this.formError.set(null);
@@ -488,4 +518,25 @@ export class InventarioPage implements OnInit {
       this.procesando.set(false);
     }
   }
+}
+
+/**
+ * F7: elige el lote inicial del formulario "Editar" filtrando por la ubicación
+ * donde el producto concentra su stock:
+ * - si hay stock en ambas ubicaciones, la principal es la de mayor stock
+ *   (empate → 'almacen', la ubicación primaria de la app);
+ * - si la ubicación principal no tiene lotes (dato legacy divergente), cae al
+ *   frente FIFO global.
+ */
+export function elegirLoteInicialEdicion(
+  lotes: LoteStock[],
+  stockAlmacen: number,
+  stockShop: number,
+): LoteStock | null {
+  if (lotes.length === 0) return null;
+  const ubicacionPrincipal: 'almacen' | 'shop' =
+    stockAlmacen >= stockShop ? 'almacen' : 'shop';
+  return (
+    lotes.find((l) => l.ubicacion === ubicacionPrincipal) ?? lotes[0]
+  );
 }
