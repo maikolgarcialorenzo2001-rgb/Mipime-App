@@ -85,6 +85,9 @@ describe('InventarioPage', () => {
       crear: vi.fn(),
       actualizar: vi.fn(),
       eliminar: vi.fn(),
+      obtenerConteoEliminacion: vi.fn().mockReturnValue(
+        of({ movimientos: 0, lotes: 0, ventaLotes: 0, ventas: 0, cuentas: 0 }),
+      ),
     };
 
     mockStockService = {
@@ -1168,7 +1171,7 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    component.confirmarEliminar(1);
+    await component.confirmarEliminar(1);
     fixture.detectChanges();
 
     expect(component.confirmandoEliminar()).toBe(1);
@@ -1192,7 +1195,7 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    component.confirmarEliminar(1);
+    await component.confirmarEliminar(1);
     fixture.detectChanges();
 
     expect(component.confirmandoEliminar()).toBe(1);
@@ -1201,7 +1204,116 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(component.confirmandoEliminar()).toBeNull();
+    expect(component.eliminarConteo()).toBeNull();
+    expect(component.eliminarConteoLoading()).toBe(false);
     expect(mockProductoService.eliminar).not.toHaveBeenCalled();
+  });
+
+  it('25.1 F9 RED: confirmarEliminar carga el conteo y lo expone en eliminarConteo', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.obtenerConteoEliminacion.mockReturnValue(
+      of({ movimientos: 5, lotes: 3, ventaLotes: 2, ventas: 0, cuentas: 0 }),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.confirmarEliminar(1);
+    fixture.detectChanges();
+
+    expect(mockProductoService.obtenerConteoEliminacion).toHaveBeenCalledWith(1);
+    expect(component.confirmandoEliminar()).toBe(1);
+    expect(component.eliminarConteo()).toEqual({
+      movimientos: 5,
+      lotes: 3,
+      ventaLotes: 2,
+      ventas: 0,
+      cuentas: 0,
+    });
+    expect(component.eliminarConteoLoading()).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('5 movimientos');
+    expect(fixture.nativeElement.textContent).toContain('3 lotes');
+    expect(fixture.nativeElement.textContent).toContain('2 registros de venta por lote');
+  });
+
+  it('25.2 F9 RED: diálogo con ventas > 0 deshabilita Eliminar y avisa que no se puede eliminar', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.obtenerConteoEliminacion.mockReturnValue(
+      of({ movimientos: 4, lotes: 2, ventaLotes: 1, ventas: 1, cuentas: 0 }),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.confirmarEliminar(1);
+    fixture.detectChanges();
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('No se puede eliminar para no degradar los reportes históricos');
+
+    const botonEliminar = fixture.nativeElement.querySelector('.fixed.inset-0 button.bg-red-600');
+    expect(botonEliminar).toBeTruthy();
+    expect(botonEliminar.disabled).toBe(true);
+    expect(botonEliminar.textContent.trim()).toContain('No se puede eliminar');
+  });
+
+  it('25.3 F9 RED: diálogo sin ventas/cuentas muestra las cantidades y habilita Eliminar', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.obtenerConteoEliminacion.mockReturnValue(
+      of({ movimientos: 7, lotes: 1, ventaLotes: 3, ventas: 0, cuentas: 0 }),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.confirmarEliminar(1);
+    fixture.detectChanges();
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('7 movimientos');
+    expect(texto).toContain('1 lotes');
+    expect(texto).toContain('3 registros de venta por lote');
+    expect(texto).toContain('Esta acción no se puede deshacer');
+    expect(texto).not.toContain('No se puede eliminar para no degradar');
+
+    const botonEliminar = fixture.nativeElement.querySelector('.fixed.inset-0 button.bg-red-600');
+    expect(botonEliminar.disabled).toBe(false);
+    expect(botonEliminar.textContent.trim()).toContain('Eliminar');
+  });
+
+  it('25.4 F9 TRIANGULATE: fallo al cargar el conteo muestra el fallback genérico con Eliminar habilitado', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.obtenerConteoEliminacion.mockReturnValue(
+      throwError(() => new Error('db fallo')),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.confirmarEliminar(1);
+    fixture.detectChanges();
+
+    expect(component.eliminarConteo()).toBeNull();
+    expect(component.eliminarConteoLoading()).toBe(false);
+
+    const texto = fixture.nativeElement.textContent;
+    expect(texto).toContain('¿Estás seguro de que deseas eliminar este producto?');
+
+    const botonEliminar = fixture.nativeElement.querySelector('.fixed.inset-0 button.bg-red-600');
+    expect(botonEliminar.disabled).toBe(false);
+    expect(botonEliminar.textContent.trim()).toContain('Eliminar');
   });
 
   it('26. cerrarModal hides modal and clears form', async () => {

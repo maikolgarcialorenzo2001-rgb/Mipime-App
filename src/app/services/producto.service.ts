@@ -184,4 +184,47 @@ export class ProductoService {
       })(),
     ).pipe(map(() => undefined));
   }
+
+  /** Cuenta los registros dependientes de un producto antes de ofrecer el borrado:
+   *  cuántos movimientos/lotes/venta_lotes se eliminarían y si tiene historial
+   *  (detalle_ventas/cuenta_cosas — mismas tablas que F1 valida en `eliminar`)
+   *  que lo bloquea para no degradar reportes históricos (F9). */
+  obtenerConteoEliminacion(id: number): Observable<{
+    movimientos: number;
+    lotes: number;
+    ventaLotes: number;
+    ventas: number;
+    cuentas: number;
+  }> {
+    return from(
+      Promise.all([
+        this._db.sql<{ total: number }>(
+          'SELECT COUNT(*) AS total FROM detalle_ventas WHERE producto_id = ?',
+          [id],
+        ),
+        this._db.sql<{ total: number }>(
+          'SELECT COUNT(*) AS total FROM cuenta_cosas WHERE producto_id = ?',
+          [id],
+        ),
+        this._db.sql<{ total: number }>(
+          'SELECT COUNT(*) AS total FROM stock_movimientos WHERE producto_id = ?',
+          [id],
+        ),
+        this._db.sql<{ total: number }>(
+          'SELECT COUNT(*) AS total FROM lotes_stock WHERE producto_id = ?',
+          [id],
+        ),
+        this._db.sql<{ total: number }>(
+          'SELECT COUNT(*) AS total FROM venta_lotes WHERE producto_id = ?',
+          [id],
+        ),
+      ]).then(([ventas, cuentas, movimientos, lotes, ventaLotes]) => ({
+        movimientos: movimientos[0]?.total ?? 0,
+        lotes: lotes[0]?.total ?? 0,
+        ventaLotes: ventaLotes[0]?.total ?? 0,
+        ventas: ventas[0]?.total ?? 0,
+        cuentas: cuentas[0]?.total ?? 0,
+      })),
+    );
+  }
 }

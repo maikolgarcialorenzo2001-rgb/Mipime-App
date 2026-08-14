@@ -440,6 +440,18 @@ export class InventarioPage implements OnInit {
   readonly procesando = signal(false);
   readonly procesandoMovimiento = signal(false);
 
+  /** Conteo de lo que se eliminaría al borrar el producto (F9): movimientos,
+   *  lotes, venta_lotes y bloqueos por historial (ventas/cuenta_cosas). null
+   *  mientras no se cargó o si falló el conteo (fallback genérico en el HTML). */
+  readonly eliminarConteo = signal<{
+    movimientos: number;
+    lotes: number;
+    ventaLotes: number;
+    ventas: number;
+    cuentas: number;
+  } | null>(null);
+  readonly eliminarConteoLoading = signal(false);
+
   abrirNuevoProducto(): void {
     if (!this.esAdmin()) return;
     this.formNombre.set('');
@@ -514,17 +526,44 @@ export class InventarioPage implements OnInit {
     }
   }
 
-  confirmarEliminar(id: number): void {
+  async confirmarEliminar(id: number): Promise<void> {
     this.confirmandoEliminar.set(id);
+    this.eliminarConteo.set(null);
+    this.eliminarConteoLoading.set(true);
+    try {
+      this.eliminarConteo.set(
+        await firstValueFrom(this.productoService.obtenerConteoEliminacion(id)),
+      );
+    } catch {
+      // Fallback genérico en el HTML: no se pudo calcular el alcance, se
+      // conserva el comportamiento previo (confirmar sin detalle).
+      this.eliminarConteo.set(null);
+    } finally {
+      this.eliminarConteoLoading.set(false);
+    }
   }
 
   cancelarEliminar(): void {
     this.confirmandoEliminar.set(null);
+    this.eliminarConteo.set(null);
+    this.eliminarConteoLoading.set(false);
   }
 
   async ejecutarEliminar(): Promise<void> {
     const id = this.confirmandoEliminar();
     if (id === null) return;
+
+    // F9: doble guard de UX — el servicio igual bloquea ventas/cuentas (F1),
+    // pero no dejamos intentar borrar un producto que sabemos que no se puede.
+    if (
+      (this.eliminarConteo()?.ventas ?? 0) > 0 ||
+      (this.eliminarConteo()?.cuentas ?? 0) > 0
+    ) {
+      this.error.set(
+        'No se puede eliminar: el producto tiene ventas o cuenta casas asociadas',
+      );
+      return;
+    }
 
     this.procesando.set(true);
     try {

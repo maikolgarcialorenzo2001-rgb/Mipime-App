@@ -661,6 +661,76 @@ describe('ProductoService', () => {
     });
   });
 
+  describe('obtenerConteoEliminacion', () => {
+    it('F9 RED: retorna el objeto completo con los 5 contadores (movimientos, lotes, venta_lotes y bloqueos por historial)', async () => {
+      // Orden real de los COUNTs en la implementación: detalle_ventas,
+      // cuenta_cosas, stock_movimientos, lotes_stock, venta_lotes.
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ total: 2 }]) // detalle_ventas
+        .mockResolvedValueOnce([{ total: 1 }]) // cuenta_cosas
+        .mockResolvedValueOnce([{ total: 5 }]) // stock_movimientos
+        .mockResolvedValueOnce([{ total: 3 }]) // lotes_stock
+        .mockResolvedValueOnce([{ total: 4 }]); // venta_lotes
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.obtenerConteoEliminacion(1),
+      );
+
+      expect(resultado).toEqual({
+        movimientos: 5,
+        lotes: 3,
+        ventaLotes: 4,
+        ventas: 2,
+        cuentas: 1,
+      });
+
+      // 5 COUNTs sobre producto_id = ? en el orden de la implementación.
+      expect(mockDb.sql).toHaveBeenCalledTimes(5);
+      const queries = vi.mocked(mockDb.sql).mock.calls.map((c) => String(c[0]));
+      expect(queries[0]).toContain('COUNT(*)');
+      expect(queries[0]).toContain('FROM detalle_ventas');
+      expect(queries[0]).toContain('producto_id = ?');
+      expect(queries[1]).toContain('COUNT(*)');
+      expect(queries[1]).toContain('FROM cuenta_cosas');
+      expect(queries[1]).toContain('producto_id = ?');
+      expect(queries[2]).toContain('COUNT(*)');
+      expect(queries[2]).toContain('FROM stock_movimientos');
+      expect(queries[2]).toContain('producto_id = ?');
+      expect(queries[3]).toContain('COUNT(*)');
+      expect(queries[3]).toContain('FROM lotes_stock');
+      expect(queries[3]).toContain('producto_id = ?');
+      expect(queries[4]).toContain('COUNT(*)');
+      expect(queries[4]).toContain('FROM venta_lotes');
+      expect(queries[4]).toContain('producto_id = ?');
+      for (const [, params] of vi.mocked(mockDb.sql).mock.calls) {
+        expect(params).toEqual([1]);
+      }
+    });
+
+    it('F9 TRIANGULATE: filas con total undefined → todos los contadores en 0', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // detalle_ventas
+        .mockResolvedValueOnce([{ total: undefined }]) // cuenta_cosas
+        .mockResolvedValueOnce([]) // stock_movimientos
+        .mockResolvedValueOnce([{ total: undefined }]) // lotes_stock
+        .mockResolvedValueOnce([]); // venta_lotes
+
+      const service = TestBed.inject(ProductoService);
+      const resultado = await firstValueFrom(
+        service.obtenerConteoEliminacion(1),
+      );
+
+      expect(resultado).toEqual({
+        movimientos: 0,
+        lotes: 0,
+        ventaLotes: 0,
+        ventas: 0,
+        cuentas: 0,
+      });
+    });
+  });
+
   describe('obtenerInversionGlobal', () => {
     beforeEach(() => {
       vi.mocked(mockDb.sql).mockReset();
