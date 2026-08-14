@@ -509,16 +509,6 @@ describe('JornadaService', () => {
 
   describe('cuenta_cosas en cierre', () => {
     it('3.1 RED: debería consultar cuenta_cosas y pasar CC records a ExcelService', async () => {
-      const mockVentas: Venta[] = [
-        { id: 10, jornada_id: 1, fecha_hora: '2026-06-02T10:00:00', total: 5000, usuario_id: 1, forma_pago: 'efectivo', created_at: '' },
-      ];
-      const mockDetalles: DetalleVenta[] = [
-        { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
-      ];
-      const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
-        { id: 2, nombre: 'Agua 1L', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 20, stock_shop: 0, created_at: '', updated_at: '' },
-      ];
       const mockCC: CuentaCosa[] = [
         { id: 1, jornada_id: 1, producto_id: 1, cantidad: 2, descripcion: 'Retiro personal', autorizado_por: 'Juan', created_at: '' },
         { id: 2, jornada_id: 1, producto_id: 2, cantidad: 1, descripcion: null, autorizado_por: 'María', created_at: '' },
@@ -1805,7 +1795,6 @@ describe('JornadaService', () => {
     });
 
     it('4.4 RED: _recolectarDatosJornada resuelve apertura con LEFT JOIN usuarios (obtenerDatosJornada)', async () => {
-      const mockJornadaRec: Jornada = { ...mockJornadaCerrada, id: 10, user_apertura_id: 2 };
       vi.mocked(mockDb.sql)
         .mockResolvedValueOnce([]) // constructor
         .mockResolvedValueOnce([]) // ventas (id 10)

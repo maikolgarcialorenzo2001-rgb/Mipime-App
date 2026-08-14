@@ -1,5 +1,3 @@
-import { TestBed } from '@angular/core/testing';
-import { Routes } from '@angular/router';
 import { routes } from './app.routes';
 
 describe('app.routes', () => {
@@ -71,7 +69,7 @@ describe('app.routes', () => {
       (r) => r.path !== '' && r.path !== 'login',
     );
     for (const r of protectedRoutes) {
-      expect(typeof (r as any).loadComponent).toBe('function');
+      expect(typeof (r as unknown as RouteWithGuard).loadComponent).toBe('function');
     }
   });
 

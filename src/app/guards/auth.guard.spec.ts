@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router, type UrlTree } from '@angular/router';
+import { type UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { DATABASE, type Database } from '../services/database';
 import { hashPassword, generateSalt } from '../services/hash-password';

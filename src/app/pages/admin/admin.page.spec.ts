@@ -24,7 +24,6 @@ function createMockAuth(usuarioValue: UsuarioPublico | null = null) {
 describe('AdminPage', () => {
   let fixture: ComponentFixture<AdminPage>;
   let component: AdminPage;
-  let userService: UserService;
   let mockDb: Database;
 
   beforeEach(() => {
