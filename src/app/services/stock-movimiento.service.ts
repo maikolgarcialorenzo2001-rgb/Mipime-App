@@ -52,6 +52,28 @@ export class StockMovimientoService {
   }
 
   /**
+   * Guard de precio de venta (F4): rechaza valores < 0 o NaN ANTES de tocar
+   * la DB. El 0 es válido. `!(v >= 0)` es NaN-safe (`NaN < 0` es false) y
+   * deja pasar null (null >= 0 es true en JS; columna nullable legacy).
+   */
+  private _validarPrecioVenta(precioVenta: number): void {
+    if (!(precioVenta >= 0)) {
+      throw new Error('El precio de venta no puede ser negativo');
+    }
+  }
+
+  /**
+   * Guard de costo (F4): rechaza valores < 0 o NaN ANTES de tocar la DB.
+   * El 0 es válido (regalos / costo 0 legítimo). Mismo criterio NaN-safe
+   * que `_validarPrecioVenta`.
+   */
+  private _validarPrecioCosto(precioCosto: number): void {
+    if (!(precioCosto >= 0)) {
+      throw new Error('El costo no puede ser negativo');
+    }
+  }
+
+  /**
    * Consume stock from the oldest lots (FIFO) filtered by location.
    * When loteId is provided, consumes ONLY from that specific lot
    * (validated up-front; throws before mutating anything if insufficient).
@@ -212,6 +234,7 @@ export class StockMovimientoService {
   ): Promise<void> {
     this._checkAdmin();
     this._validarCantidadDelta(cantidad);
+    this._validarPrecioCosto(precioCosto);
     const ahora = new Date().toISOString();
 
     // T-09: las 4 escrituras corren atómicas (BEGIN/COMMIT del adapter).
@@ -524,6 +547,8 @@ export class StockMovimientoService {
       throw new Error('El nombre del producto es obligatorio');
     }
     this._validarCantidadAbsoluta(nuevaCantidad);
+    this._validarPrecioVenta(precioVenta);
+    this._validarPrecioCosto(precioCosto);
 
     const ahora = new Date().toISOString();
 
