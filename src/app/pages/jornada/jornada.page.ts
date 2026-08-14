@@ -3,12 +3,14 @@ import { DatePipe } from '@angular/common';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
 import { DATABASE } from '../../services/database';
+import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { JornadaSummaryCardComponent } from '../../components/jornada-summary-card/jornada-summary-card.component';
 import type { Venta, DetalleVenta } from '../../models/venta';
 import type { Movimiento } from '../../models/movimiento';
 import type { StockMovimiento } from '../../models/stock-movimiento';
+import type { CuentaCosa } from '../../models/cuenta-cosa';
 
 
 @Component({
@@ -21,6 +23,7 @@ export class JornadaPage {
   protected readonly jornadaService = inject(JornadaService);
   private readonly _authService = inject(AuthService);
   private readonly _db = inject(DATABASE);
+  private readonly _cuentaCosasService = inject(CuentaCosasService);
 
   readonly error = signal<string | null>(null);
 
@@ -28,6 +31,7 @@ export class JornadaPage {
   readonly ventasDelDia = signal<Venta[]>([]);
   readonly movimientosDelDia = signal<Movimiento[]>([]);
   readonly mermasDelDia = signal<StockMovimiento[]>([]);
+  readonly cuentasCosasDelDia = signal<CuentaCosa[]>([]);
   readonly dailyLoading = signal(false);
   readonly productosMap = signal<Map<number, string>>(new Map());
   readonly detallesPorVenta = signal<Map<number, DetalleVenta[]>>(new Map());
@@ -71,6 +75,7 @@ export class JornadaPage {
       this.ventasDelDia.set([]);
       this.movimientosDelDia.set([]);
       this.mermasDelDia.set([]);
+      this.cuentasCosasDelDia.set([]);
       this.productosMap.set(new Map());
       this.detallesPorVenta.set(new Map());
       return;
@@ -78,7 +83,7 @@ export class JornadaPage {
 
     this.dailyLoading.set(true);
     try {
-      const [ventas, movimientos, mermas, productos] = await Promise.all([
+      const [ventas, movimientos, mermas, productos, cuentasCosas] = await Promise.all([
         this._db.sql<Venta>(
           'SELECT * FROM ventas WHERE jornada_id = ? ORDER BY id',
           [j.id],
@@ -94,10 +99,12 @@ export class JornadaPage {
         this._db.sql<{ id: number; nombre: string }>(
           'SELECT id, nombre FROM productos',
         ),
+        this._cuentaCosasService.listarPorJornada(j.id),
       ]);
       this.ventasDelDia.set(ventas);
       this.movimientosDelDia.set(movimientos);
       this.mermasDelDia.set(mermas);
+      this.cuentasCosasDelDia.set(cuentasCosas);
 
       // Fetch detalles for ventas
       const detallesMap = new Map<number, DetalleVenta[]>();
@@ -124,6 +131,7 @@ export class JornadaPage {
       this.ventasDelDia.set([]);
       this.movimientosDelDia.set([]);
       this.mermasDelDia.set([]);
+      this.cuentasCosasDelDia.set([]);
       this.detallesPorVenta.set(new Map());
     } finally {
       this.dailyLoading.set(false);

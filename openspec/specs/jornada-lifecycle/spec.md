@@ -186,3 +186,31 @@ The `Venta` interface MUST include `completacion_efectivo?: number` so TypeScrip
 - GIVEN `totalEnCaja() signal = 2000`, usuario ingresa monto gasto = $3000
 - WHEN el componente verifica `totalEnCaja() < monto` via `saldoSuficientePara()`
 - THEN botón "Registrar gasto" está deshabilitado y tooltip "Saldo insuficiente en caja" es visible
+
+### Requirement: Cuenta Casas del día feedback block
+
+The "ventas del día" card MUST render a "Cuenta Casas del día" block when the open jornada has ≥1 `cuenta_cosas` row. Each row MUST show: Producto (name resolved via `productosMap`), Cantidad, Descripción, Autorizado por, and Hora (`created_at | date:'short'`). Rows MUST be fetched via `listarPorJornada(jornadaId)` as part of `_cargarDatosDiarios`, ordered by `created_at` ASC. When there is no open jornada or the load fails, the list MUST be cleared. Cash register totals MUST NOT be affected.
+
+#### Scenario: Jornada with rows shows the block (testable)
+
+- GIVEN an open jornada with 2 rows created at 08:00 and 09:00
+- WHEN `_cargarDatosDiarios` completes
+- THEN the "Cuenta Casas del día" block renders 2 rows with Producto, Cantidad, Descripción, Autorizado por and Hora, in chronological order
+
+#### Scenario: Jornada without rows hides the block (testable)
+
+- GIVEN an open jornada with zero `cuenta_cosas` rows
+- WHEN `_cargarDatosDiarios` completes
+- THEN the "Cuenta Casas del día" block is NOT rendered
+
+#### Scenario: Product name resolved via productosMap (testable)
+
+- GIVEN a row with `producto_id = P`
+- WHEN the block renders
+- THEN the Producto column shows the product name from `productosMap` (same mechanism as the ventas/movimientos blocks)
+
+#### Scenario: No open jornada or load failure clears the list (testable)
+
+- GIVEN no open jornada, or `_cargarDatosDiarios` throws
+- WHEN the daily data resets
+- THEN `cuentasCosasDelDia` is empty and the block is hidden

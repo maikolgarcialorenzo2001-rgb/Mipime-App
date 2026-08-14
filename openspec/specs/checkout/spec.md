@@ -80,3 +80,28 @@ Pendiente y Cuenta Cosas mantienen comportamiento C11 sin cambios. Efectivo/Tran
 - GIVEN `saldoEnCaja = 100`, forma de pago = efectivo (sin vuelto desde caja)
 - WHEN checkout-modal no aplica guard para formas no-divisa
 - THEN botón "Confirmar" habilitado según validación normal de formulario
+
+### Requirement: Cuenta Cosas path registers per-product rows
+
+`confirmarVenta` with `formaPago = 'cuenta_cosas'` MUST call `registrarLote` with one item per cart product, each carrying its own `cantidad` (no collapse to `items[0]`), and MUST apply `payload.descripcion` and `payload.autorizadoPor` to the whole batch. When the cart is empty, `confirmarVenta` MUST return early without calling any service.
+
+(Added: no existing checkout requirement covered this path; replaces the buggy collapse-to-first-product behavior in `pos.page.ts`.)
+
+#### Scenario: Multi-product cart calls registrarLote per product (testable)
+
+- GIVEN a cart with A×2 and B×3 and `formaPago = 'cuenta_cosas'`
+- WHEN `confirmarVenta` runs
+- THEN `registrarLote` is called with `[{A,2},{B,3}]`
+- AND the single-item `registrar` is NOT called
+
+#### Scenario: Empty cart guard (testable)
+
+- GIVEN an empty cart and `formaPago = 'cuenta_cosas'`
+- WHEN `confirmarVenta` runs
+- THEN the method returns early and no service call is made
+
+#### Scenario: Sale metadata applies to the whole batch (testable)
+
+- GIVEN `payload.descripcion = "Retiro familiar"` and `payload.autorizadoPor = "María"`
+- WHEN `confirmarVenta` runs
+- THEN `registrarLote` receives those `descripcion` and `autorizadoPor` values for the batch
