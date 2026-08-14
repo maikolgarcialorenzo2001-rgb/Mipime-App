@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { ProductoService } from '../../services/producto.service';
-import { StockMovimientoService } from '../../services/stock-movimiento.service';
+import { StockMovimientoService, type EdicionResultado } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
@@ -144,6 +144,9 @@ export class InventarioPage implements OnInit {
 
     this.procesandoMovimiento.set(true);
     this.error.set(null);
+    // F3: resultado de registrarEditar para comunicar si el lote editado quedó
+    // como frente FIFO (cache actualizado) o si el frente sigue siendo otro lote.
+    let edicionResult: EdicionResultado | null = null;
     try {
       switch (action.tipo) {
         case 'entrada': {
@@ -225,7 +228,7 @@ export class InventarioPage implements OnInit {
             this.error.set('El precio de costo es obligatorio');
             return;
           }
-          await this.stockService.registrarEditar(
+          edicionResult = await this.stockService.registrarEditar(
             action.productoId,
             loteSel.id,
             nombre,
@@ -259,8 +262,22 @@ export class InventarioPage implements OnInit {
           (p) => p.id === action.productoId,
         );
         if (actualizado) {
+          // F3: feedback claro del precio costo. Cuando el lote editado es el
+          // frente FIFO, productos.precio_costo se actualizó. Cuando no lo es,
+          // el costo quedó guardado en el lote pero la columna muestra el costo
+          // del lote más viejo con stock (semántica FIFO) — se comunica para que
+          // no parezca que "no se guardó".
+          let costoMsg = '';
+          if (edicionResult) {
+            const costoProducto = edicionResult.costoProducto?.toFixed(2) ?? '—';
+            if (edicionResult.esFront) {
+              costoMsg = ` · Precio costo: $${costoProducto}`;
+            } else {
+              costoMsg = ` · Costo del lote: $${edicionResult.costoEditado.toFixed(2)} — Precio costo del producto sin cambios: $${costoProducto} (lote más viejo con stock)`;
+            }
+          }
           this._mostrarToast(
-            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u`,
+            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u${costoMsg}`,
           );
         }
       }

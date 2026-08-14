@@ -7,7 +7,7 @@
 
 - **Bug reportado por el usuario**: "al editar un producto las cantidades no se registraban y pintaba información incorrecta".
 - **Fixes aplicados ayer**: `855a838` (validación visible + toast en edición), `6c26562` (guards de cantidad + pre-validación FIFO), y `d683a41` / `7a730f3` (atomicidad de escrituras de stock).
-- **Doble check realizado**: el bug central está arreglado con tests (novalidate, validación visible, cero silencioso eliminado, pre-validación FIFO, toasts, transacciones re-entrantes). Quedan restos del síntoma original en F3 y F7.
+- **Doble check realizado**: el bug central está arreglado con tests (novalidate, validación visible, cero silencioso eliminado, pre-validación FIFO, toasts, transacciones re-entrantes). Quedan restos del síntoma original en F7.
 - **Diagnóstico previo**: `docs/investigacion-edicion-producto.md` (root causes A–F).
 
 ## Resumen de hallazgos
@@ -16,7 +16,7 @@
 |---|-----------|------|-------------------|
 | F1 | P1 | producto.service.ts | Eliminar producto NO atómico (4 DELETE sin transacción) + FKs solo en Electron |
 | F2 | P1 | electron/db.ts | `MAX_SCHEMA_VERSION = 16` con schema ya en v17 |
-| F3 | P2 | stock-movimiento.service.ts | Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo) |
+| F3 | P2 | stock-movimiento.service.ts | ~~Editar costo de lote no-frontal no actualiza `productos.precio_costo` (pinta valor viejo)~~ ✅ RESUELTO — feedback FIFO claro |
 | F4 | P2 | inventario.page.ts / stock-movimiento.service.ts | Precios/costos negativos aceptados |
 | F5 | P2 | stock-movimiento.service.ts | `registrarAjuste` (full) destruye lotes shop sin recalcular `stock_shop` |
 | F6 | P3 | producto.service.ts | `crear` no atómico + CRUD sin guard admin en el servicio |
@@ -45,12 +45,13 @@
 - **Impacto**: ALTO (bloquea migración/restauración del schema actual).
 - **Sugerencia**: subir `MAX_SCHEMA_VERSION` a 17 en `electron/db.ts:22` y actualizar `db.spec.ts:93`.
 
-### F3 — P2 · Editar costo de lote no-frontal no actualiza `productos.precio_costo`
+### F3 — P2 · Editar costo de lote no-frontal no actualiza `productos.precio_costo` — ✅ RESUELTO (2026-08-14)
 
-- **Dónde**: `stock-movimiento.service.ts:546-553` (UPDATE lote + `_syncPrecioCosto` 178-196) + `inventario.page.html:66` (columna lee el cache).
-- **Evidencia**: producto con 2 lotes (almacén viejo 10u + shop nuevo 5u); editar el lote shop y bajar su costo → `_syncPrecioCosto` selecciona el front (lote almacén) → `productos.precio_costo` no cambia → la tabla sigue pintando el costo viejo → sensación de "no se guardó". La spec solo cubre el caso front (`stock-movimiento.service.spec.ts:876`).
-- **Impacto**: MEDIO (feedback falso, resto directo del bug reportado).
-- **Sugerencia**: decidir semántica del costo cacheado y sincronizarlo también al editar lotes no-frontales.
+- **Dónde**: `stock-movimiento.service.ts` (`registrarEditar` 511-600, `_syncPrecioCosto` 182-208) + `inventario.page.ts` (toast post-edición).
+- **Evidencia**: producto con 2 lotes (almacén viejo 10u + shop nuevo 5u); editar el lote shop y bajar su costo → `_syncPrecioCosto` selecciona el front (lote almacén) → `productos.precio_costo` no cambia → la tabla sigue pintando el costo viejo → sensación de "no se guardó". La spec solo cubría el caso front (`stock-movimiento.service.spec.ts:876`).
+- **Decisión de producto (usuario, vía question tool)**: **mantener semántica FIFO** (el cache sigue siendo el costo del lote más viejo con stock — coherente con COGS) **+ feedback claro** en el toast en vez de cambiar la semántica global del cache.
+- **Fix**: `_syncPrecioCosto` retorna el front (`{ id, precio_costo } | null`); `registrarEditar` retorna `EdicionResultado` (`esFront`, `costoProducto`, `costoEditado`). El toast ahora comunica: si el lote editado es el front → `Precio costo: $X`; si no → `Costo del lote: $Y — Precio costo del producto sin cambios: $Z (lote más viejo con stock)`.
+- **Tests**: service spec F3 (2 nuevos, 82/82) + página spec 36b/36c (49/49). Suite completa: 848/848.
 
 ### F4 — P2 · Precios/costos negativos aceptados
 

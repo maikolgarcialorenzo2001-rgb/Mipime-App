@@ -879,7 +879,7 @@ describe('StockMovimientoService', () => {
         .mockResolvedValueOnce([])                      // 1: INSERT stock_movimientos
         .mockResolvedValueOnce([])                      // 2: UPDATE productos nombre + precio_venta
         .mockResolvedValueOnce([])                      // 3: UPDATE lotes_stock cantidad + precio_costo (lote -> 150)
-        .mockResolvedValueOnce([{ precio_costo: 150 }]) // 4: SELECT next lot -> el lote editado sigue siendo el frente
+        .mockResolvedValueOnce([{ id: 1, precio_costo: 150 }]) // 4: SELECT next lot -> el lote editado sigue siendo el frente
         .mockResolvedValueOnce([])                      // 5: UPDATE productos.precio_costo = 150
         .mockResolvedValueOnce([{ total: 8 }])          // 6: SELECT SUM
         .mockResolvedValueOnce([]);                     // 7: UPDATE stock
@@ -901,6 +901,41 @@ describe('StockMovimientoService', () => {
         (call) => typeof call[0] === 'string' && call[0].includes('UPDATE productos SET precio_costo'),
       );
       expect(syncUpdate).toBeGreaterThan(lotUpdate);
+    });
+
+    it('F3 RED: retorna esFront=true y costoProducto cuando el lote editado queda como frente FIFO', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                      // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                      // 2: UPDATE productos
+        .mockResolvedValueOnce([])                      // 3: UPDATE lotes_stock (lote 1 -> 150)
+        .mockResolvedValueOnce([{ id: 1, precio_costo: 150 }]) // 4: SELECT next lot -> lote editado es front
+        .mockResolvedValueOnce([])                      // 5: UPDATE productos.precio_costo
+        .mockResolvedValueOnce([{ total: 8 }])          // 6: SELECT SUM
+        .mockResolvedValueOnce([]);                     // 7: UPDATE stock
+
+      const result = await service.registrarEditar(1, 1, 'Café', 15, 150, 8, 'Actualización de precios', 'shop');
+
+      expect(result.esFront).toBe(true);
+      expect(result.costoProducto).toBe(150);
+      expect(result.costoEditado).toBe(150);
+    });
+
+    it('F3 RED: retorna esFront=false y costoProducto del front cuando el lote editado NO es el frente FIFO', async () => {
+      // Lote editado: lote 2 (costo 8); front global: lote 1 (costo 5) con stock.
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([])                      // 1: INSERT stock_movimientos
+        .mockResolvedValueOnce([])                      // 2: UPDATE productos
+        .mockResolvedValueOnce([])                      // 3: UPDATE lotes_stock (lote 2 -> 8)
+        .mockResolvedValueOnce([{ id: 1, precio_costo: 5 }]) // 4: SELECT next lot -> front sigue siendo lote 1
+        .mockResolvedValueOnce([])                      // 5: UPDATE productos.precio_costo = 5
+        .mockResolvedValueOnce([{ total: 8 }])          // 6: SELECT SUM
+        .mockResolvedValueOnce([]);                     // 7: UPDATE stock
+
+      const result = await service.registrarEditar(1, 2, 'Café', 15, 8, 8, 'Actualización de precios', 'shop');
+
+      expect(result.esFront).toBe(false);
+      expect(result.costoProducto).toBe(5);
+      expect(result.costoEditado).toBe(8);
     });
 
     it('debería rechazar motivo vacío', async () => {

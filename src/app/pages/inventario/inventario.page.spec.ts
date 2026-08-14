@@ -1332,6 +1332,82 @@ describe('InventarioPage', () => {
     expect(toast!.textContent).toContain('Tienda: 7 u');
   });
 
+  it('36b. F3: toast muestra el precio costo actualizado cuando el lote editado es el frente FIFO', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 80, stock_shop: 7 }]));
+    mockStockService.registrarEditar.mockResolvedValue({
+      esFront: true,
+      costoProducto: 150,
+      costoEditado: 150,
+    });
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(150);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toContain('Precio costo: $150.00');
+    expect(component.successMessage()).not.toContain('sin cambios');
+  });
+
+  it('36c. F3: toast aclara que el precio costo del producto NO cambió cuando el lote editado no es el frente FIFO', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+      { id: 43, producto_id: 1, cantidad: 5, precio_costo: 8, fecha_ingreso: '2026-02-01T00:00:00Z', ubicacion: 'shop', created_at: '2026-02-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 100, stock_shop: 5 }]));
+    mockStockService.registrarEditar.mockResolvedValue({
+      esFront: false,
+      costoProducto: 5,
+      costoEditado: 8,
+    });
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // Selecciona el lote 43 (shop nuevo) — no es el frente FIFO (lote 42 más viejo).
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+    component.selectedLoteIndex.set(2);
+    fixture.detectChanges();
+    component.actualizarPlaceholdersEditar();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(8);
+    component.movimientoCantidad.set(5);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toContain('Costo del lote: $8.00');
+    expect(component.successMessage()).toContain('Precio costo del producto sin cambios: $5.00');
+    expect(component.successMessage()).toContain('lote más viejo con stock');
+  });
+
   it('37. T-03: el toast se auto-oculta después de ~2.5s', async () => {
     mockStockService.obtenerLotesPorProducto.mockResolvedValue([
       { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },

@@ -10,6 +10,21 @@ import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../
  */
 export const MAX_STOCK_UNIDADES = 1_000_000;
 
+/**
+ * Resultado de registrarEditar: permite a la UI informar si el lote editado
+ * quedó como frente FIFO (el cache productos.precio_costo cambió) o si el
+ * frente sigue siendo otro lote más viejo (F3 — feedback claro en vez de
+ * "no se guardó").
+ */
+export interface EdicionResultado {
+  /** true si el lote editado es el frente FIFO tras la edición (cache actualizado a costoEditado). */
+  esFront: boolean;
+  /** productos.precio_costo resultante (costo del frente FIFO), o null si no hay lotes con stock. */
+  costoProducto: number | null;
+  /** precio_costo que quedó en el lote editado. */
+  costoEditado: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -171,7 +186,8 @@ export class StockMovimientoService {
    * Re-syncs productos.precio_costo to the FIFO front lot (oldest lot with
    * stock, product-wide — no ubicacion filter). Idempotent: when the front is
    * unchanged, the same value is rewritten. When no lot has stock, the cache
-   * is left as-is.
+   * is left as-is. Returns the front lot (id + costo) so callers can report
+   * whether an edited lot became the front (F3).
    *
    * T-09: recibe el executor de la transacción activa (tx); sin tx usa `this._db`.
    */
@@ -179,10 +195,10 @@ export class StockMovimientoService {
     productoId: number,
     ahora: string,
     tx?: SqlExecutor,
-  ): Promise<void> {
+  ): Promise<{ id: number; precio_costo: number } | null> {
     const db: SqlExecutor = tx ?? this._db;
-    const [siguienteLote] = await db.sql<{ precio_costo: number }>(
-      `SELECT precio_costo FROM lotes_stock
+    const [siguienteLote] = await db.sql<{ id: number; precio_costo: number }>(
+      `SELECT id, precio_costo FROM lotes_stock
        WHERE producto_id = ? AND cantidad > 0
        ORDER BY fecha_ingreso ASC, id ASC LIMIT 1`,
       [productoId],
@@ -193,6 +209,7 @@ export class StockMovimientoService {
         [siguienteLote.precio_costo, ahora, productoId],
       );
     }
+    return siguienteLote ?? null;
   }
 
   /**
@@ -515,7 +532,7 @@ export class StockMovimientoService {
     nuevaCantidad: number,
     motivo: string,
     ubicacion: 'almacen' | 'shop',
-  ): Promise<void> {
+  ): Promise<EdicionResultado> {
     this._checkAdmin();
     if (!motivo || motivo.trim().length === 0) {
       throw new Error('El motivo es obligatorio');
@@ -526,6 +543,11 @@ export class StockMovimientoService {
     this._validarCantidadAbsoluta(nuevaCantidad);
 
     const ahora = new Date().toISOString();
+
+    // F3: captura el frente FIFO resultante para informar a la UI si el lote
+    // editado quedó como frente (cache actualizado) o si el frente sigue siendo
+    // otro lote más viejo con stock (cache sin cambios, feedback claro).
+    let frontResultado: { id: number; precio_costo: number } | null = null;
 
     // T-09: movimiento + UPDATEs + recálculo atómicos.
     await this._db.transaction(async (tx) => {
@@ -550,7 +572,7 @@ export class StockMovimientoService {
 
       // 3b. Re-sync productos.precio_costo: the edited lot may be the FIFO front
       //     (cost changed) or was zeroed (front advances to the next lot).
-      await this._syncPrecioCosto(productoId, ahora, tx);
+      frontResultado = await this._syncPrecioCosto(productoId, ahora, tx);
 
       // 4. Recalculate stock for this ubicacion
       const [{ total }] = await tx.sql<{ total: number }>(
@@ -566,6 +588,12 @@ export class StockMovimientoService {
         [total, ahora, productoId],
       );
     });
+
+    return {
+      esFront: frontResultado?.id === loteId,
+      costoProducto: frontResultado?.precio_costo ?? null,
+      costoEditado: precioCosto,
+    };
   }
 
   /**
