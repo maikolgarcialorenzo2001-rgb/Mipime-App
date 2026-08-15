@@ -18,6 +18,6 @@ bootstrapApplication(App, appConfig)
       root.innerHTML =
         '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem;font-family:system-ui,sans-serif;color:#374151">' +
         '<div><h1 style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem">No se pudo iniciar la aplicación</h1>' +
-        '<p style="font-size:0.875rem">Contactá al desarrollador.</p></div></div>';
+        '<p style="font-size:0.875rem">Contacte al desarrollador.</p></div></div>';
     }
   });

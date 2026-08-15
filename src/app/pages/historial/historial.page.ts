@@ -294,7 +294,7 @@ export class HistorialPage {
     const hasta = this.rangeHasta();
 
     if (!desde || !hasta) {
-      this.errorExport.set('Seleccioná fecha desde y hasta para exportar.');
+      this.errorExport.set('Seleccione fecha desde y hasta para exportar.');
       return;
     }
 

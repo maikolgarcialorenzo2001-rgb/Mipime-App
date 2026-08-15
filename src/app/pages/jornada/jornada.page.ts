@@ -206,7 +206,7 @@ export class JornadaPage {
       },
       error: (err: unknown) => {
         this.registrando.set(false);
-        this.formError.set(err instanceof Error ? err.message : 'Error al registro');
+        this.formError.set(err instanceof Error ? err.message : 'Error al registrar');
       },
     });
   }

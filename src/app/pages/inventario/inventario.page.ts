@@ -167,7 +167,7 @@ export class InventarioPage implements OnInit {
           const ubicacion = this.salidaUbicacion();
           const loteIndex = this.selectedLoteIndex();
           if (ubicacion === null || loteIndex === null) {
-            this.error.set('Elegí la ubicación y el lote para el traslado');
+            this.error.set('Elija la ubicación y el lote para el traslado');
             return;
           }
           const lote = this.lotesDeUbicacion()[loteIndex - 1];

@@ -264,7 +264,7 @@
                             [value]="salidaUbicacion() ?? ''"
                             (change)="onSalidaUbicacionChange($any($event.target).value)"
                           >
-                            <option value="" disabled>Seleccioná la ubicación…</option>
+                            <option value="" disabled>Seleccione la ubicación…</option>
                             <option value="shop">Tienda</option>
                             <option value="almacen">Almacén</option>
                           </select>
@@ -277,7 +277,7 @@
                             [disabled]="!salidaUbicacion()"
                             (change)="selectedLoteIndex.set(toInt($any($event.target).value))"
                           >
-                            <option value="" disabled>Seleccioná un lote…</option>
+                            <option value="" disabled>Seleccione un lote…</option>
                             @for (lote of lotesDeUbicacion(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
                                 Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}

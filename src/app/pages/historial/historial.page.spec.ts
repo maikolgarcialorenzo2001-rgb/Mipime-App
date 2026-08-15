@@ -508,7 +508,7 @@ describe('HistorialPage', () => {
       component.rangeHasta.set('2026-06-15');
       component.exportarRango();
 
-      expect(component.errorExport()).toBe('Seleccioná fecha desde y hasta para exportar.');
+      expect(component.errorExport()).toBe('Seleccione fecha desde y hasta para exportar.');
     });
 
     it('D.2 RED: exportarRango debería limpiar error al completar', () => {
