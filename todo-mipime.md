@@ -3,8 +3,8 @@
 > POS local para pequeños comercios.
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main` (única rama — local y remota, tras limpieza 2026-08-05)
-> Tests: **Electron 141** / **web 768** (verificación SDD fix-reanudar-jornada-acceso 2026-08-08; `ng test` destrabado `b21ff36`)
-> Última actualización: 2026-08-08
+> Tests: **Electron 141** / **web 768** (verificación SDD fix-reanudar-jornada-acceso 2026-08-08; `ng test` destrabado `b21ff36`); web 902 en bundle-budget-fix (2026-08-15)
+> Última actualización: 2026-08-15
 
 ---
 
@@ -68,7 +68,31 @@
 
 **Riesgos conocidos:** (1) los `map` RxJS si no se convierten; (2) churn de tests; (3) **riesgo NUEVO:** fallo de carga del chunk lazy si la app web se usa offline sin el chunk cacheado — hoy xlsx ya está en memoria y eso no puede fallar.
 
+**✅ IMPLEMENTADO (branch `bundle-budget-fix`, 2026-08-15) — 3 commits, sin merge a main:**
+- `48e46e5` refactor(excel): lazy-load xlsx + `generarExcel*` async (`import type * as XLSX` + `_xlsxPromise` cacheado; los ~12 privados usan patrón shadowing `const XLSX = await this._xlsxPromise`)
+- `90ddb5c` refactor(jornada): adaptar callers (L300 `await`; L576/L864 `switchMap`+`from`)
+- `26f66d4` chore(build): budget initial 500kB → 600kB (red de seguridad)
+- **Resultado build:** initial raw **696.90 → 419.85 kB** (transfer 183.02 → 104.88); xlsx = chunk lazy 432.16 kB raw / 119.54 kB transfer. Build exit 0.
+- **Suite:** 46 files / **902 tests PASS** (TDD RED→GREEN en 3 rondas: 84 fail runtime → 85; type-level `Observable<Promise<string>>` → `switchMap`+`from`).
+- ⚠️ **Ojo:** el patrón shadowing compila limpio con tsc strict — el todo decía "no se tocan" pero era inexacto: los privados SÍ usan `XLSX.utils` en runtime vía el shadowing.
+
+**Exploración de riesgos POST-implementación (2026-08-15, decisión pendiente de aplicar fixes):**
+
+**Riesgo A — Leak silencioso de Promise en exportaciones (L576/L864 `jornada.service.ts`):** si alguien revierte `switchMap((d) => from(promise))` → `map((d) => promise)`, el observable emitiría `Promise<string>` y NINGÚN test lo atrapa porque `firstValueFrom` (RxJS 7) aplana promesas; los consumers (`historial.page.ts:271/:303` `.subscribe`) romperían en runtime. La guardia real hoy es solo el return type `Observable<string>`.
+- **S1. Test de regresión de tipo emitido** (barata, 30 min): mock de `generarExcelMensual` con `Promise.resolve` (no `of`), subscribe con `toArray()`, afirmar que ningún valor emitido es `instanceof Promise` y el tipo es string.
+- **S2. Convertir exportaciones a `Promise<string>` directo** (la más robusta, ~1-2 h): `generarExportacionMensual`/`generarExportacionPorRango` pasan a `async`; consumers en `historial.page.ts` a `async/await` + `try/catch`. **Elimina la clase de bug** (`Observable<Promise<T>>` deja de existir) y alinea con el service ya mayormente async (`_ejecutarCierre`).
+- S3. Helper encapsulado tipado `_excelMensual$(d): Observable<string>` (débil — un `map` lo esquiva, cosmética).
+- S4. Test de compilación `const obs: Observable<string> = ...` (complemento; el type-check ya cubre el return type).
+
+**Riesgo B — Chunk lazy xlsx offline:** `_xlsxPromise` se cachea al instanciar y si `import('xlsx')` falla (offline, chunk no cacheado) queda rechazada para siempre, sin reintento.
+- **S5. Reintento con backoff** (simple, 15 min): guardar la promesa de reintento, no la original; 2-3 intentos con delay corto antes de cachear el rechazo.
+- **S6. Preload al idle** (simple, 15 min): disparar `import('xlsx')` con `requestIdleCallback`/`setTimeout` tras el primer paint → el chunk se cachea en background.
+- S7. Service worker que cachee chunks lazy (completo, grande): fix "de verdad" para offline total; proyecto aparte (Capacitor/Electron quizá no lo necesitan).
+
+**Recomendación (orquestador, 2026-08-15):** Riesgo A = **S1 + S2** (test de regresión como red inmediata + conversión a `Promise<string>` estructural); Riesgo B = **S5 + S6** (baratas, sin riesgo). **Decisión pendiente del usuario** — no aplicar sin confirmar.
+
 **Decisión (2026-08-05):** NO implementado — se difiere a pedido del usuario. Pendiente de retomar; revisar primero si la web se usa offline (condiciona A puro vs C).
+**Estado actual (2026-08-15):** ✅ IMPLEMENTADO en branch `bundle-budget-fix` (3 commits, ver arriba) — sin merge a main; PR pendiente de abrir; fixes de riesgo A/B pendientes de decisión.
 
 ### BACKLOG-9. CI de PRs (TOOLING)
 **Contexto:** no hay CI que corra tests en los PRs.
@@ -249,7 +273,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
-| 2026-08-08 | SDD `fix-reanudar-jornada-acceso` COMPLETE: reanudar jornada para cualquier user autenticado con jornada sin cerrar (hoy o anterior) — query última abierta sin fecha, elimina auto-cierre por otro user, cierre con uid autenticado, Excel "Abierta por/Cerrada por". 4 PRs encadenados + tracker→main (#6-#10). Suite web 768. BACKLOG-13 (limpieza huérfanas) agregado, out of scope del fix | merged `main` |
+| 2026-08-15 | BACKLOG-8 ✅ implementado en branch `bundle-budget-fix` (lazy-load xlsx, budget 600kB, bundle 696.90→419.85 kB, suite web 902) — sin merge; exploración de riesgos post-implementación documentada (Riesgo A leak Promise: S1-S4; Riesgo B chunk offline: S5-S7), fix pendiente de decisión. PRs: languaje-corrections #12 abierto | `48e46e5`, `90ddb5c`, `26f66d4` |
 | 2026-08-05 | TODO sync vs remote (post-crash VS Code): BACKLOG-1b/5/6/10 ✅, BACKLOG-2/3/4 ✅ merged+archivados, seed-productos-reales MERGED, limpieza de ramas (solo `main`), bump `0.1.13-beta`. BACKLOG-8: diagnóstico bundle real (696.90 kB) + approach A+C documentado en el item, **no implementado** (decisión usuario). BACKLOG-11: diagnóstico lint 110 errores + approach Camino A documentado en el item, **no implementado** (decisión usuario) | `c6cba24` |
 | 2026-08-02 | SDD `desktop-resilience-backlogs`: BACKLOG-2/3/4 **implementados** en `fix/desktop-resilience-backlog` (colisión snapshot + parser `(?:-\d+)?`, stage fatal real, postinstall install-app-deps). Electron 141 / web 695 GREEN. **⏳ PRs NO abiertos (decisión sesión 2026-08-02).** | `b8005e5`, `70d4532`, `118b224` |
 | 2026-08-01 | Limpieza de ramas: 11 remotes + 7 locales obsoletas eliminadas (todo contenido ya en main); `feat/seed-productos-reales` traída a local con tracking; ruta auto-save Excel unificada a `Documents/Tienda - App/Tienda IPVE` | `e6243a8`, `189e951` |
