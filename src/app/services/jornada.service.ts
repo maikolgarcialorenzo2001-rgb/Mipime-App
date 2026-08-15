@@ -297,7 +297,7 @@ export class JornadaService {
   ): Promise<string> {
     const iso = new Date().toISOString();
 
-    const base64 = this._excelService.generarExcelJornada({
+    const base64 = await this._excelService.generarExcelJornada({
       jornada,
       ventas: datos.ventas,
       movimientos: datos.movimientos,
@@ -573,7 +573,7 @@ export class JornadaService {
         );
         return from(Promise.all(dataPromises));
       }),
-      map((allData) => this._excelService.generarExcelMensual(allData)),
+      switchMap((allData) => from(this._excelService.generarExcelMensual(allData))),
     );
   }
 
@@ -861,7 +861,7 @@ export class JornadaService {
         );
         return from(Promise.all(dataPromises));
       }),
-      map((allData) => this._excelService.generarExcelMensual(allData)),
+      switchMap((allData) => from(this._excelService.generarExcelMensual(allData))),
     );
   }
 

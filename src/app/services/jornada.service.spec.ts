@@ -95,8 +95,8 @@ describe('JornadaService', () => {
         {
           provide: ExcelService,
           useValue: {
-            generarExcelJornada: vi.fn().mockReturnValue(mockExcelBase64),
-            generarExcelMensual: vi.fn().mockReturnValue(mockExcelBase64),
+            generarExcelJornada: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExcelMensual: vi.fn().mockResolvedValue(mockExcelBase64),
           },
         },
         {
