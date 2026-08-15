@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CobroPendienteModalComponent } from './cobro-pendiente-modal.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { CobroPendienteService } from '../../services/cobro-pendiente.service';
 import type { PendienteItem } from '../../services/cobro-pendiente.service';
 
@@ -28,7 +29,7 @@ describe('CobroPendienteModalComponent', () => {
       registrarCobroPendiente: vi.fn(),
     };
     TestBed.configureTestingModule({
-      imports: [CobroPendienteModalComponent],
+      imports: [CobroPendienteModalComponent, PesosPipe],
       providers: [{ provide: CobroPendienteService, useValue: mockService }],
     });
     fixture = TestBed.createComponent(CobroPendienteModalComponent);

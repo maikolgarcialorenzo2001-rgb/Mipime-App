@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
@@ -21,7 +22,7 @@ export interface DiaCalendario {
 @Component({
   selector: 'app-historial',
   imports: [
-    CurrencyPipe,
+    PesosPipe,
     DatePipe,
     DecimalPipe,
     FormsModule,

@@ -3,6 +3,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { HistorialPage } from './historial.page';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada, JornadaReporte } from '../../models';
@@ -98,7 +99,7 @@ describe('HistorialPage', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,
@@ -698,7 +699,7 @@ describe('HistorialPage — vacío', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,
@@ -742,7 +743,7 @@ describe('HistorialPage — error', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,

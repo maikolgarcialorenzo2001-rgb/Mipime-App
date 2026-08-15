@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
 import { PosPage } from './pos.page';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -79,7 +80,7 @@ describe('PosPage — toast de éxito', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [PosPage],
+      imports: [PosPage, PesosPipe],
       providers: [
         CartService,
         {

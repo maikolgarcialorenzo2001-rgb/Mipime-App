@@ -50,7 +50,7 @@
               </div>
               <div class="flex shrink-0 items-center gap-2">
                 <span class="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-                  {{ p.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+                  {{ p.total | pesos:'1.0-0' }}
                 </span>
                 @if (tieneDetalle(p)) {
                   <button
@@ -93,7 +93,7 @@
         <div class="mb-4 flex items-baseline justify-between">
           <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total a cobrar</span>
           <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {{ sel.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+            {{ sel.total | pesos:'1.0-0' }}
           </span>
         </div>
 
@@ -215,14 +215,14 @@
               <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm">
                 <p class="text-red-600 dark:text-red-300 text-xs">
                   El monto en divisa no cubre el total. Faltan
-                  <strong>{{ f | currency: 'ARS': 'symbol-narrow': '1.0-0' }}</strong>.
+                  <strong>{{ f | pesos:'1.0-0' }}</strong>.
                   Completá con efectivo o aumentá el monto en divisa.
                 </p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Completar con efectivo
-                  <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | currency: 'ARS': 'symbol-narrow': '1.0-0' }})</span>
+                  <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | pesos:'1.0-0' }})</span>
                 </label>
                 <input
                   type="number"
@@ -242,7 +242,7 @@
               <div class="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-sm">
                 <span class="text-green-700 dark:text-green-300 font-medium">Vuelto:</span>
                 <strong class="text-green-700 dark:text-green-300 ml-1">
-                  {{ vuelto()! | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+                  {{ vuelto()! | pesos:'1.0-0' }}
                 </strong>
               </div>
             }
@@ -251,7 +251,7 @@
                 <span class="font-medium">Saldo insuficiente en caja</span>
                 <p class="text-xs mt-1">
                   El vuelto supera el saldo disponible en caja
-                  ({{ saldoEnCaja() | currency: 'ARS': 'symbol-narrow': '1.0-0' }}).
+                  ({{ saldoEnCaja() | pesos:'1.0-0' }}).
                   Reducí el billete o elegí otra forma de pago.
                 </p>
               </div>

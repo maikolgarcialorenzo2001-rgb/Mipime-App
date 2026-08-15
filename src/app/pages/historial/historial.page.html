@@ -230,15 +230,15 @@
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Ventas</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | pesos:'1.0-0' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
-                <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | pesos:'1.0-0' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo esperado</span>
-                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | pesos:'1.0-0' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo real</span>
@@ -248,11 +248,11 @@
                   [class.dark:text-gray-100]="j.saldo_real !== null"
                   [class.text-gray-400]="j.saldo_real === null"
                   [class.dark:text-gray-500]="j.saldo_real === null"
-                >{{ j.saldo_real !== null ? (j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}</span>
+                >{{ j.saldo_real !== null ? (j.saldo_real | pesos:'1.0-0') : '—' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Monto inicial</span>
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | pesos:'1.0-0' }}</span>
               </div>
               <div>
                 <span class="block text-xs text-gray-500 dark:text-gray-400">Diferencia</span>
@@ -263,7 +263,7 @@
                     [class.dark:text-green-400]="j.saldo_esperado - j.saldo_real >= 0"
                     [class.text-red-600]="j.saldo_esperado - j.saldo_real < 0"
                     [class.dark:text-red-400]="j.saldo_esperado - j.saldo_real < 0"
-                  >{{ j.saldo_esperado - j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                  >{{ j.saldo_esperado - j.saldo_real | pesos:'1.0-0' }}</span>
                 } @else {
                   <span class="text-gray-400 dark:text-gray-500">—</span>
                 }
@@ -353,31 +353,31 @@
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Ventas</span>
-                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.total_ventas | pesos:'1.0-0' }}</span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Gastos</span>
-                    <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="font-medium text-red-600 dark:text-red-400">{{ (j.total_gastos ?? 0) | pesos:'1.0-0' }}</span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Monto inicial</span>
-                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ j.monto_inicial | pesos:'1.0-0' }}</span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo esperado</span>
-                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | currency:'ARS':'symbol-narrow':'1.0-0' }}</span>
+                    <span class="font-semibold text-gray-900 dark:text-gray-100">{{ j.saldo_esperado | pesos:'1.0-0' }}</span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Saldo real</span>
                     <span class="font-medium" [class.text-gray-900]="j.saldo_real !== null" [class.dark:text-gray-100]="j.saldo_real !== null" [class.text-gray-400]="j.saldo_real === null" [class.dark:text-gray-500]="j.saldo_real === null">
-                      {{ j.saldo_real !== null ? (j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}
+                      {{ j.saldo_real !== null ? (j.saldo_real | pesos:'1.0-0') : '—' }}
                     </span>
                   </div>
                   <div>
                     <span class="block text-xs text-gray-500 dark:text-gray-400">Diferencia</span>
                     @if (j.saldo_real !== null) {
                       <span class="font-semibold tabular-nums" [class.text-green-600]="j.saldo_esperado - j.saldo_real >= 0" [class.dark:text-green-400]="j.saldo_esperado - j.saldo_real >= 0" [class.text-red-600]="j.saldo_esperado - j.saldo_real < 0" [class.dark:text-red-400]="j.saldo_esperado - j.saldo_real < 0">
-                        {{ j.saldo_esperado - j.saldo_real | currency:'ARS':'symbol-narrow':'1.0-0' }}
+                        {{ j.saldo_esperado - j.saldo_real | pesos:'1.0-0' }}
                       </span>
                     } @else {
                       <span class="text-gray-400 dark:text-gray-500">—</span>
@@ -413,9 +413,9 @@
                           <tr class="border-b border-gray-100 dark:border-gray-800">
                             <td class="py-1.5 pr-2 font-medium text-gray-900 dark:text-gray-100">{{ item.producto }}</td>
                             <td class="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{{ item.cantidad }}</td>
-                            <td class="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{{ item.precioUnitario | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
-                            <td class="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{{ item.precioBase !== null ? (item.precioBase | currency:'ARS':'symbol-narrow':'1.0-0') : '—' }}</td>
-                            <td class="py-1.5 pr-2 text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">{{ item.total | currency:'ARS':'symbol-narrow':'1.0-0' }}</td>
+                            <td class="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{{ item.precioUnitario | pesos:'1.0-0' }}</td>
+                            <td class="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-gray-300">{{ item.precioBase !== null ? (item.precioBase | pesos:'1.0-0') : '—' }}</td>
+                            <td class="py-1.5 pr-2 text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">{{ item.total | pesos:'1.0-0' }}</td>
                             <td class="py-1.5 text-right capitalize text-gray-700 dark:text-gray-300">{{ item.formaPago }}</td>
                           </tr>
                         }
@@ -454,7 +454,7 @@
                                [class.dark:text-red-400]="mov.tipo === 'gasto' || mov.tipo === 'compra_divisa'"
                                [class.text-green-600]="mov.tipo === 'ingreso_extra'"
                                [class.dark:text-green-400]="mov.tipo === 'ingreso_extra'">
-                              {{ mov.monto | currency:'ARS':'symbol-narrow':'1.0-0' }}
+                              {{ mov.monto | pesos:'1.0-0' }}
                             </td>
                           </tr>
                         }

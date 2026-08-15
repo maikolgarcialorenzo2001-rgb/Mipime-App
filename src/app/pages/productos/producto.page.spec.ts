@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductosPage } from './producto.page';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -53,7 +54,7 @@ describe('ProductosPage', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [ProductosPage],
+      imports: [ProductosPage, PesosPipe],
       providers: [
         ProductoService,
         { provide: DATABASE, useValue: createMockDb() },

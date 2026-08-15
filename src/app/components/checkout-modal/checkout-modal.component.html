@@ -21,7 +21,7 @@
         <li class="flex justify-between py-2">
           <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
           <span class="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-            {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
+            {{ item.subtotal | pesos:'1.0-0' }}
           </span>
         </li>
       }
@@ -187,7 +187,7 @@
               {{ est | currency: divisaTipo() === 'USD' ? 'USD' : 'EUR': 'symbol': '1.2-2' }}
             </strong>
             <span class="text-gray-500 dark:text-gray-400 text-xs ml-1">
-              ({{ total() | currency: 'ARS': 'symbol-narrow': '1.0-0' }} ÷ tasa {{ tasaCambio() }})
+              ({{ total() | pesos:'1.0-0' }} ÷ tasa {{ tasaCambio() }})
             </span>
           </div>
         }
@@ -199,14 +199,14 @@
             </div>
             <p class="text-red-600 dark:text-red-300 text-xs mt-1">
               El monto en divisa no cubre el total. Faltan
-              <strong>{{ f | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong>.
+              <strong>{{ f | pesos:'1.0-0' }}</strong>.
               Completá con efectivo o aumentá el monto en divisa.
             </p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Completar con efectivo <span class="text-red-500">*</span>
-              <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | currency:'ARS':'symbol-narrow':'1.0-0' }})</span>
+              <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | pesos:'1.0-0' }})</span>
             </label>
             <input
               type="number"
@@ -297,7 +297,7 @@
     <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
       <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total</span>
       <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        {{ total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
+        {{ total() | pesos:'1.0-0' }}
       </span>
     </div>
 
@@ -307,12 +307,12 @@
           @if (vuelto()! < 0) {
             <span class="text-sm font-medium text-red-600 dark:text-red-400">Falta</span>
             <span class="text-lg font-semibold text-red-600 dark:text-red-400">
-              {{ vuelto()! * -1 | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              {{ vuelto()! * -1 | pesos:'1.0-0' }}
             </span>
           } @else {
             <span class="text-sm font-medium text-green-600 dark:text-green-400">Vuelto</span>
             <span class="text-lg font-semibold text-green-600 dark:text-green-400">
-              {{ vuelto()! | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              {{ vuelto()! | pesos:'1.0-0' }}
             </span>
           }
         </div>
@@ -323,8 +323,8 @@
               <span class="font-medium">Saldo insuficiente en caja</span>
             </div>
             <p class="text-xs mt-1">
-              El vuelto de ${{ vuelto()! | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              supera el saldo disponible en caja (${{ saldoEnCaja() | currency:'ARS':'symbol-narrow':'1.0-0' }}).
+              El vuelto de ${{ vuelto()! | pesos:'1.0-0' }}
+              supera el saldo disponible en caja (${{ saldoEnCaja() | pesos:'1.0-0' }}).
               Reducí el billete o elegí otra forma de pago.
             </p>
           </div>

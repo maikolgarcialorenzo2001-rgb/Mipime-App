@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductCardComponent } from './product-card.component';
 import { StockBadgeComponent } from '../stock-badge/stock-badge.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
 
 const baseProducto: Producto = {
@@ -20,7 +21,7 @@ describe('ProductCardComponent — stock siempre visible con StockBadge', () => 
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [ProductCardComponent, StockBadgeComponent],
+      imports: [ProductCardComponent, StockBadgeComponent, PesosPipe],
     });
 
     fixture = TestBed.createComponent(ProductCardComponent);

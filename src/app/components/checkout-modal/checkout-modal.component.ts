@@ -1,6 +1,7 @@
 import { Component, computed, input, output, signal, effect } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
 
 export interface CheckoutPayload {
@@ -16,7 +17,7 @@ export interface CheckoutPayload {
 
 @Component({
   selector: 'app-checkout-modal',
-  imports: [CurrencyPipe, FormsModule],
+  imports: [PesosPipe, CurrencyPipe, FormsModule],
   templateUrl: './checkout-modal.component.html',
   styleUrl: './checkout-modal.component.css',
 })

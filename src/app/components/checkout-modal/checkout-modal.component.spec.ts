@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CheckoutModalComponent } from './checkout-modal.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
 import type { Producto } from '../../models';
 
@@ -25,7 +26,7 @@ describe('CheckoutModalComponent', () => {
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
-      imports: [CheckoutModalComponent],
+      imports: [CheckoutModalComponent, PesosPipe],
     });
 
     fixture = TestBed.createComponent(CheckoutModalComponent);
