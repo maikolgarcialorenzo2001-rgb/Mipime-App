@@ -668,7 +668,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       // Debe mostrar desglose por tipo: USD, monto, tasa, total en pesos
       expect(json).toContainEqual(['USD', 20, 10, 200]);
       // Debe mostrar total en pesos
-      expect(json).toContainEqual(['Total divisas en pesos cubanos', 200]);
+      expect(json).toContainEqual(['Total divisas en pesos', 200]);
     });
 
     it('3.3 RED: Resumen debe mostrar "Pendientes del día" sin paréntesis', () => {
@@ -1605,12 +1605,12 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
       const filas = json as unknown[][];
 
-      // Header should have Divisa, Monto en divisa, Tasa de cambio, Total CUP columns
+      // Header should have Divisa, Monto en divisa, Tasa de cambio, Total en pesos columns
       const header = filas[0];
       expect(header).toContain('Divisa');
       expect(header).toContain('Monto en divisa');
       expect(header).toContain('Tasa de cambio');
-      expect(header).toContain('Total CUP');
+      expect(header).toContain('Total en pesos');
 
       // Rows should show compra_divisa details
       expect(filas.some(r => r[0] === 'Compra divisa' && r[1] === 'Compra USD 100 @ 120' && r[2] === 'USD' && r[3] === 100 && r[4] === 120 && r[5] === 12000)).toBe(true);

@@ -187,7 +187,7 @@ export class ExcelService {
       for (const [tipo, datos] of divisaPorTipo) {
         filas.push([tipo, datos.monto, datos.tasa, datos.monto * datos.tasa]);
       }
-      filas.push(['Total divisas en pesos cubanos', totalDivisas]);
+      filas.push(['Total divisas en pesos', totalDivisas]);
 
       // Breakdown: ventas vs compra_divisa — collect types from BOTH sources
       const tiposDivisa = new Set(divisaPorTipo.keys());
@@ -706,7 +706,7 @@ export class ExcelService {
   private _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): void {
     const tieneCompraDivisa = data.movimientos.some(m => m.tipo === 'compra_divisa');
     const filas: unknown[][] = tieneCompraDivisa
-      ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total CUP']]
+      ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total en pesos']]
       : [['Tipo', 'Descripción', 'Monto']];
 
     for (const mov of data.movimientos) {
