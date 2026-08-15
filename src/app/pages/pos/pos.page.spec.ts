@@ -375,6 +375,21 @@ describe('PosPage — toast de éxito', () => {
     expect(ver.disabled).toBe(true);
   });
 
+  it('REQ neutro: sin jornada abierta muestra el aviso "No hay jornada abierta. Inicie el día en Jornada."', () => {
+    const jornadaService = TestBed.inject(JornadaService);
+    vi.mocked(jornadaService.jornadaAbierta).mockReturnValue(null);
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(PosPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.sinJornada).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(
+      'No hay jornada abierta. Inicie el día en Jornada.',
+    );
+  });
+
   it('FR-1/AC7: con jornada abierta de un día anterior, sinJornada=false y botones habilitados', () => {
     // Regresión fix-reanudar-jornada-acceso: obtenerAbierta() ya no filtra
     // fecha=hoy, por lo que jornadaAbierta puede contener una jornada de días

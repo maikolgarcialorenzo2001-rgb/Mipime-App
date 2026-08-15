@@ -732,6 +732,14 @@ describe('HistorialPage — vacío', () => {
     expect(empty).toBeTruthy();
   });
 
+  it('debería mostrar el mensaje neutro "Abra una jornada desde la página de Jornada."', () => {
+    const empty = fixture.nativeElement.querySelector('app-empty-state');
+    expect(empty).toBeTruthy();
+    expect(empty.textContent).toContain(
+      'No hay jornadas registradas aún. Abra una jornada desde la página de Jornada.',
+    );
+  });
+
   it('debería mostrar el calendario aunque no haya jornadas', () => {
     const calendar = fixture.nativeElement.querySelector('.grid-cols-7');
     expect(calendar).toBeTruthy();

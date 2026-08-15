@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { JornadaPage } from './jornada.page';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
@@ -386,6 +386,22 @@ describe('JornadaPage', () => {
 
       expect(component.formError()).toBe('La tasa de cambio debe ser mayor a 0');
       expect(registrarSpy).not.toHaveBeenCalled();
+    });
+
+    it('REQ S2: error no-Error de registrarMovimiento muestra el fallback neutro "Error al registrar"', () => {
+      const svc = TestBed.inject(JornadaService) as unknown as MockJornadaService;
+      svc.registrarMovimiento = vi.fn().mockReturnValue(throwError(() => 'fallo de red'));
+
+      component.tipo.set('gasto');
+      component.descripcion.set('Luz');
+      component.monto.set(500);
+      fixture.detectChanges();
+
+      component.registrarMovimiento();
+      fixture.detectChanges();
+
+      expect(component.formError()).toBe('Error al registrar');
+      expect(fixture.nativeElement.textContent).toContain('Error al registrar');
     });
   });
 

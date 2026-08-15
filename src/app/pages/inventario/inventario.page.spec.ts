@@ -638,6 +638,45 @@ describe('InventarioPage', () => {
     expect(formTextConUbicacion).not.toContain('sin lote');
   });
 
+  it('12.8 RED: salida sin ubicación/lote muestra el error neutro "Elija la ubicación y el lote para el traslado"', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('Elija la ubicación y el lote para el traslado');
+    expect(fixture.nativeElement.textContent).toContain('Elija la ubicación y el lote para el traslado');
+  });
+
+  it('12.9 RED: el formulario de salida muestra los placeholders neutros "Seleccione la ubicación…" y "Seleccione un lote…"', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+
+    const selects = fixture.nativeElement.querySelectorAll('form select');
+    expect(selects.length).toBe(2);
+    expect((selects[0] as HTMLSelectElement).textContent).toContain('Seleccione la ubicación…');
+    expect((selects[1] as HTMLSelectElement).textContent).toContain('Seleccione un lote…');
+  });
+
   it('13. calls registrarAjusteLote on form submit (with lot selected)', async () => {
     const lotesMock = [
       { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
