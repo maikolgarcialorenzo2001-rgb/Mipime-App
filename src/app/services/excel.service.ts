@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import * as XLSX from 'xlsx';
+import type * as XLSX from 'xlsx';
 import type { Jornada } from '../models/jornada';
 import type { Venta, DetalleVenta } from '../models/venta';
 import type { Movimiento } from '../models/movimiento';
@@ -57,27 +57,35 @@ export interface JornadaReportData {
 })
 export class ExcelService {
   /**
+   * Promesa cacheada del chunk lazy de SheetJS (xlsx). Se inicia al instanciar el
+   * servicio pero el módulo se carga a demanda, fuera del bundle inicial.
+   */
+  private readonly _xlsxPromise: Promise<typeof import('xlsx')> = import('xlsx');
+
+  /**
    * Genera un archivo Excel (.xlsx) con el resumen de una jornada:
    * - Hoja "Resumen": datos generales de la jornada
    * - Hoja "Ventas": listado de ventas con detalle de productos
    * - Hoja "Movimientos": gastos e ingresos extra
    *
-   * @returns string en base64 del archivo xlsx
+   * @returns Promise<string> en base64 del archivo xlsx
    */
-  generarExcelJornada(data: JornadaReportData): string {
+  async generarExcelJornada(data: JornadaReportData): Promise<string> {
+    const XLSX = await this._xlsxPromise;
     const wb = XLSX.utils.book_new();
 
-    this._agregarResumen(wb, data);
-    this._agregarVentas(wb, data);
-    this._agregarPendientesAcumulados(wb, data);
-    this._agregarMovimientos(wb, data);
-    this._agregarArqueo(wb, data);
-    this._agregarIpve(wb, data);
+    await this._agregarResumen(wb, data);
+    await this._agregarVentas(wb, data);
+    await this._agregarPendientesAcumulados(wb, data);
+    await this._agregarMovimientos(wb, data);
+    await this._agregarArqueo(wb, data);
+    await this._agregarIpve(wb, data);
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
 
-  private _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const j = data.jornada;
     const ventas = data.ventas;
 
@@ -238,7 +246,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
   }
 
-  private _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     // Determinar si hay columnas condicionales
     const tieneDivisas = data.ventas.some((v) => v.forma_pago === 'divisas');
     const tienePendientes = data.ventas.some((v) => v.forma_pago === 'pendiente');
@@ -420,7 +429,8 @@ export class ExcelService {
    * si no hay ninguno (convención de `_agregarArqueo` — "estado vacío u
    * omitida"). El Resumen "Pendientes del día" sigue intacto (solo del día).
    */
-  private _agregarPendientesAcumulados(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarPendientesAcumulados(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const pendientes = data.pendientesAcumulados;
     if (!pendientes || pendientes.length === 0) return;
 
@@ -446,20 +456,22 @@ export class ExcelService {
    * - "Resumen del Mes": totales consolidados de todas las jornadas
    * - Una hoja por jornada (fecha): resumen + ventas + movimientos
    */
-  generarExcelMensual(data: JornadaReportData[]): string {
+  async generarExcelMensual(data: JornadaReportData[]): Promise<string> {
+    const XLSX = await this._xlsxPromise;
     const wb = XLSX.utils.book_new();
 
-    this._agregarResumenDelMes(wb, data);
-    this._agregarStockConsolidado(wb, data);
+    await this._agregarResumenDelMes(wb, data);
+    await this._agregarStockConsolidado(wb, data);
 
     for (const d of data) {
-      this._agregarJornadaSheet(wb, d);
+      await this._agregarJornadaSheet(wb, d);
     }
 
     return XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
   }
 
-  private _agregarResumenDelMes(wb: XLSX.WorkBook, data: JornadaReportData[]): void {
+  private async _agregarResumenDelMes(wb: XLSX.WorkBook, data: JornadaReportData[]): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const totalVentasSinPendientes = data.reduce(
       (s, d) => s + d.ventas.filter((v) => v.forma_pago !== 'pendiente').reduce((ss, v) => ss + v.total, 0),
       0,
@@ -514,7 +526,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Resumen del Mes');
   }
 
-  private _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const j = data.jornada;
 
     // Total ventas + ingresos extra (excluye pendientes)
@@ -703,7 +716,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, `${j.fecha} (${j.id})`);
   }
 
-  private _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const tieneCompraDivisa = data.movimientos.some(m => m.tipo === 'compra_divisa');
     const filas: unknown[][] = tieneCompraDivisa
       ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total CUP']]
@@ -759,7 +773,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
   }
 
-  private _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const arqueo = data.arqueo;
     if (!arqueo || arqueo.length === 0) return;
 
@@ -815,7 +830,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Arqueo');
   }
 
-  private _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): void {
+  private async _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     // Recolectar todos los stockMovimientos de todas las jornadas
     const todos: StockMovimiento[] = [];
     const productosMap = new Map<number, ProductoInfo>();
@@ -869,7 +885,8 @@ export class ExcelService {
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos de Stock');
   }
 
-  private _agregarIpve(wb: XLSX.WorkBook, data: JornadaReportData): void {
+  private async _agregarIpve(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
+    const XLSX = await this._xlsxPromise;
     const inv = data.inversionPorProducto;
     const pmap = data.productosMap;
     if (!inv || !pmap) return;
