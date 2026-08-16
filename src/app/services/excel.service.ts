@@ -59,8 +59,72 @@ export class ExcelService {
   /**
    * Promesa cacheada del chunk lazy de SheetJS (xlsx). Se inicia al instanciar el
    * servicio pero el módulo se carga a demanda, fuera del bundle inicial.
+   * null hasta el primer uso real o el preload al idle (S5/S6).
    */
-  private readonly _xlsxPromise: Promise<typeof import('xlsx')> = import('xlsx');
+  private _xlsxPromise: Promise<typeof import('xlsx')> | null = null;
+
+  /**
+   * Hook aislado del dynamic import de SheetJS (S5): aislarlo permite espiarlo
+   * en tests para verificar el reintento con backoff sin disparar el import real.
+   */
+  private _importarXlsx(): Promise<typeof import('xlsx')> {
+    return import('xlsx');
+  }
+
+  /**
+   * Carga el módulo xlsx cacheando la promesa que ya agotó los reintentos (S5):
+   * 3 intentos (0,1,2) con delay 200ms * (intento + 1). Si la carga falla offline
+   * no queda una promesa rechazada para siempre: el uso real vuelve a reintentar.
+   */
+  private _cargarXlsx(): Promise<typeof import('xlsx')> {
+    if (this._xlsxPromise) {
+      return this._xlsxPromise;
+    }
+    this._xlsxPromise = this._importarXlsxConReintento();
+    return this._xlsxPromise;
+  }
+
+  private async _importarXlsxConReintento(): Promise<typeof import('xlsx')> {
+    let ultimoError: unknown;
+    for (let intento = 0; intento < 3; intento++) {
+      try {
+        return await this._importarXlsx();
+      } catch (err) {
+        ultimoError = err;
+        if (intento < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 200 * (intento + 1)));
+        }
+      }
+    }
+    throw ultimoError;
+  }
+
+  /**
+   * Precarga el chunk xlsx en background tras el primer paint (S6): requestIdleCallback
+   * con timeout 2000ms si existe (browser), si no setTimeout(2000). Si resuelve y no
+   * hay otra carga en curso, cachea el módulo; si falla, silencioso — el uso real
+   * hará el reintento con backoff.
+   */
+  private _precargarXlsxAlIdle(): void {
+    const precargar = (): void => {
+      this._importarXlsx()
+        .then((modulo) => {
+          if (!this._xlsxPromise) {
+            this._xlsxPromise = Promise.resolve(modulo);
+          }
+        })
+        .catch(() => undefined);
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(precargar, { timeout: 2000 });
+    } else {
+      setTimeout(precargar, 2000);
+    }
+  }
+
+  constructor() {
+    this._precargarXlsxAlIdle();
+  }
 
   /**
    * Genera un archivo Excel (.xlsx) con el resumen de una jornada:
@@ -71,7 +135,7 @@ export class ExcelService {
    * @returns Promise<string> en base64 del archivo xlsx
    */
   async generarExcelJornada(data: JornadaReportData): Promise<string> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const wb = XLSX.utils.book_new();
 
     await this._agregarResumen(wb, data);
@@ -85,7 +149,7 @@ export class ExcelService {
   }
 
   private async _agregarResumen(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const j = data.jornada;
     const ventas = data.ventas;
 
@@ -247,7 +311,7 @@ export class ExcelService {
   }
 
   private async _agregarVentas(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     // Determinar si hay columnas condicionales
     const tieneDivisas = data.ventas.some((v) => v.forma_pago === 'divisas');
     const tienePendientes = data.ventas.some((v) => v.forma_pago === 'pendiente');
@@ -430,7 +494,7 @@ export class ExcelService {
    * omitida"). El Resumen "Pendientes del día" sigue intacto (solo del día).
    */
   private async _agregarPendientesAcumulados(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const pendientes = data.pendientesAcumulados;
     if (!pendientes || pendientes.length === 0) return;
 
@@ -457,7 +521,7 @@ export class ExcelService {
    * - Una hoja por jornada (fecha): resumen + ventas + movimientos
    */
   async generarExcelMensual(data: JornadaReportData[]): Promise<string> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const wb = XLSX.utils.book_new();
 
     await this._agregarResumenDelMes(wb, data);
@@ -471,7 +535,7 @@ export class ExcelService {
   }
 
   private async _agregarResumenDelMes(wb: XLSX.WorkBook, data: JornadaReportData[]): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const totalVentasSinPendientes = data.reduce(
       (s, d) => s + d.ventas.filter((v) => v.forma_pago !== 'pendiente').reduce((ss, v) => ss + v.total, 0),
       0,
@@ -527,7 +591,7 @@ export class ExcelService {
   }
 
   private async _agregarJornadaSheet(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const j = data.jornada;
 
     // Total ventas + ingresos extra (excluye pendientes)
@@ -717,7 +781,7 @@ export class ExcelService {
   }
 
   private async _agregarMovimientos(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const tieneCompraDivisa = data.movimientos.some(m => m.tipo === 'compra_divisa');
     const filas: unknown[][] = tieneCompraDivisa
       ? [['Tipo', 'Descripción', 'Divisa', 'Monto en divisa', 'Tasa de cambio', 'Total CUP']]
@@ -774,7 +838,7 @@ export class ExcelService {
   }
 
   private async _agregarArqueo(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const arqueo = data.arqueo;
     if (!arqueo || arqueo.length === 0) return;
 
@@ -831,7 +895,7 @@ export class ExcelService {
   }
 
   private async _agregarStockConsolidado(wb: XLSX.WorkBook, allData: JornadaReportData[]): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     // Recolectar todos los stockMovimientos de todas las jornadas
     const todos: StockMovimiento[] = [];
     const productosMap = new Map<number, ProductoInfo>();
@@ -886,7 +950,7 @@ export class ExcelService {
   }
 
   private async _agregarIpve(wb: XLSX.WorkBook, data: JornadaReportData): Promise<void> {
-    const XLSX = await this._xlsxPromise;
+    const XLSX = await this._cargarXlsx();
     const inv = data.inversionPorProducto;
     const pmap = data.productosMap;
     if (!inv || !pmap) return;

@@ -1858,4 +1858,77 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', async () =>
       expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
     });
   });
+
+  describe('S5+S6 — carga del chunk xlsx con reintento backoff y preload idle', () => {
+    const priv = (): {
+      _importarXlsx(): Promise<object>;
+      _cargarXlsx(): Promise<object>;
+      _precargarXlsxAlIdle(): void;
+      _xlsxPromise: Promise<object> | null;
+    } => service as unknown as {
+      _importarXlsx(): Promise<object>;
+      _cargarXlsx(): Promise<object>;
+      _precargarXlsxAlIdle(): void;
+      _xlsxPromise: Promise<object> | null;
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('S5 RED: reintenta la carga 2 veces y resuelve el módulo al tercer intento', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx');
+      spy
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce({ utils: {} });
+
+      const promesa = p._cargarXlsx();
+      await vi.advanceTimersByTimeAsync(200 + 400);
+
+      const modulo = await promesa;
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(modulo).toEqual({ utils: {} });
+
+      // La promesa cacheada se reusa: un segundo pedido no dispara otro import.
+      const reuso = await p._cargarXlsx();
+      expect(reuso).toEqual({ utils: {} });
+      expect(spy).toHaveBeenCalledTimes(3);
+    });
+
+    it('S5 RED: tras agotar los 3 intentos propaga el último error', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx');
+      spy.mockRejectedValue(new Error('offline'));
+
+      const promesa = p._cargarXlsx();
+      // Adjuntar el handler de rechazo ANTES de avanzar los timers: si la promesa
+      // rechaza durante el avance, Node lo marcaría como unhandledRejection.
+      const assertion = expect(promesa).rejects.toThrow('offline');
+      await vi.advanceTimersByTimeAsync(200 + 400);
+
+      await assertion;
+      expect(spy).toHaveBeenCalledTimes(3);
+    });
+
+    it('S6 RED: el preload al idle cachea el módulo vía el fallback setTimeout', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx').mockResolvedValue({ utils: {} });
+
+      p._precargarXlsxAlIdle();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(p._xlsxPromise).not.toBeNull();
+
+      const modulo = await p._cargarXlsx();
+      expect(modulo).toEqual({ utils: {} });
+      // Ya cacheado por el preload: no reimporta.
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
