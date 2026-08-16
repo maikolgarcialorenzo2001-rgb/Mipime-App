@@ -4,7 +4,7 @@
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main` (única rama — local y remota, tras limpieza 2026-08-05)
 > Tests: **Electron 141** / **web 768** (verificación SDD fix-reanudar-jornada-acceso 2026-08-08; `ng test` destrabado `b21ff36`); web 902 en bundle-budget-fix (2026-08-15)
-> Última actualización: 2026-08-15
+> Última actualización: 2026-08-16
 
 ---
 
@@ -89,9 +89,8 @@
 - **S6. Preload al idle** (simple, 15 min): disparar `import('xlsx')` con `requestIdleCallback`/`setTimeout` tras el primer paint → el chunk se cachea en background.
 - S7. Service worker que cachee chunks lazy (completo, grande): fix "de verdad" para offline total; proyecto aparte (Capacitor/Electron quizá no lo necesitan).
 
-**Recomendación (orquestador, 2026-08-15):** Riesgo A = **S1 + S2** (test de regresión como red inmediata + conversión a `Promise<string>` estructural); Riesgo B = **S5 + S6** (baratas, sin riesgo). **Decisión pendiente del usuario** — no aplicar sin confirmar.
+**Decisión (2026-08-16):** el usuario aprobó y se aplicaron **S1 + S2 + S5 + S6** en `bundle-budget-fix`: `8a6d661` (S1 test de regresión de tipo emitido), `1a94aa0` (S2 exportaciones a `Promise<string>` directo + consumers async), `16c0647` (S5 reintento backoff + S6 preload idle del chunk xlsx). **S3/S4/S7 no elegidos** (S3/S4 redundan con el type-check; S7 service worker = proyecto aparte). Suite web 906 PASS — sin merge a main.
 
-**Decisión (2026-08-05):** NO implementado — se difiere a pedido del usuario. Pendiente de retomar; revisar primero si la web se usa offline (condiciona A puro vs C).
 **Estado actual (2026-08-15):** ✅ IMPLEMENTADO en branch `bundle-budget-fix` (3 commits, ver arriba) — sin merge a main; PR pendiente de abrir; fixes de riesgo A/B pendientes de decisión.
 
 ### BACKLOG-9. CI de PRs (TOOLING)
@@ -273,6 +272,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-16 | BACKLOG-8 risk fixes **aprobados por el usuario y aplicados** en `bundle-budget-fix`: S1 test regresión tipo emitido (string no-Promise), S2 exportaciones a `Promise<string>` directo + consumers async (`Observable<Promise<T>>` eliminado), S5 reintento backoff + S6 preload idle del chunk xlsx. S3/S4/S7 no elegidos. Suite web 906 PASS — sin merge a main. PR #15 abierto | `8a6d661`, `1a94aa0`, `16c0647` |
 | 2026-08-15 | BACKLOG-8 ✅ implementado en branch `bundle-budget-fix` (lazy-load xlsx, budget 600kB, bundle 696.90→419.85 kB, suite web 902) — sin merge; exploración de riesgos post-implementación documentada (Riesgo A leak Promise: S1-S4; Riesgo B chunk offline: S5-S7), fix pendiente de decisión. PRs: languaje-corrections #12 abierto | `48e46e5`, `90ddb5c`, `26f66d4` |
 | 2026-08-05 | TODO sync vs remote (post-crash VS Code): BACKLOG-1b/5/6/10 ✅, BACKLOG-2/3/4 ✅ merged+archivados, seed-productos-reales MERGED, limpieza de ramas (solo `main`), bump `0.1.13-beta`. BACKLOG-8: diagnóstico bundle real (696.90 kB) + approach A+C documentado en el item, **no implementado** (decisión usuario). BACKLOG-11: diagnóstico lint 110 errores + approach Camino A documentado en el item, **no implementado** (decisión usuario) | `c6cba24` |
 | 2026-08-02 | SDD `desktop-resilience-backlogs`: BACKLOG-2/3/4 **implementados** en `fix/desktop-resilience-backlog` (colisión snapshot + parser `(?:-\d+)?`, stage fatal real, postinstall install-app-deps). Electron 141 / web 695 GREEN. **⏳ PRs NO abiertos (decisión sesión 2026-08-02).** | `b8005e5`, `70d4532`, `118b224` |
