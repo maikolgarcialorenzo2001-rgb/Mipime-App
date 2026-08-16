@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { HistorialPage } from './historial.page';
@@ -104,8 +104,8 @@ describe('HistorialPage', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of(mockJornadas),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -232,16 +232,16 @@ describe('HistorialPage', () => {
       expect(component.exportando()).toBe(false);
     });
 
-    it('C9 RED: exportarMes debería llamar al servicio con año/mes correctos', () => {
+    it('C9 RED: exportarMes debería llamar al servicio con año/mes correctos', async () => {
       const service = TestBed.inject(JornadaService);
-      component.exportarMes();
+      await component.exportarMes();
       expect(service.generarExportacionMensual).toHaveBeenCalledWith(2026, 5);
     });
 
-    it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', () => {
+    it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', async () => {
       const electronService = TestBed.inject(ElectronFileService) as any;
 
-      component.exportarMes();
+      await component.exportarMes();
 
       expect(electronService.saveMonthly).toHaveBeenCalled();
       expect(component.exportando()).toBe(false);
@@ -272,23 +272,21 @@ describe('HistorialPage', () => {
       expect(btn.textContent).toContain('Generando');
     });
 
-    it('C9 RED: errorExport debería mostrarse cuando la exportación falla', () => {
+    it('C9 RED: errorExport debería mostrarse cuando la exportación falla', async () => {
       const service = TestBed.inject(JornadaService);
-      vi.mocked(service.generarExportacionMensual).mockReturnValue(
-        throwError(() => new Error('Error de red')),
+      vi.mocked(service.generarExportacionMensual).mockRejectedValue(
+        new Error('Error de red'),
       );
 
-      component.exportarMes();
-      // Manually advance the observable
-      fixture.detectChanges();
+      await component.exportarMes();
 
       expect(component.errorExport()).toBe('Error de red');
       expect(component.exportando()).toBe(false);
     });
 
-    it('C9 RED: después de exportación exitosa, exportando vuelve a false', () => {
-      component.exportarMes();
-      // The observable completes synchronously with of()
+    it('C9 RED: después de exportación exitosa, exportando vuelve a false', async () => {
+      await component.exportarMes();
+      // La promesa del mock resuelve en microtask; `await` asegura el flush
       expect(component.exportando()).toBe(false);
       expect(component.errorExport()).toBeNull();
     });
@@ -364,10 +362,10 @@ describe('HistorialPage', () => {
         );
       });
 
-      it('exportarMes debería llamar saveMonthly cuando isElectronPackaged=true', () => {
+      it('exportarMes debería llamar saveMonthly cuando isElectronPackaged=true', async () => {
         electronService.isElectronPackaged = true;
 
-        component.exportarMes();
+        await component.exportarMes();
 
         expect(electronService.saveMonthly).toHaveBeenCalledWith(
           mockExcelBase64,
@@ -376,12 +374,12 @@ describe('HistorialPage', () => {
         );
       });
 
-      it('exportarRango debería llamar saveRange cuando isElectronPackaged=true', () => {
+      it('exportarRango debería llamar saveRange cuando isElectronPackaged=true', async () => {
         electronService.isElectronPackaged = true;
         component.rangeDesde.set('2026-06-01');
         component.rangeHasta.set('2026-06-30');
 
-        component.exportarRango();
+        await component.exportarRango();
 
         expect(electronService.saveRange).toHaveBeenCalledWith(
           mockExcelBase64,
@@ -493,42 +491,42 @@ describe('HistorialPage', () => {
       expect(component.showRangePicker()).toBe(false);
     });
 
-    it('D.2 RED: exportarRango debería llamar al servicio con fechas correctas', () => {
+    it('D.2 RED: exportarRango debería llamar al servicio con fechas correctas', async () => {
       const service = TestBed.inject(JornadaService);
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(service.generarExportacionPorRango).toHaveBeenCalledWith('2026-06-01', '2026-06-15');
     });
 
-    it('D.2 RED: exportarRango debería mostrar error si faltan fechas', () => {
+    it('D.2 RED: exportarRango debería mostrar error si faltan fechas', async () => {
       component.rangeDesde.set('');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(component.errorExport()).toBe('Seleccioná fecha desde y hasta para exportar.');
     });
 
-    it('D.2 RED: exportarRango debería limpiar error al completar', () => {
+    it('D.2 RED: exportarRango debería limpiar error al completar', async () => {
       const service = TestBed.inject(JornadaService);
       component.errorExport.set('error previo');
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(component.errorExport()).toBeNull();
     });
 
-    it('D.2 RED: exportarRango debería manejar error del servicio', () => {
+    it('D.2 RED: exportarRango debería manejar error del servicio', async () => {
       const service = TestBed.inject(JornadaService);
-      vi.mocked(service.generarExportacionPorRango).mockReturnValue(
-        throwError(() => new Error('Error al exportar')),
+      vi.mocked(service.generarExportacionPorRango).mockRejectedValue(
+        new Error('Error al exportar'),
       );
 
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(component.errorExport()).toBe('Error al exportar');
       expect(component.exportandoRango()).toBe(false);
@@ -704,8 +702,8 @@ describe('HistorialPage — vacío', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -748,8 +746,8 @@ describe('HistorialPage — error', () => {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },

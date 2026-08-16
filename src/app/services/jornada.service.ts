@@ -1,5 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { from, firstValueFrom, map, Observable, switchMap, tap } from 'rxjs';
+import { from, firstValueFrom, map, Observable, tap } from 'rxjs';
 import { DATABASE } from './database';
 import { ExcelService, type JornadaReportData, type VentaConDetalles, type PendienteAcumulado } from './excel.service';
 import { ElectronFileService } from './electron-file.service';
@@ -543,38 +543,35 @@ export class JornadaService {
 
   /**
    * Genera la exportación mensual de todas las jornadas cerradas del mes.
-   * @returns Observable que emite el base64 del Excel multi-hoja
+   * @returns Promise<string> con el base64 del Excel multi-hoja
    */
-  generarExportacionMensual(year: number, month: number): Observable<string> {
-    return this.jornadasDelMes(year, month).pipe(
-      switchMap((jornadas) => {
-        if (jornadas.length === 0) {
-          throw new Error('No hay jornadas cerradas en este mes.');
-        }
-        const dataPromises = jornadas.map((j) =>
-          this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
-            (datos): JornadaReportData => ({
-              jornada: j,
-              ventas: datos.ventas,
-              movimientos: datos.movimientos,
-              stockMovimientos: datos.stockMovimientos,
-              ventaLotes: datos.ventaLotes,
-              productosMap: datos.productosMap,
-              totalCosto: datos.totalCosto,
-              userCierreNombre: datos.userCierreNombre,
-              userAperturaNombre: datos.userAperturaNombre,
-              cuentaCosas: datos.cuentaCosas,
-              arqueo: datos.arqueo,
-              inversionPorProducto: datos.inversionPorProducto,
-              total_usd: datos.totalUsd,
-              total_eur: datos.totalEur,
-            }),
-          ),
-        );
-        return from(Promise.all(dataPromises));
-      }),
-      switchMap((allData) => from(this._excelService.generarExcelMensual(allData))),
+  async generarExportacionMensual(year: number, month: number): Promise<string> {
+    const jornadas = await firstValueFrom(this.jornadasDelMes(year, month));
+    if (jornadas.length === 0) {
+      throw new Error('No hay jornadas cerradas en este mes.');
+    }
+    const dataPromises = jornadas.map((j) =>
+      this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
+        (datos): JornadaReportData => ({
+          jornada: j,
+          ventas: datos.ventas,
+          movimientos: datos.movimientos,
+          stockMovimientos: datos.stockMovimientos,
+          ventaLotes: datos.ventaLotes,
+          productosMap: datos.productosMap,
+          totalCosto: datos.totalCosto,
+          userCierreNombre: datos.userCierreNombre,
+          userAperturaNombre: datos.userAperturaNombre,
+          cuentaCosas: datos.cuentaCosas,
+          arqueo: datos.arqueo,
+          inversionPorProducto: datos.inversionPorProducto,
+          total_usd: datos.totalUsd,
+          total_eur: datos.totalEur,
+        }),
+      ),
     );
+    const allData = await Promise.all(dataPromises);
+    return this._excelService.generarExcelMensual(allData);
   }
 
   /**
@@ -831,38 +828,35 @@ export class JornadaService {
   /**
    * Genera la exportación por rango de fechas.
    * Recolecta datos de cada jornada y genera Excel multi-hoja.
-   * @returns Observable que emite el base64 del Excel
+   * @returns Promise<string> con el base64 del Excel
    */
-  generarExportacionPorRango(desde: string, hasta: string): Observable<string> {
-    return this.jornadasDelRango(desde, hasta).pipe(
-      switchMap((jornadas) => {
-        if (jornadas.length === 0) {
-          throw new Error('No hay jornadas en el rango seleccionado.');
-        }
-        const dataPromises = jornadas.map((j) =>
-          this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
-             (datos): JornadaReportData => ({
-              jornada: j,
-              ventas: datos.ventas,
-              movimientos: datos.movimientos,
-              stockMovimientos: datos.stockMovimientos,
-              ventaLotes: datos.ventaLotes,
-              productosMap: datos.productosMap,
-              totalCosto: datos.totalCosto,
-              userCierreNombre: datos.userCierreNombre,
-              userAperturaNombre: datos.userAperturaNombre,
-              cuentaCosas: datos.cuentaCosas,
-              arqueo: datos.arqueo,
-              inversionPorProducto: datos.inversionPorProducto,
-              total_usd: datos.totalUsd,
-              total_eur: datos.totalEur,
-            }),
-          ),
-        );
-        return from(Promise.all(dataPromises));
-      }),
-      switchMap((allData) => from(this._excelService.generarExcelMensual(allData))),
+  async generarExportacionPorRango(desde: string, hasta: string): Promise<string> {
+    const jornadas = await firstValueFrom(this.jornadasDelRango(desde, hasta));
+    if (jornadas.length === 0) {
+      throw new Error('No hay jornadas en el rango seleccionado.');
+    }
+    const dataPromises = jornadas.map((j) =>
+      this._recolectarDatosJornada(j.id, j.user_cierre_id).then(
+         (datos): JornadaReportData => ({
+          jornada: j,
+          ventas: datos.ventas,
+          movimientos: datos.movimientos,
+          stockMovimientos: datos.stockMovimientos,
+          ventaLotes: datos.ventaLotes,
+          productosMap: datos.productosMap,
+          totalCosto: datos.totalCosto,
+          userCierreNombre: datos.userCierreNombre,
+          userAperturaNombre: datos.userAperturaNombre,
+          cuentaCosas: datos.cuentaCosas,
+          arqueo: datos.arqueo,
+          inversionPorProducto: datos.inversionPorProducto,
+          total_usd: datos.totalUsd,
+          total_eur: datos.totalEur,
+        }),
+      ),
     );
+    const allData = await Promise.all(dataPromises);
+    return this._excelService.generarExcelMensual(allData);
   }
 
   /** Historial de jornadas ordenado por fecha descendente. */
