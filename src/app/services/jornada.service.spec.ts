@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, toArray } from 'rxjs';
 import { JornadaService } from './jornada.service';
 import { ExcelService } from './excel.service';
 import { DATABASE, type Database } from './database';
@@ -836,6 +836,32 @@ describe('JornadaService', () => {
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
       expect(callArg).toHaveLength(2);
+    });
+
+    it('S1 RED: la exportación emite string base64, nunca un Promise anidado', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada1]) // jornadasDelMes SQL
+        .mockResolvedValueOnce([]) // _recolectarDatosJornada: ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]); // cuenta_cosas
+
+      const excelService = TestBed.inject(ExcelService);
+      vi.mocked(excelService.generarExcelMensual).mockImplementation(() => Promise.resolve('base64'));
+
+      const service = TestBed.inject(JornadaService);
+      // toArray() NO aplana promesas (firstValueFrom sí) — si la exportación
+      // emitiera un Promise<string>, este array contendría ese Promise.
+      const emitido = await firstValueFrom(
+        service.generarExportacionMensual(2026, 5).pipe(toArray()),
+      );
+
+      expect(emitido.length).toBeGreaterThan(0);
+      for (const resultado of emitido) {
+        expect(typeof resultado).toBe('string');
+        expect(resultado).not.toBeInstanceOf(Promise);
+      }
     });
   });
 
