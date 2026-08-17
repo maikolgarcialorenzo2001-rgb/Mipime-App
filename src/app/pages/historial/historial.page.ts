@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild, ElementRef, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { PesosPipe } from '../../pipes/pesos.pipe';
@@ -49,8 +49,20 @@ export class HistorialPage {
   /** Error de la exportación mensual. */
   readonly errorExport = signal<string | null>(null);
 
+  /** Toast de confirmación. */
+  readonly toastMessage = signal<string | null>(null);
+  private _toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
   /** Controla la visibilidad del modal de vista previa. */
   readonly showPreview = signal(false);
+
+  readonly previewBackdrop = viewChild<ElementRef<HTMLElement>>('previewBackdrop');
+
+  private readonly _focusPreviewEffect = effect(() => {
+    if (this.showPreview()) {
+      setTimeout(() => this.previewBackdrop()?.nativeElement.focus());
+    }
+  });
 
   /** Controla la visibilidad del picker de rango de fechas. */
   readonly showRangePicker = signal(false);
@@ -70,7 +82,7 @@ export class HistorialPage {
   /** Datos completos cargados para la vista previa. */
   readonly previewData = signal<JornadaReportData | null>(null);
 
-  /** Indicador de carga de datos de preview. */
+  /** Señal de carga de datos de preview. */
   readonly previewLoading = signal(false);
 
   /** Detalles aplanados de productos vendidos para la tabla de preview. */
@@ -238,6 +250,7 @@ export class HistorialPage {
       next: (reporte) => {
         if (!reporte) return;
         this._electronFileService.saveIndividual(reporte.content_base64, j);
+        this._mostrarToast('Guardado con éxito');
       },
     });
   }
@@ -275,6 +288,7 @@ export class HistorialPage {
         m.getMonth(),
       );
       this._descargarBase64(base64, m);
+      this._mostrarToast('Guardado con éxito');
     } catch (err: unknown) {
       this.errorExport.set(
         err instanceof Error ? err.message : 'Error al exportar',
@@ -305,6 +319,7 @@ export class HistorialPage {
     try {
       const base64 = await this._jornadaService.generarExportacionPorRango(desde, hasta);
       this._descargarBase64Rango(base64, desde, hasta);
+      this._mostrarToast('Guardado con éxito');
       this.showRangePicker.set(false);
     } catch (err: unknown) {
       this.errorExport.set(
@@ -321,6 +336,15 @@ export class HistorialPage {
 
   private _descargarBase64(base64: string, month: Date): void {
     this._electronFileService.saveMonthly(base64, month.getFullYear(), month.getMonth());
+  }
+
+  private _mostrarToast(mensaje: string): void {
+    this.toastMessage.set(mensaje);
+    if (this._toastTimeout !== null) clearTimeout(this._toastTimeout);
+    this._toastTimeout = setTimeout(() => {
+      this.toastMessage.set(null);
+      this._toastTimeout = null;
+    }, 2500);
   }
 
   private _cargarJornadas(): void {

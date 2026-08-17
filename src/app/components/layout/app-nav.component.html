@@ -230,6 +230,7 @@
 <!-- Modal de apertura -->
 @if (showOpenModal()) {
   <div
+    #openModalBackdrop
     class="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/40"
     role="dialog"
     tabindex="-1"
@@ -292,6 +293,7 @@
 <!-- Modal de cierre -->
 @if (showCloseModal()) {
   <div
+    #closeModalBackdrop
     class="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/40"
     role="dialog"
     tabindex="-1"

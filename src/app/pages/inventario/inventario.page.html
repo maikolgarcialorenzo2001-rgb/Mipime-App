@@ -24,9 +24,15 @@
     />
   </div>
 
-  <!-- Error alert -->
+  <!-- Error toast (flotante) -->
   @if (error(); as err) {
-    <app-error-alert [message]="err" />
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 dark:bg-red-600 text-white px-5 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in flex items-center gap-3 max-w-md">
+      <span class="material-symbols-outlined text-base">error</span>
+      <span>{{ err }}</span>
+      <button type="button" class="ml-auto opacity-80 hover:opacity-100 cursor-pointer" (click)="error.set(null)">
+        <span class="material-symbols-outlined text-base">close</span>
+      </button>
+    </div>
   }
 
   <!-- Toast de éxito -->
@@ -488,6 +494,7 @@
   <!-- Producto Modal overlay — admin only -->
   @if (showProductoModal() && esAdmin()) {
     <div
+      #productoModalBackdrop
       class="modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       tabindex="-1"
@@ -498,7 +505,7 @@
         class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6"
         tabindex="-1"
         (click)="$event.stopPropagation()"
-        (keydown)="$event.stopPropagation()"
+        (keydown.escape)="$event.stopPropagation(); cerrarModal()"
       >
         <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4">
           Nuevo Producto
@@ -590,7 +597,13 @@
 
   <!-- Delete confirmation -->
   @if (confirmandoEliminar(); as id) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      #deleteModalBackdrop
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      role="dialog"
+      tabindex="-1"
+      (keydown.escape)="cancelarEliminar()"
+    >
       <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
         <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Confirmar eliminación</h3>
         @if (eliminarConteoLoading()) {
@@ -598,13 +611,13 @@
             Calculando lo que se eliminará...
           </p>
         } @else if (eliminarConteo(); as conteo) {
-          @if ((conteo.ventas ?? 0) > 0 || (conteo.cuentas ?? 0) > 0) {
+          @if (conteo.ventas > 0 || conteo.cuentas > 0) {
             <p class="text-sm text-red-600 dark:text-red-400 mb-6">
               Este producto tiene ventas o cuenta casas asociadas. No se puede eliminar para no degradar los reportes históricos.
             </p>
           } @else {
             <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Se eliminarán permanentemente: {{ (conteo.movimientos ?? 0) }} movimientos, {{ (conteo.lotes ?? 0) }} lotes y {{ (conteo.ventaLotes ?? 0) }} registros de venta por lote. Esta acción no se puede deshacer.
+              Se eliminarán permanentemente: {{ conteo.movimientos }} movimientos, {{ conteo.lotes }} lotes y {{ conteo.ventaLotes }} registros de venta por lote. Esta acción no se puede deshacer.
             </p>
           }
         } @else {
