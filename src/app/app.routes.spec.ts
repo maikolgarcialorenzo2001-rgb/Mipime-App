@@ -5,13 +5,13 @@ import { routes } from './app.routes';
 import { AuthService } from './services/auth.service';
 
 describe('app.routes', () => {
-  type RouteWithGuard = {
+  interface RouteWithGuard {
     path: string;
     pathMatch?: string;
     canActivate?: unknown[];
     loadComponent?: unknown;
     redirectTo?: string;
-  };
+  }
 
   function findRoute(path: string): RouteWithGuard | undefined {
     return routes.find((r) => r.path === path) as RouteWithGuard | undefined;
@@ -80,7 +80,7 @@ describe('app.routes', () => {
       (r) => r.path !== '' && r.path !== 'login',
     );
     for (const r of protectedRoutes) {
-      expect(typeof (r as any).loadComponent).toBe('function');
+      expect(typeof (r as unknown as RouteWithGuard).loadComponent).toBe('function');
     }
   });
 

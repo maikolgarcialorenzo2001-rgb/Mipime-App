@@ -141,7 +141,7 @@ export class PalmarService {
   async registrarJornada(payload: PalmarJornadaPayload): Promise<PalmarSaveResult> {
     const record = construirRecordPalmar(payload);
     const resumen = await this._conResumenIncluyendo(record);
-    const base64 = this._excelService.generarExcelPalmar(record, resumen);
+    const base64 = await this._excelService.generarExcelPalmar(record, resumen);
     return this._electronFile.savePalmar(
       baseNameDesdeFecha(record.fecha),
       base64,
@@ -185,7 +185,7 @@ export class PalmarService {
   async volverAImprimir(fileName: string): Promise<PalmarSaveResult> {
     const record = await this.verDetalle(fileName);
     const resumenSemanal = await this.cargarResumenSemanal(record.fecha);
-    const base64 = this._excelService.generarExcelPalmar(record, resumenSemanal);
+    const base64 = await this._excelService.generarExcelPalmar(record, resumenSemanal);
     return this._electronFile.savePalmar(baseNameDesdeFecha(record.fecha), base64);
   }
 

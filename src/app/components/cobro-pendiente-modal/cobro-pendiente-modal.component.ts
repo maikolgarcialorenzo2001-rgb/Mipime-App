@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
 
 /**
@@ -17,7 +18,7 @@ import { CobroPendienteService, type PendienteItem } from '../../services/cobro-
  */
 @Component({
   selector: 'app-cobro-pendiente-modal',
-  imports: [CurrencyPipe, DatePipe, FormsModule],
+  imports: [PesosPipe, CurrencyPipe, DatePipe, FormsModule],
   templateUrl: './cobro-pendiente-modal.component.html',
   styleUrl: './cobro-pendiente-modal.component.css',
 })

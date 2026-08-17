@@ -189,7 +189,7 @@ describe('PalmarService', () => {
     };
 
     mockExcel = {
-      generarExcelPalmar: vi.fn().mockReturnValue('mock-excel-base64'),
+      generarExcelPalmar: vi.fn().mockResolvedValue('mock-excel-base64'),
     };
 
     mockProducto = {

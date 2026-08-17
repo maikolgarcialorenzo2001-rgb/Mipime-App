@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { of, throwError } from 'rxjs';
 import { PosPage } from './pos.page';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -79,7 +80,7 @@ describe('PosPage — toast de éxito', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [PosPage],
+      imports: [PosPage, PesosPipe],
       providers: [
         CartService,
         {
@@ -372,6 +373,21 @@ describe('PosPage — toast de éxito', () => {
 
     expect(cobrar.disabled).toBe(true);
     expect(ver.disabled).toBe(true);
+  });
+
+  it('REQ neutro: sin jornada abierta muestra el aviso "No hay jornada abierta. Inicie el día en Jornada."', () => {
+    const jornadaService = TestBed.inject(JornadaService);
+    vi.mocked(jornadaService.jornadaAbierta).mockReturnValue(null);
+
+    fixture.destroy();
+    fixture = TestBed.createComponent(PosPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.sinJornada).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(
+      'No hay jornada abierta. Inicie el día en Jornada.',
+    );
   });
 
   it('FR-1/AC7: con jornada abierta de un día anterior, sinJornada=false y botones habilitados', () => {

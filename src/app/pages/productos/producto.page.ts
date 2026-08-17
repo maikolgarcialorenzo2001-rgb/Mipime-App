@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
@@ -12,7 +13,7 @@ import type { LoteDetalle } from '../../models';
 
 @Component({
   selector: 'app-productos-page',
-  imports: [FormsModule, CurrencyPipe, DatePipe, StockBadgeComponent],
+  imports: [FormsModule, PesosPipe, DatePipe, StockBadgeComponent],
   templateUrl: './producto.page.html',
   styleUrl: './producto.page.css',
 })

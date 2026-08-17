@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CheckoutModalComponent } from './checkout-modal.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
 import type { Producto } from '../../models';
 
@@ -25,7 +26,7 @@ describe('CheckoutModalComponent', () => {
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
-      imports: [CheckoutModalComponent],
+      imports: [CheckoutModalComponent, PesosPipe],
     });
 
     fixture = TestBed.createComponent(CheckoutModalComponent);
@@ -323,6 +324,20 @@ describe('CheckoutModalComponent', () => {
       expect(mensaje.textContent).toContain('Saldo insuficiente en caja');
       expect(mensaje.textContent).toContain('$500');
       expect(mensaje.textContent).toContain('supera el saldo disponible');
+      expect(mensaje.textContent).toContain('Reduzca el billete o elija otra forma de pago.');
+    });
+
+    it('5.5 RED: divisa insuficiente muestra el aviso de moneda con el texto neutro "Complete con efectivo o aumente el monto en divisa."', () => {
+      component.seleccionarFormaPago('divisas');
+      component.tasaCambio.set(700);
+      component.billeteRecibido.set(2);
+      // vuelto = 2*700 - 1700 = -300 → falta 300, pagoSuficiente false
+      fixture.detectChanges();
+
+      expect(component.pagoSuficiente()).toBe(false);
+      const texto = fixture.nativeElement.textContent as string;
+      expect(texto).toContain('Moneda insuficiente');
+      expect(texto).toContain('Complete con efectivo o aumente el monto en divisa.');
     });
 
     it('NO debería mostrar mensaje de saldo insuficiente cuando saldo es suficiente', () => {

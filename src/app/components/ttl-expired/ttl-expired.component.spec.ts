@@ -45,12 +45,12 @@ describe('TtlExpiredComponent', () => {
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('La acceso finalizó el');
+    expect(text).toContain('El acceso finalizó el');
   });
 
   it('no muestra fecha cuando no hay first_launch en localStorage', () => {
     const text = fixture.nativeElement.textContent;
-    expect(text).not.toContain('La acceso finalizó el');
+    expect(text).not.toContain('El acceso finalizó el');
   });
 
   it('tiene el ícono material-symbols-outlined con timer_off', () => {

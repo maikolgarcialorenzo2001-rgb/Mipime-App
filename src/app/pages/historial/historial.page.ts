@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
@@ -21,7 +22,7 @@ export interface DiaCalendario {
 @Component({
   selector: 'app-historial',
   imports: [
-    CurrencyPipe,
+    PesosPipe,
     DatePipe,
     DecimalPipe,
     FormsModule,
@@ -263,23 +264,24 @@ export class HistorialPage {
   }
 
   /** Exporta todas las jornadas cerradas del mes visible como Excel multi-hoja. */
-  exportarMes(): void {
+  async exportarMes(): Promise<void> {
     this.exportando.set(true);
     this.errorExport.set(null);
     const m = this.currentMonth();
 
-    this._jornadaService.generarExportacionMensual(m.getFullYear(), m.getMonth()).subscribe({
-      next: (base64) => {
-        this._descargarBase64(base64, m);
-        this.exportando.set(false);
-      },
-      error: (err: unknown) => {
-        this.errorExport.set(
-          err instanceof Error ? err.message : 'Error al exportar',
-        );
-        this.exportando.set(false);
-      },
-    });
+    try {
+      const base64 = await this._jornadaService.generarExportacionMensual(
+        m.getFullYear(),
+        m.getMonth(),
+      );
+      this._descargarBase64(base64, m);
+    } catch (err: unknown) {
+      this.errorExport.set(
+        err instanceof Error ? err.message : 'Error al exportar',
+      );
+    } finally {
+      this.exportando.set(false);
+    }
   }
 
   /** Alterna la visibilidad del picker de rango. */
@@ -288,31 +290,29 @@ export class HistorialPage {
   }
 
   /** Exporta todas las jornadas cerradas en el rango seleccionado. */
-  exportarRango(): void {
+  async exportarRango(): Promise<void> {
     const desde = this.rangeDesde();
     const hasta = this.rangeHasta();
 
     if (!desde || !hasta) {
-      this.errorExport.set('Seleccioná fecha desde y hasta para exportar.');
+      this.errorExport.set('Seleccione fecha desde y hasta para exportar.');
       return;
     }
 
     this.exportandoRango.set(true);
     this.errorExport.set(null);
 
-    this._jornadaService.generarExportacionPorRango(desde, hasta).subscribe({
-      next: (base64) => {
-        this._descargarBase64Rango(base64, desde, hasta);
-        this.exportandoRango.set(false);
-        this.showRangePicker.set(false);
-      },
-      error: (err: unknown) => {
-        this.errorExport.set(
-          err instanceof Error ? err.message : 'Error al exportar',
-        );
-        this.exportandoRango.set(false);
-      },
-    });
+    try {
+      const base64 = await this._jornadaService.generarExportacionPorRango(desde, hasta);
+      this._descargarBase64Rango(base64, desde, hasta);
+      this.showRangePicker.set(false);
+    } catch (err: unknown) {
+      this.errorExport.set(
+        err instanceof Error ? err.message : 'Error al exportar',
+      );
+    } finally {
+      this.exportandoRango.set(false);
+    }
   }
 
   private _descargarBase64Rango(base64: string, desde: string, hasta: string): void {

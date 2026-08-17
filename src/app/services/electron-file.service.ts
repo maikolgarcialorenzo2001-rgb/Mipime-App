@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- declaración global de window.electronAPI para Electron
 /// <reference path="../../../electron/types.d.ts" />
 import { Injectable } from '@angular/core';
 import type { PalmarRecord } from '../models/palmar-jornada';

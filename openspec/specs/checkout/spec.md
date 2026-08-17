@@ -15,7 +15,9 @@ El sistema DEBE mostrar 5 opciones: Efectivo, Transferencia, Divisas, Pendiente,
 
 Pendiente y Cuenta Cosas mantienen comportamiento C11 sin cambios. Efectivo/Transferencia sin formularios extra.
 
-(Previously: montoDivisa y tasaCambio eran inputs editables sin vuelto)
+Los textos del sub-form divisas y del vuelto, en checkout-modal y cobro-pendiente-modal, DEBEN usar español neutro: "Complete con efectivo o aumente el monto en divisa." cuando el monto en divisa no cubre el total, y "Reduzca el billete o elija otra forma de pago." cuando el vuelto supera el saldo en caja. Ninguno DEBE contener voseo rioplatense ("Completá", "aumentá", "Reducí", "elegí").
+
+(Previously: montoDivisa y tasaCambio eran inputs editables sin vuelto; textos del sub-form divisas en voseo rioplatense)
 
 #### Scenario: Monto sin vuelto
 
@@ -40,6 +42,20 @@ Pendiente y Cuenta Cosas mantienen comportamiento C11 sin cambios. Efectivo/Tran
 - GIVEN total=$1950
 - WHEN tasaCambio=0 o vacío
 - THEN montoDivisa="—", confirmar bloqueado
+
+#### Scenario: «Complete» cuando el monto en divisa no cubre el total
+
+- GIVEN checkout-modal o cobro-pendiente-modal con forma de pago "Divisas" y monto en divisa insuficiente
+- WHEN se renderiza el aviso de monto faltante
+- THEN el texto muestra "Complete con efectivo o aumente el monto en divisa."
+- AND no contiene "Completá" ni "aumentá"
+
+#### Scenario: «Reduzca» cuando el vuelto supera el saldo en caja
+
+- GIVEN checkout-modal o cobro-pendiente-modal con vuelto mayor al saldo disponible en caja
+- WHEN se renderiza el aviso de saldo insuficiente
+- THEN el texto muestra "Reduzca el billete o elija otra forma de pago."
+- AND no contiene "Reducí" ni "elegí"
 
 ## ADDED Requirements
 

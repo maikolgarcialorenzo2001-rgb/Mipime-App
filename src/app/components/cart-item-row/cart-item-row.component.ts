@@ -1,10 +1,10 @@
 import { Component, input, output } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
 
 @Component({
   selector: 'app-cart-item-row',
-  imports: [CurrencyPipe],
+  imports: [PesosPipe],
   templateUrl: './cart-item-row.component.html',
   styleUrl: './cart-item-row.component.css',
 })

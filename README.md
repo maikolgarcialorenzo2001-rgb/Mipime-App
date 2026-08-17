@@ -7,25 +7,25 @@ Toda la data vive en SQLite: en el navegador (SQLocal + OPFS), en escritorio
 - **Web**: corre en el navegador, la base persiste en OPFS.
 - **Desktop**: instalador nativo para Windows / macOS / Linux (Electron).
 - **Móvil**: Android / iOS vía Capacitor.
-
-> ## ⚠️ Peculiaridad de esta rama — Cliente Palmar
+> ## ⚠️ EXCEPCIÓN: Esta rama es `palmar-feature`
 >
-> **`palmar-feature` es una rama aparte para un cliente único (Palmar)** que
-> desea **registrar lotes de ventas en un punto de venta externo y separado**.
-> No se mergea a `main`: vive completa en su propia rama, desacoplada del ciclo
-> de releases de main (decisión del dueño, 2026-08-09).
+> **`palmar-feature` es una rama ÚNICA y EXCEPCIONAL** que vive aparte de `main`.
+> **NO se mergea a `main`**: es una rama independiente con sus propias features,
+> su propio ciclo de releases y su propia versión (`0.1.17-beta`).
 >
-> **Qué agrega:**
-> - Ruta `/palmar` (solo admin): registrar la jornada de la tienda externa Palmar.
-> - Modal de 3 fases: productos del catálogo pre-rellenados en 0, arqueo de
->   billetes y cálculos de efectivo/divisas/transferencia/ganancia.
-> - **Cero escrituras en la base de datos**: solo lectura fresca de `productos`;
->   cada jornada genera un **Excel de 3 hojas** (Resumen / Arqueo / Ventas) y un
->   **JSON** (fuente de verdad) en `Documents/Tienda - App/Palmar/`.
-> - Historial, detalle, reimpresión y resumen semanal (lunes a domingo).
+> **¿Por qué es excepcional?**
+> - **Cliente único**: todo lo relacionado a Palmar (ruta `/palmar`, modal de 3 fases,
+>   Excel de 3 hojas, JSON, historial, reimpresión, resumen semanal) vive SOLO aquí.
+> - **Cero escrituras en DB**: solo lectura fresca de `productos`; cada jornada genera
+>   un Excel y un JSON en `Documents/Tienda - App/Palmar/`.
+> - **Desacoplada de main**: puede ir adelantada o desfasada respecto de `main`.
+> - **PRs propios**: los PRs de Palmar apuntan a `palmar-feature`, NO a `main`.
 >
-> Reglas de negocio aprobadas por el dueño (NO cambiar sin consultar) en
+> **Reglas de negocio aprobadas por el dueño** (NO cambiar sin consultar) en
 > [docs/palmar-ventas-plan-prs.md](docs/palmar-ventas-plan-prs.md).
+>
+> **⚠️ IMPORTANTE**: Si estás trabajando en `main`, NO modifiques archivos de Palmar.
+> Si estás en `palmar-feature`, sepáralo con commits dedicados.
 
 ## Stack
 

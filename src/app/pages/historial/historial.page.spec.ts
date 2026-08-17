@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { HistorialPage } from './historial.page';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada, JornadaReporte } from '../../models';
@@ -98,14 +99,14 @@ describe('HistorialPage', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,
           useValue: {
             historial: () => of(mockJornadas),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -232,16 +233,16 @@ describe('HistorialPage', () => {
       expect(component.exportando()).toBe(false);
     });
 
-    it('C9 RED: exportarMes debería llamar al servicio con año/mes correctos', () => {
+    it('C9 RED: exportarMes debería llamar al servicio con año/mes correctos', async () => {
       const service = TestBed.inject(JornadaService);
-      component.exportarMes();
+      await component.exportarMes();
       expect(service.generarExportacionMensual).toHaveBeenCalledWith(2026, 5);
     });
 
-    it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', () => {
-      const electronService = TestBed.inject(ElectronFileService) as any;
+    it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', async () => {
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveMonthly: ReturnType<typeof vi.fn> };
 
-      component.exportarMes();
+      await component.exportarMes();
 
       expect(electronService.saveMonthly).toHaveBeenCalled();
       expect(component.exportando()).toBe(false);
@@ -272,23 +273,21 @@ describe('HistorialPage', () => {
       expect(btn.textContent).toContain('Generando');
     });
 
-    it('C9 RED: errorExport debería mostrarse cuando la exportación falla', () => {
+    it('C9 RED: errorExport debería mostrarse cuando la exportación falla', async () => {
       const service = TestBed.inject(JornadaService);
-      vi.mocked(service.generarExportacionMensual).mockReturnValue(
-        throwError(() => new Error('Error de red')),
+      vi.mocked(service.generarExportacionMensual).mockRejectedValue(
+        new Error('Error de red'),
       );
 
-      component.exportarMes();
-      // Manually advance the observable
-      fixture.detectChanges();
+      await component.exportarMes();
 
       expect(component.errorExport()).toBe('Error de red');
       expect(component.exportando()).toBe(false);
     });
 
-    it('C9 RED: después de exportación exitosa, exportando vuelve a false', () => {
-      component.exportarMes();
-      // The observable completes synchronously with of()
+    it('C9 RED: después de exportación exitosa, exportando vuelve a false', async () => {
+      await component.exportarMes();
+      // La promesa del mock resuelve en microtask; `await` asegura el flush
       expect(component.exportando()).toBe(false);
       expect(component.errorExport()).toBeNull();
     });
@@ -303,7 +302,7 @@ describe('HistorialPage', () => {
 
     it('debería descargar el archivo cuando existe el reporte', () => {
       const service = TestBed.inject(JornadaService);
-      const electronService = TestBed.inject(ElectronFileService) as any;
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveIndividual: ReturnType<typeof vi.fn> };
       const mockReporte: JornadaReporte = {
         id: 1,
         jornada_id: 3,
@@ -324,7 +323,7 @@ describe('HistorialPage', () => {
 
     it('debería no hacer nada cuando el reporte es null', () => {
       const service = TestBed.inject(JornadaService);
-      const electronService = TestBed.inject(ElectronFileService) as any;
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveIndividual: ReturnType<typeof vi.fn> };
       vi.mocked(service.obtenerReporte).mockReturnValue(of(null));
 
       component.descargarExcel(mockJornadas[0]);
@@ -364,10 +363,10 @@ describe('HistorialPage', () => {
         );
       });
 
-      it('exportarMes debería llamar saveMonthly cuando isElectronPackaged=true', () => {
+      it('exportarMes debería llamar saveMonthly cuando isElectronPackaged=true', async () => {
         electronService.isElectronPackaged = true;
 
-        component.exportarMes();
+        await component.exportarMes();
 
         expect(electronService.saveMonthly).toHaveBeenCalledWith(
           mockExcelBase64,
@@ -376,12 +375,12 @@ describe('HistorialPage', () => {
         );
       });
 
-      it('exportarRango debería llamar saveRange cuando isElectronPackaged=true', () => {
+      it('exportarRango debería llamar saveRange cuando isElectronPackaged=true', async () => {
         electronService.isElectronPackaged = true;
         component.rangeDesde.set('2026-06-01');
         component.rangeHasta.set('2026-06-30');
 
-        component.exportarRango();
+        await component.exportarRango();
 
         expect(electronService.saveRange).toHaveBeenCalledWith(
           mockExcelBase64,
@@ -412,7 +411,7 @@ describe('HistorialPage', () => {
   describe('Multi-jornada (Feature A)', () => {
     it('A.1 RED: _jornadasPorFecha debería agrupar múltiples jornadas de la misma fecha', () => {
       // Arrange: 2 jornadas on 2026-06-04 (mockJornadas[0] and mockJornadas[1])
-      const map = (component as any)._jornadasPorFecha();
+      const map = (component as unknown as { _jornadasPorFecha: () => Map<string, Jornada[]> })._jornadasPorFecha();
       const arr = map.get('2026-06-04');
       expect(arr).toBeDefined();
       expect(arr.length).toBe(2);
@@ -421,7 +420,7 @@ describe('HistorialPage', () => {
     });
 
     it('A.1 RED: _jornadasPorFecha debería tener jornadas únicas para fechas sin duplicados', () => {
-      const map = (component as any)._jornadasPorFecha();
+      const map = (component as unknown as { _jornadasPorFecha: () => Map<string, Jornada[]> })._jornadasPorFecha();
       expect(map.get('2026-06-03')!.length).toBe(1);
       expect(map.get('2026-06-01')!.length).toBe(1);
     });
@@ -493,42 +492,41 @@ describe('HistorialPage', () => {
       expect(component.showRangePicker()).toBe(false);
     });
 
-    it('D.2 RED: exportarRango debería llamar al servicio con fechas correctas', () => {
+    it('D.2 RED: exportarRango debería llamar al servicio con fechas correctas', async () => {
       const service = TestBed.inject(JornadaService);
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(service.generarExportacionPorRango).toHaveBeenCalledWith('2026-06-01', '2026-06-15');
     });
 
-    it('D.2 RED: exportarRango debería mostrar error si faltan fechas', () => {
+    it('D.2 RED: exportarRango debería mostrar error si faltan fechas', async () => {
       component.rangeDesde.set('');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
-      expect(component.errorExport()).toBe('Seleccioná fecha desde y hasta para exportar.');
+      expect(component.errorExport()).toBe('Seleccione fecha desde y hasta para exportar.');
     });
 
-    it('D.2 RED: exportarRango debería limpiar error al completar', () => {
-      const service = TestBed.inject(JornadaService);
+    it('D.2 RED: exportarRango debería limpiar error al completar', async () => {
       component.errorExport.set('error previo');
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(component.errorExport()).toBeNull();
     });
 
-    it('D.2 RED: exportarRango debería manejar error del servicio', () => {
+    it('D.2 RED: exportarRango debería manejar error del servicio', async () => {
       const service = TestBed.inject(JornadaService);
-      vi.mocked(service.generarExportacionPorRango).mockReturnValue(
-        throwError(() => new Error('Error al exportar')),
+      vi.mocked(service.generarExportacionPorRango).mockRejectedValue(
+        new Error('Error al exportar'),
       );
 
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
-      component.exportarRango();
+      await component.exportarRango();
 
       expect(component.errorExport()).toBe('Error al exportar');
       expect(component.exportandoRango()).toBe(false);
@@ -552,7 +550,8 @@ describe('HistorialPage', () => {
       const service = TestBed.inject(JornadaService);
       // Usamos un observable que nunca completa para simular carga
       vi.mocked(service.obtenerDatosJornada).mockReturnValue(
-        // eslint-disable-next-line @typescript-eslint/no-empty-function — intencional: observable que nunca emite
+        // intencional: observable que nunca emite
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
         new Observable(() => {}),
       );
 
@@ -698,14 +697,14 @@ describe('HistorialPage — vacío', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },
@@ -731,6 +730,14 @@ describe('HistorialPage — vacío', () => {
     expect(empty).toBeTruthy();
   });
 
+  it('debería mostrar el mensaje neutro "Abra una jornada desde la página de Jornada."', () => {
+    const empty = fixture.nativeElement.querySelector('app-empty-state');
+    expect(empty).toBeTruthy();
+    expect(empty.textContent).toContain(
+      'No hay jornadas registradas aún. Abra una jornada desde la página de Jornada.',
+    );
+  });
+
   it('debería mostrar el calendario aunque no haya jornadas', () => {
     const calendar = fixture.nativeElement.querySelector('.grid-cols-7');
     expect(calendar).toBeTruthy();
@@ -742,14 +749,14 @@ describe('HistorialPage — error', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HistorialPage],
+      imports: [HistorialPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,
           useValue: {
             historial: () => of([]),
-            generarExportacionMensual: vi.fn().mockReturnValue(of(mockExcelBase64)),
-            generarExportacionPorRango: vi.fn().mockReturnValue(of(mockExcelBase64)),
+            generarExportacionMensual: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExportacionPorRango: vi.fn().mockResolvedValue(mockExcelBase64),
             obtenerReporte: vi.fn().mockReturnValue(of(null)),
             obtenerDatosJornada: vi.fn().mockReturnValue(of(mockPreviewData)),
           },

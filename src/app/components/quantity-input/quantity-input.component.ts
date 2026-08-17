@@ -1,10 +1,10 @@
 import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-quantity-input',
-  imports: [CurrencyPipe],
+  imports: [PesosPipe],
   templateUrl: './quantity-input.component.html',
 })
 export class QuantityInputComponent {

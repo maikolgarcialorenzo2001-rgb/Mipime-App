@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { UserService } from './user.service';
 import { AuthService } from './auth.service';
 import { DATABASE, type Database } from './database';
-import { hashPassword, generateSalt } from './hash-password';
+import { hashPassword } from './hash-password';
 import type { Usuario, UsuarioPublico } from '../models';
 
 /**

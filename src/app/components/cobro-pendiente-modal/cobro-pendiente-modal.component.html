@@ -38,7 +38,10 @@
             <div
               class="flex items-center justify-between gap-2"
               [class.cursor-pointer]="!soloLectura()"
+              tabindex="0"
               (click)="!soloLectura() && seleccionar(p.id)"
+              (keydown.enter)="!soloLectura() && seleccionar(p.id)"
+              (keydown.space)="!soloLectura() && seleccionar(p.id)"
             >
               <div class="min-w-0">
                 <p class="truncate font-medium text-gray-900 dark:text-gray-100">
@@ -50,7 +53,7 @@
               </div>
               <div class="flex shrink-0 items-center gap-2">
                 <span class="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-                  {{ p.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+                  {{ p.total | pesos:'1.0-0' }}
                 </span>
                 @if (tieneDetalle(p)) {
                   <button
@@ -93,7 +96,7 @@
         <div class="mb-4 flex items-baseline justify-between">
           <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total a cobrar</span>
           <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {{ sel.total | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+            {{ sel.total | pesos:'1.0-0' }}
           </span>
         </div>
 
@@ -171,8 +174,9 @@
         @if (formaPago() === 'divisas') {
           <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
+              <label for="divisa-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
               <select
+                id="divisa-tipo"
                 class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
                 [ngModel]="divisaTipo()"
                 (ngModelChange)="divisaTipo.set($event)"
@@ -182,8 +186,9 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
+              <label for="tasa-cambio" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
               <input
+                id="tasa-cambio"
                 type="number"
                 class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                 placeholder="0"
@@ -192,8 +197,9 @@
               />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
+              <label for="billete-recibido" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
               <input
+                id="billete-recibido"
                 type="number"
                 class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                 placeholder="Ej: 5, 10, 20, 50, 100"
@@ -215,16 +221,17 @@
               <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-sm">
                 <p class="text-red-600 dark:text-red-300 text-xs">
                   El monto en divisa no cubre el total. Faltan
-                  <strong>{{ f | currency: 'ARS': 'symbol-narrow': '1.0-0' }}</strong>.
-                  Completá con efectivo o aumentá el monto en divisa.
+                  <strong>{{ f | pesos:'1.0-0' }}</strong>.
+                  Complete con efectivo o aumente el monto en divisa.
                 </p>
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label for="completar-efectivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Completar con efectivo
-                  <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | currency: 'ARS': 'symbol-narrow': '1.0-0' }})</span>
+                  <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | pesos:'1.0-0' }})</span>
                 </label>
                 <input
+                  id="completar-efectivo"
                   type="number"
                   class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
                   placeholder="{{ f }}"
@@ -238,11 +245,11 @@
                 }
               </div>
             }
-            @if (vuelto() != null && vuelto()! >= 0) {
+            @if (vuelto() !== null && vuelto()! >= 0) {
               <div class="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-sm">
                 <span class="text-green-700 dark:text-green-300 font-medium">Vuelto:</span>
                 <strong class="text-green-700 dark:text-green-300 ml-1">
-                  {{ vuelto()! | currency: 'ARS': 'symbol-narrow': '1.0-0' }}
+                  {{ vuelto()! | pesos:'1.0-0' }}
                 </strong>
               </div>
             }
@@ -251,8 +258,8 @@
                 <span class="font-medium">Saldo insuficiente en caja</span>
                 <p class="text-xs mt-1">
                   El vuelto supera el saldo disponible en caja
-                  ({{ saldoEnCaja() | currency: 'ARS': 'symbol-narrow': '1.0-0' }}).
-                  Reducí el billete o elegí otra forma de pago.
+                  ({{ saldoEnCaja() | pesos:'1.0-0' }}).
+                  Reduzca el billete o elija otra forma de pago.
                 </p>
               </div>
             }

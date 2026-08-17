@@ -1,6 +1,6 @@
 import { Component, inject, viewChild, ElementRef, afterNextRender, signal, DestroyRef } from '@angular/core';
-import { CurrencyPipe } from '@angular/common';
 import { from, Observable } from 'rxjs';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -21,7 +21,7 @@ import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [CurrencyPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [PesosPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })

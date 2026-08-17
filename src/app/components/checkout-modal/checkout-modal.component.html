@@ -21,7 +21,7 @@
         <li class="flex justify-between py-2">
           <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ item.cantidad }}× {{ item.producto.nombre }}</span>
           <span class="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-            {{ item.subtotal | currency:'ARS':'symbol-narrow':'1.0-0' }}
+            {{ item.subtotal | pesos:'1.0-0' }}
           </span>
         </li>
       }
@@ -148,9 +148,10 @@
     @if (formaPago() === 'divisas') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
+          <label for="divisa-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
           <select
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
+            id="divisa-tipo"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             [ngModel]="divisaTipo()"
             (ngModelChange)="divisaTipo.set($event)"
           >
@@ -159,8 +160,9 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
+          <label for="tasa-cambio" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
           <input
+            id="tasa-cambio"
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="0"
@@ -169,8 +171,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
+          <label for="billete-recibido" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
           <input
+            id="billete-recibido"
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Ej: 5, 10, 20, 50, 100"
@@ -187,7 +190,7 @@
               {{ est | currency: divisaTipo() === 'USD' ? 'USD' : 'EUR': 'symbol': '1.2-2' }}
             </strong>
             <span class="text-gray-500 dark:text-gray-400 text-xs ml-1">
-              ({{ total() | currency: 'ARS': 'symbol-narrow': '1.0-0' }} ÷ tasa {{ tasaCambio() }})
+              ({{ total() | pesos:'1.0-0' }} ÷ tasa {{ tasaCambio() }})
             </span>
           </div>
         }
@@ -199,16 +202,17 @@
             </div>
             <p class="text-red-600 dark:text-red-300 text-xs mt-1">
               El monto en divisa no cubre el total. Faltan
-              <strong>{{ f | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong>.
-              Completá con efectivo o aumentá el monto en divisa.
+              <strong>{{ f | pesos:'1.0-0' }}</strong>.
+              Complete con efectivo o aumente el monto en divisa.
             </p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="completar-efectivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Completar con efectivo <span class="text-red-500">*</span>
-              <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | currency:'ARS':'symbol-narrow':'1.0-0' }})</span>
+              <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | pesos:'1.0-0' }})</span>
             </label>
             <input
+              id="completar-efectivo"
               type="number"
               class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
               placeholder="{{ f }}"
@@ -228,8 +232,9 @@
     @if (formaPago() === 'pendiente') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador <span class="text-red-500">*</span></label>
+          <label for="comprador-nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador <span class="text-red-500">*</span></label>
           <input
+            id="comprador-nombre"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre del comprador"
@@ -241,8 +246,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
+          <label for="autorizado-pendiente" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
+            id="autorizado-pendiente"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre de quien autoriza"
@@ -254,8 +260,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <label for="descripcion-pendiente" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
           <textarea
+            id="descripcion-pendiente"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             rows="2"
             placeholder="Motivo o detalle"
@@ -269,8 +276,9 @@
     @if (formaPago() === 'cuenta_cosas') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
+          <label for="autorizado-cuenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
+            id="autorizado-cuenta"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre de quien autoriza"
@@ -282,8 +290,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <label for="descripcion-cuenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
           <textarea
+            id="descripcion-cuenta"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             rows="2"
             placeholder="Motivo o detalle"
@@ -297,7 +306,7 @@
     <div class="mb-6 flex items-baseline justify-between border-t border-gray-200 dark:border-gray-700 pt-3">
       <span class="text-base font-semibold text-gray-900 dark:text-gray-100">Total</span>
       <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        {{ total() | currency:'ARS':'symbol-narrow':'1.0-0' }}
+        {{ total() | pesos:'1.0-0' }}
       </span>
     </div>
 
@@ -307,12 +316,12 @@
           @if (vuelto()! < 0) {
             <span class="text-sm font-medium text-red-600 dark:text-red-400">Falta</span>
             <span class="text-lg font-semibold text-red-600 dark:text-red-400">
-              {{ vuelto()! * -1 | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              {{ vuelto()! * -1 | pesos:'1.0-0' }}
             </span>
           } @else {
             <span class="text-sm font-medium text-green-600 dark:text-green-400">Vuelto</span>
             <span class="text-lg font-semibold text-green-600 dark:text-green-400">
-              {{ vuelto()! | currency:'ARS':'symbol-narrow':'1.0-0' }}
+              {{ vuelto()! | pesos:'1.0-0' }}
             </span>
           }
         </div>
@@ -323,9 +332,9 @@
               <span class="font-medium">Saldo insuficiente en caja</span>
             </div>
             <p class="text-xs mt-1">
-              El vuelto de ${{ vuelto()! | currency:'ARS':'symbol-narrow':'1.0-0' }}
-              supera el saldo disponible en caja (${{ saldoEnCaja() | currency:'ARS':'symbol-narrow':'1.0-0' }}).
-              Reducí el billete o elegí otra forma de pago.
+              El vuelto de ${{ vuelto()! | pesos:'1.0-0' }}
+              supera el saldo disponible en caja (${{ saldoEnCaja() | pesos:'1.0-0' }}).
+              Reduzca el billete o elija otra forma de pago.
             </p>
           </div>
         }

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CartItemRowComponent } from './cart-item-row.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
 
 describe('CartItemRowComponent', () => {
@@ -23,7 +24,7 @@ describe('CartItemRowComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [CartItemRowComponent],
+      imports: [CartItemRowComponent, PesosPipe],
     });
     fixture = TestBed.createComponent(CartItemRowComponent);
     fixture.componentRef.setInput('item', mockItem);

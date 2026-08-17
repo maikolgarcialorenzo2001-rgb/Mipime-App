@@ -37,9 +37,9 @@ describe('DbErrorComponent', () => {
     expect(text).toContain('Error crítico en la base de datos');
   });
 
-  it('renderiza el mensaje de contacto "Contactá al desarrollador"', () => {
+  it('renderiza el mensaje de contacto "Contacte al desarrollador"', () => {
     const text = fixture.nativeElement.textContent;
-    expect(text).toContain('Contactá al desarrollador');
+    expect(text).toContain('Contacte al desarrollador');
   });
 
   it('muestra el sqliteError del diagnóstico', () => {

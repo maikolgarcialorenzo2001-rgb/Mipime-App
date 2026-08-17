@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CobroPendienteModalComponent } from './cobro-pendiente-modal.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { CobroPendienteService } from '../../services/cobro-pendiente.service';
 import type { PendienteItem } from '../../services/cobro-pendiente.service';
 
@@ -28,7 +29,7 @@ describe('CobroPendienteModalComponent', () => {
       registrarCobroPendiente: vi.fn(),
     };
     TestBed.configureTestingModule({
-      imports: [CobroPendienteModalComponent],
+      imports: [CobroPendienteModalComponent, PesosPipe],
       providers: [{ provide: CobroPendienteService, useValue: mockService }],
     });
     fixture = TestBed.createComponent(CobroPendienteModalComponent);
@@ -301,11 +302,28 @@ describe('CobroPendienteModalComponent', () => {
     const confirm = botones().find((b) => b.textContent?.includes('Confirmar cobro'));
     expect(confirm).toBeTruthy();
     expect(confirm!.disabled).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Reduzca el billete o elija otra forma de pago.',
+    );
 
     component['onConfirmar']();
     await fixture.whenStable();
     expect(mockService.registrarCobroPendiente).not.toHaveBeenCalled();
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('RED: divisa insuficiente muestra el aviso de moneda con el texto neutro "Complete con efectivo o aumente el monto en divisa."', () => {
+    listar([pendienteItem({ total: 1000 })]);
+    component.seleccionar(1);
+    component.seleccionarFormaPago('divisas');
+    component.tasaCambio.set(700);
+    component.billeteRecibido.set(1); // 700 < 1000 → falta 300
+    fixture.detectChanges();
+
+    expect(component.pagoSuficiente()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      'Complete con efectivo o aumente el monto en divisa.',
+    );
   });
 
   it('RED: divisa que pasa a pagoSuficiente limpia la completación stale (AC6)', async () => {
