@@ -95,8 +95,8 @@ describe('JornadaService', () => {
         {
           provide: ExcelService,
           useValue: {
-            generarExcelJornada: vi.fn().mockReturnValue(mockExcelBase64),
-            generarExcelMensual: vi.fn().mockReturnValue(mockExcelBase64),
+            generarExcelJornada: vi.fn().mockResolvedValue(mockExcelBase64),
+            generarExcelMensual: vi.fn().mockResolvedValue(mockExcelBase64),
           },
         },
         {
@@ -781,7 +781,7 @@ describe('JornadaService', () => {
         // movimientos, productos, cuenta_cosas — fallback mockResolvedValue([])
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.generarExportacionMensual(2026, 5));
+      const resultado = await service.generarExportacionMensual(2026, 5);
 
       // Should call generarExcelMensual on ExcelService with 2 entries
       const excelService = TestBed.inject(ExcelService);
@@ -802,7 +802,7 @@ describe('JornadaService', () => {
       const service = TestBed.inject(JornadaService);
 
       await expect(
-        firstValueFrom(service.generarExportacionMensual(2026, 1)),
+        service.generarExportacionMensual(2026, 1),
       ).rejects.toThrow('No hay jornadas cerradas en este mes.');
     });
 
@@ -830,12 +830,33 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // ventas jornada 21
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+      await service.generarExportacionMensual(2026, 5);
 
       // Both jornadas should have data collected
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
       expect(callArg).toHaveLength(2);
+    });
+
+    it('S1 RED: la exportación entrega string base64, nunca un Promise anidado', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([]) // constructor
+        .mockResolvedValueOnce([junJornada1]) // jornadasDelMes SQL
+        .mockResolvedValueOnce([]) // _recolectarDatosJornada: ventas
+        .mockResolvedValueOnce([]) // movimientos
+        .mockResolvedValueOnce([]) // productos
+        .mockResolvedValueOnce([]); // cuenta_cosas
+
+      const excelService = TestBed.inject(ExcelService);
+      vi.mocked(excelService.generarExcelMensual).mockImplementation(() => Promise.resolve('base64'));
+
+      const service = TestBed.inject(JornadaService);
+      // API async: la firma Promise<string> elimina la clase de bug Observable<Promise<T>>.
+      // `await` garantiza un string — este test documenta el contrato anti-regresión.
+      const resultado = await service.generarExportacionMensual(2026, 5);
+
+      expect(typeof resultado).toBe('string');
+      expect(resultado).not.toBeInstanceOf(Promise);
     });
   });
 
@@ -901,7 +922,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // _recolectarDatosJornada: ventas jornada 2
 
       const service = TestBed.inject(JornadaService);
-      const resultado = await firstValueFrom(service.generarExportacionPorRango('2026-06-01', '2026-06-30'));
+      const resultado = await service.generarExportacionPorRango('2026-06-01', '2026-06-30');
 
       const excelService = TestBed.inject(ExcelService);
       expect(excelService.generarExcelMensual).toHaveBeenCalledTimes(1);
@@ -921,7 +942,7 @@ describe('JornadaService', () => {
       const service = TestBed.inject(JornadaService);
 
       await expect(
-        firstValueFrom(service.generarExportacionPorRango('2026-01-01', '2026-01-31')),
+        service.generarExportacionPorRango('2026-01-01', '2026-01-31'),
       ).rejects.toThrow('No hay jornadas en el rango seleccionado.');
     });
 
@@ -949,7 +970,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // ventas 21
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionPorRango('2026-06-01', '2026-06-30'));
+      await service.generarExportacionPorRango('2026-06-01', '2026-06-30');
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
@@ -1036,7 +1057,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // arqueo_caja
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+      await service.generarExportacionMensual(2026, 5);
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
@@ -1696,7 +1717,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // arqueo_caja
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionMensual(2026, 6));
+      await service.generarExportacionMensual(2026, 6);
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
@@ -1720,7 +1741,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // arqueo_caja
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionPorRango('2026-07-01', '2026-07-31'));
+      await service.generarExportacionPorRango('2026-07-01', '2026-07-31');
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
@@ -1850,7 +1871,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // arqueo_caja
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionMensual(2026, 5));
+      await service.generarExportacionMensual(2026, 5);
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];
@@ -1879,7 +1900,7 @@ describe('JornadaService', () => {
         .mockResolvedValueOnce([]); // arqueo_caja
 
       const service = TestBed.inject(JornadaService);
-      await firstValueFrom(service.generarExportacionPorRango('2026-07-01', '2026-07-31'));
+      await service.generarExportacionPorRango('2026-07-01', '2026-07-31');
 
       const excelService = TestBed.inject(ExcelService);
       const callArg = vi.mocked(excelService.generarExcelMensual).mock.calls[0][0];

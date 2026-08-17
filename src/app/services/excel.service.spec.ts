@@ -81,8 +81,8 @@ describe('ExcelService', () => {
   });
 
   describe('generarExcelJornada', () => {
-    it('debería devolver un string base64 válido', () => {
-      const result = service.generarExcelJornada(data);
+    it('debería devolver un string base64 válido', async () => {
+      const result = await service.generarExcelJornada(data);
 
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
@@ -100,7 +100,7 @@ describe('ExcelService', () => {
       expect(workbook.SheetNames).toContain('Movimientos');
     });
 
-    it('2.1 RED: debería mostrar nombre de producto vía productosMap, no producto_id', () => {
+    it('2.1 RED: debería mostrar nombre de producto vía productosMap, no producto_id', async () => {
       const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [1, { nombre: 'Coca-Cola 500ml', precio_costo: null }],
         [2, { nombre: 'Agua 1L', precio_costo: null }],
@@ -113,7 +113,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConMap);
+      const result = await service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -129,7 +129,7 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f[0] === 3)).toBe(false);
     });
 
-    it('2.2 RED: debería mostrar fila "Total gastos" incluso cuando es 0', () => {
+    it('2.2 RED: debería mostrar fila "Total gastos" incluso cuando es 0', async () => {
       const jornadaSinGastos: Jornada = {
         ...jornada,
         total_movimientos: 0,
@@ -142,7 +142,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataSinGastos);
+      const result = await service.generarExcelJornada(dataSinGastos);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -150,8 +150,8 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Total gastos', 0]);
     });
 
-    it('debería tener la data correcta en la hoja Resumen', () => {
-      const result = service.generarExcelJornada(data);
+    it('debería tener la data correcta en la hoja Resumen', async () => {
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       const sheet = workbook.Sheets['Resumen'];
@@ -177,8 +177,8 @@ describe('ExcelService', () => {
       expect(json.some((r: unknown) => (r as unknown[])[0] === 'Diferencia')).toBe(false);
     });
 
-    it('debería listar todas las ventas con sus detalles', () => {
-      const result = service.generarExcelJornada(data);
+    it('debería listar todas las ventas con sus detalles', async () => {
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       const sheet = workbook.Sheets['Ventas'];
@@ -203,8 +203,8 @@ describe('ExcelService', () => {
       expect(esperadoRow[4]).toBe(3800);
     });
 
-    it('debería listar los movimientos', () => {
-      const result = service.generarExcelJornada(data);
+    it('debería listar los movimientos', async () => {
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       const sheet = workbook.Sheets['Movimientos'];
@@ -216,7 +216,7 @@ describe('ExcelService', () => {
       expect(json[2]).toContainEqual('Bidón de agua');
     });
 
-    it('debería manejar jornada sin ventas ni movimientos', () => {
+    it('debería manejar jornada sin ventas ni movimientos', async () => {
       const dataVacia: JornadaReportData = {
         jornada,
         ventas: [],
@@ -225,7 +225,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataVacia);
+      const result = await service.generarExcelJornada(dataVacia);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('Resumen');
@@ -238,8 +238,8 @@ describe('ExcelService', () => {
   });
 
   describe('Ventas restructuring', () => {
-    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Precio venta, Total, Forma de pago', () => {
-      const result = service.generarExcelJornada(data);
+    it('3.1 RED: header debería tener columnas Producto, Cantidad, Precio unitario, Precio venta, Total, Forma de pago', async () => {
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -254,7 +254,7 @@ describe('ExcelService', () => {
       expect(header).toHaveLength(6);
     });
 
-    it('3.1 RED: una fila por detalle con nombre de producto resuelto', () => {
+    it('3.1 RED: una fila por detalle con nombre de producto resuelto', async () => {
       const productosMap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [1, { nombre: 'Coca-Cola 500ml', precio_costo: 400 }],
         [2, { nombre: 'Agua 1L', precio_costo: 600 }],
@@ -267,7 +267,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConMap);
+      const result = await service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -285,8 +285,8 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f[0] === 1)).toBe(false);
     });
 
-    it('3.1 RED: fila footer debe tener suma total de todos los subtotales', () => {
-      const result = service.generarExcelJornada(data);
+    it('3.1 RED: fila footer debe tener suma total de todos los subtotales', async () => {
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -299,7 +299,7 @@ describe('ExcelService', () => {
       expect(footerRow![4]).toBe(3800);
     });
 
-    it('3.1 RED: footer suma debe ser 0 cuando no hay ventas', () => {
+    it('3.1 RED: footer suma debe ser 0 cuando no hay ventas', async () => {
       const dataSinVentas: JornadaReportData = {
         jornada,
         ventas: [],
@@ -308,7 +308,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataSinVentas);
+      const result = await service.generarExcelJornada(dataSinVentas);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -321,7 +321,7 @@ describe('ExcelService', () => {
   });
 
   describe('Ganancia bruta y Firmado por en Resumen', () => {
-    it('3.3 RED: Resumen debe incluir Ganancia bruta = total_ventas - total_costo - gastos - merma', () => {
+    it('3.3 RED: Resumen debe incluir Ganancia bruta = total_ventas - total_costo - gastos - merma', async () => {
       const dataConGanancia: JornadaReportData = {
         jornada,
         ventas: ventaConDetalles,
@@ -330,7 +330,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConGanancia);
+      const result = await service.generarExcelJornada(dataConGanancia);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -338,14 +338,14 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Ganancia bruta', 1760]); // 3800 (ventas array) - 40 - 2000 - 0
     });
 
-    it('3.3 RED: Ganancia bruta = total_ventas - gastos cuando total_costo y merma = 0', () => {
+    it('3.3 RED: Ganancia bruta = total_ventas - gastos cuando total_costo y merma = 0', async () => {
       const dataSinCosto: JornadaReportData = {
         ...data,
         totalCosto: 0,
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataSinCosto);
+      const result = await service.generarExcelJornada(dataSinCosto);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -353,7 +353,7 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Ganancia bruta', 1800]); // 3800 (ventas array) - 0 - 2000 - 0
     });
 
-    it('3.3 RED: Resumen debe incluir Firmado por cuando userCierreNombre no es null', () => {
+    it('3.3 RED: Resumen debe incluir Firmado por cuando userCierreNombre no es null', async () => {
       const dataConFirma: JornadaReportData = {
         jornada,
         ventas: ventaConDetalles,
@@ -362,7 +362,7 @@ describe('ExcelService', () => {
         userCierreNombre: 'Admin',
       };
 
-      const result = service.generarExcelJornada(dataConFirma);
+      const result = await service.generarExcelJornada(dataConFirma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -370,14 +370,14 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Firmado por', 'Admin']);
     });
 
-    it('3.3 RED: NO debe incluir Firmado por cuando userCierreNombre es null', () => {
+    it('3.3 RED: NO debe incluir Firmado por cuando userCierreNombre es null', async () => {
       const dataSinFirma: JornadaReportData = {
         ...data,
         totalCosto: 0,
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataSinFirma);
+      const result = await service.generarExcelJornada(dataSinFirma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -415,7 +415,7 @@ describe('ExcelService', () => {
       },
     ];
 
-    it('4.1 RED: Ventas sheet debería tener columna "Forma de pago"', () => {
+    it('4.1 RED: Ventas sheet debería tener columna "Forma de pago"', async () => {
       const dataConForma: JornadaReportData = {
         jornada,
         ventas: ventasConFormaPago,
@@ -424,7 +424,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConForma);
+      const result = await service.generarExcelJornada(dataConForma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -433,7 +433,7 @@ describe('ExcelService', () => {
       expect(header).toContain('Forma de pago');
     });
 
-    it('4.1 RED: Ventas sheet debería mostrar forma_pago de cada venta', () => {
+    it('4.1 RED: Ventas sheet debería mostrar forma_pago de cada venta', async () => {
       const dataConForma: JornadaReportData = {
         jornada,
         ventas: ventasConFormaPago,
@@ -442,7 +442,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConForma);
+      const result = await service.generarExcelJornada(dataConForma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -453,7 +453,7 @@ describe('ExcelService', () => {
       expect(filas.some((f) => f.includes('transferencia'))).toBe(true);
     });
 
-    it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia en Efectivo del Día', () => {
+    it('4.1 RED: Resumen debería tener desglose total efectivo/transferencia en Efectivo del Día', async () => {
       const dataConForma: JornadaReportData = {
         ...data,
         ventas: ventasConFormaPago,
@@ -462,7 +462,7 @@ describe('ExcelService', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataConForma);
+      const result = await service.generarExcelJornada(dataConForma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -540,15 +540,15 @@ describe('ExcelService', () => {
       },
     ];
 
-    it('C9 RED: debería generar workbook con hoja "Resumen del Mes" + una hoja por jornada', () => {
-      const result = service.generarExcelMensual(dataMulti);
+    it('C9 RED: debería generar workbook con hoja "Resumen del Mes" + una hoja por jornada', async () => {
+      const result = await service.generarExcelMensual(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toEqual(['Resumen del Mes', '2026-03-15 (1)', '2026-03-20 (2)']);
     });
 
-    it('C9 RED: Resumen del Mes debería mostrar mes, cantidad, totales consolidados', () => {
-      const result = service.generarExcelMensual(dataMulti);
+    it('C9 RED: Resumen del Mes debería mostrar mes, cantidad, totales consolidados', async () => {
+      const result = await service.generarExcelMensual(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen del Mes'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -559,8 +559,8 @@ describe('ExcelService', () => {
       expect(json).toContainEqual(['Total gastos', 1500]);  // gastos from movimientos array
     });
 
-    it('C9 RED: hoja por jornada debería tener resumen header + ventas + movimientos', () => {
-      const result = service.generarExcelMensual(dataMulti);
+    it('C9 RED: hoja por jornada debería tener resumen header + ventas + movimientos', async () => {
+      const result = await service.generarExcelMensual(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-03-15 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -579,14 +579,14 @@ describe('ExcelService', () => {
       expect(json.some((r) => r[0] === 'Total caja')).toBe(false);
     });
 
-    it('C9 RED: debería manejar una sola jornada', () => {
-      const result = service.generarExcelMensual([dataMulti[0]]);
+    it('C9 RED: debería manejar una sola jornada', async () => {
+      const result = await service.generarExcelMensual([dataMulti[0]]);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toEqual(['Resumen del Mes', '2026-03-15 (1)']);
     });
 
-    it('C9 RED: no debería colisionar cuando dos jornadas tienen la misma fecha', () => {
+    it('C9 RED: no debería colisionar cuando dos jornadas tienen la misma fecha', async () => {
       const dataSameDate: JornadaReportData[] = [
         {
           ...dataMulti[0],
@@ -598,7 +598,7 @@ describe('ExcelService', () => {
         },
       ];
 
-      const result = service.generarExcelMensual(dataSameDate);
+      const result = await service.generarExcelMensual(dataSameDate);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('2026-03-15 (5)');
@@ -608,8 +608,8 @@ describe('ExcelService', () => {
       expect(uniqueNames.size).toBe(workbook.SheetNames.length);
     });
 
-it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
-      const result = service.generarExcelMensual(dataMulti);
+it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', async () => {
+      const result = await service.generarExcelMensual(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen del Mes'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -657,9 +657,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       { id: 2, jornada_id: 1, producto_id: 3, cantidad: 2, descripcion: 'Papas', autorizado_por: 'Admin', created_at: '' },
     ];
 
-    it('3.3 RED: Resumen debe mostrar desglose de divisas por tipo con tasa de cambio', () => {
+    it('3.3 RED: Resumen debe mostrar desglose de divisas por tipo con tasa de cambio', async () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConDivisas };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -671,22 +671,22 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['Total divisas en pesos', 200]);
     });
 
-    it('3.3 RED: Resumen debe mostrar "Pendientes del día" sin paréntesis', () => {
+    it('3.3 RED: Resumen debe mostrar "Pendientes del día" sin paréntesis', async () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
       expect(json).toContainEqual(['Pendientes del día', 1500]);
     });
 
-    it('3.3 RED: Resumen debe mostrar tabla Cuenta Casas con valores negativos', () => {
+    it('3.3 RED: Resumen debe mostrar tabla Cuenta Casas con valores negativos', async () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
       ]);
       const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -701,9 +701,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(valoresNegativos.length).toBeGreaterThan(0);
     });
 
-    it('3.4 RED: Ventas debe mostrar columnas divisa_tipo, monto_divisa, tasa_cambio cuando hay divisas', () => {
+    it('3.4 RED: Ventas debe mostrar columnas divisa_tipo, monto_divisa, tasa_cambio cuando hay divisas', async () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConDivisas };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -717,9 +717,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filaEfectivo[7]).toBe('');
     });
 
-    it('3.4 RED: Ventas debe mostrar columna "Comprador" cuando hay pendientes', () => {
+    it('3.4 RED: Ventas debe mostrar columna "Comprador" cuando hay pendientes', async () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -731,13 +731,13 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
 
     // ─── Bug 2: CuentaCosas debe usar precio_costo ───────────
-    it('5.1 RED: Cuenta Casas debe usar cantidad * precio_costo para calcular valores', () => {
+    it('5.1 RED: Cuenta Casas debe usar cantidad * precio_costo para calcular valores', async () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
       ]);
       const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -755,9 +755,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     });
 
     // ─── Bug 3: Pendientes separados en filas de footer ───
-    it('5.2 RED: Ventas sheet debe separar formas de pago en 5 filas de footer', () => {
+    it('5.2 RED: Ventas sheet debe separar formas de pago en 5 filas de footer', async () => {
       const dataTest: JornadaReportData = { ...data, ventas: ventasConPendientes };
-      const result = service.generarExcelJornada(dataTest);
+      const result = await service.generarExcelJornada(dataTest);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -793,8 +793,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       productosMap,
     });
 
-    it('C3 RED: hoja Movimientos debe incluir detalle de stock cuando hay stockMovimientos', () => {
-      const result = service.generarExcelJornada(dataConStock());
+    it('C3 RED: hoja Movimientos debe incluir detalle de stock cuando hay stockMovimientos', async () => {
+      const result = await service.generarExcelJornada(dataConStock());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -826,9 +826,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(stockData[2][1]).toBe('Ajuste');
     });
 
-    it('C3 RED: Movimientos sheet no debe tener sección de stock si stockMovimientos vacío', () => {
+    it('C3 RED: Movimientos sheet no debe tener sección de stock si stockMovimientos vacío', async () => {
       const dataSinStock: JornadaReportData = { ...data, stockMovimientos: undefined };
-      const result = service.generarExcelJornada(dataSinStock);
+      const result = await service.generarExcelJornada(dataSinStock);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -839,23 +839,23 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(stockHeaderIdx).toBe(-1);
     });
 
-    it('C3 RED: generarExcelMensual debe incluir hoja "Movimientos de Stock" consolidada', () => {
+    it('C3 RED: generarExcelMensual debe incluir hoja "Movimientos de Stock" consolidada', async () => {
       const stockMovs = stockMovimientos;
       const data1: JornadaReportData = { ...dataConStock(), jornada: { ...jornada, id: 1 }, stockMovimientos: [stockMovs[0]] };
       const data2: JornadaReportData = { ...data, jornada: { ...jornada, id: 2, fecha: '2026-06-05' }, stockMovimientos: [stockMovs[1], stockMovs[2]] };
 
-      const result = service.generarExcelMensual([data1, data2]);
+      const result = await service.generarExcelMensual([data1, data2]);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('Movimientos de Stock');
     });
 
-    it('C3 RED: hoja Movimientos de Stock debe tener todos los movimientos del mes', () => {
+    it('C3 RED: hoja Movimientos de Stock debe tener todos los movimientos del mes', async () => {
       const stockMovs = stockMovimientos;
       const data1: JornadaReportData = { ...dataConStock(), jornada: { ...jornada, id: 1 }, stockMovimientos: [stockMovs[0]] };
       const data2: JornadaReportData = { ...data, jornada: { ...jornada, id: 2, fecha: '2026-06-05' }, stockMovimientos: [stockMovs[1], stockMovs[2]] };
 
-      const result = service.generarExcelMensual([data1, data2]);
+      const result = await service.generarExcelMensual([data1, data2]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos de Stock'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -870,13 +870,13 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
 
   });
 
-    it('3.5 GREEN: Cuenta Casas en hoja por jornada del Excel mensual', () => {
+    it('3.5 GREEN: Cuenta Casas en hoja por jornada del Excel mensual', async () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [2, { nombre: 'Coca cola', precio_costo: 100 }],
         [3, { nombre: 'Papas', precio_costo: 50 }],
       ]);
       const dataTest: JornadaReportData = { ...data, cuentaCosas: cuentaCosas, productosMap: pmap };
-      const result = service.generarExcelMensual([dataTest]);
+      const result = await service.generarExcelMensual([dataTest]);
       const workbook = XLSX.read(result, { type: 'base64' });
       // La hoja por jornada debería tener la sección Cuenta Casas
       const sheet = workbook.Sheets['2026-06-04 (1)'];
@@ -904,17 +904,17 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
     ];
     // total = 13000, saldo_esperado = 10000 → diferencia = -3000 → SOBRANTE
 
-    it('6.1 RED: generarExcelJornada incluye hoja "Arqueo" cuando hay arqueo entries', () => {
+    it('6.1 RED: generarExcelJornada incluye hoja "Arqueo" cuando hay arqueo entries', async () => {
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelJornada(dataConArqueo);
+      const result = await service.generarExcelJornada(dataConArqueo);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('Arqueo');
     });
 
-    it('6.2 RED: hoja Arqueo contiene filas de denominación con valores correctos', () => {
+    it('6.2 RED: hoja Arqueo contiene filas de denominación con valores correctos', async () => {
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelJornada(dataConArqueo);
+      const result = await service.generarExcelJornada(dataConArqueo);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -925,10 +925,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['Total contado', '', 12000]);
     });
 
-    it('6.3 RED: cuando totalEnCaja < totalArqueo, muestra SOBRANTE', () => {
+    it('6.3 RED: cuando totalEnCaja < totalArqueo, muestra SOBRANTE', async () => {
       // totalEnCaja = 5000+3800+0-2000 = 6800 → diff = 6800-12000 = -5200
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelJornada(dataConArqueo);
+      const result = await service.generarExcelJornada(dataConArqueo);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -936,10 +936,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['SOBRANTE', 5200]);
     });
 
-    it('6.4 RED: cuando totalEnCaja < totalArqueo con otro monto, muestra SOBRANTE', () => {
+    it('6.4 RED: cuando totalEnCaja < totalArqueo con otro monto, muestra SOBRANTE', async () => {
       // totalEnCaja = 5000+3800+0-2000 = 6800, arqueoTotal=13000 → diff = -6200
       const dataConSobrante: JornadaReportData = { ...data, arqueo: arqueoSobrante };
-      const result = service.generarExcelJornada(dataConSobrante);
+      const result = await service.generarExcelJornada(dataConSobrante);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -947,17 +947,17 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['SOBRANTE', 6200]);
     });
 
-    it('6.5 RED: cuando data.arqueo es undefined, no hay hoja "Arqueo"', () => {
+    it('6.5 RED: cuando data.arqueo es undefined, no hay hoja "Arqueo"', async () => {
       const dataSinArqueo: JornadaReportData = { ...data, arqueo: undefined };
-      const result = service.generarExcelJornada(dataSinArqueo);
+      const result = await service.generarExcelJornada(dataSinArqueo);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).not.toContain('Arqueo');
     });
 
-    it('6.6 RED: hoja por jornada del Excel mensual incluye sección Arqueo', () => {
+    it('6.6 RED: hoja por jornada del Excel mensual incluye sección Arqueo', async () => {
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelMensual([dataConArqueo]);
+      const result = await service.generarExcelMensual([dataConArqueo]);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       const sheet = workbook.Sheets['2026-06-04 (1)'];
@@ -970,7 +970,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['SOBRANTE', 5200]);
     });
 
-    it('6.7 RED: cuando totalEnCaja === totalArqueo, muestra CUADRADO', () => {
+    it('6.7 RED: cuando totalEnCaja === totalArqueo, muestra CUADRADO', async () => {
       const arqueoCuadrado: ArqueoCajaEntry[] = [
         { denominacion: 5000, cantidad: 1, subtotal: 5000 },
         { denominacion: 200, cantidad: 4, subtotal: 800 },
@@ -978,7 +978,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       ];
       // arqueoTotal = 5000+800+1000 = 6800 matches totalEnCaja
       const dataCuadrado: JornadaReportData = { ...data, arqueo: arqueoCuadrado };
-      const result = service.generarExcelJornada(dataCuadrado);
+      const result = await service.generarExcelJornada(dataCuadrado);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1006,14 +1006,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       },
     ];
 
-    it('1.3 RED: Resumen "Total ventas + ingresos extra" excluye pendientes', () => {
+    it('1.3 RED: Resumen "Total ventas + ingresos extra" excluye pendientes', async () => {
       const dataConPendientes: JornadaReportData = {
         ...data,
         ventas: ventasConPendientes,
         movimientos: [],
         totalCosto: 0,
       };
-      const result = service.generarExcelJornada(dataConPendientes);
+      const result = await service.generarExcelJornada(dataConPendientes);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1022,9 +1022,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['Total ventas + ingresos extra', 850]);
     });
 
-    it('1.3 RED: Resumen tiene fila "Total después de retirar monto inicial"', () => {
+    it('1.3 RED: Resumen tiene fila "Total después de retirar monto inicial"', async () => {
       // totalEnCaja = 5000+3800+0-2000 = 6800, net cash = 6800-5000 = 1800
-      const result = service.generarExcelJornada(data);
+      const result = await service.generarExcelJornada(data);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1042,10 +1042,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       { denominacion: 50, cantidad: 100, subtotal: 5000 },
     ];
 
-    it('1.4 RED: Arqueo sheet faltante/sobrante usa totalEnCaja, no saldo_esperado', () => {
+    it('1.4 RED: Arqueo sheet faltante/sobrante usa totalEnCaja, no saldo_esperado', async () => {
       // totalEnCaja = 5000+3800+0-2000 = 6800, arqueo=12000 → SOBRANTE 5200
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelJornada(dataConArqueo);
+      const result = await service.generarExcelJornada(dataConArqueo);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1055,14 +1055,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json).toContainEqual(['SOBRANTE', 5200]);
     });
 
-    it('1.4 RED: Arqueo sheet no usa saldo_esperado (incluso si saldo_esperado difiere)', () => {
+    it('1.4 RED: Arqueo sheet no usa saldo_esperado (incluso si saldo_esperado difiere)', async () => {
       const jornadaConSaldoAlto: Jornada = { ...jornada, saldo_esperado: 99999 };
       const dataConSaldoAlto: JornadaReportData = {
         ...data,
         jornada: jornadaConSaldoAlto,
         arqueo: arqueoFaltante,
       };
-      const result = service.generarExcelJornada(dataConSaldoAlto);
+      const result = await service.generarExcelJornada(dataConSaldoAlto);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Arqueo'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1097,14 +1097,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       },
     ];
 
-    it('1.5 RED: Jornada sheet "Total ventas + ingresos extra" excluye pendientes', () => {
+    it('1.5 RED: Jornada sheet "Total ventas + ingresos extra" excluye pendientes', async () => {
       const dataConPendientes: JornadaReportData = {
         ...data,
         ventas: ventasConPendientes,
         movimientos: [],
         totalCosto: 0,
       };
-      const result = service.generarExcelMensual([dataConPendientes]);
+      const result = await service.generarExcelMensual([dataConPendientes]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1113,9 +1113,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((r: unknown) => (r as unknown[])[0] === 'Total ventas + ingresos extra' && (r as unknown[])[1] === 1000)).toBe(true);
     });
 
-    it('1.5 RED: Jornada sheet tiene fila "Total después de retirar monto inicial"', () => {
+    it('1.5 RED: Jornada sheet tiene fila "Total después de retirar monto inicial"', async () => {
       // totalEnCajaJ = 5000+3800+0-2000 = 6800, net = 6800-5000 = 1800
-      const result = service.generarExcelMensual([data]);
+      const result = await service.generarExcelMensual([data]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1123,10 +1123,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((r: unknown) => (r as unknown[])[0] === 'Total después de retirar monto inicial' && (r as unknown[])[1] === 1800)).toBe(true);
     });
 
-    it('1.5 RED: Jornada sheet arqueo usa totalEnCaja no saldo_esperado', () => {
+    it('1.5 RED: Jornada sheet arqueo usa totalEnCaja no saldo_esperado', async () => {
       // totalEnCaja = 5000+3800+0-2000 = 6800, arqueo=12000 → SOBRANTE 5200
       const dataConArqueo: JornadaReportData = { ...data, arqueo: arqueoFaltante };
-      const result = service.generarExcelMensual([dataConArqueo]);
+      const result = await service.generarExcelMensual([dataConArqueo]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1155,15 +1155,15 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       inversionPorProducto: ipveInversion,
     });
 
-    it('4.1 RED: debería incluir hoja "ipve" cuando inversionPorProducto está definido', () => {
-      const result = service.generarExcelJornada(ipveData());
+    it('4.1 RED: debería incluir hoja "ipve" cuando inversionPorProducto está definido', async () => {
+      const result = await service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('ipve');
     });
 
-    it('4.2 RED: hoja ipve debe tener 7 columnas con precio_venta, ingreso y ganancia', () => {
-      const result = service.generarExcelJornada(ipveData());
+    it('4.2 RED: hoja ipve debe tener 7 columnas con precio_venta, ingreso y ganancia', async () => {
+      const result = await service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1178,8 +1178,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(header[6]).toBe('Ganancia Potencial');
     });
 
-    it('4.3 RED: hoja ipve debe calcular ingreso y ganancia por producto', () => {
-      const result = service.generarExcelJornada(ipveData());
+    it('4.3 RED: hoja ipve debe calcular ingreso y ganancia por producto', async () => {
+      const result = await service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1206,10 +1206,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(azucarRow![6]).toBe(9000);
     });
 
-    it('4.6 RED: merma debe estar en columna 8 (después de 7 columnas + blank)', () => {
+    it('4.6 RED: merma debe estar en columna 8 (después de 7 columnas + blank)', async () => {
       const jornadaConMerma: Jornada = { ...jornada, total_merma: 2500 };
       const dataConMerma: JornadaReportData = { ...ipveData(), jornada: jornadaConMerma };
-      const result = service.generarExcelJornada(dataConMerma);
+      const result = await service.generarExcelJornada(dataConMerma);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1220,8 +1220,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(mermaRow![9]).toBe(2500);
     });
 
-    it('4.4 RED: hoja ipve debe tener fila de totales con suma correcta', () => {
-      const result = service.generarExcelJornada(ipveData());
+    it('4.4 RED: hoja ipve debe tener fila de totales con suma correcta', async () => {
+      const result = await service.generarExcelJornada(ipveData());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1235,13 +1235,13 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(totalRow![6]).toBe(67500);
     });
 
-    it('4.5 RED: producto con precio_venta null debe renderizar "—" en precio, ingreso y ganancia', () => {
+    it('4.5 RED: producto con precio_venta null debe renderizar "—" en precio, ingreso y ganancia', async () => {
       const pmapSinPrecio = new Map<number, { nombre: string; precio_costo: number | null; stock_almacen?: number; stock_shop?: number; precio_venta?: number }>([
         [1, { nombre: 'Producto Sin Precio', precio_costo: 500, precio_venta: undefined, stock_almacen: 10, stock_shop: 5 }],
       ]);
       const invSinPrecio = new Map<number, number>([[1, 7500]]);
       const dataSinPrecio: JornadaReportData = { ...data, productosMap: pmapSinPrecio, inversionPorProducto: invSinPrecio };
-      const result = service.generarExcelJornada(dataSinPrecio);
+      const result = await service.generarExcelJornada(dataSinPrecio);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1253,15 +1253,15 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(row![6]).toBe('—');
     });
 
-    it('4.1 RED: cuando inversionPorProducto es undefined, no debe incluir hoja ipve', () => {
+    it('4.1 RED: cuando inversionPorProducto es undefined, no debe incluir hoja ipve', async () => {
       const dataSinIpve: JornadaReportData = { ...data, inversionPorProducto: undefined };
-      const result = service.generarExcelJornada(dataSinIpve);
+      const result = await service.generarExcelJornada(dataSinIpve);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).not.toContain('ipve');
     });
 
-    it('4.1 RED: producto sin inversión debe mostrar 0 en Total Invertido', () => {
+    it('4.1 RED: producto sin inversión debe mostrar 0 en Total Invertido', async () => {
       const inversionParcial = new Map<number, number>([
         [1, 55000],
         // producto 2 no tiene inversión
@@ -1272,7 +1272,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         productosMap: ipveProductosMap,
         inversionPorProducto: inversionParcial,
       });
-      const result = service.generarExcelJornada(dataParcial());
+      const result = await service.generarExcelJornada(dataParcial());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['ipve'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1300,8 +1300,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       stockMovimientos: stockConResumen,
     });
 
-    it('5.1 RED: Movimientos sheet debe incluir detalle de stock después de movimientos', () => {
-      const result = service.generarExcelJornada(dataConResumen());
+    it('5.1 RED: Movimientos sheet debe incluir detalle de stock después de movimientos', async () => {
+      const result = await service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1311,8 +1311,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(stockHeader).toBeTruthy();
     });
 
-    it('5.1 RED: detalle de stock debe tener filas por cada movimiento', () => {
-      const result = service.generarExcelJornada(dataConResumen());
+    it('5.1 RED: detalle de stock debe tener filas por cada movimiento', async () => {
+      const result = await service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1338,8 +1338,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(ajusteRow).toBeTruthy();
     });
 
-    it('5.1 RED: detalle de stock debe incluir costo_total por fila', () => {
-      const result = service.generarExcelJornada(dataConResumen());
+    it('5.1 RED: detalle de stock debe incluir costo_total por fila', async () => {
+      const result = await service.generarExcelJornada(dataConResumen());
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1353,13 +1353,13 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       });
     });
 
-    it('5.1 RED: detalle de stock debe aparecer aunque no haya movimientos tradicionales', () => {
+    it('5.1 RED: detalle de stock debe aparecer aunque no haya movimientos tradicionales', async () => {
       const dataSoloStock: JornadaReportData = {
         ...data,
         movimientos: [],
         stockMovimientos: stockConResumen,
       };
-      const result = service.generarExcelJornada(dataSoloStock);
+      const result = await service.generarExcelJornada(dataSoloStock);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1372,7 +1372,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
   // ─── fix-cierre-jornada-calculos: Task 1.6 — Resumen del Mes ───
 
   describe('fix-cierre-jornada-calculos — Resumen del Mes', () => {
-    it('1.6 RED: Resumen del Mes "Total ventas + ingresos extra" excluye pendientes', () => {
+    it('1.6 RED: Resumen del Mes "Total ventas + ingresos extra" excluye pendientes', async () => {
       const dataConPendientes: JornadaReportData = {
         ...data,
         ventas: [
@@ -1392,7 +1392,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         movimientos: [],
         totalCosto: 0,
       };
-      const result = service.generarExcelMensual([dataConPendientes]);
+      const result = await service.generarExcelMensual([dataConPendientes]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen del Mes'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1412,9 +1412,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         [3, { nombre: 'Chocolate', precio_costo: 80, precio_venta: 150 }],
       ]);
 
-    it('PR1 RED: header debe incluir columna "Precio venta" entre Precio unitario y Total', () => {
+    it('PR1 RED: header debe incluir columna "Precio venta" entre Precio unitario y Total', async () => {
       const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta as any, totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataConMap);
+      const result = await service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1427,9 +1427,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(header[5]).toBe('Forma de pago');
     });
 
-    it('PR1 RED: detalle debe mostrar precio_venta del producto en columna 3', () => {
+    it('PR1 RED: detalle debe mostrar precio_venta del producto en columna 3', async () => {
       const dataConMap: JornadaReportData = { ...data, productosMap: productosConVenta as any, totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataConMap);
+      const result = await service.generarExcelJornada(dataConMap);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1438,7 +1438,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(cocaRow[3]).toBe(850);
     });
 
-    it('PR1 RED: producto sin precio_venta debe mostrar "—"', () => {
+    it('PR1 RED: producto sin precio_venta debe mostrar "—"', async () => {
       const pmap = new Map<number, { nombre: string; precio_costo: number | null }>([
         [1, { nombre: 'Coca-Cola 500ml', precio_costo: 400 }],
       ]);
@@ -1449,7 +1449,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         totalCosto: 0,
         userCierreNombre: null,
       };
-      const result = service.generarExcelJornada(dataSinPV);
+      const result = await service.generarExcelJornada(dataSinPV);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1458,10 +1458,10 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(cocaRow[3]).toBe('—');
     });
 
-    it('PR1 RED: venta con 1 solo producto NO debe tener fila de subtotal', () => {
+    it('PR1 RED: venta con 1 solo producto NO debe tener fila de subtotal', async () => {
       const singleVenta = ventaConDetalles.slice(0, 1);
       const dataSingle: JornadaReportData = { ...data, ventas: singleVenta, totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataSingle);
+      const result = await service.generarExcelJornada(dataSingle);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1469,9 +1469,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filas.some((f) => String(f[0] ?? '').startsWith('Total venta'))).toBe(false);
     });
 
-    it('PR1 RED: venta con 2+ productos debe mostrar fila de subtotal con total', () => {
+    it('PR1 RED: venta con 2+ productos debe mostrar fila de subtotal con total', async () => {
       const dataMulti: JornadaReportData = { ...data, totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataMulti);
+      const result = await service.generarExcelJornada(dataMulti);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1481,7 +1481,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(subRow![4]).toBe(2950); // venta 2 total
     });
 
-    it('PR1 RED: multi-lot debe mostrar desglose por lote + fila de subtotal del producto', () => {
+    it('PR1 RED: multi-lot debe mostrar desglose por lote + fila de subtotal del producto', async () => {
       const ventaLotes: any[] = [
         { id: 1, venta_id: 1, lote_id: 10, producto_id: 1, cantidad: 2, precio_costo_real: 400, created_at: '' },
         { id: 2, venta_id: 1, lote_id: 11, producto_id: 1, cantidad: 3, precio_costo_real: 400, created_at: '' },
@@ -1503,7 +1503,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         totalCosto: 0,
         userCierreNombre: null,
       };
-      const result = service.generarExcelJornada(dataConLotes);
+      const result = await service.generarExcelJornada(dataConLotes);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1517,7 +1517,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(subRow![4]).toBe(4250); // 2*850 + 3*850
     });
 
-    it('PR1 RED: multi-item + multi-lot combinados deben mostrar ambos subtotales', () => {
+    it('PR1 RED: multi-item + multi-lot combinados deben mostrar ambos subtotales', async () => {
       const ventaLotes: any[] = [
         { id: 1, venta_id: 2, lote_id: 20, producto_id: 1, cantidad: 1, precio_costo_real: 400, created_at: '' },
         { id: 2, venta_id: 2, lote_id: 21, producto_id: 1, cantidad: 1, precio_costo_real: 400, created_at: '' },
@@ -1528,7 +1528,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         [3, { nombre: 'Chocolate', precio_costo: 80, precio_venta: 150 }],
       ]);
       const dataMix: JornadaReportData = { ...data, ventaLotes, productosMap: pmap as any, totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataMix);
+      const result = await service.generarExcelJornada(dataMix);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1568,7 +1568,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       created_at: '',
     };
 
-    it('Resumen debe mostrar USD/EUR de ventas y de compra separados', () => {
+    it('Resumen debe mostrar USD/EUR de ventas y de compra separados', async () => {
       const dataDivisa: JornadaReportData = {
         ...data,
         ventas: [ventaDivisaUSD as any],
@@ -1576,7 +1576,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         totalCosto: 0,
         userCierreNombre: null,
       };
-      const result = service.generarExcelJornada(dataDivisa);
+      const result = await service.generarExcelJornada(dataDivisa);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1592,14 +1592,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filas.some(r => r[0] === 'EUR de compra' && r[1] === 50)).toBe(true);
     });
 
-    it('Movimientos sheet debe mostrar compra_divisa con detalles de divisa', () => {
+    it('Movimientos sheet debe mostrar compra_divisa con detalles de divisa', async () => {
       const dataMov: JornadaReportData = {
         ...data,
         movimientos: [movCompraUSD, movCompraEUR],
         totalCosto: 0,
         userCierreNombre: null,
       };
-      const result = service.generarExcelJornada(dataMov);
+      const result = await service.generarExcelJornada(dataMov);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Movimientos'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1633,7 +1633,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       detalles: [],
     };
 
-    it('RED: venta sin detalles se renderiza como fila única "Cobrar Pendiente #42" sin crash', () => {
+    it('RED: venta sin detalles se renderiza como fila única "Cobrar Pendiente #42" sin crash', async () => {
       const dataCobro: JornadaReportData = {
         ...data,
         ventas: [ventaCobro],
@@ -1642,7 +1642,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataCobro);
+      const result = await service.generarExcelJornada(dataCobro);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1652,7 +1652,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(fila[4]).toBe(2000); // Total = total del cobro
     });
 
-    it('RED: el total del cobro suma a totalCaja y a Total esperado del día', () => {
+    it('RED: el total del cobro suma a totalCaja y a Total esperado del día', async () => {
       const dataCobro: JornadaReportData = {
         ...data,
         ventas: [...ventaConDetalles, ventaCobro],
@@ -1661,7 +1661,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataCobro);
+      const result = await service.generarExcelJornada(dataCobro);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Ventas'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1675,7 +1675,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(esperadoRow[4]).toBe(5800);
     });
 
-    it('RED: Resumen "Total ventas + ingresos extra" incluye el cobro como cualquier venta', () => {
+    it('RED: Resumen "Total ventas + ingresos extra" incluye el cobro como cualquier venta', async () => {
       const dataCobro: JornadaReportData = {
         ...data,
         ventas: [ventaCobro],
@@ -1684,7 +1684,7 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
         userCierreNombre: null,
       };
 
-      const result = service.generarExcelJornada(dataCobro);
+      const result = await service.generarExcelJornada(dataCobro);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1710,8 +1710,8 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       };
     }
 
-    it('RED: genera hoja "Pendientes Acumulados" con header y filas cross-day', () => {
-      const result = service.generarExcelJornada(dataConPendientes());
+    it('RED: genera hoja "Pendientes Acumulados" con header y filas cross-day', async () => {
+      const result = await service.generarExcelJornada(dataConPendientes());
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).toContain('Pendientes Acumulados');
@@ -1726,14 +1726,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json[json.length - 1]).toEqual(['Total', '', 2000, '']);
     });
 
-    it('RED: caso mixto mismo día — antigüedad 0 en pendientes creados hoy', () => {
+    it('RED: caso mixto mismo día — antigüedad 0 en pendientes creados hoy', async () => {
       const mixto: PendienteAcumulado[] = [
         { id: 3, comprador: 'Hoy', fechaOriginal: '2026-06-04T08:00:00Z', monto: 300, antiguedadDias: 0 },
         { id: 1, comprador: 'Ayer', fechaOriginal: '2026-06-03T08:00:00Z', monto: 700, antiguedadDias: 1 },
       ];
       const dataMixto: JornadaReportData = { ...dataConPendientes(), pendientesAcumulados: mixto };
 
-      const result = service.generarExcelJornada(dataMixto);
+      const result = await service.generarExcelJornada(dataMixto);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Pendientes Acumulados'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1744,9 +1744,9 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(filaAyer[3]).toBe(1);
     });
 
-    it('RED: cero pendientes → hoja omitida y Resumen "Pendientes del día" intacto', () => {
+    it('RED: cero pendientes → hoja omitida y Resumen "Pendientes del día" intacto', async () => {
       const dataSinPend: JornadaReportData = { ...data, pendientesAcumulados: [], totalCosto: 0, userCierreNombre: null };
-      const result = service.generarExcelJornada(dataSinPend);
+      const result = await service.generarExcelJornada(dataSinPend);
       const workbook = XLSX.read(result, { type: 'base64' });
 
       expect(workbook.SheetNames).not.toContain('Pendientes Acumulados');
@@ -1759,14 +1759,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
   // ─── fix-reanudar-jornada-acceso: FR-6 — "Abierta por A / Cerrada por B" ───
 
   describe('FR-6 — Abierta por / Cerrada por (firma condicional)', () => {
-    it('RED: A≠B — Resumen muestra "Abierta por Ana" + "Cerrada por Beto" (no "Firmado por")', () => {
+    it('RED: A≠B — Resumen muestra "Abierta por Ana" + "Cerrada por Beto" (no "Firmado por")', async () => {
       const dataAB: JornadaReportData = {
         ...data,
         userAperturaNombre: 'Ana',
         userCierreNombre: 'Beto',
       };
 
-      const result = service.generarExcelJornada(dataAB);
+      const result = await service.generarExcelJornada(dataAB);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1776,14 +1776,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((f) => (f as unknown[])[0] === 'Firmado por')).toBe(false);
     });
 
-    it('RED: A===B — Resumen muestra única fila "Firmado por" (igual que hoy)', () => {
+    it('RED: A===B — Resumen muestra única fila "Firmado por" (igual que hoy)', async () => {
       const dataAB: JornadaReportData = {
         ...data,
         userAperturaNombre: 'Beto',
         userCierreNombre: 'Beto',
       };
 
-      const result = service.generarExcelJornada(dataAB);
+      const result = await service.generarExcelJornada(dataAB);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1793,14 +1793,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((f) => (f as unknown[])[0] === 'Cerrada por')).toBe(false);
     });
 
-    it('RED: apertura NULL legacy — Resumen mantiene "Firmado por" (back-compat)', () => {
+    it('RED: apertura NULL legacy — Resumen mantiene "Firmado por" (back-compat)', async () => {
       const dataLegacy: JornadaReportData = {
         ...data,
         userAperturaNombre: null,
         userCierreNombre: 'Admin',
       };
 
-      const result = service.generarExcelJornada(dataLegacy);
+      const result = await service.generarExcelJornada(dataLegacy);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['Resumen'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1809,14 +1809,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
     });
 
-    it('RED: A≠B — hoja de jornada del Excel mensual muestra "Abierta por"/"Cerrada por"', () => {
+    it('RED: A≠B — hoja de jornada del Excel mensual muestra "Abierta por"/"Cerrada por"', async () => {
       const dataAB: JornadaReportData = {
         ...data,
         userAperturaNombre: 'Ana',
         userCierreNombre: 'Beto',
       };
 
-      const result = service.generarExcelMensual([dataAB]);
+      const result = await service.generarExcelMensual([dataAB]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1826,14 +1826,14 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((f) => (f as unknown[])[0] === 'Firmado por')).toBe(false);
     });
 
-    it('RED: A===B — hoja de jornada mantiene "Firmado por" única', () => {
+    it('RED: A===B — hoja de jornada mantiene "Firmado por" única', async () => {
       const dataAB: JornadaReportData = {
         ...data,
         userAperturaNombre: 'Beto',
         userCierreNombre: 'Beto',
       };
 
-      const result = service.generarExcelMensual([dataAB]);
+      const result = await service.generarExcelMensual([dataAB]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
@@ -1842,20 +1842,93 @@ it('C9 RED: Resumen del Mes no debe incluir Diferencia consolidada', () => {
       expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
     });
 
-    it('RED: apertura NULL — hoja de jornada mantiene "Firmado por" (back-compat)', () => {
+    it('RED: apertura NULL — hoja de jornada mantiene "Firmado por" (back-compat)', async () => {
       const dataLegacy: JornadaReportData = {
         ...data,
         userAperturaNombre: null,
         userCierreNombre: 'Admin',
       };
 
-      const result = service.generarExcelMensual([dataLegacy]);
+      const result = await service.generarExcelMensual([dataLegacy]);
       const workbook = XLSX.read(result, { type: 'base64' });
       const sheet = workbook.Sheets['2026-06-04 (1)'];
       const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
 
       expect(json).toContainEqual(['Firmado por', 'Admin']);
       expect(json.some((f) => (f as unknown[])[0] === 'Abierta por')).toBe(false);
+    });
+  });
+
+  describe('S5+S6 — carga del chunk xlsx con reintento backoff y preload idle', () => {
+    const priv = (): {
+      _importarXlsx(): Promise<object>;
+      _cargarXlsx(): Promise<object>;
+      _precargarXlsxAlIdle(): void;
+      _xlsxPromise: Promise<object> | null;
+    } => service as unknown as {
+      _importarXlsx(): Promise<object>;
+      _cargarXlsx(): Promise<object>;
+      _precargarXlsxAlIdle(): void;
+      _xlsxPromise: Promise<object> | null;
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('S5 RED: reintenta la carga 2 veces y resuelve el módulo al tercer intento', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx');
+      spy
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce({ utils: {} });
+
+      const promesa = p._cargarXlsx();
+      await vi.advanceTimersByTimeAsync(200 + 400);
+
+      const modulo = await promesa;
+      expect(spy).toHaveBeenCalledTimes(3);
+      expect(modulo).toEqual({ utils: {} });
+
+      // La promesa cacheada se reusa: un segundo pedido no dispara otro import.
+      const reuso = await p._cargarXlsx();
+      expect(reuso).toEqual({ utils: {} });
+      expect(spy).toHaveBeenCalledTimes(3);
+    });
+
+    it('S5 RED: tras agotar los 3 intentos propaga el último error', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx');
+      spy.mockRejectedValue(new Error('offline'));
+
+      const promesa = p._cargarXlsx();
+      // Adjuntar el handler de rechazo ANTES de avanzar los timers: si la promesa
+      // rechaza durante el avance, Node lo marcaría como unhandledRejection.
+      const assertion = expect(promesa).rejects.toThrow('offline');
+      await vi.advanceTimersByTimeAsync(200 + 400);
+
+      await assertion;
+      expect(spy).toHaveBeenCalledTimes(3);
+    });
+
+    it('S6 RED: el preload al idle cachea el módulo vía el fallback setTimeout', async () => {
+      vi.useFakeTimers();
+      const p = priv();
+      const spy = vi.spyOn(p, '_importarXlsx').mockResolvedValue({ utils: {} });
+
+      p._precargarXlsxAlIdle();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(p._xlsxPromise).not.toBeNull();
+
+      const modulo = await p._cargarXlsx();
+      expect(modulo).toEqual({ utils: {} });
+      // Ya cacheado por el preload: no reimporta.
+      expect(spy).toHaveBeenCalledTimes(1);
     });
   });
 });
