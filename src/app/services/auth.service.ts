@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { from, map, Observable } from 'rxjs';
+import { from, Observable } from 'rxjs';
 import { DATABASE } from './database';
 import { hashPassword } from './hash-password';
 import type { Usuario, UsuarioPublico } from '../models';

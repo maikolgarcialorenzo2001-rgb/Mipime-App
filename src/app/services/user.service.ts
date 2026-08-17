@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { DATABASE, type Database } from './database';
+import { DATABASE } from './database';
 import { AuthService } from './auth.service';
 import { generateSalt, hashPassword } from './hash-password';
 import { environment } from '../environments/environment';

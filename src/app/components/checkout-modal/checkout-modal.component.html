@@ -148,9 +148,10 @@
     @if (formaPago() === 'divisas') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
+          <label for="divisa-tipo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de divisa</label>
           <select
-            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 dark:[color-scheme:dark]"
+            id="divisa-tipo"
+            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             [ngModel]="divisaTipo()"
             (ngModelChange)="divisaTipo.set($event)"
           >
@@ -159,8 +160,9 @@
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
+          <label for="tasa-cambio" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tasa de cambio (1 divisa = X $)</label>
           <input
+            id="tasa-cambio"
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="0"
@@ -169,8 +171,9 @@
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
+          <label for="billete-recibido" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Billete recibido (en divisa)</label>
           <input
+            id="billete-recibido"
             type="number"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Ej: 5, 10, 20, 50, 100"
@@ -204,11 +207,12 @@
             </p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label for="completar-efectivo" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Completar con efectivo <span class="text-red-500">*</span>
               <span class="text-gray-400 font-normal text-xs ml-1">(mín. {{ f | pesos:'1.0-0' }})</span>
             </label>
             <input
+              id="completar-efectivo"
               type="number"
               class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
               placeholder="{{ f }}"
@@ -228,8 +232,9 @@
     @if (formaPago() === 'pendiente') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador <span class="text-red-500">*</span></label>
+          <label for="comprador-nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nombre del comprador <span class="text-red-500">*</span></label>
           <input
+            id="comprador-nombre"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre del comprador"
@@ -241,8 +246,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
+          <label for="autorizado-pendiente" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
+            id="autorizado-pendiente"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre de quien autoriza"
@@ -254,8 +260,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <label for="descripcion-pendiente" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
           <textarea
+            id="descripcion-pendiente"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             rows="2"
             placeholder="Motivo o detalle"
@@ -269,8 +276,9 @@
     @if (formaPago() === 'cuenta_cosas') {
       <div class="mb-4 space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
+          <label for="autorizado-cuenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Autorizado por <span class="text-red-500">*</span></label>
           <input
+            id="autorizado-cuenta"
             type="text"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             placeholder="Nombre de quien autoriza"
@@ -282,8 +290,9 @@
           }
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
+          <label for="descripcion-cuenta" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descripción <span class="text-gray-400">(opcional)</span></label>
           <textarea
+            id="descripcion-cuenta"
             class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
             rows="2"
             placeholder="Motivo o detalle"

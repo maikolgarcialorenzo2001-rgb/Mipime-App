@@ -144,7 +144,7 @@ describe('ElectronFileService', () => {
 
       const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:url');
       const clickMock = vi.fn();
-      const createElement = vi.spyOn(document, 'createElement').mockReturnValue({
+      vi.spyOn(document, 'createElement').mockReturnValue({
         href: '',
         download: '',
         click: clickMock,

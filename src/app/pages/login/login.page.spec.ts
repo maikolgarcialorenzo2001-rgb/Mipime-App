@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter, Router, RouterModule } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { LoginPage } from './login.page';
 import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';

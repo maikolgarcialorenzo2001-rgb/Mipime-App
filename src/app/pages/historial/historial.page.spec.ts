@@ -240,7 +240,7 @@ describe('HistorialPage', () => {
     });
 
     it('C9 RED: exportarMes debería iniciar descarga y limpiar exportando', async () => {
-      const electronService = TestBed.inject(ElectronFileService) as any;
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveMonthly: ReturnType<typeof vi.fn> };
 
       await component.exportarMes();
 
@@ -302,7 +302,7 @@ describe('HistorialPage', () => {
 
     it('debería descargar el archivo cuando existe el reporte', () => {
       const service = TestBed.inject(JornadaService);
-      const electronService = TestBed.inject(ElectronFileService) as any;
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveIndividual: ReturnType<typeof vi.fn> };
       const mockReporte: JornadaReporte = {
         id: 1,
         jornada_id: 3,
@@ -323,7 +323,7 @@ describe('HistorialPage', () => {
 
     it('debería no hacer nada cuando el reporte es null', () => {
       const service = TestBed.inject(JornadaService);
-      const electronService = TestBed.inject(ElectronFileService) as any;
+      const electronService = TestBed.inject(ElectronFileService) as unknown as { saveIndividual: ReturnType<typeof vi.fn> };
       vi.mocked(service.obtenerReporte).mockReturnValue(of(null));
 
       component.descargarExcel(mockJornadas[0]);
@@ -411,7 +411,7 @@ describe('HistorialPage', () => {
   describe('Multi-jornada (Feature A)', () => {
     it('A.1 RED: _jornadasPorFecha debería agrupar múltiples jornadas de la misma fecha', () => {
       // Arrange: 2 jornadas on 2026-06-04 (mockJornadas[0] and mockJornadas[1])
-      const map = (component as any)._jornadasPorFecha();
+      const map = (component as unknown as { _jornadasPorFecha: () => Map<string, Jornada[]> })._jornadasPorFecha();
       const arr = map.get('2026-06-04');
       expect(arr).toBeDefined();
       expect(arr.length).toBe(2);
@@ -420,7 +420,7 @@ describe('HistorialPage', () => {
     });
 
     it('A.1 RED: _jornadasPorFecha debería tener jornadas únicas para fechas sin duplicados', () => {
-      const map = (component as any)._jornadasPorFecha();
+      const map = (component as unknown as { _jornadasPorFecha: () => Map<string, Jornada[]> })._jornadasPorFecha();
       expect(map.get('2026-06-03')!.length).toBe(1);
       expect(map.get('2026-06-01')!.length).toBe(1);
     });
@@ -510,7 +510,6 @@ describe('HistorialPage', () => {
     });
 
     it('D.2 RED: exportarRango debería limpiar error al completar', async () => {
-      const service = TestBed.inject(JornadaService);
       component.errorExport.set('error previo');
       component.rangeDesde.set('2026-06-01');
       component.rangeHasta.set('2026-06-15');
@@ -551,7 +550,8 @@ describe('HistorialPage', () => {
       const service = TestBed.inject(JornadaService);
       // Usamos un observable que nunca completa para simular carga
       vi.mocked(service.obtenerDatosJornada).mockReturnValue(
-        // eslint-disable-next-line @typescript-eslint/no-empty-function — intencional: observable que nunca emite
+        // intencional: observable que nunca emite
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
         new Observable(() => {}),
       );
 
