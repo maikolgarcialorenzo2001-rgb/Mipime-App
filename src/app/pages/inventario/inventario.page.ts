@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, viewChild, ElementRef, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
-import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
+
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 
@@ -19,7 +19,6 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
     FormsModule,
     DatePipe,
     StockBadgeComponent,
-    ErrorAlertComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
   ],
@@ -40,6 +39,7 @@ export class InventarioPage implements OnInit {
   readonly error = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
   private _toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  private _errorTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
     productoId: number;
@@ -439,6 +439,34 @@ export class InventarioPage implements OnInit {
   readonly confirmandoEliminar = signal<number | null>(null);
   readonly procesando = signal(false);
   readonly procesandoMovimiento = signal(false);
+
+  /** Autofocus refs for modals */
+  readonly productoModalBackdrop = viewChild<ElementRef<HTMLElement>>('productoModalBackdrop');
+  readonly deleteModalBackdrop = viewChild<ElementRef<HTMLElement>>('deleteModalBackdrop');
+
+  private readonly _focusProductoEffect = effect(() => {
+    if (this.showProductoModal()) {
+      setTimeout(() => this.productoModalBackdrop()?.nativeElement.focus());
+    }
+  });
+
+  private readonly _focusDeleteEffect = effect(() => {
+    if (this.confirmandoEliminar() != null) {
+      setTimeout(() => this.deleteModalBackdrop()?.nativeElement.focus());
+    }
+  });
+
+  /** Auto-dismiss error toast after 4s. */
+  private readonly _errorAutoDismiss = effect(() => {
+    const msg = this.error();
+    if (msg) {
+      if (this._errorTimeout !== null) clearTimeout(this._errorTimeout);
+      this._errorTimeout = setTimeout(() => {
+        this.error.set(null);
+        this._errorTimeout = null;
+      }, 4000);
+    }
+  });
 
   /** Conteo de lo que se eliminaría al borrar el producto (F9): movimientos,
    *  lotes, venta_lotes y bloqueos por historial (ventas/cuenta_cosas). null

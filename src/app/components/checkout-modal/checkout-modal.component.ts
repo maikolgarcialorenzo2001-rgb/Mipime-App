@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal, effect } from '@angular/core';
+import { Component, computed, input, output, signal, effect, viewChild, ElementRef, afterNextRender } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PesosPipe } from '../../pipes/pesos.pipe';
@@ -28,6 +28,14 @@ export class CheckoutModalComponent {
   readonly saldoEnCaja = input<number>(0);
   readonly confirmar = output<CheckoutPayload>();
   readonly cancelar = output();
+
+  readonly backdrop = viewChild<ElementRef<HTMLElement>>('backdrop');
+
+  constructor() {
+    afterNextRender(() => {
+      setTimeout(() => this.backdrop()?.nativeElement.focus());
+    });
+  }
 
   readonly formaPago = signal<string>('efectivo');
 
