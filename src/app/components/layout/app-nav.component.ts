@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
@@ -38,6 +38,22 @@ export class AppNavComponent {
   readonly showCloseModal = signal(false);
   readonly cerrando = signal(false);
   readonly cerrarError = signal<string | null>(null);
+
+  /** Autofocus refs */
+  readonly openModalBackdrop = viewChild<ElementRef<HTMLElement>>('openModalBackdrop');
+  readonly closeModalBackdrop = viewChild<ElementRef<HTMLElement>>('closeModalBackdrop');
+
+  private readonly _focusOpenEffect = effect(() => {
+    if (this.showOpenModal()) {
+      setTimeout(() => this.openModalBackdrop()?.nativeElement.focus());
+    }
+  });
+
+  private readonly _focusCloseEffect = effect(() => {
+    if (this.showCloseModal()) {
+      setTimeout(() => this.closeModalBackdrop()?.nativeElement.focus());
+    }
+  });
 
   /** Entries de arqueo emitidos por <app-arqueo-billetes-form> (solo cantidad > 0). */
   readonly arqueoEntries = signal<ArqueoCajaEntry[]>([]);

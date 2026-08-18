@@ -13,8 +13,7 @@
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": true,
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0"
+    "moduleResolution": "node"
   },
   "include": ["./**/*.ts"],
   "exclude": ["./**/*.spec.ts"]
