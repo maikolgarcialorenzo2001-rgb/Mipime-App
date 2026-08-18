@@ -210,6 +210,8 @@ export class VentaService {
         const consumos = await this._stockMovimiento.registrarSalida(
           item.producto.id,
           item.cantidad,
+          undefined,
+          jornadaId,
         );
 
         // Insert venta_lotes records

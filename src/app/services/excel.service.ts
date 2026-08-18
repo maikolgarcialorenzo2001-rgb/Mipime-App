@@ -1049,9 +1049,24 @@ export class ExcelService {
     const pmap = data.productosMap;
     if (!inv || !pmap) return;
 
+    const ventas = data.ventas ?? [];
+    const stockMovs = data.stockMovimientos ?? [];
+    const entradasMap = new Map<number, number>();
+    const mermaMap = new Map<number, number>();
+    const ventasMap = new Map<number, number>();
+    for (const m of stockMovs) {
+      if (m.tipo === 'traslado') entradasMap.set(m.producto_id, (entradasMap.get(m.producto_id) ?? 0) + m.cantidad);
+      if (m.tipo === 'merma') mermaMap.set(m.producto_id, (mermaMap.get(m.producto_id) ?? 0) + m.cantidad);
+    }
+    for (const v of ventas) {
+      for (const d of v.detalles) {
+        ventasMap.set(d.producto_id, (ventasMap.get(d.producto_id) ?? 0) + d.cantidad);
+      }
+    }
+
     // Left table: product stock + investment + expected revenue + potential profit
     const filas: unknown[][] = [
-      ['Nombre', 'Stock Almacén', 'Stock Tienda', 'Precio Venta', 'Ingreso Esperado', 'Total Invertido', 'Ganancia Potencial'],
+      ['Nombre', 'Stck Tienda Inicial', 'Entradas', 'Stck Tienda Final', 'Stock Almacén', 'Precio Venta', 'Ingreso Esperado', 'Total Invertido', 'Ganancia Potencial'],
     ];
 
     let sumIngreso = 0;
@@ -1063,6 +1078,10 @@ export class ExcelService {
       const pv = info.precio_venta;
       const stockAlmacen = info.stock_almacen;
       const stockShop = info.stock_shop;
+      const entradas = entradasMap.get(productoId) ?? 0;
+      const ventasProd = ventasMap.get(productoId) ?? 0;
+      const mermaProd = mermaMap.get(productoId) ?? 0;
+      const stckTiendaInicial = stockShop != null ? stockShop + ventasProd + mermaProd - entradas : null;
 
       if (pv != null && stockAlmacen != null && stockShop != null) {
         const totalStock = stockAlmacen + stockShop;
@@ -1071,30 +1090,32 @@ export class ExcelService {
         sumIngreso += ingreso;
         sumInversion += inversion;
         sumGanancia += ganancia;
-        filas.push([info.nombre, stockAlmacen, stockShop, pv, ingreso, inversion, ganancia]);
+        filas.push([info.nombre, stckTiendaInicial, entradas, stockShop, stockAlmacen, pv, ingreso, inversion, ganancia]);
       } else {
         sumInversion += inversion;
-        filas.push([info.nombre, stockAlmacen ?? '—', stockShop ?? '—', '—', '—', inversion, '—']);
+        filas.push([info.nombre, stckTiendaInicial ?? '—', entradas, stockShop ?? '—', stockAlmacen ?? '—', '—', '—', inversion, '—']);
       }
     }
 
     // Totals row
-    filas.push(['TOTALES', '', '', '', sumIngreso, sumInversion, sumGanancia]);
+    filas.push(['TOTALES', '', '', '', '', '', sumIngreso, sumInversion, sumGanancia]);
 
     const ws = XLSX.utils.aoa_to_sheet(filas);
 
-    // Merma table to the RIGHT (offset after 7 data columns + 1 blank = starting at col I)
+    // Merma table to the RIGHT (offset after 9 data columns + 1 blank = starting at col K)
     const mermaVal = data.jornada.total_merma ?? 0;
-    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 8 } });
+    XLSX.utils.sheet_add_aoa(ws, [['Merma del día', mermaVal]], { origin: { r: 0, c: 10 } });
 
     ws['!cols'] = [
-      { wch: 20 },
-      { wch: 16 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 18 },
+      { wch: 20 },  // Nombre
+      { wch: 18 },  // Stck Tienda Inicial
+      { wch: 12 },  // Entradas
+      { wch: 18 },  // Stck Tienda Final
+      { wch: 16 },  // Stock Almacén
+      { wch: 14 },  // Precio Venta
+      { wch: 18 },  // Ingreso Esperado
+      { wch: 18 },  // Total Invertido
+      { wch: 18 },  // Ganancia Potencial
     ];
     ws['!protect'] = {};
 

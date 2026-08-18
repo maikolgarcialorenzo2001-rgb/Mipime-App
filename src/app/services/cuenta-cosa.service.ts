@@ -53,7 +53,7 @@ export class CuentaCosasService {
           [jornadaId, item.productoId, item.cantidad, descripcion ?? null, autorizadoPor, ahora],
         );
 
-        await this._stockMovimiento.registrarSalida(item.productoId, item.cantidad);
+        await this._stockMovimiento.registrarSalida(item.productoId, item.cantidad, undefined, jornadaId);
       }
 
       // COMMIT

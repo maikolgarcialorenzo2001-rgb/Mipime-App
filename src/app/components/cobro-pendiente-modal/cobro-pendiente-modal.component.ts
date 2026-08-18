@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, viewChild, ElementRef, afterNextRender } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PesosPipe } from '../../pipes/pesos.pipe';
@@ -31,6 +31,14 @@ export class CobroPendienteModalComponent {
 
   readonly cobroCompletado = output();
   readonly cancelar = output();
+
+  readonly backdrop = viewChild<ElementRef<HTMLElement>>('backdrop');
+
+  constructor() {
+    afterNextRender(() => {
+      setTimeout(() => this.backdrop()?.nativeElement.focus());
+    });
+  }
 
   private readonly _service = inject(CobroPendienteService);
 

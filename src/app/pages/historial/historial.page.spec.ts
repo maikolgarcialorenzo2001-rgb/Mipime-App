@@ -414,9 +414,9 @@ describe('HistorialPage', () => {
       const map = (component as unknown as { _jornadasPorFecha: () => Map<string, Jornada[]> })._jornadasPorFecha();
       const arr = map.get('2026-06-04');
       expect(arr).toBeDefined();
-      expect(arr.length).toBe(2);
-      expect(arr[0].id).toBe(3);
-      expect(arr[1].id).toBe(4);
+      expect(arr!.length).toBe(2);
+      expect(arr![0].id).toBe(3);
+      expect(arr![1].id).toBe(4);
     });
 
     it('A.1 RED: _jornadasPorFecha debería tener jornadas únicas para fechas sin duplicados', () => {
