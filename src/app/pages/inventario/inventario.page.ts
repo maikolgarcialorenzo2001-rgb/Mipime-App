@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService, type EdicionResultado } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
+import { JornadaService } from '../../services/jornada.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
@@ -29,6 +30,7 @@ export class InventarioPage implements OnInit {
   private readonly productoService = inject(ProductoService);
   private readonly stockService = inject(StockMovimientoService);
   private readonly authService = inject(AuthService);
+  private readonly jornadaService = inject(JornadaService);
 
   readonly esAdmin = computed(() => this.authService.usuario()?.rol === 'admin');
 
@@ -160,6 +162,7 @@ export class InventarioPage implements OnInit {
             this.movimientoCantidad() ?? 0,
             costo ?? 0,
             this.movimientoMotivo() || undefined,
+            this.jornadaService.jornadaAbierta()?.id,
           );
           break;
         }
@@ -175,7 +178,7 @@ export class InventarioPage implements OnInit {
             action.productoId,
             this.movimientoCantidad() ?? 0,
             this.movimientoMotivo() || undefined,
-            undefined,
+            this.jornadaService.jornadaAbierta()?.id,
             ubicacion,
             lote.id,
           );
@@ -266,6 +269,7 @@ export class InventarioPage implements OnInit {
           await this.stockService.registrarTraslado(
             action.productoId,
             this.movimientoCantidad() ?? 0,
+            this.jornadaService.jornadaAbierta()?.id,
           );
           break;
       }

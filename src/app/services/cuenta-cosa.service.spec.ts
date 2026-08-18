@@ -70,7 +70,7 @@ describe('CuentaCosasService', () => {
       expect(allCalls[3][0]).toBe('COMMIT');
 
       // registrarSalida was delegated to StockMovimientoService
-      expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 2);
+      expect(mockStockService.registrarSalida).toHaveBeenCalledWith(1, 2, undefined, 1);
     });
 
     it('2.6 RED: NO debería modificar jornadas (sin UPDATE jornadas)', async () => {
@@ -142,8 +142,8 @@ describe('CuentaCosasService', () => {
 
       // Should have 2 registrarSalida calls
       expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(2);
-      expect(mockStockService.registrarSalida).toHaveBeenNthCalledWith(1, 1, 2);
-      expect(mockStockService.registrarSalida).toHaveBeenNthCalledWith(2, 2, 3);
+      expect(mockStockService.registrarSalida).toHaveBeenNthCalledWith(1, 1, 2, undefined, 1);
+      expect(mockStockService.registrarSalida).toHaveBeenNthCalledWith(2, 2, 3, undefined, 1);
 
       // Should have COMMIT
       expect(allCalls.some((c) => c[0] === 'COMMIT')).toBe(true);
