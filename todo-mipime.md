@@ -4,7 +4,7 @@
 > Stack: Angular 21 (standalone) + Tailwind 4 + SQLocal (SQLite WASM) + Signals + Vitest (Strict TDD)
 > Branch: `main` (única rama — local y remota, tras limpieza 2026-08-05)
 > Tests: **Electron 141** / **web 768** (verificación SDD fix-reanudar-jornada-acceso 2026-08-08; `ng test` destrabado `b21ff36`); web 902 en bundle-budget-fix (2026-08-15)
-> Última actualización: 2026-08-16
+> Última actualización: 2026-08-18
 
 ---
 
@@ -166,6 +166,127 @@
 
 ---
 
+## 🔴 Alta Prioridad — Issues de Exploración 2026-08-18
+
+> Exploración exhaustiva del codebase en `main` (2026-08-18). 35 issues encontrados.
+> Detalle completo en `docs/exploration-issues-2026-08-18.md`.
+
+### BACKLOG-14. Password hashing usa SHA-256 (SEGURIDAD)
+**Contexto:** `src/app/services/hash-password.ts` usa SHA-256+salt single-iteration. SHA-256 es para integridad, no passwords. Un atacante con la DB crackea passwords en segundos con GPU.
+**Fix:** Reemplazar con bcrypt o argon2id.
+**Riesgo:** ALTO — si la DB se exfiltraa, todas las passwords están comprometidas.
+
+### BACKLOG-15. Credenciales admin hardcodeadas en source (SEGURIDAD)
+**Contexto:** `environment.prod.ts` tiene `adminPassword: 'softwarez'`, `environment.ts` tiene `adminPassword: 'admin123'`. Anyone con acceso al repo puede impersonar admin.
+**Fix:** Inyectar en deploy time o detrás de setup flow, nunca en source.
+**Riesgo:** ALTO — backdoor de admin visible en el repo.
+
+### BACKLOG-16. ROLLBACK error tragado en native-sqlite (DATA INTEGRITY)
+**Contexto:** `native-sqlite.service.ts:83` — `await this.sql('ROLLBACK').catch(() => undefined)`. Si ROLLBACK falla, el caller no sabe que la transacción está inconsistente.
+**Fix:** Loguear el error; idealmente trigger reconexión o estado fatal.
+**Riesgo:** MEDIO-ALTO — fallo silencioso de recovery.
+
+### BACKLOG-17. File deletion error tragado en excel.service (DATA LEAK)
+**Contexto:** `excel.service.ts:116` — `.catch(() => undefined)` en borrado de temp files. En Electron, puede filtrar disco o dejar archivos con datos financieros sensibles.
+**Fix:** Loguear el error; programar limpieza retry en Electron.
+**Riesgo:** MEDIO — data leak silencioso.
+
+### BACKLOG-18. 30 setTimeout sin clearTimeout match (MEMORY LEAKS)
+**Contexto:** `pos.page.ts` (3), `app-nav.component.ts` (3), `quantity-input.component.ts` (2), `cobro-pendiente-modal.component.ts` (1), `historial.page.ts` (1), `jornada.page.ts` (1). Componentes sin OnDestroy/DestroyRef.
+**Fix:** Agregar `DestroyRef` + cleanup en todos los componentes con timers.
+**Riesgo:** MEDIO — memory leaks acumulativos.
+
+### BACKLOG-19. Zero componentes usan OnPush (PERFORMANCE)
+**Contexto:** Los 23 componentes corren change detection en cada browser event. Con signals, OnPush daría boost significativo (especialmente POS: product grid + cart + search).
+**Fix:** Agregar `changeDetection: ChangeDetectionStrategy.OnPush` progresivamente.
+**Riesgo:** MEDIO — performance degradada en POS.
+
+### BACKLOG-20. Raw SQL en jornada.page.ts bypassa service layer (ARCHITECTURE)
+**Contexto:** `jornada.page.ts:86-117` inyecta `DATABASE` directamente y corre SQL raw. Bypassa VentaService, StockMovimientoService.
+**Fix:** Crear método dedicado en servicio en vez de SQL directo.
+**Riesgo:** MEDIO — rompe abstracciones, fragile ante cambios de schema.
+
+### BACKLOG-21. Race condition en pos.page.ts `_buscar()` (CORRECTNESS)
+**Contexto:** `pos.page.ts:283-307` — keystrokes rápidos disparan múltiples llamadas. Hay debounce 200ms pero sin cancellation. Request lento sobreescribe resultados nuevos.
+**Fix:** Usar `switchMap` o `unsubscribe` previo.
+**Riesgo:** MEDIO — resultados de búsqueda incorrectos.
+
+### BACKLOG-22-24. Subscriptions sin cleanup en 3 componentes (MEMORY LEAKS)
+**Contexto:** `producto.page.ts` (4 subs), `historial.page.ts` (3 subs), `app-nav.component.ts` (3 subs) — todos sin `takeUntilDestroyed()`.
+**Fix:** `takeUntilDestroyed()` en cada subscription.
+**Riesgo:** MEDIO — callbacks en componente destruido.
+
+### BACKLOG-25. 2 componentes sin spec files (TESTING)
+**Contexto:** `loading-spinner.component.ts` y `quantity-input.component.ts` no tienen tests.
+**Fix:** Agregar specs básicas.
+**Riesgo:** BAJO-MEDIO — cobertura incompleta.
+
+### BACKLOG-26. DATABASE injection en jornada.page.ts rompe DI (ARCHITECTURE)
+**Contexto:** `jornada.page.ts:25` — inyección directa de token `DATABASE` en page component.
+**Fix:** Mover a servicio dedicado.
+**Riesgo:** BAJO-MEDIO — testability rota.
+
+---
+
+## 🟡 Media Prioridad — Code Smells y Tech Debt
+
+### BACKLOG-27-28. filtrarTecla() y soloNumeros duplicados (3 lugares) (DRY)
+**Contexto:** `app-nav.component.ts:199`, `jornada.page.ts:145`, `quantity-input.component.ts:47` — copy-paste idéntico con magic number `1800`.
+**Fix:** Extraer a directiva o función utilitaria compartida.
+**Riesgo:** BAJO — mantenibilidad.
+
+### BACKLOG-29. Lógica divisa/vuelto duplicada entre 2 modales (DRY)
+**Contexto:** `checkout-modal.component.ts:54-104` y `cobro-pendiente-modal.component.ts:88-147` — computed properties idénticas.
+**Fix:** Extraer a computed factory o clase base.
+**Riesgo:** BAJO — mantenibilidad.
+
+### BACKLOG-30-34. God services/components (MAINTENANCE)
+**Contexto:** `excel.service.ts` (1030 líneas), `jornada.service.ts` (878), `stock-movimiento.service.ts` (809), `db-migrations.ts` (697), `inventario.page.ts` (640).
+**Fix:** Descomponer en módulos más pequeños.
+**Riesgo:** BAJO — dificultad de mantenimiento.
+
+### BACKLOG-35. Non-null assertions (`!`) en todo el codebase (MAINTENANCE)
+**Contexto:** `inventario.page.ts`, `pos.page.ts`, `producto.page.ts` y otros — assertions que pueden mentir si cambia la validación.
+**Fix:** Reemplazar con null checks explícitos.
+**Riesgo:** BAJO — hazard de mantenimiento.
+
+### BACKLOG-36. @ts-ignore en electron-file.service.ts (TOOLING)
+**Contexto:** `electron-file.service.ts:1` — usa `// @ts-ignore` para triple-slash reference.
+**Fix:** Usar type import proper o declaration merging.
+**Riesgo:** BAJO — type safety.
+
+### BACKLOG-37. DOM queries en services (ARCHITECTURE)
+**Contexto:** `backup.service.ts`, `electron-file.service.ts`, `theme.service.ts` — services consultando DOM directamente.
+**Fix:** Mover DOM work a components o utility services dedicadas.
+**Riesgo:** BAJO — platform coupling.
+
+### BACKLOG-38. innerHTML en main.ts (SECURITY)
+**Contexto:** `src/main.ts:18` — `document.body.innerHTML = ...` es vector XSS si el error message incluye datos de usuario.
+**Fix:** Usar `textContent` o element creation.
+**Riesgo:** BAJO — actualmente safe (string estático).
+
+---
+
+## 🟢 Baja Prioridad — Mejoras Menores
+
+### BACKLOG-39. Magic numbers en todo el codebase
+**Contexto:** `150`, `200`, `300`, `1800`, `2000`, `2500`, `4000` — todos hardcodeados.
+**Fix:** Extraer a named constants.
+
+### BACKLOG-40. Naming inconsistente de loading states
+**Contexto:** `procesando`, `registrando`, `loading`, `buscando` — mismo concepto, 5 nombres.
+**Fix:** Estandarizar a un solo nombre.
+
+### BACKLOG-41. Utility exportada desde page component
+**Contexto:** `inventario.page.ts:629` — función utilitaria exportada desde archivo de componente.
+**Fix:** Mover a shared utility.
+
+### BACKLOG-42. Sin provideAnimations() visible
+**Contexto:** `app.config.ts` — Angular 19+ necesita `provideAnimations()` si se usan animations.
+**Fix:** Verificar si se necesitan animations; si sí, agregar provider.
+
+---
+
 ## ✅ Completado
 
 ### ~~B4. Reabrir jornada~~ ✅
@@ -289,6 +410,7 @@ A3 (editar/eliminar movimientos) y A4 (CRUD productos) removidos de `todo-mipime
 
 | Fecha | Cambio | Commits |
 |-------|--------|---------|
+| 2026-08-18 | Exploración exhaustiva de código: 35 issues encontrados (4 S1, 9 S2, 14 S3, 8 S4). BACKLOG-14 a BACKLOG-42 agregados. Detalle en `docs/exploration-issues-2026-08-18.md` | — |
 | 2026-08-16 | BACKLOG-8 risk fixes **aprobados por el usuario y aplicados** en `bundle-budget-fix`: S1 test regresión tipo emitido (string no-Promise), S2 exportaciones a `Promise<string>` directo + consumers async (`Observable<Promise<T>>` eliminado), S5 reintento backoff + S6 preload idle del chunk xlsx. S3/S4/S7 no elegidos. Suite web 906 PASS — sin merge a main. PR #15 abierto | `8a6d661`, `1a94aa0`, `16c0647` |
 | 2026-08-16 | Sección "Integración de branches pendiente" agregada: flujo testear → merge → rebase acordado con el dueño; orden recomendado #12 → #15 → #16; reglas de resolución para palmar-feature (palmar gana en conflictos). Nada integrado a main aún | — |
 | 2026-08-15 | BACKLOG-8 ✅ implementado en branch `bundle-budget-fix` (lazy-load xlsx, budget 600kB, bundle 696.90→419.85 kB, suite web 902) — sin merge; exploración de riesgos post-implementación documentada (Riesgo A leak Promise: S1-S4; Riesgo B chunk offline: S5-S7), fix pendiente de decisión. PRs: languaje-corrections #12 abierto | `48e46e5`, `90ddb5c`, `26f66d4` |
