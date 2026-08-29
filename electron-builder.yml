@@ -1,6 +1,14 @@
 # electron-builder configuration
 # Docs: https://www.electron.build/configuration/configuration
 
+# NOTE (build metadata gotcha): if package.json version contains semver build
+# metadata like "0.1.21+Palmar", electron-builder TRUNCATES the "+Palmar" part
+# in generated artifacts (installer file name, blockmap name, latest.yml
+# version/url). The app UI keeps the full version, but the artifacts do not.
+# After building a "+" version, rename the installer + blockmap and patch
+# latest.yml manually. `scripts/build-version-check.mjs` prints this warning
+# automatically on every `electron:build:win` run.
+
 appId: com.mipime.cuentas
 productName: Tienda - App
 copyright: Copyright © 2026 Mipime
