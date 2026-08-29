@@ -39,12 +39,12 @@ Chain strategy: n/a (single PR)
 
 ## Phase 2: Core Implementation
 
-- [ ] 2.1 Create `src/app/guards/setup.guard.ts` CanActivateFn using SetupService.countUsers. Accept: `/login`→`/setup` when 0 users; `/setup`→`/pos` when users exist.
-- [ ] 2.2 Create `src/app/services/setup.service.ts` providedIn:'root': countUsers, getConfig, setConfig, createInitialAdmin(nombre, password, nombreComercio, seedProducts) — persist `config.seedProducts` ('1'/'0'); call `seedProductosSiVacio` only when seedProducts true. Accept: SQL correct, seed conditional + persisted, testable with mocked DATABASE.
-- [ ] 2.3 Modify `src/app/services/user.service.ts`: add getActiveAdminCount(); replace `environment.adminUser` checks in toggleActivo/updateRol with count-based blocking when count===1. Accept: last active admin blocked from deactivation.
-- [ ] 2.4 Modify `src/app/pages/admin/admin.page.ts`: remove seedAdminId computed; add activeAdminCount signal/computed; disable deactivation/rol change when activeAdminCount()===1. Accept: UI disables controls for last admin.
-- [ ] 2.5 Modify `src/app/pages/admin/admin.page.html`: bind disabled state to activeAdminCount; show warning tooltip. Accept: tooltip appears when last admin.
-- [ ] 2.6 Modify `src/app/services/auth.service.ts`: add legacy hash verification in _restoreSession against SHA-256(salt+'softwarez'/admin123); set legacyResetRequired signal; redirect to /setup?mode=reset&userId=X if legacy detected and flag not set. Accept: legacy user forced reset on startup.
+- [x] 2.1 Create `src/app/guards/setup.guard.ts` CanActivateFn using SetupService.countUsers. Accept: `/login`→`/setup` when 0 users; `/setup`→`/pos` when users exist.
+- [x] 2.2 Create `src/app/services/setup.service.ts` providedIn:'root': countUsers, getConfig, setConfig, createInitialAdmin(nombre, password, nombreComercio, seedProducts) — persist `config.seedProducts` ('1'/'0'); call `seedProductosSiVacio` only when seedProducts true. Accept: SQL correct, seed conditional + persisted, testable with mocked DATABASE.
+- [x] 2.3 Modify `src/app/services/user.service.ts`: add getActiveAdminCount(); replace `environment.adminUser` checks in toggleActivo/updateRol with count-based blocking when count===1. Accept: last active admin blocked from deactivation.
+- [x] 2.4 Modify `src/app/pages/admin/admin.page.ts`: remove seedAdminId computed; add activeAdminCount signal/computed; disable deactivation/rol change when activeAdminCount()===1. Accept: UI disables controls for last admin.
+- [x] 2.5 Modify `src/app/pages/admin/admin.page.html`: bind disabled state to activeAdminCount; show warning tooltip. Accept: tooltip appears when last admin.
+- [x] 2.6 Modify `src/app/services/auth.service.ts`: add legacy hash verification in _restoreSession against SHA-256(salt+'softwarez'/admin123); set legacyResetRequired signal; redirect to /setup?mode=reset&userId=X if legacy detected and flag not set. Accept: legacy user forced reset on startup.
 
 ## Phase 3: Integration / Wiring
 
