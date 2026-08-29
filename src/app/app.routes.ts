@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { adminGuard } from './guards/admin.guard';
+import { setupGuard } from './guards/setup.guard';
 
 export const routes: Routes = [
   {
@@ -10,7 +11,13 @@ export const routes: Routes = [
   },
   {
     path: 'login',
+    canActivate: [setupGuard],
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
+  },
+  {
+    path: 'setup',
+    canActivate: [setupGuard],
+    loadComponent: () => import('./pages/setup/setup.page').then((m) => m.SetupPage),
   },
   {
     path: 'jornada',

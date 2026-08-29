@@ -1,5 +1,3 @@
-import { environment } from '../environments/environment';
-
 /**
  * Ejecutor de SQL que abstrae el driver concreto (SQLocal en web,
  * IPC nativo en Electron). Recibe query + parámetros posicionales.
@@ -101,8 +99,12 @@ export async function runMigrations(
     await migrationV17(exec);
   }
 
+  if (currentVersion < 18) {
+    await migrationV18(exec);
+  }
+
   if (opts.seedEnabled) {
-    await seedIfEmpty(exec);
+    await seedProductosSiVacio(exec);
   }
 }
 
@@ -201,22 +203,8 @@ async function migrationV2(exec: MigrationExecutor): Promise<void> {
     try { await exec.sql(q); } catch { /* columna ya existe */ }
   }
 
-  // Seed admin: solo si no existe (parte de v2, no depende de seedEnabled)
-  const [{ count }] = await exec.sql<{ count: number }>(
-    "SELECT COUNT(*) AS count FROM usuarios WHERE nombre = ?",
-    [environment.adminUser],
-  );
-  if (count === 0) {
-    const ahora = new Date().toISOString();
-    const { generateSalt, hashPassword } = await import('./hash-password');
-    const salt = generateSalt();
-    const hash = await hashPassword(environment.adminPassword, salt);
-    await exec.sql(
-      `INSERT INTO usuarios (nombre, password_hash, salt, rol, activo, created_at, updated_at)
-       VALUES (?, ?, ?, 'admin', 1, ?, ?)`,
-      [environment.adminUser, hash, salt, ahora, ahora],
-    );
-  }
+  // Admin seed removed - initial admin created via /setup page (no environment credentials)
+  // This is a no-op placeholder to maintain migration numbering
 
   await exec.sql('INSERT INTO schema_version (version) VALUES (2)');
 }
@@ -581,7 +569,22 @@ async function migrationV17(exec: MigrationExecutor): Promise<void> {
   await exec.sql('INSERT INTO schema_version (version) VALUES (17)');
 }
 
-async function seedIfEmpty(exec: MigrationExecutor): Promise<void> {
+async function migrationV18(exec: MigrationExecutor): Promise<void> {
+  // v18: config table for key-value settings (nombre_comercio, legacy_reset_done, seedProducts)
+  await exec.sql(`CREATE TABLE IF NOT EXISTS config (
+    clave TEXT PRIMARY KEY,
+    valor TEXT NOT NULL
+  )`);
+
+  await exec.sql('INSERT INTO schema_version (version) VALUES (18)');
+}
+
+/**
+ * Siembra el catálogo de 74 productos de ejemplo solo si la tabla productos está vacía.
+ * Idempotente: si ya hay productos, no hace nada.
+ * Exportada para ser reutilizada por SetupService.createInitialAdmin(seedProducts=true).
+ */
+export async function seedProductosSiVacio(exec: MigrationExecutor): Promise<void> {
   const [{ count }] = await exec.sql<{ count: number }>(
     'SELECT COUNT(*) AS count FROM productos',
   );

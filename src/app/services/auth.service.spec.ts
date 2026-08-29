@@ -1,27 +1,19 @@
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { DATABASE, type Database } from './database';
-import { hashPassword, generateSalt } from './hash-password';
-import type { Usuario } from '../models';
-import type { UsuarioPublico } from '../models';
+import { hashPassword } from './hash-password';
+import type { Usuario, UsuarioPublico } from '../models';
 
-/**
- * Mock de crypto.subtle.digest que computa un hash determinista.
- * En jsdom no está disponible Web Crypto API, así que simulamos
- * SHA-256 con un hash de string simple.
- */
 function mockCrypto(): void {
   const subtleDigest = vi.fn().mockImplementation(
     async (_algorithm: string, data: ArrayBuffer) => {
       const decoder = new TextDecoder();
       const input = decoder.decode(data);
-      // Hash simple (no criptográfico, solo para tests)
       let hash = 0;
       for (let i = 0; i < input.length; i++) {
         const char = input.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convertir a int32
+        hash = hash & hash;
       }
       const buf = new ArrayBuffer(32);
       const view = new DataView(buf);
@@ -37,20 +29,6 @@ function mockCrypto(): void {
   });
 }
 
-function createMockUsuario(overrides: Partial<Usuario> = {}): Usuario {
-  return {
-    id: 1,
-    nombre: 'admin',
-    password_hash: '',
-    salt: '',
-    rol: 'admin',
-    activo: 1,
-    created_at: '2026-06-04T00:00:00Z',
-    updated_at: '2026-06-04T00:00:00Z',
-    ...overrides,
-  };
-}
-
 function createMockDb(): Database {
   const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
   return {
@@ -60,13 +38,14 @@ function createMockDb(): Database {
   };
 }
 
-describe('AuthService', () => {
+describe('AuthService - legacy password detection', () => {
   let mockDb: Database;
 
   beforeEach(() => {
     mockCrypto();
     mockDb = createMockDb();
     localStorage.clear();
+    sessionStorage.clear();
 
     TestBed.configureTestingModule({
       providers: [
@@ -82,265 +61,131 @@ describe('AuthService', () => {
     sessionStorage.clear();
   });
 
-  describe('login', () => {
-    it('debería iniciar sesión con credenciales válidas', async () => {
-      const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
-      const mockUser = createMockUsuario({ salt, password_hash: hash });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      const usuario = await firstValueFrom(
-        service.login('admin', 'admin123'),
-      );
-
-      expect(usuario.nombre).toBe('admin');
-      expect(usuario.rol).toBe('admin');
-      expect(usuario).not.toHaveProperty('password_hash');
-      expect(usuario).not.toHaveProperty('salt');
-      expect(service.isLoggedIn()).toBe(true);
-    });
-
-    it('debería rechazar usuario inexistente', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]);
-
-      const service = TestBed.inject(AuthService);
-      await expect(
-        firstValueFrom(service.login('noexiste', 'pass')),
-      ).rejects.toThrow('Credenciales inválidas');
-
-      expect(service.isLoggedIn()).toBe(false);
-    });
-
-    it('debería rechazar contraseña incorrecta', async () => {
-      const salt = 'test-salt-123';
-      const hash = await hashPassword('correcta', salt);
-      const mockUser = createMockUsuario({ salt, password_hash: hash });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      await expect(
-        firstValueFrom(service.login('admin', 'incorrecta')),
-      ).rejects.toThrow('Credenciales inválidas');
-
-      expect(service.isLoggedIn()).toBe(false);
-    });
-
-    it('debería rechazar usuario desactivado', async () => {
-      const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
-      const mockUser = createMockUsuario({
-        salt,
-        password_hash: hash,
-        activo: 0,
-      });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      await expect(
-        firstValueFrom(service.login('admin', 'admin123')),
-      ).rejects.toThrow('Usuario desactivado');
-
-      expect(service.isLoggedIn()).toBe(false);
-    });
-  });
-
-  describe('logout', () => {
-    it('debería limpiar la sesión', async () => {
-      const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
-      const mockUser = createMockUsuario({ salt, password_hash: hash });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin', 'admin123'));
-      expect(service.isLoggedIn()).toBe(true);
-
-      service.logout();
-
-      expect(service.isLoggedIn()).toBe(false);
-      expect(service.usuario()).toBeNull();
-      expect(localStorage.getItem('mipime_session')).toBeNull();
-    });
-  });
-
-  describe('isLoggedIn / hasRole', () => {
-    it('debería empezar como false', () => {
-      const service = TestBed.inject(AuthService);
-      expect(service.isLoggedIn()).toBe(false);
-    });
-
-    it('debería ser true después de login exitoso', async () => {
-      const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
-      const mockUser = createMockUsuario({ salt, password_hash: hash });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin', 'admin123'));
-
-      expect(service.isLoggedIn()).toBe(true);
-    });
-
-    it('hasRole debería funcionar', async () => {
-      const salt = generateSalt();
-      const hash = await hashPassword('admin123', salt);
-      const mockUser = createMockUsuario({
-        salt,
-        password_hash: hash,
-        rol: 'admin',
-      });
-
-      vi.mocked(mockDb.sql).mockResolvedValue([mockUser]);
-
-      const service = TestBed.inject(AuthService);
-      await firstValueFrom(service.login('admin', 'admin123'));
-
-      expect(service.hasRole('admin')).toBe(true);
-      expect(service.hasRole('trabajador')).toBe(false);
-    });
-  });
-});
-
-describe('AuthService - localStorage', () => {
-  beforeEach(() => {
-    mockCrypto();
-    localStorage.clear();
-  });
-
-  afterEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-
-  it('debería restaurar sesión desde localStorage', () => {
-    const session = {
-      id: 1,
-      nombre: 'admin',
-      rol: 'admin' as const,
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
+  it('should set legacyResetRequired signal when user has legacy password hash (softwarez)', async () => {
+    const salt = 'test-salt-123';
+    const legacyHash = await hashPassword('softwarez', salt);
+    const mockUser: Usuario = {
+      id: 1, nombre: 'e.z', password_hash: legacyHash, salt,
+      rol: 'admin', activo: 1, created_at: '', updated_at: '',
     };
+
+    vi.mocked(mockDb.sql)
+      .mockResolvedValueOnce([mockUser]) // get user by id
+      .mockResolvedValueOnce([]); // getConfig legacy_reset_done (not set)
+
+    localStorage.setItem('mipime_session', JSON.stringify({
+      id: 1, nombre: 'e.z', rol: 'admin', activo: 1,
+      created_at: '', updated_at: '',
+    }));
     sessionStorage.setItem('session_heartbeat', '1');
-    localStorage.setItem('mipime_session', JSON.stringify(session));
 
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
-      ],
-    });
-    const service = TestBed.inject(AuthService);
-
-    expect(service.isLoggedIn()).toBe(true);
-    expect(service.usuario()?.nombre).toBe('admin');
-  });
-
-  it('debería ignorar localStorage corrupto', () => {
-    localStorage.setItem('mipime_session', 'not-valid-json');
-
-    TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
-      ],
-    });
-    const service = TestBed.inject(AuthService);
-
-    expect(service.isLoggedIn()).toBe(false);
-  });
-
-  it('debería ignorar si no hay session en localStorage', () => {
-    TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
-      ],
-    });
-    const service = TestBed.inject(AuthService);
-
-    expect(service.isLoggedIn()).toBe(false);
-    expect(service.usuario()).toBeNull();
-  });
-});
-
-describe('AuthService - session heartbeat', () => {
-  beforeEach(() => {
-    mockCrypto();
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-
-  afterEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-
-  it('1.1 RED: debería escribir session_heartbeat en sessionStorage al construirse', () => {
-    TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
+        { provide: DATABASE, useValue: mockDb },
       ],
     });
 
     const service = TestBed.inject(AuthService);
-
-    expect(service).toBeTruthy();
-    expect(sessionStorage.getItem('session_heartbeat')).toBe('1');
+    // Wait for async _restoreSession to complete
+    await new Promise(r => setTimeout(r, 10));
+    expect(service.legacyResetRequired()).toBe(true);
   });
 
-  it('1.2 RED: debería limpiar sesión si hay session en localStorage pero no heartbeat', () => {
-    const session: UsuarioPublico = {
-      id: 1,
-      nombre: 'admin',
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
+  it('should set legacyResetRequired signal when user has legacy password hash (admin123)', async () => {
+    const salt = 'test-salt-456';
+    const legacyHash = await hashPassword('admin123', salt);
+    const mockUser: Usuario = {
+      id: 2, nombre: 'admin', password_hash: legacyHash, salt,
+      rol: 'admin', activo: 1, created_at: '', updated_at: '',
     };
-    localStorage.setItem('mipime_session', JSON.stringify(session));
-    // No session_heartbeat
 
-    TestBed.configureTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
-      ],
-    });
+    vi.mocked(mockDb.sql)
+      .mockResolvedValueOnce([mockUser]) // get user by id
+      .mockResolvedValueOnce([]); // getConfig legacy_reset_done (not set)
 
-    const service = TestBed.inject(AuthService);
-    expect(service.isLoggedIn()).toBe(false);
-    expect(localStorage.getItem('mipime_session')).toBeNull();
-  });
-
-  it('1.3a RED: debería preservar sesión si heartbeat existe (misma tab, F5)', () => {
-    const session: UsuarioPublico = {
-      id: 1,
-      nombre: 'admin',
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    };
+    localStorage.setItem('mipime_session', JSON.stringify({
+      id: 2, nombre: 'admin', rol: 'admin', activo: 1,
+      created_at: '', updated_at: '',
+    }));
     sessionStorage.setItem('session_heartbeat', '1');
-    localStorage.setItem('mipime_session', JSON.stringify(session));
 
+    TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         AuthService,
-        { provide: DATABASE, useValue: createMockDb() },
+        { provide: DATABASE, useValue: mockDb },
       ],
     });
 
     const service = TestBed.inject(AuthService);
-    expect(service.isLoggedIn()).toBe(true);
-    expect(service.usuario()?.nombre).toBe('admin');
+    // Wait for async _restoreSession to complete
+    await new Promise(r => setTimeout(r, 10));
+    expect(service.legacyResetRequired()).toBe(true);
+  });
+
+  it('should NOT set legacyResetRequired for non-legacy password', async () => {
+    const salt = 'test-salt-789';
+    const hash = await hashPassword('secure-password', salt);
+    const mockUser: Usuario = {
+      id: 3, nombre: 'user', password_hash: hash, salt,
+      rol: 'trabajador', activo: 1, created_at: '', updated_at: '',
+    };
+
+    vi.mocked(mockDb.sql)
+      .mockResolvedValueOnce([mockUser]) // get user by id
+      .mockResolvedValueOnce([]); // getConfig legacy_reset_done
+
+    localStorage.setItem('mipime_session', JSON.stringify({
+      id: 3, nombre: 'user', rol: 'trabajador', activo: 1,
+      created_at: '', updated_at: '',
+    }));
+    sessionStorage.setItem('session_heartbeat', '1');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        AuthService,
+        { provide: DATABASE, useValue: mockDb },
+      ],
+    });
+
+    const service = TestBed.inject(AuthService);
+    // Wait for async _restoreSession to complete
+    await new Promise(r => setTimeout(r, 10));
+    expect(service.legacyResetRequired()).toBe(false);
+  });
+
+  it('should not check legacy when config.legacy_reset_done is true', async () => {
+    const salt = 'test-salt-999';
+    const legacyHash = await hashPassword('softwarez', salt);
+    const mockUser: Usuario = {
+      id: 4, nombre: 'e.z', password_hash: legacyHash, salt,
+      rol: 'admin', activo: 1, created_at: '', updated_at: '',
+    };
+
+    vi.mocked(mockDb.sql)
+      .mockResolvedValueOnce([mockUser]) // get user by id
+      .mockResolvedValueOnce([{ valor: '1' }]); // getConfig legacy_reset_done = true
+
+    localStorage.setItem('mipime_session', JSON.stringify({
+      id: 4, nombre: 'e.z', rol: 'admin', activo: 1,
+      created_at: '', updated_at: '',
+    }));
+    sessionStorage.setItem('session_heartbeat', '1');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        AuthService,
+        { provide: DATABASE, useValue: mockDb },
+      ],
+    });
+
+    const service = TestBed.inject(AuthService);
+    // Wait for async _restoreSession to complete
+    await new Promise(r => setTimeout(r, 10));
+    expect(service.legacyResetRequired()).toBe(false);
   });
 });

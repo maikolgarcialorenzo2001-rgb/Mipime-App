@@ -4,6 +4,9 @@
  * Helper to bump the app version without typing it manually:
  *   - increments the last numeric component of package.json#version,
  *     preserving any prerelease suffix (e.g. 0.1.12-beta → 0.1.13-beta);
+ *   - `--release` promotes to a clean SEMVER release: strips any prerelease
+ *     suffix (e.g. 0.1.16-beta → 0.1.17). An optional build-metadata tag may
+ *     follow the flag (e.g. `--release +Palmar` → 0.1.20+Palmar);
  *   - updates the root "version" field in package.json AND package-lock.json;
  *   - runs scripts/sync-version.mjs to regenerate version.ts + index.html.
  *
@@ -24,18 +27,30 @@ function writeJson(relativePath, obj) {
   writeFileSync(join(root, relativePath), `${JSON.stringify(obj, null, 2)}\n`);
 }
 
-function bumpVersion(version) {
-  const suffixMatch = version.match(/^(.+?)(-.*)?$/);
-  const core = suffixMatch[1];
-  const suffix = suffixMatch[2] ?? '';
+function bumpVersion(version, { release = false, meta = '' } = {}) {
+  // Separa: core numérico (0.1.16), prerelease (-beta) y metadata de build (+x).
+  const match = version.match(/^([^+]+?)(-[^+]*)?(\+.*)?$/);
+  const core = match[1];
+  const prerelease = match[2] ?? '';
   const parts = core.split('.');
   parts[parts.length - 1] = String(Number(parts[parts.length - 1]) + 1);
-  return `${parts.join('.')}${suffix}`;
+
+  if (release) {
+    // Promoción a release: sin prerelease; metadata semver opcional (ej: +Palmar).
+    return meta ? `${parts.join('.')}+${meta.replace(/^\+/, '')}` : parts.join('.');
+  }
+  return `${parts.join('.')}${prerelease}`;
 }
+
+// ── Argumentos ────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+const releaseIdx = args.indexOf('--release');
+const release = releaseIdx !== -1;
+const meta = release && args[releaseIdx + 1]?.startsWith('+') ? args[releaseIdx + 1] : '';
 
 const pkg = readJson('package.json');
 const current = pkg.version;
-const next = bumpVersion(current);
+const next = bumpVersion(current, { release, meta });
 
 pkg.version = next;
 writeJson('package.json', pkg);

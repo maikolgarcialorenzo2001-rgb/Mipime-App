@@ -70,15 +70,15 @@ describe('runMigrations', () => {
     });
   });
 
-  it('inserts 17 schema versions in order on a fresh DB (v1..v17)', async () => {
+  it('inserts 18 schema versions in order on a fresh DB (v1..v18)', async () => {
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     ]);
   });
 
-  it('1.2 RED: desde la versión 16 aplica la migración v17 de forma aditiva (2 ALTERs + índice parcial)', async () => {
+  it('1.2 RED: desde la versión 16 aplica las migraciones v17 y v18 de forma aditiva', async () => {
     exec.version = 16;
     await runMigrations(exec, { seedEnabled: false });
 
@@ -94,16 +94,16 @@ describe('runMigrations', () => {
         ),
       ),
     ).toBe(true);
-    expect(exec.versionNumbers()).toEqual([17]);
+    expect(exec.versionNumbers()).toEqual([17, 18]);
     // La seed no debe ejecutarse sin seedEnabled
     expect(exec.productSeedBatches().length).toBe(0);
   });
 
-  it('1.2 RED: re-ejecutar sobre una DB ya en 17 es idempotente (no repite ALTERs ni vuelve a insertar versión)', async () => {
-    exec.version = 17;
+  it('1.2 RED: re-ejecutar sobre una DB ya en 18 es idempotente (no repite ALTERs ni vuelve a insertar versión)', async () => {
+    exec.version = 18;
     await runMigrations(exec, { seedEnabled: false });
 
-    // v17 ya existe: el runner NO re-ejecuta la migración
+    // v18 ya existe: el runner NO re-ejecuta la migración
     expect(exec.versionNumbers()).toEqual([]);
     const legCoales = exec.calls.filter((c) =>
       c.query.includes('ALTER TABLE ventas ADD COLUMN'),
@@ -148,24 +148,49 @@ describe('runMigrations', () => {
     ).toBe(false);
   });
 
-  it('inserts the admin seed (part of v2) even when seedEnabled is false', async () => {
+  it('does NOT insert admin seed in v2 (admin created via /setup page)', async () => {
     await runMigrations(exec, { seedEnabled: false });
 
     const adminInsert = exec.calls.find(
-      (c) =>
-        c.query.includes('INSERT INTO usuarios') &&
-        c.params.includes(environment.adminUser),
+      (c) => c.query.includes('INSERT INTO usuarios'),
     );
-    expect(adminInsert).toBeDefined();
-    expect(adminInsert!.params).toContain(environment.adminUser);
+    expect(adminInsert).toBeUndefined();
   });
 
-  it('skips all migrations when schema_version is already 17', async () => {
-    exec.version = 17;
+  it('migration v18 creates config table and sets schema version to 18', async () => {
+    exec.version = 17; // Run only v18
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should have run v18 (version 18 inserted)
+    expect(exec.versionNumbers()).toContain(18);
+
+    // Verify config table creation
+    const createConfig = exec.calls.find((c) =>
+      c.query.includes('CREATE TABLE IF NOT EXISTS config'),
+    );
+    expect(createConfig).toBeDefined();
+    expect(createConfig!.query).toContain('clave TEXT PRIMARY KEY');
+    expect(createConfig!.query).toContain('valor TEXT NOT NULL');
+  });
+
+  it('migration v18 is idempotent - does not re-run on existing v18 DB', async () => {
+    exec.version = 18;
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should NOT re-run v18
+    expect(exec.versionNumbers()).toEqual([]);
+    const createConfig = exec.calls.find((c) =>
+      c.query.includes('CREATE TABLE IF NOT EXISTS config'),
+    );
+    expect(createConfig).toBeUndefined();
+  });
+
+  it('skips all migrations when schema_version is already 18', async () => {
+    exec.version = 18;
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([]);
-    // el runner crea schema_version siempre, pero NO ejecuta migraciones v1-v17
+    // el runner crea schema_version siempre, pero NO ejecuta migraciones v1-v18
     expect(exec.calls[0].query).toContain(
       'CREATE TABLE IF NOT EXISTS schema_version',
     );
@@ -179,11 +204,11 @@ describe('runMigrations', () => {
     await runMigrations(exec, { seedEnabled: true });
 
     // el runner es autocontenido: la primera sentencia crea schema_version
-expect(exec.calls[0].query).toContain(
+    expect(exec.calls[0].query).toContain(
       'CREATE TABLE IF NOT EXISTS schema_version',
     );
     expect(exec.versionNumbers()).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     ]);
   });
 
@@ -192,8 +217,72 @@ expect(exec.calls[0].query).toContain(
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([
-      6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+      6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
     ]);
     expect(exec.productSeedBatches().length).toBe(8);
+  });
+
+  it('migrationV2 no longer seeds admin from environment - no env references', async () => {
+    exec.version = 1; // Run only v2
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should have run v2 (version 2 inserted)
+    expect(exec.versionNumbers()).toContain(2);
+
+    // Verify no INSERT INTO usuarios with environment.adminUser
+    const adminInsert = exec.calls.find(
+      (c) =>
+        c.query.includes('INSERT INTO usuarios') &&
+        (c.params?.includes('admin') || c.params?.includes('e.z')),
+    );
+    expect(adminInsert).toBeUndefined();
+
+    // Verify no reference to environment in the migration calls
+    // (the test above ensures the old seed pattern is gone)
+  });
+
+  it('migrationV2 creates usuarios table but does not insert admin seed', async () => {
+    exec.version = 1;
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should have created usuarios table (part of v2)
+    const createUsuarios = exec.calls.find((c) =>
+      c.query.includes('CREATE TABLE IF NOT EXISTS usuarios'),
+    );
+    expect(createUsuarios).toBeDefined();
+
+    // But should NOT have inserted any admin user
+    const adminInsert = exec.calls.find((c) =>
+      c.query.includes('INSERT INTO usuarios'),
+    );
+    expect(adminInsert).toBeUndefined();
+  });
+
+  it('seedProductosSiVacio is exported and callable', async () => {
+    const { seedProductosSiVacio } = await import('./db-migrations');
+    expect(typeof seedProductosSiVacio).toBe('function');
+  });
+
+  it('seedProductosSiVacio idempotency: count=0 seeds 74 products, count>0 no-op', async () => {
+    const { seedProductosSiVacio } = await import('./db-migrations');
+    
+    // Test with count=0 (should seed)
+    exec.productCount = 0;
+    await seedProductosSiVacio(exec);
+    const seedCalls = exec.calls.filter((c) =>
+      c.query.includes('INSERT INTO productos') &&
+      c.query.includes('VALUES (?'),
+    );
+    expect(seedCalls.length).toBeGreaterThan(0);
+    
+    // Test with count>0 (should NOT seed)
+    exec.calls = [];
+    exec.productCount = 5;
+    await seedProductosSiVacio(exec);
+    const seedCalls2 = exec.calls.filter((c) =>
+      c.query.includes('INSERT INTO productos') &&
+      c.query.includes('VALUES (?'),
+    );
+    expect(seedCalls2.length).toBe(0);
   });
 });

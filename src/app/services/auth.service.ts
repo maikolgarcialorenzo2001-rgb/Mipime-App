@@ -14,6 +14,7 @@ export class AuthService {
   private readonly _db = inject(DATABASE);
 
   private readonly _currentUser = signal<UsuarioPublico | null>(null);
+  readonly legacyResetRequired = signal(false);
 
   /** Señal reactiva del usuario logueado (sin hash/salt). */
   readonly usuario = this._currentUser.asReadonly();
@@ -58,6 +59,7 @@ export class AuthService {
    */
   logout(): void {
     this._currentUser.set(null);
+    this.legacyResetRequired.set(false);
     localStorage.removeItem(SESSION_KEY);
   }
 
@@ -117,7 +119,15 @@ export class AuthService {
     }
   }
 
-  private _restoreSession(): void {
+  private async _checkLegacyPassword(user: Usuario): Promise<boolean> {
+    const legacyHashes = [
+      await hashPassword('softwarez', user.salt),
+      await hashPassword('admin123', user.salt),
+    ];
+    return legacyHashes.includes(user.password_hash);
+  }
+
+  private async _restoreSession(): Promise<void> {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) return;
@@ -132,6 +142,24 @@ export class AuthService {
       const session = JSON.parse(raw) as UsuarioPublico;
       if (session && session.id && session.nombre) {
         this._currentUser.set(session);
+
+        // Check for legacy password hash
+        const userRows = await this._db.sql<Usuario>(
+          'SELECT * FROM usuarios WHERE id = ?',
+          [session.id],
+        );
+        if (userRows.length > 0) {
+          const user = userRows[0];
+          const isLegacy = await this._checkLegacyPassword(user);
+          if (isLegacy) {
+            const legacyResetDone = await this._db.sql<{ valor: string }>(
+              "SELECT valor FROM config WHERE clave = 'legacy_reset_done'",
+            );
+            if (!legacyResetDone.length || legacyResetDone[0].valor !== '1') {
+              this.legacyResetRequired.set(true);
+            }
+          }
+        }
       }
     } catch {
       // JSON corrupto → no hay sesión

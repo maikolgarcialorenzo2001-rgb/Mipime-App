@@ -163,6 +163,29 @@ describe('UserService', () => {
     });
   });
 
+  describe('getActiveAdminCount', () => {
+    it('should return count of active admins', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([{ count: 2 }]);
+
+      const service = TestBed.inject(UserService);
+      const count = await service.getActiveAdminCount();
+
+      expect(count).toBe(2);
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        "SELECT COUNT(*) AS count FROM usuarios WHERE rol = 'admin' AND activo = 1",
+      );
+    });
+
+    it('should return 0 when no active admins', async () => {
+      vi.mocked(mockDb.sql).mockResolvedValue([{ count: 0 }]);
+
+      const service = TestBed.inject(UserService);
+      const count = await service.getActiveAdminCount();
+
+      expect(count).toBe(0);
+    });
+  });
+
   describe('toggleActivo', () => {
     it('debería cambiar activo de 1 a 0', async () => {
       TestBed.resetTestingModule();
@@ -174,18 +197,22 @@ describe('UserService', () => {
         ],
       });
 
-      vi.mocked(mockDb.sql).mockResolvedValue([]); // seed admin query: no match
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 2 }]) // getActiveAdminCount - multiple admins
+        .mockResolvedValueOnce([]); // UPDATE
 
       const service = TestBed.inject(UserService);
       await service.toggleActivo(1);
 
-      expect(mockDb.sql).toHaveBeenCalledWith(
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('UPDATE'),
         [expect.any(String), 1],
       );
     });
 
-    it('debería lanzar error al desactivar al usuario administrador semilla', async () => {
+    it('debería lanzar error al desactivar al último administrador activo', async () => {
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
         providers: [
@@ -195,11 +222,13 @@ describe('UserService', () => {
         ],
       });
 
-      vi.mocked(mockDb.sql).mockResolvedValue([{ id: 1 }]); // seed admin id = 1
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 1 }]) // getActiveAdminCount - only 1 admin
+        .mockResolvedValueOnce([{ rol: 'admin', activo: 1 }]); // target check
 
       const service = TestBed.inject(UserService);
       await expect(service.toggleActivo(1)).rejects.toThrow(
-        'No puedes desactivar al usuario administrador',
+        'No puedes desactivar al último administrador activo',
       );
     });
 
@@ -225,23 +254,29 @@ describe('UserService', () => {
 
   describe('updateRol', () => {
     it('debería cambiar el rol del usuario', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([]); // seed admin query: no match
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 2 }]) // getActiveAdminCount - multiple admins
+        .mockResolvedValueOnce([]); // UPDATE
 
       const service = TestBed.inject(UserService);
       await service.updateRol(2, 'admin');
 
-      expect(mockDb.sql).toHaveBeenCalledWith(
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+      expect(mockDb.sql).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('UPDATE'),
         ['admin', expect.any(String), 2],
       );
     });
 
-    it('debería lanzar error al cambiar rol del administrador semilla', async () => {
-      vi.mocked(mockDb.sql).mockResolvedValue([{ id: 1 }]); // seed admin id = 1
+    it('debería lanzar error al cambiar rol del último administrador activo', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 1 }]) // getActiveAdminCount - only 1 admin
+        .mockResolvedValueOnce([{ rol: 'admin', activo: 1 }]); // target check
 
       const service = TestBed.inject(UserService);
       await expect(service.updateRol(1, 'trabajador')).rejects.toThrow(
-        'No puedes cambiar el rol del usuario administrador',
+        'No puedes cambiar el rol del último administrador activo',
       );
     });
   });
@@ -273,6 +308,72 @@ describe('UserService', () => {
       );
 
       expect(mockDb.sql).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('toggleActivo - last admin protection', () => {
+    it('should block deactivation when only one active admin exists', async () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          UserService,
+          { provide: DATABASE, useValue: mockDb },
+          { provide: AuthService, useValue: { usuario: vi.fn().mockReturnValue({ id: 2 }) } },
+        ],
+      });
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 1 }]) // getActiveAdminCount
+        .mockResolvedValueOnce([{ rol: 'admin', activo: 1 }]); // target check
+
+      const service = TestBed.inject(UserService);
+      await expect(service.toggleActivo(1)).rejects.toThrow(
+        'No puedes desactivar al último administrador activo',
+      );
+    });
+
+    it('should allow deactivation when multiple active admins exist', async () => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          UserService,
+          { provide: DATABASE, useValue: mockDb },
+          { provide: AuthService, useValue: { usuario: vi.fn().mockReturnValue({ id: 2 }) } },
+        ],
+      });
+
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 2 }]) // getActiveAdminCount
+        .mockResolvedValueOnce([]); // UPDATE
+
+      const service = TestBed.inject(UserService);
+      await service.toggleActivo(1);
+
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('updateRol - last admin protection', () => {
+    it('should block role change when only one active admin exists', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 1 }]) // getActiveAdminCount
+        .mockResolvedValueOnce([{ rol: 'admin', activo: 1 }]); // target check
+
+      const service = TestBed.inject(UserService);
+      await expect(service.updateRol(1, 'trabajador')).rejects.toThrow(
+        'No puedes cambiar el rol del último administrador activo',
+      );
+    });
+
+    it('should allow role change when multiple active admins exist', async () => {
+      vi.mocked(mockDb.sql)
+        .mockResolvedValueOnce([{ count: 2 }]) // getActiveAdminCount
+        .mockResolvedValueOnce([]); // UPDATE
+
+      const service = TestBed.inject(UserService);
+      await service.updateRol(1, 'trabajador');
+
+      expect(mockDb.sql).toHaveBeenCalledTimes(2);
     });
   });
 });

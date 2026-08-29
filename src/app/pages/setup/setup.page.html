@@ -1,0 +1,120 @@
+<div class="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950 p-4 safe-top safe-bottom">
+  <div class="w-full max-w-sm bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50 p-6 sm:p-8">
+    <h1 class="text-2xl font-bold text-center mb-6 text-gray-900 dark:text-gray-100">
+      @if (modeReset()) {
+        Restablecer contraseña
+      } @else {
+        Configuración inicial
+      }
+    </h1>
+
+    <form (ngSubmit)="onSubmit()" class="space-y-4">
+      @if (!modeReset()) {
+        <div>
+          <label for="nombre" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Usuario administrador</label>
+          <input
+            id="nombre"
+            type="text"
+            [ngModel]="nombre()"
+            (ngModelChange)="nombre.set($event)"
+            name="nombre"
+            class="w-full border rounded px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 focus:border-blue-500 dark:focus:border-blue-400 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+            required
+            autocomplete="username"
+          />
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contraseña</label>
+          <input
+            id="password"
+            type="password"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            name="password"
+            class="w-full border rounded px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 focus:border-blue-500 dark:focus:border-blue-400 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+            required
+            autocomplete="new-password"
+          />
+        </div>
+
+        <div>
+          <label for="nombreComercio" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del comercio (máx. 18 caracteres)</label>
+          <input
+            id="nombreComercio"
+            type="text"
+            [ngModel]="nombreComercio()"
+            (ngModelChange)="nombreComercio.set($event)"
+            name="nombreComercio"
+            maxlength="18"
+            class="w-full border rounded px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 focus:border-blue-500 dark:focus:border-blue-400 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+            required
+            autocomplete="organization"
+          />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input
+            id="seedProducts"
+            type="checkbox"
+            [ngModel]="seedProducts()"
+            (ngModelChange)="seedProducts.set($event)"
+            name="seedProducts"
+            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+          />
+          <label for="seedProducts" class="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            Cargar catálogo de ejemplo (74 productos, stock 0)
+          </label>
+        </div>
+      } @else {
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nueva contraseña</label>
+          <input
+            id="password"
+            type="password"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            name="password"
+            class="w-full border rounded px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 focus:border-blue-500 dark:focus:border-blue-400 outline-none dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+            required
+            autocomplete="new-password"
+          />
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          Establece una nueva contraseña para tu cuenta.
+        </p>
+      }
+
+      @if (error(); as err) {
+        <app-error-alert [message]="err" />
+      }
+
+      <button
+        type="submit"
+        class="w-full bg-blue-600 dark:bg-blue-500 text-white rounded px-4 py-2 font-medium hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        [disabled]="loading()"
+      >
+        @if (loading()) {
+          <span class="inline-flex items-center gap-1.5">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            @if (modeReset()) {
+              Restableciendo...
+            } @else {
+              Configurando...
+            }
+          </span>
+        } @else {
+          <span class="inline-flex items-center gap-1.5">
+            @if (modeReset()) {
+              <span class="material-symbols-outlined leading-none text-sm">key</span>
+              Restablecer contraseña
+            } @else {
+              <span class="material-symbols-outlined leading-none text-sm">check_circle</span>
+              Completar configuración
+            }
+          </span>
+        }
+      </button>
+    </form>
+  </div>
+</div>
