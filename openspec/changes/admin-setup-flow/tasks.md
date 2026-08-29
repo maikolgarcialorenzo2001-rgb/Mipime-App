@@ -55,22 +55,22 @@ Chain strategy: n/a (single PR)
 
 ## Phase 4: Testing
 
-- [ ] 4.1 Unit: SetupService.countUsers, createInitialAdmin, getConfig/setConfig — mock DATABASE with vi.fn(). Accept: SQL calls verified, returns correct.
-- [ ] 4.2 Unit: setupGuard redirections (0 users, >0 users, authenticated). Mock SetupService, AuthService, Router; test CanActivateFn return values. Accept: guard behavior correct.
-- [ ] 4.3 Unit: UserService.getActiveAdminCount, toggleActivo/updateRol blocking. Mock DATABASE, test count query and throw conditions. Accept: blocking works as expected.
-- [ ] 4.4 Unit: AuthService._restoreSession legacy detection. Mock DATABASE returning user with known legacy hash; verify legacyResetRequired signal set and redirect flag. Accept: legacy detection works.
-- [ ] 4.5 Integration: SetupPage form submission → SetupService → DB → AuthService login → redirect /pos, with seedProducts toggle on and off. Mount SetupPage with TestBed, mock services, simulate submit for both states. Accept: navigation to /pos authenticated + `config.seedProducts` persisted.
-- [ ] 4.6 Integration: Fresh install — run migrations v1..v18, config table created, /setup accessible. Spin up SqliteService with real SQL in Vitest, run initialize(), query schema_version. Accept: migration v18 applied successfully.
-- [ ] 4.7 Integration: Existing DB at v17 upgrades to v18, config table created without data loss. Use runMigrations executor hitting test DB at v17, verify v18 applied. Accept: upgrade path works.
-- [ ] 4.8 E2E: Fresh install flow — /login → /setup → form submission → /pos authenticated. Playwright/Vitest browser mode. Accept: end-to-end setup flow works from scratch.
-- [ ] 4.9 E2E: Legacy user `e.z`/`softwarez` login → forced reset once → new password works. Seed v2 with legacy hash, login, verify redirect to /setup?mode=reset, submit new password, verify login. Accept: legacy reset flow completes.
-- [ ] 4.10 Unit: `seedProductosSiVacio` idempotencia — mock DATABASE: count=0 → 74 inserts; count>0 → no-op. Accept: seed runs only on empty table.
-- [ ] 4.11 Unit: `SetupService.createInitialAdmin` seedProducts=true/false → setConfig('seedProducts','1'/'0') and `seedProductosSiVacio` called / not called. Mock DATABASE + spy. Accept: decision persisted and honored.
+- [x] 4.1 Unit: SetupService.countUsers, createInitialAdmin, getConfig/setConfig — mock DATABASE with vi.fn(). Accept: SQL calls verified, returns correct.
+- [x] 4.2 Unit: setupGuard redirections (0 users, >0 users, authenticated). Mock SetupService, AuthService, Router; test CanActivateFn return values. Accept: guard behavior correct.
+- [x] 4.3 Unit: UserService.getActiveAdminCount, toggleActivo/updateRol blocking. Mock DATABASE, test count query and throw conditions. Accept: blocking works as expected.
+- [x] 4.4 Unit: AuthService._restoreSession legacy detection. Mock DATABASE returning user with known legacy hash; verify legacyResetRequired signal set and redirect flag. Accept: legacy detection works.
+- [x] 4.5 Integration: SetupPage form submission → SetupService → DB → AuthService login → redirect /pos, with seedProducts toggle on and off. Mount SetupPage with TestBed, mock services, simulate submit for both states. Accept: navigation to /pos authenticated + `config.seedProducts` persisted.
+- [ ] 4.6 Integration: Fresh install — run migrations v1..v18, config table created, /setup accessible. Spin up SqliteService with real SQL in Vitest, run initialize(), query schema_version. Accept: migration v18 applied successfully. (Requires Node Worker environment - follow-up)
+- [ ] 4.7 Integration: Existing DB at v17 upgrades to v18, config table created without data loss. Use runMigrations executor hitting test DB at v17, verify v18 applied. Accept: upgrade path works. (Requires Node Worker environment - follow-up)
+- [ ] 4.8 E2E: Fresh install flow — /login → /setup → form submission → /pos authenticated. Playwright/Vitest browser mode. Accept: end-to-end setup flow works from scratch. (Requires Playwright - follow-up)
+- [ ] 4.9 E2E: Legacy user `e.z`/`softwarez` login → forced reset once → new password works. Seed v2 with legacy hash, login, verify redirect to /setup?mode=reset, submit new password, verify login. Accept: legacy reset flow completes. (Requires Playwright - follow-up)
+- [x] 4.10 Unit: `seedProductosSiVacio` idempotencia — mock DATABASE: count=0 → 74 inserts; count>0 → no-op. Accept: seed runs only on empty table.
+- [x] 4.11 Unit: `SetupService.createInitialAdmin` seedProducts=true/false → setConfig('seedProducts','1'/'0') and `seedProductosSiVacio` called / not called. Mock DATABASE + spy. Accept: decision persisted and honored.
 
 ## Phase 5: Cleanup
 
-- [ ] 5.1 Remove temporary console.log/debug code from all modified files. Accept: no temporary debugging artifacts remain.
-- [ ] 5.2 Update documentation comments reflecting new flow (setup guard, service, legacy detection). Accept: comments consistent with implementation.
+- [x] 5.1 Remove temporary console.log/debug code from all modified files. Accept: no temporary debugging artifacts remain (only intentional storage persistence log in sqlite.service.ts remains).
+- [x] 5.2 Update documentation comments reflecting new flow (setup guard, service, legacy detection). Accept: comments consistent with implementation.
 
 Review Workload Forecast (plain text):
 Decision needed before apply: No
