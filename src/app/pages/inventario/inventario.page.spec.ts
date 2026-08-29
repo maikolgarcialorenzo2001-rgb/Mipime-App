@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 import { InventarioPage, elegirLoteInicialEdicion } from './inventario.page';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
+import { JornadaService } from '../../services/jornada.service';
 import type { Producto, StockMovimiento } from '../../models';
 
 describe('InventarioPage', () => {
@@ -15,6 +17,8 @@ describe('InventarioPage', () => {
   let mockStockService: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockAuthService: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockJornadaService: any;
 
   const productos: Producto[] = [
     {
@@ -78,6 +82,10 @@ describe('InventarioPage', () => {
       usuario: vi.fn().mockReturnValue({ id: 1, nombre: 'Admin', rol: 'admin' }),
     };
 
+    mockJornadaService = {
+      jornadaAbierta: signal(null),
+    };
+
     mockProductoService = {
       listar: vi.fn(),
       buscar: vi.fn(),
@@ -109,6 +117,7 @@ describe('InventarioPage', () => {
         { provide: AuthService, useValue: mockAuthService },
         { provide: ProductoService, useValue: mockProductoService },
         { provide: StockMovimientoService, useValue: mockStockService },
+        { provide: JornadaService, useValue: mockJornadaService },
       ],
     });
   });
@@ -180,9 +189,10 @@ describe('InventarioPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const errorAlert = fixture.nativeElement.querySelector('app-error-alert');
-    expect(errorAlert).toBeTruthy();
-    expect(errorAlert.textContent).toContain('Error de prueba');
+    const errorToast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('Error de prueba'),
+    );
+    expect(errorToast).toBeTruthy();
     expect(component.loading()).toBe(false);
   });
 
@@ -312,7 +322,7 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(mockStockService.registrarTraslado).toHaveBeenCalledWith(1, 5);
+    expect(mockStockService.registrarTraslado).toHaveBeenCalledWith(1, 5, undefined);
   });
 
   it('11. calls registrarEntrada on form submit', async () => {
@@ -336,7 +346,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(mockStockService.registrarEntrada).toHaveBeenCalledWith(
-      1, 5, 500, 'Repo',
+      1, 5, 500, 'Repo', undefined,
     );
   });
 
@@ -384,7 +394,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(mockStockService.registrarEntrada).toHaveBeenCalledWith(
-      1, 5, 0, undefined,
+      1, 5, 0, undefined, undefined,
     );
   });
 
@@ -1632,9 +1642,10 @@ describe('InventarioPage', () => {
 
     expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
     expect(component.error()).toBe('El motivo es obligatorio');
-    const errorAlert = fixture.nativeElement.querySelector('app-error-alert');
-    expect(errorAlert).toBeTruthy();
-    expect(errorAlert.textContent).toContain('motivo');
+    const errorToast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('El motivo es obligatorio'),
+    );
+    expect(errorToast).toBeTruthy();
   });
 
   it('34. S-02: "Cantidad nueva del lote" vacía muestra error visible y NO envía 0 (nunca zeroing silencioso)', async () => {
@@ -1663,9 +1674,10 @@ describe('InventarioPage', () => {
 
     expect(mockStockService.registrarEditar).not.toHaveBeenCalled();
     expect(component.error()).toBe('La cantidad es obligatoria');
-    const errorAlert = fixture.nativeElement.querySelector('app-error-alert');
-    expect(errorAlert).toBeTruthy();
-    expect(errorAlert.textContent).toContain('cantidad');
+    const errorToast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('La cantidad es obligatoria'),
+    );
+    expect(errorToast).toBeTruthy();
   });
 
   it('35. T-02: Guardar sin nombre en editar muestra error visible y NO llama al servicio', async () => {
@@ -1886,7 +1898,10 @@ describe('InventarioPage', () => {
       (el) => el.textContent?.includes('Stock guardado'),
     );
     expect(toast).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('app-error-alert').textContent).toContain('Error al guardar');
+    const errorToast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
+      (el) => el.textContent?.includes('Error al guardar'),
+    );
+    expect(errorToast).toBeTruthy();
   });
 
   it('39. F8: producto sin lotes en editar materializa lote 0 y guarda (loteId null)', async () => {
