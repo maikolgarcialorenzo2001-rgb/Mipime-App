@@ -69,7 +69,7 @@ export class UserService {
     const activeAdminCount = await this.getActiveAdminCount();
     if (activeAdminCount === 1) {
       // Check if the target is an active admin
-      const target = await this._db.sql<Pick<Usuario, 'rol', 'activo'>>(
+      const target = await this._db.sql<Pick<Usuario, 'rol' | 'activo'>>(
         'SELECT rol, activo FROM usuarios WHERE id = ?',
         [id],
       );
@@ -92,7 +92,7 @@ export class UserService {
     const activeAdminCount = await this.getActiveAdminCount();
     if (activeAdminCount === 1) {
       // Check if the target is an active admin
-      const target = await this._db.sql<Pick<Usuario, 'rol', 'activo'>>(
+      const target = await this._db.sql<Pick<Usuario, 'rol' | 'activo'>>(
         'SELECT rol, activo FROM usuarios WHERE id = ?',
         [id],
       );

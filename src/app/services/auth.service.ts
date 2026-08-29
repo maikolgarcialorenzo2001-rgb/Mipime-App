@@ -127,7 +127,7 @@ export class AuthService {
     return legacyHashes.includes(user.password_hash);
   }
 
-  private async _restoreSession(): void {
+  private async _restoreSession(): Promise<void> {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) return;
