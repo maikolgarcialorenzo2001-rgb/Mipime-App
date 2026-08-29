@@ -15,7 +15,7 @@
     "electron:rebuild": "npx @electron/rebuild -f -w better-sqlite3",
     "electron:start": "tsc -p electron/tsconfig.json && electron dist-electron/main.js",
     "electron:build": "ng build && tsc -p electron/tsconfig.json",
-    "electron:build:win": "ng build && tsc -p electron/tsconfig.json && electron-builder --win",
+    "electron:build:win": "node scripts/build-version-check.mjs && ng build && tsc -p electron/tsconfig.json && electron-builder --win",
     "electron:build:mac": "ng build && tsc -p electron/tsconfig.json && electron-builder --mac",
     "electron:build:linux": "ng build && tsc -p electron/tsconfig.json && electron-builder --linux",
     "cap:sync": "npx cap sync",
