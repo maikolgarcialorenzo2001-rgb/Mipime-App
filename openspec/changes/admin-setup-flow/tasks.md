@@ -48,10 +48,10 @@ Chain strategy: n/a (single PR)
 
 ## Phase 3: Integration / Wiring
 
-- [ ] 3.1 Create `src/app/pages/setup/setup.page.ts` standalone component: form admin nombre, password, nombreComercio (maxlength 18), seedProducts toggle (default off); mode=reset support; loading/error states. Accept: toggle wired to submit, decision sent to service.
-- [ ] 3.2 Create `src/app/pages/setup/setup.page.html` template: centered card, Tailwind, ErrorAlertComponent, seedProducts toggle following login.page.html pattern. Accept: template matches design, toggle renders and binds.
-- [ ] 3.3 Create `src/app/pages/setup/setup.page.css` minimal styles reusing login patterns. Accept: styles applied correctly.
-- [ ] 3.4 Modify `src/app/app.routes.ts`: add /setup route lazy load SetupPage; apply setupGuard to /login and /setup routes. Accept: routes configured, guard applied.
+- [x] 3.1 Create `src/app/pages/setup/setup.page.ts` standalone component: form admin nombre, password, nombreComercio (maxlength 18), seedProducts toggle (default off); mode=reset support; loading/error states. Accept: toggle wired to submit, decision sent to service.
+- [x] 3.2 Create `src/app/pages/setup/setup.page.html` template: centered card, Tailwind, ErrorAlertComponent, seedProducts toggle following login.page.html pattern. Accept: template matches design, toggle renders and binds.
+- [x] 3.3 Create `src/app/pages/setup/setup.page.css` minimal styles reusing login patterns. Accept: styles applied correctly.
+- [x] 3.4 Modify `src/app/app.routes.ts`: add /setup route lazy load SetupPage; apply setupGuard to /login and /setup routes. Accept: routes configured, guard applied.
 
 ## Phase 4: Testing
 

@@ -71,24 +71,24 @@
 ## Phase 3: Integration / Wiring
 
 ### Task 3.1: Create setup.page.ts standalone component
-- [ ] RED: Write tests for form rendering, submission, mode=reset support
-- [ ] GREEN: Create SetupPage with form, loading/error states
-- [ ] REFACTOR: Verify form renders, submits via service
+- [x] RED: Write tests for form rendering, submission, mode=reset support
+- [x] GREEN: Create SetupPage with form, loading/error states
+- [x] REFACTOR: Verify form renders, submits via service
 
 ### Task 3.2: Create setup.page.html template
-- [ ] RED: Write tests for template rendering
-- [ ] GREEN: Create template following login.page.html pattern
-- [ ] REFACTOR: Verify template matches design
+- [x] RED: Write tests for template rendering
+- [x] GREEN: Create template following login.page.html pattern
+- [x] REFACTOR: Verify template matches design
 
 ### Task 3.3: Create setup.page.css
-- [ ] RED: Verify styles applied
-- [ ] GREEN: Create minimal styles reusing login patterns
-- [ ] REFACTOR: Verify styles correct
+- [x] RED: Verify styles applied
+- [x] GREEN: Create minimal styles reusing login patterns
+- [x] REFACTOR: Verify styles correct
 
 ### Task 3.4: Modify app.routes.ts: add /setup route, apply setupGuard
-- [ ] RED: Write tests for routes and guard application
-- [ ] GREEN: Add /setup route with lazy load, apply setupGuard to /login and /setup
-- [ ] REFACTOR: Verify routes configured, guard applied
+- [x] RED: Write tests for routes and guard application
+- [x] GREEN: Add /setup route with lazy load, apply setupGuard to /login and /setup
+- [x] REFACTOR: Verify routes configured, guard applied
 
 ## Phase 4: Testing
 
@@ -175,6 +175,10 @@
 | 2.4 | `src/app/pages/admin/admin.page.spec.ts` | Unit | ✅ 3/3 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
 | 2.5 | (template) | Integration | ✅ 3/3 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
 | 2.6 | `src/app/services/auth.service.spec.ts` | Unit | ✅ 4/4 | ✅ Written | ✅ Passed | ✅ 4 cases | ✅ Clean |
+| 3.1 | `src/app/pages/setup/setup.page.spec.ts` | Unit | ✅ 7/7 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 3.2 | (template) | Integration | ✅ 7/7 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 3.3 | (css) | Integration | ✅ 7/7 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 3.4 | `src/app/app.routes.spec.ts` | Unit | ✅ 4/4 | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
 
 ## Files Changed (Tracking)
 
@@ -184,6 +188,11 @@
 - `src/app/guards/setup.guard.spec.ts`
 - `src/app/services/setup.service.ts`
 - `src/app/services/setup.service.spec.ts`
+- `src/app/pages/setup/setup.page.ts`
+- `src/app/pages/setup/setup.page.spec.ts`
+- `src/app/pages/setup/setup.page.html`
+- `src/app/pages/setup/setup.page.css`
+- `src/app/app.routes.spec.ts`
 
 ### Modified
 - `src/app/environments/environment.ts`
@@ -199,12 +208,14 @@
 - `src/app/pages/admin/admin.page.spec.ts`
 - `src/app/services/auth.service.ts`
 - `src/app/services/auth.service.spec.ts`
+- `src/app/app.routes.ts`
 
 ## Tests Summary
 - Runner: `bunx vitest run`
 - Phase 1: 15 tests passing
 - Phase 2: 38 tests passing
-- Total tests passing: 92 (including safety net)
+- Phase 3: 18 tests passing
+- Total tests passing: 110 (including safety net)
 
 ## Deviations from Design
 None — implementation matches design.
@@ -213,10 +224,10 @@ None — implementation matches design.
 None.
 
 ## Remaining Tasks
-Phase 3 (tasks 3.1-3.4), Phase 4 (4.5-4.9), Phase 5 (5.1-5.2) — 15 tasks pending.
+Phase 4 (tasks 4.5-4.9), Phase 5 (5.1-5.2) — 11 tasks pending.
 
 ## Workload / PR Boundary
 - Mode: Single PR with size:exception (~500 lines estimated, maintainer approved)
-- Current work unit: Phase 3
+- Current work unit: Phase 4
 - Boundary: All 27 tasks in one PR on branch `setup-upgrade`
 - Estimated review budget impact: ~500 lines (exception approved)
