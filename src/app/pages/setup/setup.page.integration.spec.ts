@@ -3,12 +3,14 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { SetupPage } from './setup.page';
 import { SetupService } from '../../services/setup.service';
 import { AuthService } from '../../services/auth.service';
+import { UserService } from '../../services/user.service';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
 describe('SetupPage - Integration', () => {
   let mockSetupService: Partial<SetupService>;
   let mockAuthService: Partial<AuthService>;
+  let mockUserService: Partial<UserService>;
   let mockRouter: Partial<Router>;
   let mockActivatedRoute: Partial<ActivatedRoute>;
 
@@ -16,6 +18,7 @@ describe('SetupPage - Integration', () => {
     mockSetupService = {
       createInitialAdmin: vi.fn(),
       countUsers: vi.fn(),
+      setConfig: vi.fn().mockResolvedValue(undefined),
     };
 
     mockAuthService = {
@@ -23,6 +26,10 @@ describe('SetupPage - Integration', () => {
       usuario: signal(null),
       isLoggedIn: signal(false),
       hasRole: vi.fn(),
+    };
+
+    mockUserService = {
+      updatePassword: vi.fn().mockResolvedValue(undefined),
     };
 
     mockRouter = {
@@ -44,6 +51,7 @@ describe('SetupPage - Integration', () => {
       providers: [
         { provide: SetupService, useValue: mockSetupService },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: UserService, useValue: mockUserService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],

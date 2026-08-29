@@ -3,12 +3,14 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { SetupPage } from './setup.page';
 import { SetupService } from '../../services/setup.service';
 import { AuthService } from '../../services/auth.service';
+import { UserService } from '../../services/user.service';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
 describe('SetupPage', () => {
   let mockSetupService: Partial<SetupService>;
   let mockAuthService: Partial<AuthService>;
+  let mockUserService: Partial<UserService>;
   let mockRouter: Partial<Router>;
   let mockActivatedRoute: Partial<ActivatedRoute>;
 
@@ -16,6 +18,7 @@ describe('SetupPage', () => {
     mockSetupService = {
       createInitialAdmin: vi.fn(),
       countUsers: vi.fn(),
+      setConfig: vi.fn().mockResolvedValue(undefined),
     };
 
     mockAuthService = {
@@ -23,6 +26,10 @@ describe('SetupPage', () => {
       usuario: signal(null),
       isLoggedIn: signal(false),
       hasRole: vi.fn(),
+    };
+
+    mockUserService = {
+      updatePassword: vi.fn().mockResolvedValue(undefined),
     };
 
     mockRouter = {
@@ -44,6 +51,7 @@ describe('SetupPage', () => {
       providers: [
         { provide: SetupService, useValue: mockSetupService },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: UserService, useValue: mockUserService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
@@ -85,6 +93,7 @@ describe('SetupPage', () => {
       providers: [
         { provide: SetupService, useValue: mockSetupService },
         { provide: AuthService, useValue: mockAuthService },
+        { provide: UserService, useValue: mockUserService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
       ],
@@ -177,5 +186,125 @@ describe('SetupPage', () => {
     component.nombreComercio.set('A'.repeat(19));
     // The form validation should prevent submission
     // or the input maxlength should limit to 18
+  });
+
+  describe('reset flow (mode=reset)', () => {
+    let resetActivatedRoute: Partial<ActivatedRoute>;
+
+    beforeEach(() => {
+      resetActivatedRoute = {
+        queryParamMap: of({
+          get: (key: string) => key === 'mode' ? 'reset' : (key === 'userId' ? '5' : null),
+        }),
+        snapshot: {
+          queryParamMap: {
+            get: (key: string) => key === 'mode' ? 'reset' : (key === 'userId' ? '5' : null),
+          },
+        },
+      };
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: SetupService, useValue: mockSetupService },
+          { provide: AuthService, useValue: mockAuthService },
+          { provide: UserService, useValue: mockUserService },
+          { provide: Router, useValue: mockRouter },
+          { provide: ActivatedRoute, useValue: resetActivatedRoute },
+        ],
+      });
+    });
+
+    it('should call updatePassword and setConfig on successful reset, then navigate to /login', async () => {
+      const fixture = TestBed.createComponent(SetupPage);
+      const component = fixture.componentInstance;
+
+      component.ngOnInit();
+      expect(component.modeReset()).toBe(true);
+      expect(component.userId()).toBe(5);
+
+      component.password.set('new-password-123');
+
+      await component.onSubmit();
+
+      expect(mockUserService.updatePassword).toHaveBeenCalledWith(5, 'new-password-123');
+      expect(mockSetupService.setConfig).toHaveBeenCalledWith('legacy_reset_done', '1');
+      expect(mockRouter.navigate).toHaveBeenCalledWith(['/login']);
+      expect(component.error()).toBeNull();
+      expect(component.loading()).toBe(false);
+    });
+
+    it('should show error when password is empty and not call updatePassword', async () => {
+      const fixture = TestBed.createComponent(SetupPage);
+      const component = fixture.componentInstance;
+
+      component.ngOnInit();
+      component.password.set('');
+
+      await component.onSubmit();
+
+      expect(component.error()).toBe('La contraseña es obligatoria');
+      expect(mockUserService.updatePassword).not.toHaveBeenCalled();
+      expect(mockSetupService.setConfig).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      expect(component.loading()).toBe(false);
+    });
+
+    it('should show error when userId is missing and not call updatePassword', async () => {
+      const noUserIdRoute = {
+        queryParamMap: of({
+          get: (key: string) => key === 'mode' ? 'reset' : null,
+        }),
+        snapshot: {
+          queryParamMap: {
+            get: (key: string) => key === 'mode' ? 'reset' : null,
+          },
+        },
+      };
+
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: SetupService, useValue: mockSetupService },
+          { provide: AuthService, useValue: mockAuthService },
+          { provide: UserService, useValue: mockUserService },
+          { provide: Router, useValue: mockRouter },
+          { provide: ActivatedRoute, useValue: noUserIdRoute },
+        ],
+      });
+
+      const fixture = TestBed.createComponent(SetupPage);
+      const component = fixture.componentInstance;
+
+      component.ngOnInit();
+      expect(component.userId()).toBeNull();
+      component.password.set('some-password');
+
+      await component.onSubmit();
+
+      expect(component.error()).toBe('Usuario no especificado para reset');
+      expect(mockUserService.updatePassword).not.toHaveBeenCalled();
+      expect(mockSetupService.setConfig).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      expect(component.loading()).toBe(false);
+    });
+
+    it('should show error when updatePassword throws', async () => {
+      mockUserService.updatePassword!.mockRejectedValue(new Error('DB error'));
+
+      const fixture = TestBed.createComponent(SetupPage);
+      const component = fixture.componentInstance;
+
+      component.ngOnInit();
+      component.password.set('new-password');
+
+      await component.onSubmit();
+
+      expect(component.error()).toBe('DB error');
+      expect(mockUserService.updatePassword).toHaveBeenCalledWith(5, 'new-password');
+      expect(mockSetupService.setConfig).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).not.toHaveBeenCalled();
+      expect(component.loading()).toBe(false);
+    });
   });
 });

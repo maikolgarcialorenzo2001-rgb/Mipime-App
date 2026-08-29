@@ -4,6 +4,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { SetupService } from '../../services/setup.service';
 import { AuthService } from '../../services/auth.service';
+import { UserService } from '../../services/user.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 
 @Component({
@@ -16,6 +17,7 @@ import { ErrorAlertComponent } from '../../components/error-alert/error-alert.co
 export class SetupPage implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly auth = inject(AuthService);
+  private readonly userService = inject(UserService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -92,10 +94,9 @@ export class SetupPage implements OnInit {
       }
 
       try {
-        // Update password for the legacy user
-        // We need to use UserService.updatePassword, but for now just show error
-        // In a real implementation, we'd inject UserService and call updatePassword
-        this.error.set('Funcionalidad de reset de contraseña pendiente');
+        await this.userService.updatePassword(this.userId()!, this.password());
+        await this.setupService.setConfig('legacy_reset_done', '1');
+        this.router.navigate(['/login']);
       } catch (e) {
         this.error.set(e instanceof Error ? e.message : 'Error al resetear contraseña');
       } finally {
