@@ -12,6 +12,19 @@
     </button>
   </div>
 
+  <!-- Warning when only one active admin exists -->
+  @if (isLastAdmin()) {
+    <div class="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      <span class="material-symbols-outlined text-yellow-600 dark:text-yellow-400 mt-0.5">warning</span>
+      <div>
+        <p class="font-medium text-yellow-800 dark:text-yellow-300">Único administrador activo</p>
+        <p class="text-sm text-yellow-700 dark:text-yellow-400">
+          No puedes desactivar ni cambiar el rol del último administrador activo.
+        </p>
+      </div>
+    </div>
+  }
+
   <!-- Create form (inline) -->
   @if (showCreateForm()) {
     <form
@@ -92,19 +105,16 @@
             <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               <td class="px-4 py-3 text-gray-900 dark:text-gray-100">
                 {{ user.nombre }}
-                @if (user.id === seedAdminId()) {
-                  <span class="text-sm dark:text-gray-300">🔒</span>
-                }
                 @if (user.id === currentUserId()) {
                   <span class="text-sm text-gray-500 dark:text-gray-400">(usted)</span>
                 }
               </td>
               <td class="px-4 py-3">
                 <select
-                  [disabled]="user.id === seedAdminId()"
+                  [disabled]="isLastAdmin() && user.rol === 'admin' && user.activo === 1"
                   class="border rounded px-3 py-1 text-sm dark:bg-gray-900 dark:text-gray-200 dark:border-gray-600 dark:[color-scheme:dark]"
-                  [class.opacity-50]="user.id === seedAdminId()"
-                  [class.cursor-not-allowed]="user.id === seedAdminId()"
+                  [class.opacity-50]="isLastAdmin() && user.rol === 'admin' && user.activo === 1"
+                  [class.cursor-not-allowed]="isLastAdmin() && user.rol === 'admin' && user.activo === 1"
                   (change)="onUpdateRol(user.id, $event)"
                 >
                   <option
@@ -123,7 +133,7 @@
               </td>
               <td class="px-4 py-3">
                 <button
-                  [disabled]="user.id === seedAdminId() || user.id === currentUserId()"
+                  [disabled]="isLastAdmin() && user.rol === 'admin' && user.activo === 1 || user.id === currentUserId()"
                   class="rounded px-3 py-1 text-sm font-medium transition-colors"
                   [class.bg-green-100]="user.activo === 1"
                   [class.dark:bg-green-900/40]="user.activo === 1"
@@ -133,8 +143,8 @@
                   [class.dark:bg-red-900/40]="user.activo === 0"
                   [class.text-red-700]="user.activo === 0"
                   [class.dark:text-red-400]="user.activo === 0"
-                  [class.opacity-50]="user.id === seedAdminId() || user.id === currentUserId()"
-                  [class.cursor-not-allowed]="user.id === seedAdminId() || user.id === currentUserId()"
+                  [class.opacity-50]="isLastAdmin() && user.rol === 'admin' && user.activo === 1 || user.id === currentUserId()"
+                  [class.cursor-not-allowed]="isLastAdmin() && user.rol === 'admin' && user.activo === 1 || user.id === currentUserId()"
                   (click)="onToggle(user.id)"
                 >
                   {{ user.activo ? 'Activo' : 'Inactivo' }}

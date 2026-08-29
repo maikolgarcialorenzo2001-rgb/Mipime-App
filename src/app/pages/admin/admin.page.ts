@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { AuthService } from '../../services/auth.service';
 import { UserService } from '../../services/user.service';
-import { environment } from '../../environments/environment';
 import type { UsuarioPublico } from '../../models';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -30,6 +29,7 @@ export class AdminPage implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly showCreateForm = signal(false);
+  readonly activeAdminCount = signal(0);
 
   // Create form signals
   readonly newNombre = signal('');
@@ -42,11 +42,10 @@ export class AdminPage implements OnInit {
 
   // Computed
   readonly currentUserId = computed(() => this.auth.usuario()?.id ?? null);
-  readonly seedAdminId = computed(() => {
-    const admin = this.usuarios().find(
-      (u) => u.nombre === environment.adminUser && u.rol === 'admin',
-    );
-    return admin?.id ?? null;
+  readonly isLastAdmin = computed(() => {
+    if (this.activeAdminCount() !== 1) return false;
+    const soleAdmin = this.usuarios().find(u => u.rol === 'admin' && u.activo === 1);
+    return !!soleAdmin;
   });
 
   async ngOnInit(): Promise<void> {
@@ -57,8 +56,12 @@ export class AdminPage implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const users = await this.userService.list();
+      const [users, adminCount] = await Promise.all([
+        this.userService.list(),
+        this.userService.getActiveAdminCount(),
+      ]);
       this.usuarios.set(users);
+      this.activeAdminCount.set(adminCount);
     } catch (e) {
       this.error.set(
         e instanceof Error ? e.message : 'Error al cargar usuarios',

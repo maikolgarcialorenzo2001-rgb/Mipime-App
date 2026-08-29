@@ -30,12 +30,12 @@ Chain strategy: n/a (single PR)
 
 ## Phase 1: Foundation / Infrastructure
 
-- [ ] 1.1 Remove `adminUser`/`adminPassword` from `src/app/environments/environment.ts` (~2 del). Accept: no credentials; `fileReplacements` shape intact.
-- [ ] 1.2 Remove from `src/app/environments/environment.prod.ts` (~2 del). Accept: same.
-- [ ] 1.3 Remove from `src/app/environments/environment.test.ts` (~2 del, keep `seedEnabled: true`). Accept: test env clean.
-- [ ] 1.4 Edit `src/app/services/db-migrations.ts`: remove env-based seed block in migrationV2; replace with no-op. Accept: seed has no env references.
-- [ ] 1.5 Add migration v18 config table SQL + update `electron/db.ts` `MAX_SCHEMA_VERSION` 17→18. Accept: config table created; schema version 18 set.
-- [ ] 1.6 Refactor seed: rename `seedIfEmpty` → `seedProductosSiVacio` and export from `src/app/services/db-migrations.ts`; update call site in `runMigrations`. Accept: reusable export, existing seed tests still green.
+- [x] 1.1 Remove `adminUser`/`adminPassword` from `src/app/environments/environment.ts` (~2 del). Accept: no credentials; `fileReplacements` shape intact.
+- [x] 1.2 Remove from `src/app/environments/environment.prod.ts` (~2 del). Accept: same.
+- [x] 1.3 Remove from `src/app/environments/environment.test.ts` (~2 del, keep `seedEnabled: true`). Accept: test env clean.
+- [x] 1.4 Edit `src/app/services/db-migrations.ts`: remove env-based seed block in migrationV2; replace with no-op. Accept: seed has no env references.
+- [x] 1.5 Add migration v18 config table SQL + update `electron/db.ts` `MAX_SCHEMA_VERSION` 17→18. Accept: config table created; schema version 18 set.
+- [x] 1.6 Refactor seed: rename `seedIfEmpty` → `seedProductosSiVacio` and export from `src/app/services/db-migrations.ts`; update call site in `runMigrations`. Accept: reusable export, existing seed tests still green.
 
 ## Phase 2: Core Implementation
 

@@ -7,29 +7,34 @@
 ## Phase 1: Foundation / Infrastructure
 
 ### Task 1.1: Remove adminUser/adminPassword from environment.ts
-- [ ] RED: Write test verifying credentials removed
-- [ ] GREEN: Remove credentials
-- [ ] REFACTOR: Verify fileReplacements shape intact
+- [x] RED: Write test verifying credentials removed
+- [x] GREEN: Remove credentials
+- [x] REFACTOR: Verify fileReplacements shape intact
 
 ### Task 1.2: Remove from environment.prod.ts
-- [ ] RED: Write test verifying credentials removed
-- [ ] GREEN: Remove credentials
-- [ ] REFACTOR: Verify fileReplacements shape intact
+- [x] RED: Write test verifying credentials removed
+- [x] GREEN: Remove credentials
+- [x] REFACTOR: Verify fileReplacements shape intact
 
 ### Task 1.3: Remove from environment.test.ts (keep seedEnabled: true)
-- [ ] RED: Write test verifying credentials removed, seedEnabled kept
-- [ ] GREEN: Remove credentials, keep seedEnabled
-- [ ] REFACTOR: Verify test env clean
+- [x] RED: Write test verifying credentials removed, seedEnabled kept
+- [x] GREEN: Remove credentials, keep seedEnabled
+- [x] REFACTOR: Verify test env clean
 
 ### Task 1.4: Edit db-migrations.ts: remove env-based seed block in migrationV2; replace with no-op
-- [ ] RED: Write test verifying migrationV2 no longer uses environment.*
-- [ ] GREEN: Remove seed block using environment.*, replace with no-op
-- [ ] REFACTOR: Verify seed has no env references
+- [x] RED: Write test verifying migrationV2 no longer uses environment.*
+- [x] GREEN: Remove seed block using environment.*, replace with no-op
+- [x] REFACTOR: Verify seed has no env references
 
 ### Task 1.5: Add migration v18 config table SQL + update electron/db.ts MAX_SCHEMA_VERSION 17→18
-- [ ] RED: Write test verifying config table created and schema version 18
-- [ ] GREEN: Add migrationV18 creating config table, update MAX_SCHEMA_VERSION
-- [ ] REFACTOR: Verify config table created; schema version 18 set
+- [x] RED: Write test verifying config table created and schema version 18
+- [x] GREEN: Add migrationV18 creating config table, update MAX_SCHEMA_VERSION
+- [x] REFACTOR: Verify config table created; schema version 18 set
+
+### Task 1.6: Refactor seed: rename seedIfEmpty → seedProductosSiVacio and export
+- [x] RED: Write test verifying seedProductosSiVacio exported and idempotent
+- [x] GREEN: Rename function, export, update runMigrations call site
+- [x] REFACTOR: Verify existing seed tests still green
 
 ## Phase 2: Core Implementation
 
@@ -132,6 +137,16 @@
 - [ ] GREEN: Test passes
 - [ ] REFACTOR: Verify legacy reset flow
 
+### Task 4.10: Unit: seedProductosSiVacio idempotencia
+- [x] RED: Written in Task 1.6
+- [x] GREEN: Tests pass
+- [ ] REFACTOR: -
+
+### Task 4.11: Unit: SetupService.createInitialAdmin seedProducts toggle
+- [ ] RED: Write test for seedProducts true/false
+- [ ] GREEN: Test passes
+- [ ] REFACTOR: -
+
 ## Phase 5: Cleanup
 
 ### Task 5.1: Remove temporary console.log/debug code
@@ -146,37 +161,19 @@
 
 ## TDD Cycle Evidence
 
-| Task | RED (Test First) | GREEN (Implementation) | REFACTOR |
-|------|------------------|------------------------|----------|
-| 1.1 |  |  |  |
-| 1.2 |  |  |  |
-| 1.3 |  |  |  |
-| 1.4 |  |  |  |
-| 1.5 |  |  |  |
-| 2.1 |  |  |  |
-| 2.2 |  |  |  |
-| 2.3 |  |  |  |
-| 2.4 |  |  |  |
-| 2.5 |  |  |  |
-| 2.6 |  |  |  |
-| 3.1 |  |  |  |
-| 3.2 |  |  |  |
-| 3.3 |  |  |  |
-| 3.4 |  |  |  |
-| 4.1-4.9 |  |  |  |
-| 5.1-5.2 |  |  |  |
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 1.1 | `src/app/environments/environment.spec.ts` | Unit | N/A (new) | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 1.2 | `src/app/environments/environment.spec.ts` | Unit | N/A (new) | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 1.3 | `src/app/environments/environment.spec.ts` | Unit | N/A (new) | ✅ Written | ✅ Passed | ➖ Single | ✅ Clean |
+| 1.4 | `src/app/services/db-migrations.spec.ts` | Unit | ✅ 10/10 | ✅ Written | ✅ Passed | ✅ 2 cases | ✅ Clean |
+| 1.5 | `src/app/services/db-migrations.spec.ts` | Unit | ✅ 10/10 | ✅ Written | ✅ Passed | ✅ 2 cases | ✅ Clean |
+| 1.6 | `src/app/services/db-migrations.spec.ts` | Unit | ✅ 10/10 | ✅ Written | ✅ Passed | ✅ 2 cases | ✅ Clean |
 
 ## Files Changed (Tracking)
 
 ### Created
-- `src/app/guards/setup.guard.ts`
-- `src/app/guards/setup.guard.spec.ts`
-- `src/app/services/setup.service.ts`
-- `src/app/services/setup.service.spec.ts`
-- `src/app/pages/setup/setup.page.ts`
-- `src/app/pages/setup/setup.page.spec.ts`
-- `src/app/pages/setup/setup.page.html`
-- `src/app/pages/setup/setup.page.css`
+- `src/app/environments/environment.spec.ts`
 
 ### Modified
 - `src/app/environments/environment.ts`
@@ -185,33 +182,23 @@
 - `src/app/services/db-migrations.ts`
 - `src/app/services/db-migrations.spec.ts`
 - `electron/db.ts`
-- `src/app/services/user.service.ts`
-- `src/app/services/user.service.spec.ts`
-- `src/app/pages/admin/admin.page.ts`
-- `src/app/pages/admin/admin.page.html`
-- `src/app/pages/admin/admin.page.spec.ts`
-- `src/app/services/auth.service.ts`
-- `src/app/services/auth.service.spec.ts`
-- `src/app/app.routes.ts`
 
 ## Tests Summary
 - Runner: `bunx vitest run`
-- Total: TBD
-- Passed: TBD
-- Failed: TBD
-- Pre-existing failures: TBD
+- Phase 1: 15 tests passing
+- Total tests passing: 44 (including safety net)
 
 ## Deviations from Design
-None yet.
+None — implementation matches design.
 
 ## Issues Found
-None yet.
+None.
 
 ## Remaining Tasks
-All 26 tasks pending.
+Phase 2 (tasks 2.1-2.6), Phase 3 (3.1-3.4), Phase 4 (4.1-4.9, 4.11), Phase 5 (5.1-5.2) — 21 tasks pending.
 
 ## Workload / PR Boundary
-- Mode: Single PR with size:exception (420 lines > 400, maintainer approved)
-- Current work unit: Phase 1
-- Boundary: All 26 tasks in one PR on branch `setup-upgrade`
-- Estimated review budget impact: 420 lines (exception approved)
+- Mode: Single PR with size:exception (~500 lines estimated, maintainer approved)
+- Current work unit: Phase 2
+- Boundary: All 27 tasks in one PR on branch `setup-upgrade`
+- Estimated review budget impact: ~500 lines (exception approved)

@@ -2,7 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import { DATABASE } from './database';
 import { AuthService } from './auth.service';
 import { generateSalt, hashPassword } from './hash-password';
-import { environment } from '../environments/environment';
 import type { Usuario, UsuarioPublico } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -54,19 +53,29 @@ export class UserService {
     };
   }
 
+  async getActiveAdminCount(): Promise<number> {
+    const [{ count }] = await this._db.sql<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM usuarios WHERE rol = 'admin' AND activo = 1",
+    );
+    return count;
+  }
+
   async toggleActivo(id: number): Promise<void> {
     const currentUser = this._auth.usuario();
     if (currentUser && id === currentUser.id) {
       throw new Error('No puedes desactivarte a ti mismo');
     }
 
-    const seedAdmin = await this._db.sql<Pick<Usuario, 'id'>>(
-      'SELECT id FROM usuarios WHERE nombre = ? AND rol = ? LIMIT 1',
-      [environment.adminUser, 'admin'],
-    );
-
-    if (seedAdmin.length > 0 && id === seedAdmin[0].id) {
-      throw new Error('No puedes desactivar al usuario administrador');
+    const activeAdminCount = await this.getActiveAdminCount();
+    if (activeAdminCount === 1) {
+      // Check if the target is an active admin
+      const target = await this._db.sql<Pick<Usuario, 'rol', 'activo'>>(
+        'SELECT rol, activo FROM usuarios WHERE id = ?',
+        [id],
+      );
+      if (target.length > 0 && target[0].rol === 'admin' && target[0].activo === 1) {
+        throw new Error('No puedes desactivar al último administrador activo');
+      }
     }
 
     const now = new Date().toISOString();
@@ -80,13 +89,16 @@ export class UserService {
     id: number,
     rol: 'admin' | 'trabajador',
   ): Promise<void> {
-    const seedAdmin = await this._db.sql<Pick<Usuario, 'id'>>(
-      'SELECT id FROM usuarios WHERE nombre = ? AND rol = ? LIMIT 1',
-      [environment.adminUser, 'admin'],
-    );
-
-    if (seedAdmin.length > 0 && id === seedAdmin[0].id) {
-      throw new Error('No puedes cambiar el rol del usuario administrador');
+    const activeAdminCount = await this.getActiveAdminCount();
+    if (activeAdminCount === 1) {
+      // Check if the target is an active admin
+      const target = await this._db.sql<Pick<Usuario, 'rol', 'activo'>>(
+        'SELECT rol, activo FROM usuarios WHERE id = ?',
+        [id],
+      );
+      if (target.length > 0 && target[0].rol === 'admin' && target[0].activo === 1) {
+        throw new Error('No puedes cambiar el rol del último administrador activo');
+      }
     }
 
     const now = new Date().toISOString();
