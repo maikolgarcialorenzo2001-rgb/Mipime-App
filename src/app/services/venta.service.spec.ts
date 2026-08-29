@@ -98,10 +98,10 @@ describe('VentaService', () => {
       // Verify registrarSalida called for each item via mocked service
       expect(mockStockService.registrarSalida).toHaveBeenCalledTimes(2);
       expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
-        mockItems[0].producto.id, mockItems[0].cantidad,
+        mockItems[0].producto.id, mockItems[0].cantidad, undefined, 1,
       );
       expect(mockStockService.registrarSalida).toHaveBeenCalledWith(
-        mockItems[1].producto.id, mockItems[1].cantidad,
+        mockItems[1].producto.id, mockItems[1].cantidad, undefined, 1,
       );
     });
 

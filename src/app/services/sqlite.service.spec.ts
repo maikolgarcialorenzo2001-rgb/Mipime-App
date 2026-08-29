@@ -16,11 +16,6 @@ class MockSQLocalClient {
     if (query.includes('COALESCE(MAX(version), 0)')) {
       return [{ version: mockSchemaVersion ?? 1 }];
     }
-    // Check if admin user exists: return count 0 so seed runs
-    if (query.includes("SELECT COUNT(*) AS count FROM usuarios WHERE nombre = ?") &&
-        params.includes(environment.adminUser)) {
-      return [{ count: 0 }];
-    }
     // Seed check for productos (after migration)
     if (query.includes('SELECT COUNT(*) AS count FROM productos')) {
       return [{ count: 1 }];
@@ -215,7 +210,7 @@ describe('SqliteService migration v2', () => {
     expect(versionInsert).toBeDefined();
   });
 
-  it('debería insertar seed admin si no existe', async () => {
+  it('no debería insertar seed admin en initialize (admin se crea en /setup)', async () => {
     await service.initialize();
 
     const adminInsert = sqlCalls.find(
@@ -223,9 +218,9 @@ describe('SqliteService migration v2', () => {
         c.query.includes('INSERT INTO usuarios') &&
         c.params.some((p) => p === 'admin'),
     );
-    expect(adminInsert).toBeDefined();
-    // El seed ya no incluye email, solo nombre ('admin') + hash + salt + rol + timestamps
-    expect(adminInsert!.params).toContain('admin');
+    // El seed de admin se eliminó en admin-setup-flow: el admin inicial se
+    // crea desde la página /setup (SetupService.createInitialAdmin), no acá.
+    expect(adminInsert).toBeUndefined();
   });
 
   it('debería saltar migration v1 y ejecutar v2 directo si version >= 1', async () => {
