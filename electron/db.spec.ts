@@ -48,6 +48,17 @@ function docsRoot(dir: string): string {
   return path.join(dir, 'docs', 'Tienda - App', 'DataBase');
 }
 
+/**
+ * Linux test helper mirroring docsRoot() for Crostini and Linux desktop paths.
+ * Per design Section V: linuxDocsRoot(dir) for Linux path fixtures.
+ */
+function linuxDocsRoot(dir: string, isCrostini: boolean): string {
+  const base = isCrostini
+    ? '/mnt/chromeos/MyFiles/Downloads'
+    : path.join(os.homedir(), 'Downloads');
+  return path.join(base, 'Tienda - App', 'DataBase');
+}
+
 afterEach(() => {
   for (const dir of dirs) {
     try {
@@ -604,6 +615,165 @@ describe('runStartupSequence', () => {
 
     expect(result.status).toBe('fresh');
     expect(fs.existsSync(path.join(userData, 'tienda-app.db'))).toBe(true);
+  });
+
+  // --- linux-downloads-data: runStartupSequence adoption from Linux base ---
+  // 4.6 RED: runStartupSequence adopts from new Linux base using linuxDocsRoot()
+
+  it('adopts rodante backup from Linux Crostini Downloads path (fresh install + flag)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    fs.writeFileSync(path.join(userData, 'native-db-imported.flag'), '{}');
+
+    // Simulate Crostini: rodante backup at /mnt/chromeos/MyFiles/Downloads/Tienda - App/DataBase/
+    // Use a path within the temp dir to avoid cross-test contamination
+    const crostiniBase = path.join(dir, 'crostini', 'MyFiles', 'Downloads');
+    const crostiniDocs = path.join(crostiniBase, 'Tienda - App', 'DataBase');
+    const crostiniBackups = path.join(crostiniDocs, 'backups');
+    fs.mkdirSync(crostiniDocs, { recursive: true });
+    fs.mkdirSync(crostiniBackups, { recursive: true });
+    createValidDb(path.join(crostiniDocs, 'tienda-app.db'), 7, 16);
+
+    // Pass the Crostini path as documentsPath (what main.ts now does via baseDataDirFor)
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: crostiniBase,
+      appVersion: '0.1.9-beta',
+      platform: 'linux',
+    });
+
+    expect(result.status).toBe('adopted');
+    expect(result.restoreInfo?.from).toBe('adopt');
+    expect(result.restoreInfo?.path).toContain(path.join(crostiniBase, 'Tienda - App', 'DataBase', 'tienda-app.db'));
+    const db = openNativeDb(path.join(userData, 'tienda-app.db'));
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number }).c;
+    db.close();
+    expect(count).toBe(7);
+  });
+
+  it('adopts rodante backup from Linux desktop XDG Downloads path (fresh install + flag)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    fs.writeFileSync(path.join(userData, 'native-db-imported.flag'), '{}');
+
+    // Simulate Linux desktop: rodante backup at ~/Downloads/Tienda - App/DataBase/
+    // Use a path within the temp dir to avoid cross-test contamination
+    const desktopBase = path.join(dir, 'home', 'user', 'Downloads');
+    const desktopDocs = path.join(desktopBase, 'Tienda - App', 'DataBase');
+    const desktopBackups = path.join(desktopDocs, 'backups');
+    fs.mkdirSync(desktopDocs, { recursive: true });
+    fs.mkdirSync(desktopBackups, { recursive: true });
+    createValidDb(path.join(desktopDocs, 'tienda-app.db'), 5, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: desktopBase,
+      appVersion: '0.1.9-beta',
+      platform: 'linux',
+    });
+
+    expect(result.status).toBe('adopted');
+    expect(result.restoreInfo?.from).toBe('adopt');
+    expect(result.restoreInfo?.path).toContain(path.join(desktopBase, 'Tienda - App', 'DataBase', 'tienda-app.db'));
+    const db = openNativeDb(path.join(userData, 'tienda-app.db'));
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number }).c;
+    db.close();
+    expect(count).toBe(5);
+  });
+
+  it('falls through to rodante backup on Linux when in-place recovery fails (Crostini)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    writeGarbage(path.join(userData, 'tienda-app.db'));
+
+    const crostiniBase = path.join(dir, 'crostini', 'MyFiles', 'Downloads');
+    const crostiniDocs = path.join(crostiniBase, 'Tienda - App', 'DataBase');
+    const crostiniBackups = path.join(crostiniDocs, 'backups');
+    fs.mkdirSync(crostiniDocs, { recursive: true });
+    fs.mkdirSync(crostiniBackups, { recursive: true });
+    createValidDb(path.join(crostiniDocs, 'tienda-app.db'), 8, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: crostiniBase,
+      appVersion: '0.1.9-beta',
+      platform: 'linux',
+    });
+
+    expect(result.status).toBe('restored');
+    expect(result.restoreInfo?.from).toBe('rodante');
+    const db = openNativeDb(path.join(userData, 'tienda-app.db'));
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number }).c;
+    db.close();
+    expect(count).toBe(8);
+  });
+
+  it('tries timestamped backups on Linux desktop when rodante missing', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    writeGarbage(path.join(userData, 'tienda-app.db'));
+
+    const desktopBase = path.join(dir, 'home', 'user', 'Downloads');
+    const desktopDocs = path.join(desktopBase, 'Tienda - App', 'DataBase');
+    const desktopBackups = path.join(desktopDocs, 'backups');
+    fs.mkdirSync(desktopDocs, { recursive: true });
+    fs.mkdirSync(desktopBackups, { recursive: true });
+    // rodante missing (corrupt)
+    writeGarbage(path.join(desktopDocs, 'tienda-app.db'));
+    // timestamped backup valid
+    createValidDb(path.join(desktopBackups, 'tienda_2026-07-30_1000.db'), 9, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: desktopBase,
+      appVersion: '0.1.9-beta',
+      platform: 'linux',
+    });
+
+    expect(result.status).toBe('restored');
+    expect(result.restoreInfo?.from).toBe('timestamped');
+    expect(result.restoreInfo?.path).toContain('tienda_2026-07-30_1000.db');
+    const db = openNativeDb(path.join(userData, 'tienda-app.db'));
+    const count = (db.prepare('SELECT COUNT(*) AS c FROM t').get() as { c: number }).c;
+    db.close();
+    expect(count).toBe(9);
+  });
+
+  it('preserves corrupt DB as .corrupt-<ts> on Linux when restoring from rodante (M1)', () => {
+    const dir = tmpDir();
+    const userData = path.join(dir, 'userData');
+    fs.mkdirSync(userData, { recursive: true });
+    const dbPath = path.join(userData, 'tienda-app.db');
+    writeGarbage(dbPath);
+
+    const crostiniBase = path.join(dir, 'crostini', 'MyFiles', 'Downloads');
+    const crostiniDocs = path.join(crostiniBase, 'Tienda - App', 'DataBase');
+    const crostiniBackups = path.join(crostiniDocs, 'backups');
+    fs.mkdirSync(crostiniDocs, { recursive: true });
+    fs.mkdirSync(crostiniBackups, { recursive: true });
+    createValidDb(path.join(crostiniDocs, 'tienda-app.db'), 6, 16);
+
+    const result = runStartupSequence({
+      userDataPath: userData,
+      documentsPath: crostiniBase,
+      appVersion: '0.1.9-beta',
+      platform: 'linux',
+    });
+
+    expect(result.status).toBe('restored');
+    expect(result.restoreInfo?.from).toBe('rodante');
+    const preserved = fs
+      .readdirSync(userData)
+      .filter((f) => f.startsWith('tienda-app.db.corrupt-'));
+    expect(preserved).toHaveLength(1);
+    expect(preserved[0]).toMatch(
+      /^tienda-app\.db\.corrupt-\d{4}-\d{2}-\d{2}_\d{6}$/,
+    );
+    expect(fs.existsSync(dbPath)).toBe(true);
   });
 });
 

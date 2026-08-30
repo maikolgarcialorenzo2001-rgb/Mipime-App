@@ -147,6 +147,140 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+/**
+ * Helper to mock app.getPath per platform for testing baseDataDirFor and path helpers.
+ * Returns an object with cleanup function to restore defaults.
+ */
+function mockPlatform(getPathReturns: {
+  documents: string;
+  downloads: string;
+  userData: string;
+}): { cleanup: () => void } {
+  const originalPlatform = process.platform;
+  const originalGetPath = mockAppGetPath.getMockImplementation();
+
+  return {
+    cleanup: () => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+      mockAppGetPath.mockImplementation(originalGetPath ?? (() => '/fake/userData'));
+    },
+  };
+}
+
+/**
+ * Helper to set up Linux platform with Crostini or desktop scenario.
+ * Mocks process.platform, fs.existsSync for Crostini, and app.getPath returns.
+ */
+function setupLinuxPlatform(options: {
+  isCrostini: boolean;
+  documentsPath?: string;
+  downloadsPath?: string;
+  userDataPath?: string;
+}): { cleanup: () => void } {
+  const originalPlatform = process.platform;
+  const originalExistsSync = mockFsExistsSync.getMockImplementation();
+  const originalGetPath = mockAppGetPath.getMockImplementation();
+
+  Object.defineProperty(process, 'platform', { value: 'linux', writable: true });
+
+  if (options.isCrostini) {
+    mockFsExistsSync.mockImplementation((path: string) => {
+      return path === '/mnt/chromeos/MyFiles/Downloads';
+    });
+  } else {
+    mockFsExistsSync.mockReturnValue(false);
+  }
+
+  mockAppGetPath.mockImplementation((name: string) => {
+    switch (name) {
+      case 'documents':
+        return options.documentsPath ?? '/fake/Documents';
+      case 'downloads':
+        return options.downloadsPath ?? '/fake/Downloads';
+      case 'userData':
+        return options.userDataPath ?? '/fake/userData';
+      default:
+        return '/fake/userData';
+    }
+  });
+
+  return {
+    cleanup: () => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+      mockFsExistsSync.mockImplementation(originalExistsSync ?? (() => false));
+      mockAppGetPath.mockImplementation(originalGetPath ?? (() => '/fake/userData'));
+    },
+  };
+}
+
+/**
+ * Helper to set up Windows platform.
+ */
+function setupWindowsPlatform(options: {
+  documentsPath?: string;
+  downloadsPath?: string;
+  userDataPath?: string;
+}): { cleanup: () => void } {
+  const originalPlatform = process.platform;
+  const originalGetPath = mockAppGetPath.getMockImplementation();
+
+  Object.defineProperty(process, 'platform', { value: 'win32', writable: true });
+
+  mockAppGetPath.mockImplementation((name: string) => {
+    switch (name) {
+      case 'documents':
+        return options.documentsPath ?? 'C:\\Users\\Test\\Documents';
+      case 'downloads':
+        return options.downloadsPath ?? 'C:\\Users\\Test\\Downloads';
+      case 'userData':
+        return options.userDataPath ?? 'C:\\Users\\Test\\AppData\\Roaming';
+      default:
+        return 'C:\\Users\\Test\\AppData\\Roaming';
+    }
+  });
+
+  return {
+    cleanup: () => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+      mockAppGetPath.mockImplementation(originalGetPath ?? (() => '/fake/userData'));
+    },
+  };
+}
+
+/**
+ * Helper to set up macOS platform.
+ */
+function setupMacOSPlatform(options: {
+  documentsPath?: string;
+  downloadsPath?: string;
+  userDataPath?: string;
+}): { cleanup: () => void } {
+  const originalPlatform = process.platform;
+  const originalGetPath = mockAppGetPath.getMockImplementation();
+
+  Object.defineProperty(process, 'platform', { value: 'darwin', writable: true });
+
+  mockAppGetPath.mockImplementation((name: string) => {
+    switch (name) {
+      case 'documents':
+        return options.documentsPath ?? '/Users/Test/Documents';
+      case 'downloads':
+        return options.downloadsPath ?? '/Users/Test/Downloads';
+      case 'userData':
+        return options.userDataPath ?? '/Users/Test/Library/Application Support';
+      default:
+        return '/Users/Test/Library/Application Support';
+    }
+  });
+
+  return {
+    cleanup: () => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+      mockAppGetPath.mockImplementation(originalGetPath ?? (() => '/fake/userData'));
+    },
+  };
+}
+
 describe('main process', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -254,6 +388,395 @@ describe('main process', () => {
 
       expect(handler).toBeDefined();
       expect(handler()).toBe(process.platform);
+    });
+  });
+
+  // ===== baseDataDirFor helper tests (RED phase - linux-downloads-data) =====
+  describe('baseDataDirFor helper (linux-downloads-data)', () => {
+    // 4.1 RED: Crostini detection returns /mnt/chromeos/MyFiles/Downloads
+    it('should return Crostini Downloads path when /mnt/chromeos/MyFiles/Downloads exists on Linux', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: true });
+      try {
+        vi.resetModules();
+        const { baseDataDirFor } = await import('./main');
+        const result = baseDataDirFor(
+          { getPath: (name: string) => name === 'documents' ? '/fake/Documents' : '/fake/Downloads' } as any,
+          { existsSync: (p: string) => p === '/mnt/chromeos/MyFiles/Downloads' } as any,
+        );
+        expect(result).toBe('/mnt/chromeos/MyFiles/Downloads');
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    // 4.2 RED: Linux desktop falls back to app.getPath('downloads')
+    it('should return XDG Downloads path on Linux desktop when Crostini does not exist', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: false, downloadsPath: '/home/user/Downloads' });
+      try {
+        vi.resetModules();
+        const { baseDataDirFor } = await import('./main');
+        const result = baseDataDirFor(
+          { getPath: (name: string) => name === 'documents' ? '/home/user/Documents' : '/home/user/Downloads' } as any,
+          { existsSync: () => false } as any,
+        );
+        expect(result).toBe('/home/user/Downloads');
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    // 4.3 RED: Windows returns app.getPath('documents')
+    it('should return Documents path on Windows', async () => {
+      const cleanup = setupWindowsPlatform({ documentsPath: 'C:\\Users\\Test\\Documents' });
+      try {
+        vi.resetModules();
+        const { baseDataDirFor } = await import('./main');
+        const result = baseDataDirFor(
+          { getPath: (name: string) => name === 'documents' ? 'C:\\Users\\Test\\Documents' : 'C:\\Users\\Test\\Downloads' } as any,
+          { existsSync: () => false } as any,
+        );
+        expect(result).toBe('C:\\Users\\Test\\Documents');
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    // 4.3 RED: macOS returns app.getPath('documents')
+    it('should return Documents path on macOS', async () => {
+      const cleanup = setupMacOSPlatform({ documentsPath: '/Users/Test/Documents' });
+      try {
+        vi.resetModules();
+        const { baseDataDirFor } = await import('./main');
+        const result = baseDataDirFor(
+          { getPath: (name: string) => name === 'documents' ? '/Users/Test/Documents' : '/Users/Test/Downloads' } as any,
+          { existsSync: () => false } as any,
+        );
+        expect(result).toBe('/Users/Test/Documents');
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    // 4.4 RED: Path helpers compose correctly with new Linux base
+    describe('path helpers with baseDataDirFor', () => {
+      it('rodantePathFor should use Downloads/Tienda - App/DataBase on Linux Crostini', async () => {
+        const cleanup = setupLinuxPlatform({ isCrostini: true });
+        try {
+          vi.resetModules();
+          await import('./main');
+          const { rodantePathFor } = await import('./main');
+          // The helper uses baseDataDirFor internally which uses process.platform and fs.existsSync
+          const result = rodantePathFor().replace(/\\/g, '/');
+          expect(result).toContain('/mnt/chromeos/MyFiles/Downloads');
+          expect(result).toContain('Tienda - App');
+          expect(result).toContain('DataBase');
+          expect(result).toContain('tienda-app.db');
+        } finally {
+          cleanup.cleanup();
+        }
+      });
+
+      it('rodantePathFor should use Downloads/Tienda - App/DataBase on Linux desktop', async () => {
+        const cleanup = setupLinuxPlatform({ isCrostini: false, downloadsPath: '/home/user/Downloads' });
+        try {
+          vi.resetModules();
+          await import('./main');
+          const { rodantePathFor } = await import('./main');
+          const result = rodantePathFor().replace(/\\/g, '/');
+          expect(result).toContain('/home/user/Downloads');
+          expect(result).toContain('Tienda - App');
+          expect(result).toContain('DataBase');
+        } finally {
+          cleanup.cleanup();
+        }
+      });
+
+      it('backupsDirFor should use Downloads/Tienda - App/DataBase/backups on Linux', async () => {
+        const cleanup = setupLinuxPlatform({ isCrostini: true });
+        try {
+          vi.resetModules();
+          await import('./main');
+          const { backupsDirFor } = await import('./main');
+          const result = backupsDirFor().replace(/\\/g, '/');
+          expect(result).toContain('/mnt/chromeos/MyFiles/Downloads');
+          expect(result).toContain('Tienda - App');
+          expect(result).toContain('DataBase');
+          expect(result).toContain('backups');
+        } finally {
+          cleanup.cleanup();
+        }
+      });
+
+      it('rodantePathFor and backupsDirFor should use Documents on Windows', async () => {
+        const cleanup = setupWindowsPlatform({ documentsPath: 'C:\\Users\\Test\\Documents' });
+        try {
+          vi.resetModules();
+          await import('./main');
+          const { rodantePathFor, backupsDirFor } = await import('./main');
+          expect(rodantePathFor().replace(/\\/g, '/')).toContain('C:/Users/Test/Documents');
+          expect(rodantePathFor().replace(/\\/g, '/')).toContain('Tienda - App');
+          expect(backupsDirFor().replace(/\\/g, '/')).toContain('C:/Users/Test/Documents');
+          expect(backupsDirFor().replace(/\\/g, '/')).toContain('backups');
+        } finally {
+          cleanup.cleanup();
+        }
+      });
+
+      it('rodantePathFor and backupsDirFor should use Documents on macOS', async () => {
+        const cleanup = setupMacOSPlatform({ documentsPath: '/Users/Test/Documents' });
+        try {
+          vi.resetModules();
+          await import('./main');
+          const { rodantePathFor, backupsDirFor } = await import('./main');
+          expect(rodantePathFor().replace(/\\/g, '/')).toContain('/Users/Test/Documents');
+          expect(backupsDirFor().replace(/\\/g, '/')).toContain('/Users/Test/Documents');
+        } finally {
+          cleanup.cleanup();
+        }
+      });
+    });
+  });
+
+  // 4.5 RED: Handlers write to new Linux base (spies on mkdirSync/writeFileSync)
+  describe('IPC handlers use baseDataDirFor on Linux (linux-downloads-data)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockIsPackaged = false;
+      mockGetAllWindows.mockReturnValue([]);
+      mockAppGetPath.mockReturnValue('/fake/userData');
+    });
+
+    // Helper to create a platform-agnostic path matcher
+    function pathContains(...segments: string[]): RegExp {
+      const sep = '[\\\\/]';
+      const pattern = segments.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(sep);
+      return new RegExp(pattern);
+    }
+
+    it('file:saveFile should write to Downloads/Tienda - App/Tienda IPVE on Linux Crostini', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: true });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'file:saveFile',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        mockFsMkdirSync.mockClear();
+        mockFsWriteFileSync.mockClear();
+
+        const result = await handler({}, {
+          base64: 'SGVsbG8gV29ybGQ=',
+          filePath: '2026/07 - Julio/jornada_2026-07-28_123.xlsx',
+        });
+
+        // Should use Crostini path
+        expect(mockFsMkdirSync).toHaveBeenCalledWith(
+          expect.stringMatching(pathContains('mnt', 'chromeos', 'MyFiles', 'Downloads', 'Tienda - App', 'Tienda IPVE')),
+          { recursive: true },
+        );
+        expect(result).toEqual({
+          success: true,
+          filePath: expect.stringMatching(pathContains('mnt', 'chromeos', 'MyFiles', 'Downloads', 'Tienda - App', 'Tienda IPVE')),
+        });
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    it('file:saveFile should write to Downloads/Tienda - App/Tienda IPVE on Linux desktop', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: false, downloadsPath: '/home/user/Downloads' });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'file:saveFile',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        mockFsMkdirSync.mockClear();
+        mockFsWriteFileSync.mockClear();
+
+        const result = await handler({}, {
+          base64: 'SGVsbG8gV29ybGQ=',
+          filePath: 'test.xlsx',
+        });
+
+        expect(mockFsMkdirSync).toHaveBeenCalledWith(
+          expect.stringMatching(pathContains('home', 'user', 'Downloads', 'Tienda - App', 'Tienda IPVE')),
+          { recursive: true },
+        );
+        expect(result).toEqual({
+          success: true,
+          filePath: expect.stringMatching(pathContains('home', 'user', 'Downloads', 'Tienda - App', 'Tienda IPVE')),
+        });
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    it('file:saveFile should write to Documents/Tienda - App/Tienda IPVE on Windows', async () => {
+      const cleanup = setupWindowsPlatform({ documentsPath: 'C:\\Users\\Test\\Documents' });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'file:saveFile',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        mockFsMkdirSync.mockClear();
+        mockFsWriteFileSync.mockClear();
+
+        const result = await handler({}, {
+          base64: 'SGVsbG8gV29ybGQ=',
+          filePath: 'test.xlsx',
+        });
+
+        expect(mockFsMkdirSync).toHaveBeenCalledWith(
+          expect.stringMatching(pathContains('C:', 'Users', 'Test', 'Documents', 'Tienda - App', 'Tienda IPVE')),
+          { recursive: true },
+        );
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    it('db:export defaultPath should use Downloads/Tienda - App/DataBase on Linux Crostini', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: true });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        mockDialogShowSaveDialog.mockResolvedValue({
+          canceled: false,
+          filePath: '/mnt/chromeos/MyFiles/Downloads/Tienda - App/DataBase/tienda_export_20260728_1200.db',
+        });
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'db:export',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        await handler();
+
+        expect(mockDialogShowSaveDialog).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            defaultPath: expect.stringMatching(pathContains('mnt', 'chromeos', 'MyFiles', 'Downloads', 'Tienda - App', 'DataBase')),
+          }),
+        );
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    it('db:export defaultPath should use Downloads/Tienda - App/DataBase on Linux desktop', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: false, downloadsPath: '/home/user/Downloads' });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        mockDialogShowSaveDialog.mockResolvedValue({
+          canceled: false,
+          filePath: '/home/user/Downloads/Tienda - App/DataBase/tienda_export_20260728_1200.db',
+        });
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'db:export',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        await handler();
+
+        expect(mockDialogShowSaveDialog).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            defaultPath: expect.stringMatching(pathContains('home', 'user', 'Downloads', 'Tienda - App', 'DataBase')),
+          }),
+        );
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    it('db:export defaultPath should use Documents/Tienda - App/DataBase on Windows', async () => {
+      const cleanup = setupWindowsPlatform({ documentsPath: 'C:\\Users\\Test\\Documents' });
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        mockDialogShowSaveDialog.mockResolvedValue({
+          canceled: false,
+          filePath: 'C:\\Users\\Test\\Documents\\Tienda - App\\DataBase\\tienda_export_20260728_1200.db',
+        });
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'db:export',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        await handler();
+
+        expect(mockDialogShowSaveDialog).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            defaultPath: expect.stringMatching(pathContains('C:', 'Users', 'Test', 'Documents', 'Tienda - App', 'DataBase')),
+          }),
+        );
+      } finally {
+        cleanup.cleanup();
+      }
+    });
+
+    // EACCES fallback test
+    it('file:saveFile should fall back to XDG Downloads on EACCES and log error (Linux Crostini)', async () => {
+      const cleanup = setupLinuxPlatform({ isCrostini: true, downloadsPath: '/home/user/Downloads' });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        vi.resetModules();
+        await import('./main');
+        await flush();
+
+        const handler = mockIpcMainHandle.mock.calls.find(
+          ([channel]) => channel === 'file:saveFile',
+        )?.[1] as (...args: unknown[]) => Promise<unknown>;
+
+        // First call throws EACCES, second succeeds with fallback
+        mockFsMkdirSync
+          .mockImplementationOnce(() => {
+            const err = new Error('EACCES: permission denied') as NodeJS.ErrnoException;
+            err.code = 'EACCES';
+            throw err;
+          })
+          .mockImplementationOnce(() => {}); // fallback succeeds
+
+        mockFsWriteFileSync.mockImplementationOnce(() => {});
+
+        const result = await handler({}, {
+          base64: 'SGVsbG8gV29ybGQ=',
+          filePath: 'test.xlsx',
+        });
+
+        // Should have tried Crostini path first (EACCES), then fallback to XDG Downloads
+        expect(mockFsMkdirSync).toHaveBeenCalledTimes(2);
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          expect.stringContaining('EACCES on Crostini mount'),
+          expect.any(Error),
+        );
+        // Result should succeed with fallback path
+        expect(result).toEqual({
+          success: true,
+          filePath: expect.stringMatching(pathContains('home', 'user', 'Downloads', 'Tienda - App', 'Tienda IPVE')),
+        });
+      } finally {
+        cleanup.cleanup();
+        consoleErrorSpy.mockRestore();
+      }
     });
   });
 
