@@ -64,8 +64,19 @@ linux:
     - target: AppImage
       arch:
         - x64
+    - target: deb
+      arch:
+        - x64
   category: Finance
   icon: build/icon.png
+
+# Deb (FPM) metadata. FPM exige maintainer (con email) y url; si faltan,
+# electron-builder falla con "Please specify project homepage" / "authorEmailIsMissed".
+deb:
+  maintainer: Enjin2310 <Rodriguez.Lorenzo@spikersoft.com>
+  vendor: Mipime
+  synopsis: Tienda - App (Mipime-Cuentas)
+  priority: optional
 
 # Publish configuration for electron-updater
 publish:
