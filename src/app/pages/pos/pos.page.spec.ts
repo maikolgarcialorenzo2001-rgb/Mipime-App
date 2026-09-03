@@ -480,4 +480,76 @@ describe('PosPage — toast de éxito', () => {
 
     expect(component.showPendienteModal()).toBe(false);
   });
+
+  // ─── ADD-1: ±step por unidad de medida via keyboard y botones ──────
+
+  function makeProductoGM(unidad_medida: 'unidad' | 'gramaje', id = 10): Producto {
+    return {
+      id,
+      nombre: `Producto ${id}`,
+      descripcion: null,
+      precio_venta: 100,
+      precio_costo: null,
+      stock_almacen: 100,
+      stock_shop: 50,
+      unidad_medida,
+      created_at: '',
+      updated_at: '',
+    };
+  }
+
+  it('ADD-1: Backspace decrementa gramaje por step=0.1 (2.0 → 1.9)', () => {
+    const prod = makeProductoGM('gramaje', 10);
+    const cart = TestBed.inject(CartService);
+    cart.agregar(prod, 2);
+
+    // Simular que hay resultados de búsqueda con el producto seleccionado
+    component.query.set('');
+    component.resultados.set([prod]);
+    component.selectedIndex.set(0);
+
+    const bsEvent = new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true });
+    component.onKeydown(bsEvent);
+
+    const item = cart.items().find(i => i.producto.id === prod.id);
+    expect(item!.cantidad).toBe(1.9);
+  });
+
+  it('ADD-1: Backspace decrementa unidad por step=1 (3 → 2)', () => {
+    const prod = makeProductoGM('unidad', 20);
+    const cart = TestBed.inject(CartService);
+    cart.agregar(prod, 3);
+
+    component.query.set('');
+    component.resultados.set([prod]);
+    component.selectedIndex.set(0);
+
+    const bsEvent = new KeyboardEvent('keydown', { key: 'Backspace', cancelable: true });
+    component.onKeydown(bsEvent);
+
+    const item = cart.items().find(i => i.producto.id === prod.id);
+    expect(item!.cantidad).toBe(2);
+  });
+
+  it('ADD-1: incrementar gramaje en carrito suma step=0.1 (2.0 → 2.1)', () => {
+    const prod = makeProductoGM('gramaje', 11);
+    const cart = TestBed.inject(CartService);
+    cart.agregar(prod, 2);
+
+    cart.incrementar(prod, 2);
+
+    const item = cart.items().find(i => i.producto.id === prod.id);
+    expect(item!.cantidad).toBe(2.1);
+  });
+
+  it('ADD-1: incrementar unidad en carrito suma step=1 (3 → 4)', () => {
+    const prod = makeProductoGM('unidad', 21);
+    const cart = TestBed.inject(CartService);
+    cart.agregar(prod, 3);
+
+    cart.incrementar(prod, 3);
+
+    const item = cart.items().find(i => i.producto.id === prod.id);
+    expect(item!.cantidad).toBe(4);
+  });
 });

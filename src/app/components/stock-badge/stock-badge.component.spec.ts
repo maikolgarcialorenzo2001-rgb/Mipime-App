@@ -81,4 +81,38 @@ describe('StockBadgeComponent', () => {
     expect(span.classList.contains('dark:bg-red-900/40')).toBe(true);
     expect(span.classList.contains('dark:text-red-400')).toBe(true);
   });
+
+  // ─── REQ-5: suffix coverage by unidad_medida ──────────────────────
+
+  it('REQ-5: stock entero con gramaje muestra sufijo "lb" sin decimales extra', () => {
+    fixture.componentRef.setInput('stock', 3);
+    fixture.componentRef.setInput('unidadMedida', 'gramaje');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('3 lb');
+  });
+
+  it('REQ-5: stock decimal con unidad muestra sufijo "u." con el valor exacto', () => {
+    fixture.componentRef.setInput('stock', 2.5);
+    fixture.componentRef.setInput('unidadMedida', 'unidad');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('2.5 u.');
+  });
+
+  it('REQ-5: stock=0 con unidad muestra "0 u."', () => {
+    fixture.componentRef.setInput('stock', 0);
+    fixture.componentRef.setInput('unidadMedida', 'unidad');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('0 u.');
+  });
+
+  it('REQ-5: stock=0 con gramaje muestra "0 lb"', () => {
+    fixture.componentRef.setInput('stock', 0);
+    fixture.componentRef.setInput('unidadMedida', 'gramaje');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('0 lb');
+  });
 });
