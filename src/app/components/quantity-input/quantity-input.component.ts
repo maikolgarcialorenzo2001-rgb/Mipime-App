@@ -21,9 +21,6 @@ export class QuantityInputComponent {
     () => UNIDAD_MEDIDA[this.producto().unidad_medida].allowsDecimal,
   );
 
-  /** paso de incremento/decremento por unidad de medida (1 | 0.1). */
-  readonly paso = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].step);
-
   /** sufijo de la etiqueta de precio ("c/u" | "por lb"). */
   readonly sufijo = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].suffix);
 
