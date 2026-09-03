@@ -12,6 +12,7 @@ const baseProducto: Producto = {
   precio_costo: null,
   stock_almacen: 100,
   stock_shop: 50,
+  unidad_medida: 'unidad',
   created_at: '',
   updated_at: '',
 };

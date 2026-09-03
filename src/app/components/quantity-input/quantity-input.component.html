@@ -14,12 +14,12 @@
     (keydown.enter)="$event.stopPropagation()"
   >
     <p class="mb-1 text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ producto().nombre }}</p>
-    <p class="mb-3 text-xs text-gray-400 dark:text-gray-500">{{ producto().precio_venta | pesos:'1.0-0' }} c/u</p>
+    <p class="mb-3 text-xs text-gray-400 dark:text-gray-500">{{ producto().precio_venta | pesos:'1.0-0' }} {{ sufijo() === 'u.' ? 'c/u' : 'por lb' }}</p>
 
     <input
       #qtyInput
       type="text"
-      inputmode="numeric"
+      [attr.inputmode]="permiteDecimal() ? 'decimal' : 'numeric'"
       [value]="cantidad()"
       (input)="cantidad.set(+$any($event.target).value || 1)"
       (keydown)="onInputKeydown($event)"

@@ -4,6 +4,7 @@ import { DATABASE } from './database';
 import { AuthService } from './auth.service';
 import { StockMovimientoService } from './stock-movimiento.service';
 import type { Producto } from '../models';
+import type { UnidadMedida } from '../models/producto';
 import type { GlobalInvestment, PerProductInvestment } from '../models';
 
 @Injectable({
@@ -60,6 +61,7 @@ export class ProductoService {
     precio_costo: number;
     precio_venta: number;
     stock_almacen: number;
+    unidad_medida?: UnidadMedida;
   }): Observable<Producto> {
     return from(
       (async () => {
@@ -74,15 +76,16 @@ export class ProductoService {
           throw new Error('El precio de venta no puede ser negativo');
         }
         const ahora = new Date().toISOString();
+        const unidadMedida = data.unidad_medida ?? 'unidad';
         // F6 R1: INSERT + registrarEntrada atómicos en la MISMA transacción.
         // Si registrarEntrada falla, el adapter hace ROLLBACK y NO queda
         // producto fantasma. registrarEntrada anida su propia transaction()
         // re-entrante → JOIN (D1), misma conexión, sin segundo BEGIN.
         return this._db.transaction(async (tx) => {
           const [producto] = await tx.sql<Producto>(
-            `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_almacen, stock_shop, created_at, updated_at)
-             VALUES (?, ?, ?, ?, 0, 0, ?, ?) RETURNING *`,
-            [data.nombre, null, data.precio_costo, data.precio_venta, ahora, ahora],
+            `INSERT INTO productos (nombre, descripcion, precio_costo, precio_venta, stock_almacen, stock_shop, unidad_medida, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?) RETURNING *`,
+            [data.nombre, null, data.precio_costo, data.precio_venta, unidadMedida, ahora, ahora],
           );
           if (data.stock_almacen > 0) {
             await this._stockMovimiento.registrarEntrada(

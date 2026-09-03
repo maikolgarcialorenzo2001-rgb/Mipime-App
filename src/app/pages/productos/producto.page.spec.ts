@@ -21,8 +21,8 @@ function createMockDb(): Database {
 }
 
 const mockProductos: Producto[] = [
-  { id: 1, nombre: 'Café', descripcion: null, precio_costo: 300, precio_venta: 500, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
-  { id: 2, nombre: 'Té', descripcion: 'Té negro', precio_costo: 200, precio_venta: 350, stock_almacen: 25, stock_shop: 0, created_at: '', updated_at: '' },
+  { id: 1, nombre: 'Café', descripcion: null, precio_costo: 300, precio_venta: 500, stock_almacen: 10, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
+  { id: 2, nombre: 'Té', descripcion: 'Té negro', precio_costo: 200, precio_venta: 350, stock_almacen: 25, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
 ];
 
 const mockLotes: LoteDetalle[] = [

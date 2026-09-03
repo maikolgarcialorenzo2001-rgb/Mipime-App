@@ -70,15 +70,15 @@ describe('runMigrations', () => {
     });
   });
 
-  it('inserts 18 schema versions in order on a fresh DB (v1..v18)', async () => {
+  it('inserts 19 schema versions in order on a fresh DB (v1..v19)', async () => {
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
     ]);
   });
 
-  it('1.2 RED: desde la versión 16 aplica las migraciones v17 y v18 de forma aditiva', async () => {
+  it('1.2 RED: desde la versión 16 aplica las migraciones v17, v18 y v19 de forma aditiva', async () => {
     exec.version = 16;
     await runMigrations(exec, { seedEnabled: false });
 
@@ -94,16 +94,16 @@ describe('runMigrations', () => {
         ),
       ),
     ).toBe(true);
-    expect(exec.versionNumbers()).toEqual([17, 18]);
+    expect(exec.versionNumbers()).toEqual([17, 18, 19]);
     // La seed no debe ejecutarse sin seedEnabled
     expect(exec.productSeedBatches().length).toBe(0);
   });
 
-  it('1.2 RED: re-ejecutar sobre una DB ya en 18 es idempotente (no repite ALTERs ni vuelve a insertar versión)', async () => {
-    exec.version = 18;
+  it('1.2 RED: re-ejecutar sobre una DB ya en 19 es idempotente (no repite ALTERs ni vuelve a insertar versión)', async () => {
+    exec.version = 19;
     await runMigrations(exec, { seedEnabled: false });
 
-    // v18 ya existe: el runner NO re-ejecuta la migración
+    // v19 ya existe: el runner NO re-ejecuta la migración
     expect(exec.versionNumbers()).toEqual([]);
     const legCoales = exec.calls.filter((c) =>
       c.query.includes('ALTER TABLE ventas ADD COLUMN'),
@@ -177,26 +177,54 @@ describe('runMigrations', () => {
     exec.version = 18;
     await runMigrations(exec, { seedEnabled: false });
 
-    // Should NOT re-run v18
-    expect(exec.versionNumbers()).toEqual([]);
+    // Running from v18: v19 executes but v18 does NOT re-run
+    expect(exec.versionNumbers()).toEqual([19]);
     const createConfig = exec.calls.find((c) =>
       c.query.includes('CREATE TABLE IF NOT EXISTS config'),
     );
     expect(createConfig).toBeUndefined();
   });
 
-  it('skips all migrations when schema_version is already 18', async () => {
-    exec.version = 18;
+  it('skips all migrations when schema_version is already 19', async () => {
+    exec.version = 19;
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([]);
-    // el runner crea schema_version siempre, pero NO ejecuta migraciones v1-v18
+    // el runner crea schema_version siempre, pero NO ejecuta migraciones v1-v19
     expect(exec.calls[0].query).toContain(
       'CREATE TABLE IF NOT EXISTS schema_version',
     );
     expect(
       exec.calls.some((c) => c.query.includes('CREATE TABLE IF NOT EXISTS jornadas')),
     ).toBe(false);
+  });
+
+  it('migration v19 adds unidad_medida column defaulting to unidad and sets schema to 19', async () => {
+    exec.version = 18; // Run only v19
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should have run v19
+    expect(exec.versionNumbers()).toContain(19);
+
+    // Verify the ADD COLUMN for unidad_medida
+    const alter = exec.calls.find((c) =>
+      c.query.includes('ALTER TABLE productos ADD COLUMN unidad_medida'),
+    );
+    expect(alter).toBeDefined();
+    expect(alter!.query).toContain("DEFAULT 'unidad'");
+    expect(alter!.query).toContain('TEXT NOT NULL');
+  });
+
+  it('migration v19 is idempotent - does not re-run on existing v19 DB', async () => {
+    exec.version = 19;
+    await runMigrations(exec, { seedEnabled: false });
+
+    // Should NOT re-run v19
+    expect(exec.versionNumbers()).toEqual([]);
+    const alter = exec.calls.find((c) =>
+      c.query.includes('ALTER TABLE productos ADD COLUMN unidad_medida'),
+    );
+    expect(alter).toBeUndefined();
   });
 
   it('works on a completely fresh DB without a pre-created schema_version (M2)', async () => {
@@ -208,7 +236,7 @@ describe('runMigrations', () => {
       'CREATE TABLE IF NOT EXISTS schema_version',
     );
     expect(exec.versionNumbers()).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
     ]);
   });
 
@@ -217,7 +245,7 @@ describe('runMigrations', () => {
     await runMigrations(exec, { seedEnabled: true });
 
     expect(exec.versionNumbers()).toEqual([
-      6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+      6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
     ]);
     expect(exec.productSeedBatches().length).toBe(8);
   });

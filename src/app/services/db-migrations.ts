@@ -11,7 +11,7 @@ export interface RunMigrationsOptions {
 }
 
 /**
- * Runner compartido de migraciones v1–v16 + seed condicional.
+ * Runner compartido de migraciones v1–v19 + seed condicional.
  * Mismo SQL exacto para ambos drivers (web y native); solo cambia
  * la capa de ejecución.
  */
@@ -101,6 +101,10 @@ export async function runMigrations(
 
   if (currentVersion < 18) {
     await migrationV18(exec);
+  }
+
+  if (currentVersion < 19) {
+    await migrationV19(exec);
   }
 
   if (opts.seedEnabled) {
@@ -577,6 +581,19 @@ async function migrationV18(exec: MigrationExecutor): Promise<void> {
   )`);
 
   await exec.sql('INSERT INTO schema_version (version) VALUES (18)');
+}
+
+async function migrationV19(exec: MigrationExecutor): Promise<void> {
+  // v19: unidad_medida por producto ('unidad' | 'gramaje'). Columna solo
+  // aditiva con default 'unidad' → los productos existentes quedan como
+  // unidades sin pérdida de datos. try/catch idempotente (patrón v16/v17).
+  try {
+    await exec.sql(
+      "ALTER TABLE productos ADD COLUMN unidad_medida TEXT NOT NULL DEFAULT 'unidad'",
+    );
+  } catch { /* columna ya existe */ }
+
+  await exec.sql('INSERT INTO schema_version (version) VALUES (19)');
 }
 
 /**

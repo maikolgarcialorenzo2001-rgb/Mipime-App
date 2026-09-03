@@ -429,8 +429,8 @@ describe('JornadaService', () => {
         { id: 2, venta_id: 10, producto_id: 2, cantidad: 3, precio_unitario: 1000, subtotal: 3000 },
       ];
       const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Prod A', descripcion: null, precio_venta: 2500, precio_costo: 10, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
-        { id: 2, nombre: 'Prod B', descripcion: null, precio_venta: 1000, precio_costo: 5, stock_almacen: 20, stock_shop: 0, created_at: '', updated_at: '' },
+        { id: 1, nombre: 'Prod A', descripcion: null, precio_venta: 2500, precio_costo: 10, stock_almacen: 10, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
+        { id: 2, nombre: 'Prod B', descripcion: null, precio_venta: 1000, precio_costo: 5, stock_almacen: 20, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
       ];
 
       vi.mocked(mockDb.sql)
@@ -464,7 +464,7 @@ describe('JornadaService', () => {
         { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 1500, subtotal: 3000 },
       ];
       const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Prod Sin Costo', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
+        { id: 1, nombre: 'Prod Sin Costo', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 10, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
       ];
 
       vi.mocked(mockDb.sql)
@@ -664,7 +664,7 @@ describe('JornadaService', () => {
         { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
       ];
       const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
+        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
       ];
 
       vi.mocked(mockDb.sql)
@@ -707,8 +707,8 @@ describe('JornadaService', () => {
         { id: 1, venta_id: 10, producto_id: 1, cantidad: 2, precio_unitario: 2500, subtotal: 5000 },
       ];
       const mockProductos: Producto[] = [
-        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, created_at: '', updated_at: '' },
-        { id: 2, nombre: 'Agua 1L', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 20, stock_shop: 0, created_at: '', updated_at: '' },
+        { id: 1, nombre: 'Coca-Cola', descripcion: null, precio_venta: 2500, precio_costo: null, stock_almacen: 10, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
+        { id: 2, nombre: 'Agua 1L', descripcion: null, precio_venta: 1500, precio_costo: null, stock_almacen: 20, stock_shop: 0, unidad_medida: 'unidad', created_at: '', updated_at: '' },
       ];
 
       vi.mocked(mockDb.sql)

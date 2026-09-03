@@ -120,7 +120,7 @@ export class PosPage {
           const item = this.cart.items().find(i => i.producto.id === producto.id);
           if (item) {
             event.preventDefault();
-            this.cart.actualizarCantidad(producto.id, item.cantidad - 1);
+            this.cart.decrementar(producto, item.cantidad);
           }
         }
       }

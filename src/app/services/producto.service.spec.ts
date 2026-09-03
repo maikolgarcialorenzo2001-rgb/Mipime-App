@@ -15,6 +15,7 @@ const mockProductos: Producto[] = [
     precio_costo: 550,
     stock_almacen: 50,
     stock_shop: 0,
+    unidad_medida: 'unidad',
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -26,6 +27,7 @@ const mockProductos: Producto[] = [
     precio_costo: 600,
     stock_almacen: 40,
     stock_shop: 0,
+    unidad_medida: 'unidad',
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -37,6 +39,7 @@ const mockProductos: Producto[] = [
     precio_costo: 750,
     stock_almacen: 30,
     stock_shop: 0,
+    unidad_medida: 'unidad',
     created_at: '2026-06-02T22:00:00Z',
     updated_at: '2026-06-02T22:00:00Z',
   },
@@ -152,6 +155,7 @@ describe('ProductoService', () => {
         precio_costo: 1000,
         stock_almacen: 0,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -165,6 +169,7 @@ describe('ProductoService', () => {
           precio_costo: 1000,
           precio_venta: 1500,
           stock_almacen: 20,
+          unidad_medida: 'unidad',
         }),
       );
 
@@ -176,6 +181,7 @@ describe('ProductoService', () => {
           null,
           1000,
           1500,
+          'unidad',
         ]),
       );
     });
@@ -189,6 +195,7 @@ describe('ProductoService', () => {
         precio_costo: 300,
         stock_almacen: 10,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -202,6 +209,7 @@ describe('ProductoService', () => {
           precio_costo: 300,
           precio_venta: 500,
           stock_almacen: 10,
+          unidad_medida: 'unidad',
         }),
       );
 
@@ -219,6 +227,7 @@ describe('ProductoService', () => {
         precio_costo: 300,
         stock_almacen: 0,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -298,6 +307,7 @@ describe('ProductoService', () => {
         precio_costo: 0,
         stock_almacen: 0,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -329,6 +339,7 @@ describe('ProductoService', () => {
         precio_costo: 300,
         stock_almacen: 5,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -364,6 +375,7 @@ describe('ProductoService', () => {
         precio_costo: 300,
         stock_almacen: 5,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-07-23T19:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -431,6 +443,7 @@ describe('ProductoService', () => {
         precio_costo: 600,
         stock_almacen: 50,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-06-02T22:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };
@@ -515,6 +528,7 @@ describe('ProductoService', () => {
         precio_costo: 0,
         stock_almacen: 50,
         stock_shop: 0,
+        unidad_medida: 'unidad',
         created_at: '2026-06-02T22:00:00Z',
         updated_at: '2026-07-23T19:00:00Z',
       };

@@ -9,6 +9,7 @@ import { JornadaService } from '../../services/jornada.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
+import { UNIDAD_MEDIDA, type UnidadMedida } from '../../models/producto';
 
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
@@ -85,6 +86,11 @@ export class InventarioPage implements OnInit {
     if (value === null || value === '') return null;
     const n = typeof value === 'number' ? value : Number(value);
     return Number.isNaN(n) ? null : n;
+  }
+
+  /** Sufijo de unidad de medida para render en templates (u. / lb). */
+  sufijoDe(producto: Producto): string {
+    return UNIDAD_MEDIDA[producto.unidad_medida]?.suffix ?? 'u.';
   }
 
   /** Cambia la ubicación de origen del Traslado y resetea el lote elegido. */
@@ -288,6 +294,7 @@ export class InventarioPage implements OnInit {
           (p) => p.id === action.productoId,
         );
         if (actualizado) {
+          const sufijo = UNIDAD_MEDIDA[actualizado.unidad_medida].suffix;
           // F3: feedback claro del precio costo. Cuando el lote editado es el
           // frente FIFO, productos.precio_costo se actualizó. Cuando no lo es,
           // el costo quedó guardado en el lote pero la columna muestra el costo
@@ -303,7 +310,7 @@ export class InventarioPage implements OnInit {
             }
           }
           this._mostrarToast(
-            `Stock guardado — Almacén: ${actualizado.stock_almacen} u · Tienda: ${actualizado.stock_shop} u${costoMsg}`,
+            `Stock guardado — Almacén: ${actualizado.stock_almacen} ${sufijo} · Tienda: ${actualizado.stock_shop} ${sufijo}${costoMsg}`,
           );
         }
       }
@@ -439,6 +446,7 @@ export class InventarioPage implements OnInit {
   readonly formCosto = signal<number | null>(null);
   readonly formPrecioVenta = signal<number | null>(null);
   readonly formUnidades = signal<number | null>(null);
+  readonly formUnidadMedida = signal<UnidadMedida>('unidad');
   readonly formError = signal<string | null>(null);
   readonly confirmandoEliminar = signal<number | null>(null);
   readonly procesando = signal(false);
@@ -490,6 +498,7 @@ export class InventarioPage implements OnInit {
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
     this.formUnidades.set(null);
+    this.formUnidadMedida.set('unidad');
     this.formError.set(null);
     this.procesando.set(false);
     this.showProductoModal.set(true);
@@ -501,6 +510,7 @@ export class InventarioPage implements OnInit {
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
     this.formUnidades.set(null);
+    this.formUnidadMedida.set('unidad');
     this.formError.set(null);
     this.procesando.set(false);
   }
@@ -551,6 +561,7 @@ export class InventarioPage implements OnInit {
           precio_costo: this.formCosto()!,
           precio_venta: this.formPrecioVenta()!,
           stock_almacen: this.formUnidades()!,
+          unidad_medida: this.formUnidadMedida(),
         }),
       );
       this.cerrarModal();

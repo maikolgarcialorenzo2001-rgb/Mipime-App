@@ -1,6 +1,7 @@
-import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal } from '@angular/core';
+import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal, computed } from '@angular/core';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
+import { UNIDAD_MEDIDA } from '../../models/producto';
 
 @Component({
   selector: 'app-quantity-input',
@@ -14,6 +15,17 @@ export class QuantityInputComponent {
   readonly cancelar = output<void>();
   readonly qtyInput = viewChild<ElementRef<HTMLInputElement>>('qtyInput');
   readonly soloNumeros = signal(false);
+
+  /** true cuando el producto admite decimales (gramaje). */
+  readonly permiteDecimal = computed(
+    () => UNIDAD_MEDIDA[this.producto().unidad_medida].allowsDecimal,
+  );
+
+  /** paso de incremento/decremento por unidad de medida (1 | 0.1). */
+  readonly paso = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].step);
+
+  /** sufijo de la etiqueta de precio ("c/u" | "por lb"). */
+  readonly sufijo = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].suffix);
 
   constructor() {
     afterNextRender(() => {
@@ -54,7 +66,35 @@ export class QuantityInputComponent {
 
     if (teclasPermitidas.includes(event.key)) return;
 
-    // Bloquear si no es un dígito (0-9) ni una tecla numérica
+    const permiteDecimal = this.permiteDecimal();
+
+    if (permiteDecimal) {
+      // Gramaje: permite dígitos y UN solo punto decimal, con máx 2 decimales
+      if (/^\d$/.test(event.key)) {
+        // Max 2 decimal places: block if already at 2 decimals and key is a digit
+        const current = String(this.cantidad());
+        const decimalIndex = current.indexOf('.');
+        if (decimalIndex !== -1 && current.length - decimalIndex - 1 >= 2) {
+          event.preventDefault();
+          this.soloNumeros.set(true);
+          setTimeout(() => this.soloNumeros.set(false), 1800);
+        }
+        return;
+      }
+      if (event.key === '.') {
+        const current = String(this.cantidad());
+        if (current.includes('.')) {
+          event.preventDefault();
+        }
+        return;
+      }
+      event.preventDefault();
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+      return;
+    }
+
+    // Unidad: solo dígitos, filtra el punto decimal
     if (!/^\d$/.test(event.key)) {
       event.preventDefault();
       this.soloNumeros.set(true);

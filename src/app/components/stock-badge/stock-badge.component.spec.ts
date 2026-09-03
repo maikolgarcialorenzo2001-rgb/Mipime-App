@@ -19,6 +19,29 @@ describe('StockBadgeComponent', () => {
     expect(span.textContent).toContain('5');
   });
 
+  it('por defecto (unidad) muestra el sufijo "u."', () => {
+    fixture.componentRef.setInput('stock', 5);
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('5 u.');
+  });
+
+  it('unidadMedida=gramaje muestra el sufijo "lb"', () => {
+    fixture.componentRef.setInput('stock', 2.5);
+    fixture.componentRef.setInput('unidadMedida', 'gramaje');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('2.5 lb');
+  });
+
+  it('unidadMedida=unidad muestra el sufijo "u."', () => {
+    fixture.componentRef.setInput('stock', 7);
+    fixture.componentRef.setInput('unidadMedida', 'unidad');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('7 u.');
+  });
+
   it('stock > 10 aplica clases bg-green-100/text-green-700 + dark: companion', () => {
     fixture.componentRef.setInput('stock', 25);
     fixture.detectChanges();

@@ -8,7 +8,7 @@ import type { StockMovimiento, LoteStock, LoteDetalle, ConsumoRecord } from '../
  * (editar/ajuste/ajusteLote) no pueden superarlo; se valida en el servicio,
  * no solo en la UI.
  */
-export const MAX_STOCK_UNIDADES = 1_000_000;
+export const MAX_STOCK_CANTIDAD = 1_000_000;
 
 /**
  * Resultado de registrarEditar: permite a la UI informar si el lote editado
@@ -45,13 +45,13 @@ export class StockMovimientoService {
 
   /**
    * Guard de cantidad ABSOLUTA (editar/ajuste/ajusteLote, D3): rechaza
-   * valores < 0 o > MAX_STOCK_UNIDADES ANTES de tocar la DB.
+   * valores < 0 o > MAX_STOCK_CANTIDAD ANTES de tocar la DB.
    */
   private _validarCantidadAbsoluta(cantidad: number): void {
     if (cantidad < 0) {
       throw new Error('La cantidad no puede ser negativa');
     }
-    if (cantidad > MAX_STOCK_UNIDADES) {
+    if (cantidad > MAX_STOCK_CANTIDAD) {
       throw new Error('La cantidad supera el máximo permitido');
     }
   }

@@ -15,6 +15,7 @@ describe('CartItemRowComponent', () => {
       stock_almacen: 10,
       stock_shop: 0,
       descripcion: null,
+      unidad_medida: 'unidad',
       created_at: '',
       updated_at: '',
     },
@@ -41,6 +42,23 @@ describe('CartItemRowComponent', () => {
 
   it('renderiza el precio unitario', () => {
     expect(fixture.nativeElement.textContent).toContain('500');
+  });
+
+  it('renderiza "c/u" para un producto de unidad', () => {
+    expect(fixture.nativeElement.textContent).toContain('500 c/u');
+  });
+
+  it('renderiza "por lb" para un producto de gramaje', () => {
+    const gramajeItem: CartItem = {
+      producto: { ...mockItem.producto, id: 2, nombre: 'Jamón', unidad_medida: 'gramaje' },
+      cantidad: 2.5,
+      subtotal: 2500,
+    };
+    fixture.componentRef.setInput('item', gramajeItem);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('por lb');
+    expect(text).not.toContain('c/u');
   });
 
   it('renderiza la cantidad', () => {

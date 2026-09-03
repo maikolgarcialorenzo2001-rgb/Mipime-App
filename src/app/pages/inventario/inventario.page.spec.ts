@@ -29,6 +29,7 @@ describe('InventarioPage', () => {
       precio_costo: 8,
       stock_almacen: 100,
       stock_shop: 10,
+      unidad_medida: 'unidad',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -40,6 +41,7 @@ describe('InventarioPage', () => {
       precio_costo: 7,
       stock_almacen: 50,
       stock_shop: 5,
+      unidad_medida: 'unidad',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -51,6 +53,7 @@ describe('InventarioPage', () => {
       precio_costo: 2,
       stock_almacen: 200,
       stock_shop: 20,
+      unidad_medida: 'unidad',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -956,6 +959,7 @@ describe('InventarioPage', () => {
       precio_costo: 200,
       stock_almacen: 10,
       stock_shop: 0,
+      unidad_medida: 'unidad',
       created_at: '2026-07-23T19:00:00Z',
       updated_at: '2026-07-23T19:00:00Z',
     };
@@ -980,6 +984,47 @@ describe('InventarioPage', () => {
       precio_costo: 200,
       precio_venta: 500,
       stock_almacen: 10,
+      unidad_medida: 'unidad',
+    });
+    expect(component.showProductoModal()).toBe(false);
+  });
+
+  it('TDD: guardarProducto pasa unidad_medida gramaje cuando se selecciona Gramaje', async () => {
+    const productoCreado: Producto = {
+      id: 101,
+      nombre: 'Harina',
+      descripcion: null,
+      precio_venta: 500,
+      precio_costo: 200,
+      stock_almacen: 10,
+      stock_shop: 0,
+      unidad_medida: 'gramaje',
+      created_at: '2026-07-23T19:00:00Z',
+      updated_at: '2026-07-23T19:00:00Z',
+    };
+    mockProductoService.crear.mockReturnValue(of(productoCreado));
+
+    await setupLoaded();
+
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+
+    component.formNombre.set('Harina');
+    component.formCosto.set(200);
+    component.formPrecioVenta.set(500);
+    component.formUnidades.set(10);
+    component.formUnidadMedida.set('gramaje');
+    fixture.detectChanges();
+
+    await component.guardarProducto();
+    fixture.detectChanges();
+
+    expect(mockProductoService.crear).toHaveBeenCalledWith({
+      nombre: 'Harina',
+      precio_costo: 200,
+      precio_venta: 500,
+      stock_almacen: 10,
+      unidad_medida: 'gramaje',
     });
     expect(component.showProductoModal()).toBe(false);
   });
@@ -1031,6 +1076,7 @@ describe('InventarioPage', () => {
       precio_costo: 0,
       stock_almacen: 10,
       stock_shop: 0,
+      unidad_medida: 'unidad',
       created_at: '2026-07-23T19:00:00Z',
       updated_at: '2026-07-23T19:00:00Z',
     };
@@ -1055,6 +1101,7 @@ describe('InventarioPage', () => {
       precio_costo: 0,
       precio_venta: 0,
       stock_almacen: 10,
+      unidad_medida: 'unidad',
     });
     expect(component.showProductoModal()).toBe(false);
   });
@@ -1742,15 +1789,45 @@ describe('InventarioPage', () => {
     expect(mockProductoService.listar).toHaveBeenCalledTimes(2);
     expect(component.productos()[0].stock_almacen).toBe(80);
     expect(component.productos()[0].stock_shop).toBe(7);
-    // FR-03: toast post-save con stock nuevo por ubicación
-    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u · Tienda: 7 u');
+    // FR-03: toast post-save con stock nuevo por ubicación (sufijo 'u.' para unidad)
+    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
 
     const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
       (el) => el.textContent?.includes('Stock guardado'),
     );
     expect(toast).toBeTruthy();
-    expect(toast!.textContent).toContain('Almacén: 80 u');
-    expect(toast!.textContent).toContain('Tienda: 7 u');
+    expect(toast!.textContent).toContain('Almacén: 80 u.');
+    expect(toast!.textContent).toContain('Tienda: 7 u.');
+  });
+
+  it('36c. S-UT: toast de edición usa el sufijo "lb" para productos con unidad_medida=gramaje', async () => {
+    const gramaje = { ...productos[0], unidad_medida: 'gramaje' as const };
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of([gramaje]))
+      .mockReturnValueOnce(of([{ ...gramaje, stock_almacen: 80, stock_shop: 7 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 lb · Tienda: 7 lb');
   });
 
   it('36b. F3: toast muestra el precio costo actualizado cuando el lote editado es el frente FIFO', async () => {

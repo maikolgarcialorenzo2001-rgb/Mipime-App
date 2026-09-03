@@ -75,10 +75,10 @@
                 ${{ producto.precio_venta.toFixed(2) }}
               </td>
               <td class="px-4 py-3">
-                <app-stock-badge [stock]="producto.stock_almacen" />
+                <app-stock-badge [stock]="producto.stock_almacen" [unidadMedida]="producto.unidad_medida" />
               </td>
               <td class="px-4 py-3">
-                <app-stock-badge [stock]="producto.stock_shop" />
+                <app-stock-badge [stock]="producto.stock_shop" [unidadMedida]="producto.unidad_medida" />
               </td>
               <td class="px-4 py-3">
                 <div class="flex flex-wrap gap-2">
@@ -184,7 +184,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -238,7 +238,7 @@
                           type="number"
                           [(ngModel)]="movimientoCantidad"
                           name="movimientoCantidad"
-                          [placeholder]="(loteActual?.cantidad ?? 0) + 'u'"
+                          [placeholder]="(loteActual?.cantidad ?? 0) + sufijoDe(producto)"
                           min="0"
                           required
                           class="border rounded px-3 py-2 text-sm w-28 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
@@ -295,7 +295,7 @@
                             <option value="" disabled>Seleccione un lote…</option>
                             @for (lote of lotesDeUbicacion(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -329,7 +329,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -570,6 +570,31 @@
               required
               class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400"
             />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unidad de medida</label>
+            <div class="flex gap-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="formUnidadMedida"
+                  [checked]="formUnidadMedida() === 'unidad'"
+                  (change)="formUnidadMedida.set('unidad')"
+                  class="accent-blue-600"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Unidad</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="formUnidadMedida"
+                  [checked]="formUnidadMedida() === 'gramaje'"
+                  (change)="formUnidadMedida.set('gramaje')"
+                  class="accent-blue-600"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">Gramaje</span>
+              </label>
+            </div>
           </div>
         </div>
 

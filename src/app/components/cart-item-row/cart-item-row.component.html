@@ -1,7 +1,7 @@
 <li class="flex items-center gap-2 sm:gap-3 py-3">
   <div class="flex-1 min-w-0">
     <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{{ item().producto.nombre }}</p>
-    <p class="text-xs text-gray-400 dark:text-gray-500">{{ item().producto.precio_venta | pesos:'1.0-0' }} c/u</p>
+    <p class="text-xs text-gray-400 dark:text-gray-500">{{ item().producto.precio_venta | pesos:'1.0-0' }} {{ etiquetaPrecio(item()) }}</p>
   </div>
 
   <div class="flex items-center gap-1">

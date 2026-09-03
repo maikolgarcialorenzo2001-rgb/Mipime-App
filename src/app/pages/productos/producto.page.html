@@ -90,11 +90,11 @@
                 </td>
               }
               <td class="px-6 py-4">
-                <app-stock-badge [stock]="p.stock_almacen" />
+                <app-stock-badge [stock]="p.stock_almacen" [unidadMedida]="p.unidad_medida" />
                 <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_almacen }}</span>
               </td>
               <td class="px-6 py-4">
-                <app-stock-badge [stock]="p.stock_shop" />
+                <app-stock-badge [stock]="p.stock_shop" [unidadMedida]="p.unidad_medida" />
                 <span class="ml-2 font-medium text-gray-900 dark:text-gray-100 tabular-nums">{{ p.stock_shop }}</span>
               </td>
               @if (esAdmin()) {

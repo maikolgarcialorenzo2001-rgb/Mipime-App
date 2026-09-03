@@ -12,6 +12,7 @@ const mockProducto: Producto = {
   precio_costo: null,
   stock_almacen: 50,
   stock_shop: 0,
+  unidad_medida: 'unidad',
   created_at: '',
   updated_at: '',
 };

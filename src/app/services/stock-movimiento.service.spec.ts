@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { StockMovimientoService, MAX_STOCK_UNIDADES } from './stock-movimiento.service';
+import { StockMovimientoService, MAX_STOCK_CANTIDAD } from './stock-movimiento.service';
 import { DATABASE, type Database } from './database';
 import { AuthService } from './auth.service';
 import type { StockMovimiento, LoteStock } from '../models';
@@ -1341,8 +1341,8 @@ describe('StockMovimientoService', () => {
   });
 
   describe('guards de cantidad (T-04 / FR-04 / S-05)', () => {
-    it('debería exportar MAX_STOCK_UNIDADES = 1_000_000', () => {
-      expect(MAX_STOCK_UNIDADES).toBe(1_000_000);
+    it('debería exportar MAX_STOCK_CANTIDAD = 1_000_000', () => {
+      expect(MAX_STOCK_CANTIDAD).toBe(1_000_000);
     });
 
     it('S-05: registrarEditar con cantidad negativa rechaza sin tocar la DB', async () => {
@@ -1355,7 +1355,7 @@ describe('StockMovimientoService', () => {
 
     it('registrarEditar con cantidad sobre el techo rechaza sin tocar la DB', async () => {
       await expect(
-        service.registrarEditar(1, 3, 'Café', 15, 10, MAX_STOCK_UNIDADES + 1, 'Motivo', 'shop'),
+        service.registrarEditar(1, 3, 'Café', 15, 10, MAX_STOCK_CANTIDAD + 1, 'Motivo', 'shop'),
       ).rejects.toThrow('La cantidad supera el máximo permitido');
 
       expect(mockDb.sql).not.toHaveBeenCalled();
@@ -1371,7 +1371,7 @@ describe('StockMovimientoService', () => {
 
     it('registrarAjusteLote con cantidad sobre el techo rechaza sin tocar la DB', async () => {
       await expect(
-        service.registrarAjusteLote(1, 3, MAX_STOCK_UNIDADES + 1, 'Motivo', 'shop'),
+        service.registrarAjusteLote(1, 3, MAX_STOCK_CANTIDAD + 1, 'Motivo', 'shop'),
       ).rejects.toThrow('La cantidad supera el máximo permitido');
 
       expect(mockDb.sql).not.toHaveBeenCalled();
@@ -1387,7 +1387,7 @@ describe('StockMovimientoService', () => {
 
     it('registrarAjuste con cantidad sobre el techo rechaza sin tocar la DB', async () => {
       await expect(
-        service.registrarAjuste(1, MAX_STOCK_UNIDADES + 1, 'Motivo'),
+        service.registrarAjuste(1, MAX_STOCK_CANTIDAD + 1, 'Motivo'),
       ).rejects.toThrow('La cantidad supera el máximo permitido');
 
       expect(mockDb.sql).not.toHaveBeenCalled();

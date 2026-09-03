@@ -78,8 +78,8 @@
           @for (item of cart.items(); track item.producto.id) {
             <app-cart-item-row
               [item]="item"
-              (cantidadReducir)="cart.actualizarCantidad(item.producto.id, item.cantidad - 1)"
-              (cantidadAumentar)="cart.actualizarCantidad(item.producto.id, item.cantidad + 1)"
+              (cantidadReducir)="cart.decrementar(item.producto, item.cantidad)"
+              (cantidadAumentar)="cart.incrementar(item.producto, item.cantidad)"
               (quitar)="cart.quitar(item.producto.id)"
             />
           }
