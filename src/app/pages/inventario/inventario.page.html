@@ -559,13 +559,13 @@
             />
           </div>
           <div>
-            <label for="form-unidades" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unidades</label>
+            <label for="form-unidades" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ formUnidadMedida() === 'gramaje' ? 'Libras' : 'Unidades' }}</label>
             <input
               id="form-unidades"
               type="number"
               [(ngModel)]="formUnidades"
               name="formUnidades"
-              placeholder="Unidades"
+              [placeholder]="formUnidadMedida() === 'gramaje' ? 'Libras' : 'Unidades'"
               min="0"
               required
               class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400"
@@ -582,7 +582,7 @@
                   (change)="formUnidadMedida.set('unidad')"
                   class="accent-blue-600"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Unidad</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Unidades</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
@@ -592,7 +592,7 @@
                   (change)="formUnidadMedida.set('gramaje')"
                   class="accent-blue-600"
                 />
-                <span class="text-sm text-gray-700 dark:text-gray-300">Gramaje</span>
+                <span class="text-sm text-gray-700 dark:text-gray-300">Libras</span>
               </label>
             </div>
           </div>

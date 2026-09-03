@@ -1029,6 +1029,30 @@ describe('InventarioPage', () => {
     expect(component.showProductoModal()).toBe(false);
   });
 
+  it('UI: el label del campo de cantidad cambia de "Unidades" a "Libras" al seleccionar libras', async () => {
+    await setupLoaded();
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+
+    const labelEl = (() => {
+      const labels = fixture.nativeElement.querySelectorAll('label') as HTMLLabelElement[];
+      return Array.from(labels).find((l) => l.htmlFor === 'form-unidades');
+    })() as HTMLLabelElement;
+
+    // Por defecto (unidad) el label es "Unidades"
+    expect(labelEl.textContent?.trim()).toBe('Unidades');
+
+    // Al seleccionar libras, el label cambia a "Libras"
+    component.formUnidadMedida.set('gramaje');
+    fixture.detectChanges();
+    expect(labelEl.textContent?.trim()).toBe('Libras');
+
+    // Al volver a unidades, regresa a "Unidades"
+    component.formUnidadMedida.set('unidad');
+    fixture.detectChanges();
+    expect(labelEl.textContent?.trim()).toBe('Unidades');
+  });
+
   it('RED: guardarProducto con costo negativo muestra formError y no llama crear', async () => {
     await setupLoaded();
 
