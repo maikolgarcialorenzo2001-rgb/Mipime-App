@@ -1,6 +1,10 @@
 {
   "name": "mipime-cuentas",
-  "version": "0.1.18",
+  "version": "0.1.20-beta",
+  "description": "Tienda - App (Mipime-Cuentas): gestión de cuentas, jornadas y reportes",
+  "author": "Enjin2310 <Rodriguez.Lorenzo@spikersoft.com>",
+  "homepage": "https://github.com/maikolgarcialorenzo2001-rgb/Mipime-App",
+  "desktopName": "com.mipime.cuentas",
   "main": "dist-electron/main.js",
   "scripts": {
     "ng": "ng",

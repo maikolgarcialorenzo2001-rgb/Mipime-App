@@ -23,6 +23,26 @@ import {
 } from './db';
 import { exportName } from './export-name';
 
+/**
+ * Centralized platform-aware base directory resolution (linux-downloads-data).
+ * Returns the base directory for user data files (backups, exports, IPVE).
+ * - Linux + Crostini (/mnt/chromeos/MyFiles/Downloads exists) → that path
+ * - Linux desktop → app.getPath('downloads') (XDG ~/Downloads)
+ * - Windows/macOS → app.getPath('documents') (unchanged behavior)
+ * 
+ * Does NOT affect live DB path (userData/tienda-app.db), which stays on userData.
+ */
+export function baseDataDirFor(app: Electron.App, fs: typeof import('fs')): string {
+  if (process.platform === 'linux') {
+    const crostiniPath = '/mnt/chromeos/MyFiles/Downloads';
+    if (fs.existsSync(crostiniPath)) {
+      return crostiniPath;
+    }
+    return app.getPath('downloads');
+  }
+  return app.getPath('documents');
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 // Register custom protocol BEFORE app is ready (required by Electron)
@@ -56,10 +76,10 @@ export function addIsolationHeaders(response: Response): Response {
 // Rutas de la DB nativa (single source). Se invocan solo tras whenReady
 // (createMainWindow / handlers IPC), donde app.getPath ya es seguro.
 const dbPathFor = () => path.join(app.getPath('userData'), DB_FILENAME);
-const rodantePathFor = () =>
-  path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', DB_FILENAME);
-const backupsDirFor = () =>
-  path.join(app.getPath('documents'), 'Tienda - App', 'DataBase', 'backups');
+export const rodantePathFor = () =>
+  path.join(baseDataDirFor(app, fs), 'Tienda - App', 'DataBase', DB_FILENAME);
+export const backupsDirFor = () =>
+  path.join(baseDataDirFor(app, fs), 'Tienda - App', 'DataBase', 'backups');
 
 function createMainWindow(): BrowserWindow {
   const isDev = !app.isPackaged;
@@ -177,18 +197,33 @@ app.whenReady().then(() => {
     event.returnValue = app.isPackaged;
   });
 
-  // Save file to Documents/Tienda - App/Tienda IPVE/ without user-facing dialog.
+  // Save file to baseDataDirFor()/Tienda - App/Tienda IPVE/ without user-facing dialog.
   // filePath is relative, e.g. "2026/07 - Julio/jornada_2026-07-28_123.xlsx".
   // base64 is the raw Excel base64 string.
+  // On Linux Crostini, falls back to XDG Downloads on EACCES (9p share permission issue).
   ipcMain.handle('file:saveFile', async (_event, { base64, filePath }) => {
     try {
-      const documentsPath = app.getPath('documents');
-      const destDir = path.join(documentsPath, 'Tienda - App', 'Tienda IPVE');
+      const base = baseDataDirFor(app, fs);
+      const destDir = path.join(base, 'Tienda - App', 'Tienda IPVE');
       const fullPath = path.join(destDir, filePath);
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
       fs.writeFileSync(fullPath, Buffer.from(base64, 'base64'));
       return { success: true, filePath: fullPath };
     } catch (error) {
+      // EACCES fallback for Crostini 9p share (AD-2)
+      if (process.platform === 'linux' && (error as NodeJS.ErrnoException).code === 'EACCES') {
+        console.error('[baseDataDirFor] EACCES on Crostini mount, falling back to XDG Downloads:', error);
+        try {
+          const fallbackBase = app.getPath('downloads');
+          const fallbackDir = path.join(fallbackBase, 'Tienda - App', 'Tienda IPVE');
+          const fallbackPath = path.join(fallbackDir, filePath);
+          fs.mkdirSync(path.dirname(fallbackPath), { recursive: true });
+          fs.writeFileSync(fallbackPath, Buffer.from(base64, 'base64'));
+          return { success: true, filePath: fallbackPath };
+        } catch {
+          // If fallback also fails, return original error
+        }
+      }
       return { success: false, error: (error as Error).message };
     }
   });
@@ -228,7 +263,7 @@ app.whenReady().then(() => {
       closeSqlConn();
       return runStartupSequence({
         userDataPath: app.getPath('userData'),
-        documentsPath: app.getPath('documents'),
+        documentsPath: baseDataDirFor(app, fs),
         appVersion: app.getVersion(),
         platform: process.platform,
       });
@@ -406,9 +441,10 @@ app.whenReady().then(() => {
   // Export manual (R5): diálogo guardar + backupDb incremental al destino.
   ipcMain.handle('db:export', async () => {
     try {
+      const base = baseDataDirFor(app, fs);
       const result = await dialog.showSaveDialog(mainWindow!, {
         defaultPath: path.join(
-          app.getPath('documents'),
+          base,
           'Tienda - App',
           'DataBase',
           exportName(new Date()),
