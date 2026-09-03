@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, type ParamMap } from '@angular/router';
 import { SetupPage } from './setup.page';
 import { SetupService } from '../../services/setup.service';
 import { AuthService } from '../../services/auth.service';
@@ -7,12 +7,42 @@ import { UserService } from '../../services/user.service';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
+function createMockParamMap(get: (key: string) => string | null): ParamMap {
+  return {
+    get,
+    has: (key: string) => get(key) !== null,
+    getAll: () => [],
+    keys: [],
+  } as ParamMap;
+}
+
+function createMockActivatedRoute(get: (key: string) => string | null) {
+  const paramMap = createMockParamMap(get);
+  return {
+    queryParamMap: of(paramMap),
+    snapshot: { queryParamMap: paramMap },
+  };
+}
+
 describe('SetupPage', () => {
-  let mockSetupService: Partial<SetupService>;
-  let mockAuthService: Partial<AuthService>;
-  let mockUserService: Partial<UserService>;
-  let mockRouter: Partial<Router>;
-  let mockActivatedRoute: Partial<ActivatedRoute>;
+  let mockSetupService: {
+    createInitialAdmin: ReturnType<typeof vi.fn>;
+    countUsers: ReturnType<typeof vi.fn>;
+    setConfig: ReturnType<typeof vi.fn>;
+  };
+  let mockAuthService: {
+    login: ReturnType<typeof vi.fn>;
+    usuario: ReturnType<typeof signal<null>>;
+    isLoggedIn: ReturnType<typeof signal<boolean>>;
+    hasRole: ReturnType<typeof vi.fn>;
+  };
+  let mockUserService: {
+    updatePassword: ReturnType<typeof vi.fn>;
+  };
+  let mockRouter: {
+    navigate: ReturnType<typeof vi.fn>;
+  };
+  let mockActivatedRoute: ReturnType<typeof createMockActivatedRoute>;
 
   beforeEach(() => {
     mockSetupService = {
@@ -36,16 +66,7 @@ describe('SetupPage', () => {
       navigate: vi.fn().mockResolvedValue(true),
     };
 
-    mockActivatedRoute = {
-      queryParamMap: of({
-        get: (key: string) => null,
-      }),
-      snapshot: {
-        queryParamMap: {
-          get: (key: string) => null,
-        },
-      },
-    };
+    mockActivatedRoute = createMockActivatedRoute(() => null);
 
     TestBed.configureTestingModule({
       providers: [
@@ -77,16 +98,9 @@ describe('SetupPage', () => {
   });
 
   it('should detect mode=reset from route params', () => {
-    mockActivatedRoute = {
-      queryParamMap: of({
-        get: (key: string) => key === 'mode' ? 'reset' : null,
-      }),
-      snapshot: {
-        queryParamMap: {
-          get: (key: string) => key === 'mode' ? 'reset' : null,
-        },
-      },
-    };
+    mockActivatedRoute = createMockActivatedRoute(
+      (key) => key === 'mode' ? 'reset' : null,
+    );
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -121,8 +135,8 @@ describe('SetupPage', () => {
       id: 1, nombre: 'admin', rol: 'admin', activo: 1,
       created_at: '', updated_at: '',
     };
-    mockSetupService.createInitialAdmin!.mockResolvedValue(mockUser);
-    mockAuthService.login!.mockReturnValue(Promise.resolve(mockUser));
+    mockSetupService.createInitialAdmin.mockResolvedValue(mockUser);
+    mockAuthService.login.mockReturnValue(Promise.resolve(mockUser));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -145,8 +159,8 @@ describe('SetupPage', () => {
       id: 1, nombre: 'admin', rol: 'admin', activo: 1,
       created_at: '', updated_at: '',
     };
-    mockSetupService.createInitialAdmin!.mockResolvedValue(mockUser);
-    mockAuthService.login!.mockReturnValue(Promise.resolve(mockUser));
+    mockSetupService.createInitialAdmin.mockResolvedValue(mockUser);
+    mockAuthService.login.mockReturnValue(Promise.resolve(mockUser));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -164,7 +178,7 @@ describe('SetupPage', () => {
   });
 
   it('should set error when createInitialAdmin throws', async () => {
-    mockSetupService.createInitialAdmin!.mockRejectedValue(new Error('Setup already completed'));
+    mockSetupService.createInitialAdmin.mockRejectedValue(new Error('Setup already completed'));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -189,19 +203,12 @@ describe('SetupPage', () => {
   });
 
   describe('reset flow (mode=reset)', () => {
-    let resetActivatedRoute: Partial<ActivatedRoute>;
+    let resetActivatedRoute: ReturnType<typeof createMockActivatedRoute>;
 
     beforeEach(() => {
-      resetActivatedRoute = {
-        queryParamMap: of({
-          get: (key: string) => key === 'mode' ? 'reset' : (key === 'userId' ? '5' : null),
-        }),
-        snapshot: {
-          queryParamMap: {
-            get: (key: string) => key === 'mode' ? 'reset' : (key === 'userId' ? '5' : null),
-          },
-        },
-      };
+      resetActivatedRoute = createMockActivatedRoute(
+        (key) => key === 'mode' ? 'reset' : (key === 'userId' ? '5' : null),
+      );
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
@@ -251,16 +258,9 @@ describe('SetupPage', () => {
     });
 
     it('should show error when userId is missing and not call updatePassword', async () => {
-      const noUserIdRoute = {
-        queryParamMap: of({
-          get: (key: string) => key === 'mode' ? 'reset' : null,
-        }),
-        snapshot: {
-          queryParamMap: {
-            get: (key: string) => key === 'mode' ? 'reset' : null,
-          },
-        },
-      };
+      const noUserIdRoute = createMockActivatedRoute(
+        (key) => key === 'mode' ? 'reset' : null,
+      );
 
       TestBed.resetTestingModule();
       TestBed.configureTestingModule({
@@ -290,7 +290,7 @@ describe('SetupPage', () => {
     });
 
     it('should show error when updatePassword throws', async () => {
-      mockUserService.updatePassword!.mockRejectedValue(new Error('DB error'));
+      mockUserService.updatePassword.mockRejectedValue(new Error('DB error'));
 
       const fixture = TestBed.createComponent(SetupPage);
       const component = fixture.componentInstance;

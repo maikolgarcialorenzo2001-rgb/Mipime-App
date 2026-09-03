@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { Router, type ActivatedRouteSnapshot, type RouterStateSnapshot } from '@angular/router';
 import { setupGuard } from './setup.guard';
 import { SetupService } from '../services/setup.service';
 import { AuthService } from '../services/auth.service';
@@ -7,8 +7,8 @@ import { DATABASE } from '../services/database';
 
 describe('setupGuard', () => {
   let mockSetupService: { countUsers: ReturnType<typeof vi.fn> };
-  let mockAuthService: Partial<AuthService>;
-  let mockRouter: Partial<Router>;
+  let mockAuthService: { isLoggedIn: ReturnType<typeof vi.fn> };
+  let mockRouter: { parseUrl: ReturnType<typeof vi.fn> };
   let parseUrlSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -42,8 +42,9 @@ describe('setupGuard', () => {
   it('should allow access to /setup when 0 users exist', async () => {
     mockSetupService.countUsers.mockResolvedValue(0);
 
-    const route = { routeConfig: { path: 'setup' } } as any;
-    const result = await TestBed.runInInjectionContext(() => setupGuard(route));
+    const route = { routeConfig: { path: 'setup' } } as ActivatedRouteSnapshot;
+    const state = {} as RouterStateSnapshot;
+    const result = await TestBed.runInInjectionContext(() => setupGuard(route, state));
 
     expect(result).toBe(true);
     expect(mockSetupService.countUsers).toHaveBeenCalled();
@@ -52,18 +53,21 @@ describe('setupGuard', () => {
   it('should redirect to /setup when navigating to /login with 0 users', async () => {
     mockSetupService.countUsers.mockResolvedValue(0);
 
-    const route = { routeConfig: { path: 'login' } } as any;
-    const result = await TestBed.runInInjectionContext(() => setupGuard(route));
+    const route = { routeConfig: { path: 'login' } } as ActivatedRouteSnapshot;
+    const state = {} as RouterStateSnapshot;
+    const result = await TestBed.runInInjectionContext(() => setupGuard(route, state));
 
-    expect(result).toEqual(mockRouter.parseUrl('/setup'));
+    // Cast: vitest 3.x Mock<Procedure|Constructable> union is not directly callable
+    expect(result).toEqual((parseUrlSpy as (...args: unknown[]) => unknown)('/setup'));
     expect(parseUrlSpy).toHaveBeenCalledWith('/setup');
   });
 
   it('should allow access to /login when users exist', async () => {
     mockSetupService.countUsers.mockResolvedValue(1);
 
-    const route = { routeConfig: { path: 'login' } } as any;
-    const result = await TestBed.runInInjectionContext(() => setupGuard(route));
+    const route = { routeConfig: { path: 'login' } } as ActivatedRouteSnapshot;
+    const state = {} as RouterStateSnapshot;
+    const result = await TestBed.runInInjectionContext(() => setupGuard(route, state));
 
     expect(result).toBe(true);
   });
@@ -72,10 +76,11 @@ describe('setupGuard', () => {
     mockSetupService.countUsers.mockResolvedValue(1);
     mockAuthService.isLoggedIn.mockReturnValue(true);
 
-    const route = { routeConfig: { path: 'setup' } } as any;
-    const result = await TestBed.runInInjectionContext(() => setupGuard(route));
+    const route = { routeConfig: { path: 'setup' } } as ActivatedRouteSnapshot;
+    const state = {} as RouterStateSnapshot;
+    const result = await TestBed.runInInjectionContext(() => setupGuard(route, state));
 
-    expect(result).toEqual(mockRouter.parseUrl('/pos'));
+    expect(result).toEqual((parseUrlSpy as (...args: unknown[]) => unknown)('/pos'));
     expect(parseUrlSpy).toHaveBeenCalledWith('/pos');
   });
 
@@ -83,10 +88,11 @@ describe('setupGuard', () => {
     mockSetupService.countUsers.mockResolvedValue(1);
     mockAuthService.isLoggedIn.mockReturnValue(false);
 
-    const route = { routeConfig: { path: 'setup' } } as any;
-    const result = await TestBed.runInInjectionContext(() => setupGuard(route));
+    const route = { routeConfig: { path: 'setup' } } as ActivatedRouteSnapshot;
+    const state = {} as RouterStateSnapshot;
+    const result = await TestBed.runInInjectionContext(() => setupGuard(route, state));
 
-    expect(result).toEqual(mockRouter.parseUrl('/login'));
+    expect(result).toEqual((parseUrlSpy as (...args: unknown[]) => unknown)('/login'));
     expect(parseUrlSpy).toHaveBeenCalledWith('/login');
   });
 });

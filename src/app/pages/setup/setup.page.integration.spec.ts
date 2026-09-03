@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, type ParamMap } from '@angular/router';
 import { SetupPage } from './setup.page';
 import { SetupService } from '../../services/setup.service';
 import { AuthService } from '../../services/auth.service';
@@ -7,12 +7,42 @@ import { UserService } from '../../services/user.service';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
+function createMockParamMap(get: (key: string) => string | null): ParamMap {
+  return {
+    get,
+    has: (key: string) => get(key) !== null,
+    getAll: () => [],
+    keys: [],
+  } as ParamMap;
+}
+
+function createMockActivatedRoute(get: (key: string) => string | null) {
+  const paramMap = createMockParamMap(get);
+  return {
+    queryParamMap: of(paramMap),
+    snapshot: { queryParamMap: paramMap },
+  };
+}
+
 describe('SetupPage - Integration', () => {
-  let mockSetupService: Partial<SetupService>;
-  let mockAuthService: Partial<AuthService>;
-  let mockUserService: Partial<UserService>;
-  let mockRouter: Partial<Router>;
-  let mockActivatedRoute: Partial<ActivatedRoute>;
+  let mockSetupService: {
+    createInitialAdmin: ReturnType<typeof vi.fn>;
+    countUsers: ReturnType<typeof vi.fn>;
+    setConfig: ReturnType<typeof vi.fn>;
+  };
+  let mockAuthService: {
+    login: ReturnType<typeof vi.fn>;
+    usuario: ReturnType<typeof signal<null>>;
+    isLoggedIn: ReturnType<typeof signal<boolean>>;
+    hasRole: ReturnType<typeof vi.fn>;
+  };
+  let mockUserService: {
+    updatePassword: ReturnType<typeof vi.fn>;
+  };
+  let mockRouter: {
+    navigate: ReturnType<typeof vi.fn>;
+  };
+  let mockActivatedRoute: ReturnType<typeof createMockActivatedRoute>;
 
   beforeEach(() => {
     mockSetupService = {
@@ -36,16 +66,7 @@ describe('SetupPage - Integration', () => {
       navigate: vi.fn().mockResolvedValue(true),
     };
 
-    mockActivatedRoute = {
-      queryParamMap: of({
-        get: (key: string) => null,
-      }),
-      snapshot: {
-        queryParamMap: {
-          get: (key: string) => null,
-        },
-      },
-    };
+    mockActivatedRoute = createMockActivatedRoute(() => null);
 
     TestBed.configureTestingModule({
       providers: [
@@ -68,8 +89,8 @@ describe('SetupPage - Integration', () => {
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     };
 
-    mockSetupService.createInitialAdmin!.mockResolvedValue(mockUser);
-    mockAuthService.login!.mockReturnValue(of(mockUser));
+    mockSetupService.createInitialAdmin.mockResolvedValue(mockUser);
+    mockAuthService.login.mockReturnValue(of(mockUser));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -96,8 +117,8 @@ describe('SetupPage - Integration', () => {
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     };
 
-    mockSetupService.createInitialAdmin!.mockResolvedValue(mockUser);
-    mockAuthService.login!.mockReturnValue(of(mockUser));
+    mockSetupService.createInitialAdmin.mockResolvedValue(mockUser);
+    mockAuthService.login.mockReturnValue(of(mockUser));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -117,7 +138,7 @@ describe('SetupPage - Integration', () => {
   });
 
   it('should set error when createInitialAdmin fails', async () => {
-    mockSetupService.createInitialAdmin!.mockRejectedValue(new Error('Setup already completed'));
+    mockSetupService.createInitialAdmin.mockRejectedValue(new Error('Setup already completed'));
 
     const fixture = TestBed.createComponent(SetupPage);
     const component = fixture.componentInstance;
@@ -172,10 +193,10 @@ describe('SetupPage - Integration', () => {
   });
 
   it('should show loading state during submit', async () => {
-    let resolveCreate: (value: any) => void;
+    let resolveCreate!: (value: unknown) => void;
     const createPromise = new Promise((resolve) => { resolveCreate = resolve; });
-    mockSetupService.createInitialAdmin!.mockReturnValue(createPromise);
-    mockAuthService.login!.mockReturnValue(of({
+    mockSetupService.createInitialAdmin.mockReturnValue(createPromise);
+    mockAuthService.login.mockReturnValue(of({
       id: 1, nombre: 'admin', rol: 'admin', activo: 1, created_at: '', updated_at: '',
     }));
 
@@ -190,7 +211,7 @@ describe('SetupPage - Integration', () => {
     // Loading should be true during submit
     expect(component.loading()).toBe(true);
 
-    resolveCreate!({
+    resolveCreate({
       id: 1, nombre: 'admin', rol: 'admin', activo: 1, created_at: '', updated_at: '',
     });
     await submitPromise;
