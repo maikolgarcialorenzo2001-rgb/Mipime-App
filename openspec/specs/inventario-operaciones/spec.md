@@ -6,14 +6,16 @@ Product registration with per-product unit type (unidad vs gramaje), DB migratio
 
 ## Requirements
 
-### Requirement: Database migration V12 — unidad_medida column
+### Requirement: Database migration V19 — unidad_medida column
 
-The system MUST add `unidad_medida TEXT NOT NULL DEFAULT 'unidad'` to the `productos` table via migration V12. All existing products MUST receive the default value `'unidad'` with no data loss.
+The system MUST add `unidad_medida TEXT NOT NULL DEFAULT 'unidad'` to the `productos` table via migration V19. All existing products MUST receive the default value `'unidad'` with no data loss.
+
+> **Spec drift note**: Original proposal/spec said "V12", but `db-migrations.ts` was already at V18 and V12 is taken (`total_gastos → total_movimientos`). Canonical version is V19. See `design.md` § Correction to Proposal/Spec.
 
 #### Scenario: New column exists after migration
 
-- GIVEN the database is at version < V12
-- WHEN migration V12 runs
+- GIVEN the database is at version < V19
+- WHEN migration V19 runs
 - THEN `productos.unidad_medida` exists with type TEXT NOT NULL
 - AND all existing rows have `unidad_medida = 'unidad'`
 
