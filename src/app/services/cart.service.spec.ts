@@ -41,6 +41,14 @@ const jamon: Producto = {
   updated_at: '2026-06-02T22:00:00Z',
 };
 
+/** Producto con unidad_medida corrupta/desconocida (p.ej. dato legacy). */
+const corrupto: Producto = {
+  ...harina,
+  id: 4,
+  nombre: 'Producto Corrupto',
+  unidad_medida: 'KILOGRAMO',
+} as unknown as Producto;
+
 describe('CartService', () => {
   let service: CartService;
 
@@ -206,6 +214,10 @@ describe('CartService', () => {
 
     it('stepPara devuelve 0.1 para producto de gramaje', () => {
       expect(service.stepPara(jamon)).toBe(0.1);
+    });
+
+    it('AC-10: stepPara devuelve 1 para producto con unidad_medida corrupta (sin throw)', () => {
+      expect(service.stepPara(corrupto)).toBe(1);
     });
 
     it('incrementar suma 1 a un producto de unidad', () => {

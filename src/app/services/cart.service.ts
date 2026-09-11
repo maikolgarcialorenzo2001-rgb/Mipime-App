@@ -1,6 +1,6 @@
 import { Injectable, signal, computed } from '@angular/core';
 import type { Producto } from '../models';
-import { UNIDAD_MEDIDA } from '../models/producto';
+import { unidadMedidaInfo } from '../models/producto';
 
 export interface CartItem {
   producto: Producto;
@@ -24,7 +24,7 @@ export class CartService {
 
   /** Paso de incremento/decremento según unidad de medida (1 | 0.1). */
   stepPara(producto: Producto): number {
-    return UNIDAD_MEDIDA[producto.unidad_medida].step;
+    return unidadMedidaInfo(producto.unidad_medida).step;
   }
 
   /** Cantidad redondeada a 2 decimales para evitar ruido de float (0.3000000004). */
