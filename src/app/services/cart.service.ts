@@ -90,8 +90,10 @@ export class CartService {
         item.producto.id === productoId
           ? {
               ...item,
-              cantidad,
-              subtotal: cantidad * item.producto.precio_venta,
+              cantidad: this._redondear(cantidad),
+              subtotal: this._redondear(
+                this._redondear(cantidad) * item.producto.precio_venta,
+              ),
             }
           : item,
       ),

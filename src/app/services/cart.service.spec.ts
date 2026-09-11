@@ -157,6 +157,15 @@ describe('CartService', () => {
 
       expect(service.items()).toHaveLength(0);
     });
+
+    it('debería redondear cantidad recibida para evitar ruido de float (0.30000000000000004 → 0.3)', () => {
+      service.agregar(jamon, 0.1);
+      service.actualizarCantidad(jamon.id, 0.30000000000000004);
+
+      const item = service.items()[0];
+      expect(item.cantidad).toBe(0.3);
+      expect(item.subtotal).toBe(3600);
+    });
   });
 
   describe('quitar', () => {
