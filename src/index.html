@@ -11,7 +11,12 @@
         document.documentElement.classList.add('dark');
       }
       var fontScale = localStorage.getItem('fontScale');
-      if (fontScale === 'small' || fontScale === 'large' || fontScale === 'xlarge' || fontScale === 'xxlarge') {
+      if (
+        fontScale === 'small' ||
+        fontScale === 'large' ||
+        fontScale === 'xlarge' ||
+        fontScale === 'xxlarge'
+      ) {
         document.documentElement.classList.add('font-scale-' + fontScale);
       }
     </script>

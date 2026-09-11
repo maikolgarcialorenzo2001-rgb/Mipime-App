@@ -66,7 +66,7 @@ describe('FontScale CSS root', () => {
   });
 
   it('debería aplicar el porcentaje declarado al root cuando el marcador está presente', () => {
-    const esperado: Array<[FontScaleLevel, string]> = [
+    const esperado: [FontScaleLevel, string][] = [
       ['small', '87.5%'],
       ['large', '112.5%'],
       ['xlarge', '125%'],
@@ -91,7 +91,7 @@ describe('FontScale CSS root', () => {
   });
 
   it('debería producir los px esperados por el spec a partir del porcentaje declarado', () => {
-    const esperadoPx: Array<[FontScaleLevel, number]> = [
+    const esperadoPx: [FontScaleLevel, number][] = [
       ['small', 14],
       ['normal', 16],
       ['large', 18],

@@ -115,7 +115,7 @@ describe('FontScaleService', () => {
 
   it('debería exponer percentage y label para cada nivel', () => {
     const service = crearServicio();
-    const esperado: Array<[FontScaleLevel, number, string]> = [
+    const esperado: [FontScaleLevel, number, string][] = [
       ['small', 87.5, 'Pequeña'],
       ['normal', 100, 'Normal'],
       ['large', 112.5, 'Grande'],
