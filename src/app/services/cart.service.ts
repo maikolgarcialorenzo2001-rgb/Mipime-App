@@ -59,8 +59,10 @@ export class CartService {
           item.producto.id === producto.id
             ? {
                 ...item,
-                cantidad: item.cantidad + cantidad,
-                subtotal: (item.cantidad + cantidad) * item.producto.precio_venta,
+                cantidad: this._redondear(item.cantidad + cantidad),
+                subtotal: this._redondear(
+                  this._redondear(item.cantidad + cantidad) * item.producto.precio_venta,
+                ),
               }
             : item,
         );

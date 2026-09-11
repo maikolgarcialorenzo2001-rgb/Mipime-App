@@ -78,6 +78,54 @@ describe('CartService', () => {
       service.agregar(harina, 0);
       expect(service.items()).toHaveLength(0);
     });
+
+    it('debería redondear la suma en el merge de gramaje (0.2 + 0.1 = 0.3)', () => {
+      service.agregar(jamon, 0.2);
+      service.agregar(jamon, 0.1);
+
+      expect(service.items()[0].cantidad).toBe(0.3);
+    });
+
+    it('debería redondear el merge con clamp de 2 decimales (0.15 + 0.15 = 0.3)', () => {
+      service.agregar(jamon, 0.15);
+      service.agregar(jamon, 0.15);
+
+      expect(service.items()[0].cantidad).toBe(0.3);
+    });
+
+    it('debería mantener el merge de gramaje sin acumular ruido (0.3 × 3 = 0.9)', () => {
+      service.agregar(jamon, 0.3);
+      service.agregar(jamon, 0.3);
+      service.agregar(jamon, 0.3);
+
+      expect(service.items()[0].cantidad).toBe(0.9);
+    });
+
+    it('debería redondear subtotal y total en el merge de gramaje (0.3 × 12000 = 3600)', () => {
+      service.agregar(jamon, 0.1);
+      service.agregar(jamon, 0.2);
+
+      const item = service.items()[0];
+      expect(item.subtotal).toBe(3600);
+      expect(service.total()).toBe(3600);
+    });
+
+    it('debería dejar cantidadItems() limpio tras merge de gramaje', () => {
+      service.agregar(jamon, 0.1);
+      service.agregar(harina, 2);
+      service.agregar(jamon, 0.2);
+
+      expect(service.cantidadItems()).toBe(2.3);
+    });
+
+    it('debería mantener el merge de unidades enteras con subtotal correcto (2 + 3 = 5)', () => {
+      service.agregar(harina, 2);
+      service.agregar(harina, 3);
+
+      const item = service.items()[0];
+      expect(item.cantidad).toBe(5);
+      expect(item.subtotal).toBe(4250);
+    });
   });
 
   describe('total', () => {
