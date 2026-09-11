@@ -5,6 +5,7 @@ import { TtlExpiredComponent } from './components/ttl-expired/ttl-expired.compon
 import { DbErrorComponent } from './components/db-error/db-error.component';
 import { RestoreFeedbackComponent } from './components/restore-feedback/restore-feedback.component';
 import { DbStatusService } from './services/db-status.service';
+import { FontScaleService } from './services/font-scale.service';
 
 @Component({
   selector: 'app-root',
@@ -21,6 +22,7 @@ import { DbStatusService } from './services/db-status.service';
 export class App {
   readonly ttlExpired = signal(false);
   readonly dbStatus = inject(DbStatusService);
+  readonly fontScale = inject(FontScaleService);
 
   constructor() {
     try {
