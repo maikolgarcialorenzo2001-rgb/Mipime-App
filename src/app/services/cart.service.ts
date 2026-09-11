@@ -55,17 +55,15 @@ export class CartService {
       );
 
       if (existente) {
-        return actual.map((item) =>
-          item.producto.id === producto.id
-            ? {
-                ...item,
-                cantidad: this._redondear(item.cantidad + cantidad),
-                subtotal: this._redondear(
-                  this._redondear(item.cantidad + cantidad) * item.producto.precio_venta,
-                ),
-              }
-            : item,
-        );
+        return actual.map((item) => {
+          if (item.producto.id !== producto.id) return item;
+          const nuevaCantidad = this._redondear(item.cantidad + cantidad);
+          return {
+            ...item,
+            cantidad: nuevaCantidad,
+            subtotal: this._redondear(nuevaCantidad * item.producto.precio_venta),
+          };
+        });
       }
 
       return [
@@ -86,17 +84,15 @@ export class CartService {
     }
 
     this.items.update((actual) =>
-      actual.map((item) =>
-        item.producto.id === productoId
-          ? {
-              ...item,
-              cantidad: this._redondear(cantidad),
-              subtotal: this._redondear(
-                this._redondear(cantidad) * item.producto.precio_venta,
-              ),
-            }
-          : item,
-      ),
+      actual.map((item) => {
+        if (item.producto.id !== productoId) return item;
+        const nuevaCantidad = this._redondear(cantidad);
+        return {
+          ...item,
+          cantidad: nuevaCantidad,
+          subtotal: this._redondear(nuevaCantidad * item.producto.precio_venta),
+        };
+      }),
     );
   }
 
