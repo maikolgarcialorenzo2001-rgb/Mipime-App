@@ -20,9 +20,11 @@
           #pos="routerLinkActive"
           [class.text-blue-600]="pos.isActive"
           [class.dark:text-blue-400]="pos.isActive"
+          [class.text-gray-600]="!pos.isActive"
+          [class.dark:text-gray-400]="!pos.isActive"
           [class.font-semibold]="pos.isActive"
-          [class.underline]="pos.isActive"
-          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+          [class.active-accent]="pos.isActive"
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">point_of_sale</span>
@@ -35,9 +37,11 @@
           #productos="routerLinkActive"
           [class.text-blue-600]="productos.isActive"
           [class.dark:text-blue-400]="productos.isActive"
+          [class.text-gray-600]="!productos.isActive"
+          [class.dark:text-gray-400]="!productos.isActive"
           [class.font-semibold]="productos.isActive"
-          [class.underline]="productos.isActive"
-          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+          [class.active-accent]="productos.isActive"
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">inventory_2</span>
@@ -50,9 +54,11 @@
           #jornada="routerLinkActive"
           [class.text-blue-600]="jornada.isActive"
           [class.dark:text-blue-400]="jornada.isActive"
+          [class.text-gray-600]="!jornada.isActive"
+          [class.dark:text-gray-400]="!jornada.isActive"
           [class.font-semibold]="jornada.isActive"
-          [class.underline]="jornada.isActive"
-          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+          [class.active-accent]="jornada.isActive"
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">calendar_month</span>
@@ -65,9 +71,11 @@
           #inventario="routerLinkActive"
           [class.text-blue-600]="inventario.isActive"
           [class.dark:text-blue-400]="inventario.isActive"
+          [class.text-gray-600]="!inventario.isActive"
+          [class.dark:text-gray-400]="!inventario.isActive"
           [class.font-semibold]="inventario.isActive"
-          [class.underline]="inventario.isActive"
-          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+          [class.active-accent]="inventario.isActive"
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">warehouse</span>
@@ -80,9 +88,11 @@
           #historial="routerLinkActive"
           [class.text-blue-600]="historial.isActive"
           [class.dark:text-blue-400]="historial.isActive"
+          [class.text-gray-600]="!historial.isActive"
+          [class.dark:text-gray-400]="!historial.isActive"
           [class.font-semibold]="historial.isActive"
-          [class.underline]="historial.isActive"
-          class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+          [class.active-accent]="historial.isActive"
+          class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
         >
           <span class="inline-flex items-center gap-1.5">
             <span class="material-symbols-outlined leading-none text-sm">history</span>
@@ -96,9 +106,11 @@
             #admin="routerLinkActive"
             [class.text-blue-600]="admin.isActive"
             [class.dark:text-blue-400]="admin.isActive"
+            [class.text-gray-600]="!admin.isActive"
+            [class.dark:text-gray-400]="!admin.isActive"
             [class.font-semibold]="admin.isActive"
-            [class.underline]="admin.isActive"
-            class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
+            [class.active-accent]="admin.isActive"
+            class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
           >
             <span class="inline-flex items-center gap-1.5">
               <span class="material-symbols-outlined leading-none text-sm"
@@ -180,7 +192,10 @@
         #posBottom="routerLinkActive"
         [class.text-blue-600]="posBottom.isActive"
         [class.dark:text-blue-400]="posBottom.isActive"
-        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+        [class.text-gray-600]="!posBottom.isActive"
+        [class.dark:text-gray-400]="!posBottom.isActive"
+        [class.active-accent]="posBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
       >
         <span class="material-symbols-outlined text-xl leading-none">point_of_sale</span>
         <span class="font-medium">POS</span>
@@ -191,7 +206,10 @@
         #productosBottom="routerLinkActive"
         [class.text-blue-600]="productosBottom.isActive"
         [class.dark:text-blue-400]="productosBottom.isActive"
-        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+        [class.text-gray-600]="!productosBottom.isActive"
+        [class.dark:text-gray-400]="!productosBottom.isActive"
+        [class.active-accent]="productosBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
       >
         <span class="material-symbols-outlined text-xl leading-none">inventory_2</span>
         <span class="font-medium">Productos</span>
@@ -202,7 +220,10 @@
         #jornadaBottom="routerLinkActive"
         [class.text-blue-600]="jornadaBottom.isActive"
         [class.dark:text-blue-400]="jornadaBottom.isActive"
-        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+        [class.text-gray-600]="!jornadaBottom.isActive"
+        [class.dark:text-gray-400]="!jornadaBottom.isActive"
+        [class.active-accent]="jornadaBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
       >
         <span class="material-symbols-outlined text-xl leading-none">calendar_month</span>
         <span class="font-medium">Jornada</span>
@@ -213,7 +234,10 @@
         #inventarioBottom="routerLinkActive"
         [class.text-blue-600]="inventarioBottom.isActive"
         [class.dark:text-blue-400]="inventarioBottom.isActive"
-        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+        [class.text-gray-600]="!inventarioBottom.isActive"
+        [class.dark:text-gray-400]="!inventarioBottom.isActive"
+        [class.active-accent]="inventarioBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
       >
         <span class="material-symbols-outlined text-xl leading-none">warehouse</span>
         <span class="font-medium">Inventario</span>
@@ -224,7 +248,10 @@
         #historialBottom="routerLinkActive"
         [class.text-blue-600]="historialBottom.isActive"
         [class.dark:text-blue-400]="historialBottom.isActive"
-        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+        [class.text-gray-600]="!historialBottom.isActive"
+        [class.dark:text-gray-400]="!historialBottom.isActive"
+        [class.active-accent]="historialBottom.isActive"
+        class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
       >
         <span class="material-symbols-outlined text-xl leading-none">history</span>
         <span class="font-medium">Historial</span>
@@ -236,7 +263,10 @@
           #adminBottom="routerLinkActive"
           [class.text-blue-600]="adminBottom.isActive"
           [class.dark:text-blue-400]="adminBottom.isActive"
-          class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
+          [class.text-gray-600]="!adminBottom.isActive"
+          [class.dark:text-gray-400]="!adminBottom.isActive"
+          [class.active-accent]="adminBottom.isActive"
+          class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
         >
           <span class="material-symbols-outlined text-xl leading-none">admin_panel_settings</span>
           <span class="font-medium">Admin</span>

@@ -31,6 +31,29 @@ html.font-scale-xxlarge {
     box-shadow 0.6s ease;
 }
 
+/* Indicador de página activa en el nav: píldora corta centrada bajo el ítem.
+   Vive aquí (global) porque el dark de ThemeService se aplica en <html> y la
+   encapsulación emulada del componente rompería el selector .dark descendiente. */
+.active-accent {
+  position: relative;
+}
+
+.active-accent::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  height: 3px;
+  width: 24px;
+  border-radius: 9999px;
+  background-color: #2563eb; /* blue-600, mismo tono del texto activo/hover */
+}
+
+.dark .active-accent::after {
+  background-color: #60a5fa; /* blue-400 */
+}
+
 body {
   overflow-x: hidden;
   /* Prevent text selection on touch */

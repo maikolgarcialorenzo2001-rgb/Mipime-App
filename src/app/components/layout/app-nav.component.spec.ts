@@ -9,6 +9,7 @@ import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
+import { readFileSync } from 'node:fs';
 import { APP_VERSION } from '../../version';
 
 const mockJornadaAbierta: Jornada = {
@@ -261,6 +262,39 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     const occurrences = text.split(`v${APP_VERSION}`).length - 1;
     expect(occurrences).toBe(1);
+  });
+
+  it('el indicador de la página activa es una píldora corta centrada (active-accent), sin chip de texto', () => {
+    const tpl = readFileSync('src/app/components/layout/app-nav.component.html', 'utf-8');
+
+    // Sin chip de texto de la página activa en la top bar
+    expect(tpl).not.toContain('activePage');
+    expect(tpl).not.toContain('font-mono');
+
+    // El acento ya no es un borde full-width: no debe quedar border-b-2 en los ítems
+    expect(tpl.match(/border-b-2/g) ?? []).toHaveLength(0);
+
+    // Los 12 ítems (6 desktop + 6 bottom) usan el marcador active-accent
+    const acentos = tpl.match(/\[class\.active-accent\]="[a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(acentos.length).toBe(12);
+
+    // El texto activo queda del tono del hover (azul), el gris solo si NO está activo
+    const textoAzul = tpl.match(/\[class\.text-blue-600\]="[a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoAzul.length).toBe(12);
+    const textoGrisNoActivo = tpl.match(/\[class\.text-gray-600\]="![a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoGrisNoActivo.length).toBe(12);
+    const textoGrisDark = tpl.match(/\[class\.dark:text-gray-400\]="![a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoGrisDark.length).toBe(12);
+
+    // Contrato CSS (global): píldora corta, centrada, con variante dark.
+    // Vive en styles.css porque la encapsulación emulada del componente rompe
+    // el selector .dark descendiente (el dark vive en <html>).
+    const css = readFileSync('src/styles.css', 'utf-8');
+    expect(css).toContain('.active-accent::after');
+    expect(css).toMatch(/left:\s*50%/);
+    expect(css).toMatch(/transform:\s*translateX\(-50%\)/);
+    expect(css).toMatch(/width:\s*\d+px/);
+    expect(css).toMatch(/\.dark \.active-accent::after/);
   });
 
   describe('Modal de ajustes', () => {
