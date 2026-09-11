@@ -74,7 +74,7 @@ describe('QuantityInputComponent — decimal por unidad de medida', () => {
 
   it('gramaje: tercer decimal bloqueado (max 2 lugares) cuando valor actual = 1.25', () => {
     create('gramaje');
-    component.cantidad.set(1.25);
+    component.onInput('1.25');
     const event = new KeyboardEvent('keydown', { key: '5', cancelable: true });
     component.onInputKeydown(event);
     expect(event.defaultPrevented).toBe(true);
@@ -82,7 +82,7 @@ describe('QuantityInputComponent — decimal por unidad de medida', () => {
 
   it('gramaje: segundo decimal permitido cuando valor actual = 1.2', () => {
     create('gramaje');
-    component.cantidad.set(1.2);
+    component.onInput('1.2');
     const event = new KeyboardEvent('keydown', { key: '3', cancelable: true });
     component.onInputKeydown(event);
     expect(event.defaultPrevented).toBe(false);
@@ -169,5 +169,79 @@ describe('QuantityInputComponent — onInput: parseo con Number.isFinite y buffe
     component.onInput('abc');
     expect(component.cantidad()).toBe(0.6);
     expect(component.soloNumeros()).toBe(true);
+  });
+});
+
+describe('QuantityInputComponent — umbral por unidad de medida y confirmación Enter', () => {
+  let fixture: ComponentFixture<QuantityInputComponent>;
+  let component: QuantityInputComponent;
+
+  function create(unidad: 'unidad' | 'gramaje'): void {
+    TestBed.configureTestingModule({
+      imports: [QuantityInputComponent, PesosPipe],
+    });
+    fixture = TestBed.createComponent(QuantityInputComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('producto', makeProducto(unidad));
+    fixture.detectChanges();
+  }
+
+  function botonAgregar(): HTMLButtonElement {
+    const buttons = [...fixture.nativeElement.querySelectorAll('button')] as HTMLButtonElement[];
+    return buttons.find((b) => b.textContent?.includes('Agregar'))!;
+  }
+
+  it('7. gramaje: cantidad 0.5 habilita el umbral; 0.05 no', () => {
+    create('gramaje');
+    component.cantidad.set(0.5);
+    expect(component.umbralHabilitado()).toBe(true);
+    component.cantidad.set(0.05);
+    expect(component.umbralHabilitado()).toBe(false);
+  });
+
+  it('7b. gramaje: botón Agregar habilitado con 0.5 y deshabilitado con 0.05', () => {
+    create('gramaje');
+    component.cantidad.set(0.5);
+    fixture.detectChanges();
+    const agregar = botonAgregar();
+    expect(agregar.disabled).toBe(false);
+    component.cantidad.set(0.05);
+    fixture.detectChanges();
+    expect(agregar.disabled).toBe(true);
+  });
+
+  it('8. unidad: cantidad 1 habilita el umbral; 0 y 0.9 no', () => {
+    create('unidad');
+    component.cantidad.set(1);
+    expect(component.umbralHabilitado()).toBe(true);
+    component.cantidad.set(0);
+    expect(component.umbralHabilitado()).toBe(false);
+    component.cantidad.set(0.9);
+    expect(component.umbralHabilitado()).toBe(false);
+  });
+
+  it('8b. unidad: botón Agregar deshabilitado con cantidad 0', () => {
+    create('unidad');
+    component.cantidad.set(0);
+    fixture.detectChanges();
+    expect(botonAgregar().disabled).toBe(true);
+  });
+
+  it('9. Enter con gramaje cantidad 0.6 emite 0.6', () => {
+    create('gramaje');
+    const spy = vi.spyOn(component.confirmar, 'emit');
+    component.cantidad.set(0.6);
+    const event = new KeyboardEvent('keydown', { key: 'Enter' });
+    component.onKeydown(event);
+    expect(spy).toHaveBeenCalledWith(0.6);
+  });
+
+  it('10. Enter con unidad cantidad 0 no emite', () => {
+    create('unidad');
+    const spy = vi.spyOn(component.confirmar, 'emit');
+    component.cantidad.set(0);
+    const event = new KeyboardEvent('keydown', { key: 'Enter' });
+    component.onKeydown(event);
+    expect(spy).not.toHaveBeenCalled();
   });
 });

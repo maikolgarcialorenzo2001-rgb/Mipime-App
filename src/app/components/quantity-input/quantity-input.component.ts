@@ -25,6 +25,11 @@ export class QuantityInputComponent {
   /** sufijo de la etiqueta de precio ("c/u" | "por lb"). */
   readonly sufijo = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].suffix);
 
+  /** true cuando la cantidad supera el mínimo útil según la unidad de medida (step). */
+  readonly umbralHabilitado = computed(
+    () => this.cantidad() >= UNIDAD_MEDIDA[this.producto().unidad_medida].step,
+  );
+
   constructor() {
     this.rawText.set(String(this.cantidad()));
 
@@ -85,7 +90,7 @@ export class QuantityInputComponent {
       event.preventDefault();
       event.stopPropagation();
       const qty = this.cantidad();
-      if (qty > 0) {
+      if (this.umbralHabilitado()) {
         this.confirmar.emit(qty);
       }
       return;
@@ -108,7 +113,7 @@ export class QuantityInputComponent {
       // Gramaje: permite dígitos y UN solo punto decimal, con máx 2 decimales
       if (/^\d$/.test(event.key)) {
         // Max 2 decimal places: block if already at 2 decimals and key is a digit
-        const current = String(this.cantidad());
+        const current = this.rawText();
         const decimalIndex = current.indexOf('.');
         if (decimalIndex !== -1 && current.length - decimalIndex - 1 >= 2) {
           event.preventDefault();
@@ -118,7 +123,7 @@ export class QuantityInputComponent {
         return;
       }
       if (event.key === '.') {
-        const current = String(this.cantidad());
+        const current = this.rawText();
         if (current.includes('.')) {
           event.preventDefault();
         }
