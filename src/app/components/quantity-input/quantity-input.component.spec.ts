@@ -199,6 +199,12 @@ describe('QuantityInputComponent — umbral por unidad de medida y confirmación
     expect(component.umbralHabilitado()).toBe(false);
   });
 
+  it('7c. gramaje: cantidad 0.1 (step) en el límite exacto habilita el umbral', () => {
+    create('gramaje');
+    component.cantidad.set(0.1);
+    expect(component.umbralHabilitado()).toBe(true);
+  });
+
   it('7b. gramaje: botón Agregar habilitado con 0.5 y deshabilitado con 0.05', () => {
     create('gramaje');
     component.cantidad.set(0.5);
