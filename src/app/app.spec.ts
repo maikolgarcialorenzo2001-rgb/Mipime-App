@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { App } from './app';
+import { App, clasesMain } from './app';
 import { AuthService } from './services/auth.service';
 import { DbStatusService } from './services/db-status.service';
 import { DATABASE, type Database } from './services/database';
@@ -157,6 +157,22 @@ describe('App component nav', () => {
 
     expect(linkTexts.some((t) => t?.includes('Admin'))).toBe(false);
     expect(linkTexts.some((t) => t?.includes('POS'))).toBe(true);
+  });
+
+  it('el shell renderiza con pt-16 (nav) y px-2 por defecto (página no-POS)', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const main = fixture.nativeElement.querySelector('main') as HTMLElement;
+    expect(main.className).toContain('pt-16');
+    expect(main.className).toContain('px-2');
+  });
+
+  it('clasesMain: POS es full-bleed (sin px-2) y el resto conserva el padding lateral', () => {
+    expect(clasesMain('pos')).not.toContain('px-2');
+    expect(clasesMain('pos')).toContain('min-h-screen');
+    for (const pagina of ['jornada', 'inventario', 'historial', 'admin', 'productos', 'inicio']) {
+      expect(clasesMain(pagina)).toContain('px-2');
+    }
   });
 
   it('no debería mostrar nav completo cuando no hay sesión', () => {
