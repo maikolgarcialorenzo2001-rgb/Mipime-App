@@ -5,6 +5,7 @@ import { StockMovimientoService } from './stock-movimiento.service';
 import { AuthService } from './auth.service';
 import { DATABASE, type Database } from './database';
 import type { Producto } from '../models';
+import type { UnidadMedida } from '../models/producto';
 
 const mockProductos: Producto[] = [
   {
@@ -183,6 +184,105 @@ describe('ProductoService', () => {
           1500,
           'unidad',
         ]),
+      );
+    });
+
+    it('AC-13: crear con unidad_medida corrupta "KILOGRAMO" persiste "unidad"', async () => {
+      const nuevoProducto: Producto = {
+        id: 40,
+        nombre: 'Corrupto',
+        descripcion: null,
+        precio_venta: 100,
+        precio_costo: 50,
+        stock_almacen: 0,
+        stock_shop: 0,
+        unidad_medida: 'unidad',
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      await firstValueFrom(
+        service.crear({
+          nombre: 'Corrupto',
+          precio_costo: 50,
+          precio_venta: 100,
+          stock_almacen: 0,
+          unidad_medida: 'KILOGRAMO' as UnidadMedida,
+        }),
+      );
+
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['unidad']),
+      );
+      expect(mockDb.sql).not.toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['KILOGRAMO']),
+      );
+    });
+
+    it('AC-13: crear con unidad_medida "gramaje" persiste "gramaje"', async () => {
+      const nuevoProducto: Producto = {
+        id: 41,
+        nombre: 'Gramaje',
+        descripcion: null,
+        precio_venta: 100,
+        precio_costo: 50,
+        stock_almacen: 0,
+        stock_shop: 0,
+        unidad_medida: 'gramaje',
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      await firstValueFrom(
+        service.crear({
+          nombre: 'Gramaje',
+          precio_costo: 50,
+          precio_venta: 100,
+          stock_almacen: 0,
+          unidad_medida: 'gramaje',
+        }),
+      );
+
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['gramaje']),
+      );
+    });
+
+    it('AC-13: crear sin unidad_medida persiste "unidad" (default)', async () => {
+      const nuevoProducto: Producto = {
+        id: 42,
+        nombre: 'Sin Unidad',
+        descripcion: null,
+        precio_venta: 100,
+        precio_costo: 50,
+        stock_almacen: 0,
+        stock_shop: 0,
+        unidad_medida: 'unidad',
+        created_at: '2026-07-23T19:00:00Z',
+        updated_at: '2026-07-23T19:00:00Z',
+      };
+      vi.mocked(mockDb.sql).mockResolvedValue([nuevoProducto]);
+
+      const service = TestBed.inject(ProductoService);
+      await firstValueFrom(
+        service.crear({
+          nombre: 'Sin Unidad',
+          precio_costo: 50,
+          precio_venta: 100,
+          stock_almacen: 0,
+        }),
+      );
+
+      expect(mockDb.sql).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(['unidad']),
       );
     });
 

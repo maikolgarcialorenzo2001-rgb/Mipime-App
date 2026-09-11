@@ -76,7 +76,9 @@ export class ProductoService {
           throw new Error('El precio de venta no puede ser negativo');
         }
         const ahora = new Date().toISOString();
-        const unidadMedida = data.unidad_medida ?? 'unidad';
+        // Coerción defensiva: solo 'gramaje' se persiste tal cual; cualquier
+        // otro valor (undefined/null/desconocido/corrupto) se persiste 'unidad'.
+        const unidadMedida = data.unidad_medida === 'gramaje' ? 'gramaje' : 'unidad';
         // F6 R1: INSERT + registrarEntrada atómicos en la MISMA transacción.
         // Si registrarEntrada falla, el adapter hace ROLLBACK y NO queda
         // producto fantasma. registrarEntrada anida su propia transaction()
