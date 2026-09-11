@@ -30,9 +30,17 @@ function normalizar(css: string): string {
 }
 
 describe('FontScale outliers px→rem', () => {
-  it('no debería quedar px en la calc del POS (56px→3.5rem)', () => {
+  it('la calc del POS no debería reservar la barra de búsqueda (altura natural del flex, escala-safe)', () => {
+    // La barra de búsqueda es un hijo en flujo del flex; reservar 3.5rem en la
+    // calc solo coincidía al 100% y producía márgenes al escalar la fuente.
     expect(posHtml).not.toContain('56px');
-    expect(posHtml).toContain('h-[calc(100vh-4rem-3.5rem-0.5rem)]');
+    expect(posHtml).not.toContain('100vh-4rem-3.5rem');
+    expect(posHtml).toContain('h-[calc(100vh-4rem-1rem)]');
+
+    // El bottom tab bar móvil es fixed (lg:hidden): el contenedor le deja holgura
+    // con padding inferior en móvil, sin reserva dentro de la calc.
+    expect(posHtml).toContain('pb-16');
+    expect(posHtml).toContain('lg:pb-0');
   });
 
   it('la sombra del drawer del POS debería usar rem', () => {
@@ -82,8 +90,7 @@ describe('FontScale outliers px→rem', () => {
   });
 
   it('las equivalencias rem→px y los floors deberían cumplirse en el nivel small', () => {
-    // Equivalencias declaradas: 56px=3.5rem, 90px=5.625rem, 100px=6.25rem, 10px=0.625rem, 48px=3rem, 16px=1rem
-    expect(3.5 * 16).toBe(56);
+    // Equivalencias declaradas: 90px=5.625rem, 100px=6.25rem, 10px=0.625rem, 48px=3rem, 16px=1rem
     expect(5.625 * 16).toBe(90);
     expect(6.25 * 16).toBe(100);
     expect(0.625 * 16).toBe(10);
