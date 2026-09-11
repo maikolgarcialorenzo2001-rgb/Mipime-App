@@ -9,7 +9,7 @@ import { JornadaService } from '../../services/jornada.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
-import { UNIDAD_MEDIDA, type UnidadMedida } from '../../models/producto';
+import { unidadMedidaInfo, type UnidadMedida } from '../../models/producto';
 
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
@@ -90,7 +90,7 @@ export class InventarioPage implements OnInit {
 
   /** Sufijo de unidad de medida para render en templates (u. / lb). */
   sufijoDe(producto: Producto): string {
-    return UNIDAD_MEDIDA[producto.unidad_medida]?.suffix ?? 'u.';
+    return unidadMedidaInfo(producto.unidad_medida).suffix;
   }
 
   /** Cambia la ubicación de origen del Traslado y resetea el lote elegido. */
@@ -294,7 +294,7 @@ export class InventarioPage implements OnInit {
           (p) => p.id === action.productoId,
         );
         if (actualizado) {
-          const sufijo = UNIDAD_MEDIDA[actualizado.unidad_medida].suffix;
+          const sufijo = unidadMedidaInfo(actualizado.unidad_medida).suffix;
           // F3: feedback claro del precio costo. Cuando el lote editado es el
           // frente FIFO, productos.precio_costo se actualizó. Cuando no lo es,
           // el costo quedó guardado en el lote pero la columna muestra el costo

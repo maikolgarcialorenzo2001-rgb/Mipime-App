@@ -1854,6 +1854,39 @@ describe('InventarioPage', () => {
     expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 lb · Tienda: 7 lb');
   });
 
+  it('36d. AC-12: toast de edición con unidad_medida corrupta muestra "u." sin lanzar', async () => {
+    const corrupto = {
+      ...productos[0],
+      unidad_medida: 'KILOGRAMO',
+    } as unknown as Producto;
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of([corrupto]))
+      .mockReturnValueOnce(of([{ ...corrupto, stock_almacen: 80, stock_shop: 7 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'editar');
+    fixture.detectChanges();
+
+    component.editarPrecioVenta.set(15);
+    component.editarPrecioCosto.set(10);
+    component.movimientoCantidad.set(80);
+    component.movimientoMotivo.set('Actualización de precios');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
+  });
+
   it('36b. F3: toast muestra el precio costo actualizado cuando el lote editado es el frente FIFO', async () => {
     mockStockService.obtenerLotesPorProducto.mockResolvedValue([
       { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
@@ -2064,6 +2097,34 @@ describe('InventarioPage', () => {
     expect(component.editarPrecioVenta()).toBe(productos[0].precio_venta);
     expect(component.editarPrecioCosto()).toBe(productos[0].precio_costo);
     expect(component.movimientoCantidad()).toBe(0);
+  });
+
+  describe('sufijoDe (AC-12): fallback seguro vía accessor', () => {
+    it('AC-12: unidad_medida corrupta "KILOGRAMO" → "u." sin lanzar', () => {
+      mockProductoService.listar.mockReturnValue(of([]));
+      fixture = TestBed.createComponent(InventarioPage);
+      component = fixture.componentInstance;
+      const corrupto = {
+        ...productos[0],
+        unidad_medida: 'KILOGRAMO',
+      } as unknown as Producto;
+      expect(component.sufijoDe(corrupto)).toBe('u.');
+    });
+
+    it('AC-12: "gramaje" → "lb"', () => {
+      mockProductoService.listar.mockReturnValue(of([]));
+      fixture = TestBed.createComponent(InventarioPage);
+      component = fixture.componentInstance;
+      const gramaje = { ...productos[0], unidad_medida: 'gramaje' as const };
+      expect(component.sufijoDe(gramaje)).toBe('lb');
+    });
+
+    it('AC-12: "unidad" → "u." (regresión valid-path)', () => {
+      mockProductoService.listar.mockReturnValue(of([]));
+      fixture = TestBed.createComponent(InventarioPage);
+      component = fixture.componentInstance;
+      expect(component.sufijoDe(productos[0])).toBe('u.');
+    });
   });
 
   describe('responsive layout', () => {
