@@ -3,11 +3,32 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 
+/* Font scale levels: porcentaje del root (16px base; sin clase = normal 100%) */
+html.font-scale-small {
+  font-size: 87.5%;
+}
+
+html.font-scale-large {
+  font-size: 112.5%;
+}
+
+html.font-scale-xlarge {
+  font-size: 125%;
+}
+
+html.font-scale-xxlarge {
+  font-size: 135%;
+}
+
 /* Smooth dark/light mode transition */
 *,
 *::before,
 *::after {
-  transition: background-color 0.6s ease, color 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+  transition:
+    background-color 0.6s ease,
+    color 0.6s ease,
+    border-color 0.6s ease,
+    box-shadow 0.6s ease;
 }
 
 body {
@@ -28,7 +49,9 @@ body {
 }
 
 /* Touch-friendly form inputs */
-input, select, textarea {
+input,
+select,
+textarea {
   font-size: 16px !important; /* Prevent iOS zoom on focus */
 }
 
@@ -40,7 +63,9 @@ input, select, textarea {
 }
 
 /* Disable double-tap zoom on buttons/links */
-button, a, [role="button"] {
+button,
+a,
+[role='button'] {
   touch-action: manipulation;
 }
 
@@ -58,8 +83,12 @@ button, a, [role="button"] {
 
 /* Toast fade-in animation */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .animate-fade-in {
   animation: fade-in 0.25s ease-out;
