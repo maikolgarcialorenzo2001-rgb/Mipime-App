@@ -1,17 +1,23 @@
 @if (auth.isLoggedIn()) {
   <!-- TOP BAR: visible en desktop (lg+), simplificado en móvil -->
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-top">
+  <nav
+    class="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-top"
+  >
     <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
       <div class="flex items-center gap-2">
         <span class="text-lg font-bold text-gray-900 dark:text-gray-100">Tienda-App</span>
-        <span class="select-none rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">v{{ appVersion }}</span>
+        <span
+          class="select-none rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+          >v{{ appVersion }}</span
+        >
       </div>
 
       <!-- Desktop links: hidden en móvil/tablet -->
       <div class="hidden lg:flex items-center gap-8 text-sm font-medium whitespace-nowrap">
         <a
           routerLink="/pos"
-          routerLinkActive #pos="routerLinkActive"
+          routerLinkActive
+          #pos="routerLinkActive"
           [class.text-blue-600]="pos.isActive"
           [class.dark:text-blue-400]="pos.isActive"
           [class.font-semibold]="pos.isActive"
@@ -25,7 +31,8 @@
         </a>
         <a
           routerLink="/productos"
-          routerLinkActive #productos="routerLinkActive"
+          routerLinkActive
+          #productos="routerLinkActive"
           [class.text-blue-600]="productos.isActive"
           [class.dark:text-blue-400]="productos.isActive"
           [class.font-semibold]="productos.isActive"
@@ -39,7 +46,8 @@
         </a>
         <a
           routerLink="/jornada"
-          routerLinkActive #jornada="routerLinkActive"
+          routerLinkActive
+          #jornada="routerLinkActive"
           [class.text-blue-600]="jornada.isActive"
           [class.dark:text-blue-400]="jornada.isActive"
           [class.font-semibold]="jornada.isActive"
@@ -53,7 +61,8 @@
         </a>
         <a
           routerLink="/inventario"
-          routerLinkActive #inventario="routerLinkActive"
+          routerLinkActive
+          #inventario="routerLinkActive"
           [class.text-blue-600]="inventario.isActive"
           [class.dark:text-blue-400]="inventario.isActive"
           [class.font-semibold]="inventario.isActive"
@@ -67,7 +76,8 @@
         </a>
         <a
           routerLink="/historial"
-          routerLinkActive #historial="routerLinkActive"
+          routerLinkActive
+          #historial="routerLinkActive"
           [class.text-blue-600]="historial.isActive"
           [class.dark:text-blue-400]="historial.isActive"
           [class.font-semibold]="historial.isActive"
@@ -82,7 +92,8 @@
         @if (auth.hasRole('admin')) {
           <a
             routerLink="/admin"
-            routerLinkActive #admin="routerLinkActive"
+            routerLinkActive
+            #admin="routerLinkActive"
             [class.text-blue-600]="admin.isActive"
             [class.dark:text-blue-400]="admin.isActive"
             [class.font-semibold]="admin.isActive"
@@ -90,7 +101,9 @@
             class="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer underline-offset-4 decoration-gray-400 dark:decoration-gray-600 decoration-2"
           >
             <span class="inline-flex items-center gap-1.5">
-              <span class="material-symbols-outlined leading-none text-sm">admin_panel_settings</span>
+              <span class="material-symbols-outlined leading-none text-sm"
+                >admin_panel_settings</span
+              >
               Admin
             </span>
           </a>
@@ -129,19 +142,17 @@
 
         <button
           type="button"
-          (click)="themeService.toggle()"
+          (click)="abrirModalAjustes()"
           class="cursor-pointer rounded-lg p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors leading-none"
-          aria-label="Cambiar tema"
+          aria-label="Ajustes"
         >
-          @if (themeService.isDark()) {
-            <span class="material-symbols-outlined text-base leading-none">light_mode</span>
-          } @else {
-            <span class="material-symbols-outlined text-base leading-none">dark_mode</span>
-          }
+          <span class="material-symbols-outlined text-base leading-none">settings</span>
         </button>
 
         <!-- Nombre usuario: solo desktop -->
-        <span class="hidden md:inline text-gray-500 dark:text-gray-400">{{ auth.usuario()?.nombre }}</span>
+        <span class="hidden md:inline text-gray-500 dark:text-gray-400">{{
+          auth.usuario()?.nombre
+        }}</span>
 
         <span class="hidden md:inline mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700"></span>
 
@@ -159,11 +170,14 @@
   </nav>
 
   <!-- BOTTOM TAB BAR: visible solo en móvil/tablet (<lg) -->
-  <nav class="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-bottom">
+  <nav
+    class="fixed bottom-0 left-0 right-0 z-50 lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 select-none safe-bottom"
+  >
     <div class="flex items-center justify-around px-2 py-1">
       <a
         routerLink="/pos"
-        routerLinkActive #posBottom="routerLinkActive"
+        routerLinkActive
+        #posBottom="routerLinkActive"
         [class.text-blue-600]="posBottom.isActive"
         [class.dark:text-blue-400]="posBottom.isActive"
         class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -173,7 +187,8 @@
       </a>
       <a
         routerLink="/productos"
-        routerLinkActive #productosBottom="routerLinkActive"
+        routerLinkActive
+        #productosBottom="routerLinkActive"
         [class.text-blue-600]="productosBottom.isActive"
         [class.dark:text-blue-400]="productosBottom.isActive"
         class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -183,7 +198,8 @@
       </a>
       <a
         routerLink="/jornada"
-        routerLinkActive #jornadaBottom="routerLinkActive"
+        routerLinkActive
+        #jornadaBottom="routerLinkActive"
         [class.text-blue-600]="jornadaBottom.isActive"
         [class.dark:text-blue-400]="jornadaBottom.isActive"
         class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -193,7 +209,8 @@
       </a>
       <a
         routerLink="/inventario"
-        routerLinkActive #inventarioBottom="routerLinkActive"
+        routerLinkActive
+        #inventarioBottom="routerLinkActive"
         [class.text-blue-600]="inventarioBottom.isActive"
         [class.dark:text-blue-400]="inventarioBottom.isActive"
         class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -203,7 +220,8 @@
       </a>
       <a
         routerLink="/historial"
-        routerLinkActive #historialBottom="routerLinkActive"
+        routerLinkActive
+        #historialBottom="routerLinkActive"
         [class.text-blue-600]="historialBottom.isActive"
         [class.dark:text-blue-400]="historialBottom.isActive"
         class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -214,7 +232,8 @@
       @if (auth.hasRole('admin')) {
         <a
           routerLink="/admin"
-          routerLinkActive #adminBottom="routerLinkActive"
+          routerLinkActive
+          #adminBottom="routerLinkActive"
           [class.text-blue-600]="adminBottom.isActive"
           [class.dark:text-blue-400]="adminBottom.isActive"
           class="flex flex-col items-center gap-0.5 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors cursor-pointer min-w-[max(3rem,48px)]"
@@ -243,13 +262,18 @@
       <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Iniciar jornada</h3>
 
       @if (abrirError(); as err) {
-        <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+        <div
+          class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400"
+        >
           {{ err }}
         </div>
       }
 
       <div class="mb-4">
-        <label for="monto-inicial-nav" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label
+          for="monto-inicial-nav"
+          class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           Fondo de caja
         </label>
         <input
@@ -264,7 +288,9 @@
           (keydown)="filtrarTecla($event)"
         />
         @if (soloNumeros()) {
-          <p class="text-xs text-red-500 dark:text-red-400 mt-1 animate-pulse">Solo se permiten números</p>
+          <p class="text-xs text-red-500 dark:text-red-400 mt-1 animate-pulse">
+            Solo se permiten números
+          </p>
         }
       </div>
 
@@ -276,7 +302,9 @@
       >
         @if (abriendo()) {
           <span class="inline-flex items-center gap-2">
-            <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            <span
+              class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+            ></span>
             Abriendo...
           </span>
         } @else {
@@ -302,11 +330,13 @@
   >
     <div
       class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
-      >
-        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Terminar jornada</h3>
+    >
+      <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Terminar jornada</h3>
 
       @if (cerrarError()) {
-        <div class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+        <div
+          class="mb-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400"
+        >
           {{ cerrarError() }}
         </div>
       }
@@ -315,7 +345,9 @@
         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
           Total en caja ($)
         </span>
-        <div class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <div
+          class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-lg font-semibold text-gray-900 dark:text-gray-100"
+        >
           {{ jornadaService.totalEnCaja().toLocaleString() }}
         </div>
       </div>
@@ -352,11 +384,14 @@
         <input
           type="checkbox"
           id="show-optional-denoms-nav"
-        [checked]="showOptionalDenoms()"
+          [checked]="showOptionalDenoms()"
           (change)="showOptionalDenoms.set($any($event.target).checked)"
           class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:bg-gray-800"
         />
-        <label for="show-optional-denoms-nav" class="text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+        <label
+          for="show-optional-denoms-nav"
+          class="text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none"
+        >
           Incluir billetes de $1 y $3
         </label>
       </div>
@@ -373,10 +408,14 @@
             <span class="text-green-600 dark:text-green-400 font-medium">$0</span>
           } @else if (diferencia() < 0) {
             <span class="text-green-600 dark:text-green-400 font-medium">Sobrante</span>
-            <span class="text-green-600 dark:text-green-400 font-medium">${{ (-diferencia()).toLocaleString() }}</span>
+            <span class="text-green-600 dark:text-green-400 font-medium"
+              >${{ (-diferencia()).toLocaleString() }}</span
+            >
           } @else {
             <span class="text-red-600 dark:text-red-400 font-medium">Faltante</span>
-            <span class="text-red-600 dark:text-red-400 font-medium">${{ diferencia().toLocaleString() }}</span>
+            <span class="text-red-600 dark:text-red-400 font-medium"
+              >${{ diferencia().toLocaleString() }}</span
+            >
           }
         </div>
       </div>
@@ -401,7 +440,9 @@
         >
           @if (cerrando()) {
             <span class="inline-flex items-center gap-2">
-              <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span
+                class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+              ></span>
               Cerrando...
             </span>
           } @else {
@@ -409,6 +450,78 @@
               <span class="material-symbols-outlined leading-none text-sm">stop</span>
               Terminar y descargar
             </span>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal de ajustes (escala de fuente + tema) -->
+@if (showSettingsModal()) {
+  <div
+    #settingsModalBackdrop
+    class="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/40"
+    role="dialog"
+    tabindex="-1"
+    (click)="onSettingsBackdropClick($event)"
+    (keydown)="onSettingsKeydown($event)"
+  >
+    <div
+      class="mx-4 w-full max-w-md rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/80"
+    >
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Ajustes</h3>
+        <button
+          type="button"
+          (click)="cerrarModalAjustes()"
+          class="cursor-pointer rounded-lg p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors leading-none"
+          aria-label="Cerrar ajustes"
+        >
+          <span class="material-symbols-outlined text-base leading-none">close</span>
+        </button>
+      </div>
+
+      <div class="mb-6">
+        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Tamaño de fuente ({{ fontScale.percentage() }}%)
+        </span>
+        <div class="grid grid-cols-5 gap-1" role="group" aria-label="Tamaño de fuente">
+          @for (level of fontScaleLevels; track level) {
+            <button
+              type="button"
+              (click)="fontScale.setLevel(level)"
+              class="cursor-pointer rounded-lg border px-1 py-2 text-xs font-medium transition-colors"
+              [class.bg-blue-600]="fontScale.level() === level"
+              [class.border-blue-600]="fontScale.level() === level"
+              [class.text-white]="fontScale.level() === level"
+              [class.bg-white]="fontScale.level() !== level"
+              [class.dark:bg-gray-800]="fontScale.level() !== level"
+              [class.border-gray-300]="fontScale.level() !== level"
+              [class.dark:border-gray-600]="fontScale.level() !== level"
+              [class.text-gray-700]="fontScale.level() !== level"
+              [class.dark:text-gray-300]="fontScale.level() !== level"
+            >
+              {{ fontScaleLabels[level] }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div
+        class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3"
+      >
+        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Tema oscuro</span>
+        <button
+          type="button"
+          (click)="themeService.toggle()"
+          class="cursor-pointer rounded-lg p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors leading-none"
+          aria-label="Cambiar tema"
+        >
+          @if (themeService.isDark()) {
+            <span class="material-symbols-outlined text-base leading-none">light_mode</span>
+          } @else {
+            <span class="material-symbols-outlined text-base leading-none">dark_mode</span>
           }
         </button>
       </div>
