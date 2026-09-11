@@ -115,4 +115,22 @@ describe('StockBadgeComponent', () => {
     const span: HTMLElement = fixture.nativeElement.querySelector('span');
     expect(span.textContent!.trim()).toBe('0 lb');
   });
+
+  // ─── AC-8: valor corrupto/desconocido → fallback 'u.' sin TypeError ────
+
+  it('AC-8: unidadMedida="KILOGRAMO" (corrupto) muestra "5 u." sin lanzar', () => {
+    fixture.componentRef.setInput('stock', 5);
+    fixture.componentRef.setInput('unidadMedida', 'KILOGRAMO');
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('5 u.');
+  });
+
+  it('AC-8b: unidadMedida=null muestra "5 u." sin lanzar', () => {
+    fixture.componentRef.setInput('stock', 5);
+    fixture.componentRef.setInput('unidadMedida', null);
+    fixture.detectChanges();
+    const span: HTMLElement = fixture.nativeElement.querySelector('span');
+    expect(span.textContent!.trim()).toBe('5 u.');
+  });
 });

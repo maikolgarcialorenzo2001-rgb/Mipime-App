@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import { UNIDAD_MEDIDA, type UnidadMedida } from '../../models/producto';
+import { unidadMedidaInfo } from '../../models/producto';
 
 @Component({
   selector: 'app-stock-badge',
@@ -8,10 +8,10 @@ import { UNIDAD_MEDIDA, type UnidadMedida } from '../../models/producto';
 })
 export class StockBadgeComponent {
   readonly stock = input.required<number>();
-  readonly unidadMedida = input<UnidadMedida>('unidad');
+  readonly unidadMedida = input<string | null | undefined>('unidad');
 
-  protected readonly suffix = computed(
-    () => UNIDAD_MEDIDA[this.unidadMedida()].suffix,
+  protected readonly suffix = computed(() =>
+    unidadMedidaInfo(this.unidadMedida()).suffix,
   );
 
   protected readonly stockLevel = computed(() => {
