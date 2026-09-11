@@ -1,7 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { CartItem } from '../../services/cart.service';
-import { UNIDAD_MEDIDA } from '../../models/producto';
+import { unidadMedidaInfo } from '../../models/producto';
 
 @Component({
   selector: 'app-cart-item-row',
@@ -17,8 +17,8 @@ export class CartItemRowComponent {
 
   /** Etiqueta de precio por unidad de medida: "c/u" | "por lb". */
   etiquetaPrecio(item: CartItem): string {
-    return UNIDAD_MEDIDA[item.producto.unidad_medida].suffix === 'u.'
-      ? 'c/u'
-      : 'por lb';
+    return unidadMedidaInfo(item.producto.unidad_medida).allowsDecimal
+      ? 'por lb'
+      : 'c/u';
   }
 }

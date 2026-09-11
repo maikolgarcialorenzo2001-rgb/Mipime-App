@@ -98,4 +98,48 @@ describe('CartItemRowComponent', () => {
 
     expect(spy).toHaveBeenCalledOnce();
   });
+
+  // ─── AC-11: etiquetaPrecio desacoplada del string de sufijo ────────────
+
+  /** Item con unidad_medida corrupta/desconocida (p.ej. dato legacy). */
+  function corruptoItem(): CartItem {
+    return {
+      producto: {
+        ...mockItem.producto,
+        id: 3,
+        nombre: 'Corrupto',
+        unidad_medida: 'KILOGRAMO',
+      },
+      cantidad: 1,
+      subtotal: 100,
+    } as unknown as CartItem;
+  }
+
+  it('AC-11: etiquetaPrecio con "KILOGRAMO" (corrupto) → "c/u" sin lanzar', () => {
+    expect(fixture.componentInstance.etiquetaPrecio(corruptoItem())).toBe('c/u');
+  });
+
+  it('AC-11: etiquetaPrecio con "gramaje" → "por lb"', () => {
+    const gramajeItem: CartItem = {
+      producto: { ...mockItem.producto, unidad_medida: 'gramaje' },
+      cantidad: 2.5,
+      subtotal: 2500,
+    };
+    expect(fixture.componentInstance.etiquetaPrecio(gramajeItem)).toBe('por lb');
+  });
+
+  it('AC-11: etiquetaPrecio con "unidad" → "c/u" (regresión valid-path)', () => {
+    const unidadItem: CartItem = {
+      producto: { ...mockItem.producto, unidad_medida: 'unidad' },
+      cantidad: 1,
+      subtotal: 500,
+    };
+    expect(fixture.componentInstance.etiquetaPrecio(unidadItem)).toBe('c/u');
+  });
+
+  it('AC-11: renderiza el item corrupto con "c/u" sin lanzar TypeError', () => {
+    fixture.componentRef.setInput('item', corruptoItem());
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('c/u');
+  });
 });
