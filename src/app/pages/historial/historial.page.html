@@ -157,7 +157,7 @@
               <!-- Día con jornada(s) -->
               <button
                 type="button"
-                class="flex cursor-pointer flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 min-h-[90px]"
+                class="flex cursor-pointer flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30 min-h-[5.625rem]"
                 [class.bg-blue-50]="selectedDateStr() === cell.dateStr"
                 [class.dark:bg-blue-900/30]="selectedDateStr() === cell.dateStr"
                 [class.ring-2]="selectedDateStr() === cell.dateStr"
@@ -180,12 +180,12 @@
                   }
                 </div>
 
-                <span class="mt-1 text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums leading-tight">
+                <span class="mt-1 text-[0.625rem] font-medium text-gray-700 dark:text-gray-300 tabular-nums leading-tight">
                   ${{ cell.jornadas[0].total_ventas | number:'1.0-0' }}
                 </span>
 
                 @if (cell.jornadas[0].saldo_real !== null) {
-                  <span class="text-[10px] text-green-600 dark:text-green-400 tabular-nums leading-tight">
+                  <span class="text-[0.625rem] text-green-600 dark:text-green-400 tabular-nums leading-tight">
                     ${{ cell.jornadas[0].saldo_real | number:'1.0-0' }}
                   </span>
                 }
@@ -193,14 +193,14 @@
             } @else {
               <!-- Día sin jornada -->
               <div
-                class="flex flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 min-h-[90px]"
+                class="flex flex-col items-center border-b border-r border-gray-100 dark:border-gray-800 p-2 min-h-[5.625rem]"
               >
                 <span class="text-sm text-gray-300 dark:text-gray-600">{{ cell.day }}</span>
               </div>
             }
           } @else {
             <!-- Celda vacía (padding) -->
-            <div class="min-h-[90px] border-b border-r border-gray-50 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/50"></div>
+            <div class="min-h-[5.625rem] border-b border-r border-gray-50 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-800/50"></div>
           }
         }
       </div>
