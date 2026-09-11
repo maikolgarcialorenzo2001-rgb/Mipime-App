@@ -1,4 +1,4 @@
-import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal, computed } from '@angular/core';
+import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal, computed, effect } from '@angular/core';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
 import { UNIDAD_MEDIDA } from '../../models/producto';
@@ -15,6 +15,7 @@ export class QuantityInputComponent {
   readonly cancelar = output<void>();
   readonly qtyInput = viewChild<ElementRef<HTMLInputElement>>('qtyInput');
   readonly soloNumeros = signal(false);
+  readonly rawText = signal('');
 
   /** true cuando el producto admite decimales (gramaje). */
   readonly permiteDecimal = computed(
@@ -25,12 +26,50 @@ export class QuantityInputComponent {
   readonly sufijo = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].suffix);
 
   constructor() {
+    this.rawText.set(String(this.cantidad()));
+
+    effect(() => {
+      // Re-sync rawText whenever the product changes.
+      // The modal instance can be reused across products without being destroyed.
+      this.producto();
+      this.rawText.set(String(this.cantidad()));
+    });
+
     afterNextRender(() => {
       setTimeout(() => {
         this.qtyInput()?.nativeElement.focus();
         this.qtyInput()?.nativeElement.select();
       });
     });
+  }
+
+  /** Handle (input) event: update rawText and parse to cantidad. */
+  onInput(raw: string): void {
+    const clamped = QuantityInputComponent.clampDecimals(raw);
+    this.rawText.set(clamped);
+
+    if (clamped === '' || clamped === '.') {
+      return; // intermediate state — preserve last valid cantidad
+    }
+
+    const n = Number(clamped);
+    if (Number.isFinite(n) && n >= 0) {
+      this.cantidad.set(n);
+    } else {
+      // Non-numeric paste: show feedback, preserve last valid cantidad
+      this.soloNumeros.set(true);
+      setTimeout(() => this.soloNumeros.set(false), 1800);
+    }
+  }
+
+  /** Clamp to 2 decimal places for paste (matches _redondear in cart). */
+  private static clampDecimals(raw: string): string {
+    const dotIndex = raw.indexOf('.');
+    if (dotIndex === -1) return raw;
+    const intPart = raw.substring(0, dotIndex);
+    const decPart = raw.substring(dotIndex + 1);
+    if (decPart.length <= 2) return raw;
+    return `${intPart}.${decPart.substring(0, 2)}`;
   }
 
   @HostListener('keydown', ['$event'])
