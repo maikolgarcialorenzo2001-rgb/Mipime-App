@@ -126,6 +126,15 @@ describe('CartService', () => {
       expect(item.cantidad).toBe(5);
       expect(item.subtotal).toBe(4250);
     });
+
+    it('debería redondear sin overflow en merge con cantidades máximas (500000 + 500000 = 1000000)', () => {
+      service.agregar(jamon, 500000);
+      service.agregar(jamon, 500000);
+
+      const item = service.items()[0];
+      expect(item.cantidad).toBe(1_000_000);
+      expect(item.subtotal).toBe(12_000_000_000);
+    });
   });
 
   describe('total', () => {
