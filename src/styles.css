@@ -75,6 +75,13 @@ a,
   overscroll-behavior: contain;
 }
 
+/* Dark mode: los scrollbars nativos y form controls respetan el scheme oscuro.
+   color-scheme en la raíz .dark hace que todo contenedor con overflow-*
+   herede el scheme y sus scrollbars dejen de verse blancos en oscuro. */
+.dark {
+  color-scheme: dark;
+}
+
 /* Ensure native select/option elements respect dark mode */
 .dark select,
 .dark select option {
