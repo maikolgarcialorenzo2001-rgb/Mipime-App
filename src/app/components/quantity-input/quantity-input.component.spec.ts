@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { QuantityInputComponent } from './quantity-input.component';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
+import type { UnidadMedida } from '../../models/producto';
 
 function makeProducto(unidad_medida: 'unidad' | 'gramaje'): Producto {
   return {
@@ -16,6 +17,11 @@ function makeProducto(unidad_medida: 'unidad' | 'gramaje'): Producto {
     created_at: '',
     updated_at: '',
   };
+}
+
+/** Producto con unidad_medida corrupta/desconocida (p.ej. dato legacy). */
+function makeCorruptProducto(): Producto {
+  return { ...makeProducto('unidad'), unidad_medida: 'KILOGRAMO' as UnidadMedida };
 }
 
 describe('QuantityInputComponent — decimal por unidad de medida', () => {
@@ -249,5 +255,45 @@ describe('QuantityInputComponent — umbral por unidad de medida y confirmación
     const event = new KeyboardEvent('keydown', { key: 'Enter' });
     component.onKeydown(event);
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('QuantityInputComponent — producto con unidad_medida corrupta (AC-9)', () => {
+  let fixture: ComponentFixture<QuantityInputComponent>;
+  let component: QuantityInputComponent;
+
+  function create(): void {
+    TestBed.configureTestingModule({
+      imports: [QuantityInputComponent, PesosPipe],
+    });
+    fixture = TestBed.createComponent(QuantityInputComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('producto', makeCorruptProducto());
+    fixture.detectChanges();
+  }
+
+  it('AC-9: permiteDecimal=false (fallback unidad) sin lanzar', () => {
+    create();
+    expect(component.permiteDecimal()).toBe(false);
+  });
+
+  it('AC-9: sufijo="u." (fallback unidad) sin lanzar', () => {
+    create();
+    expect(component.sufijo()).toBe('u.');
+  });
+
+  it('AC-9: umbral con step 1 — cantidad 1 habilita, 0.9 no', () => {
+    create();
+    component.cantidad.set(1);
+    expect(component.umbralHabilitado()).toBe(true);
+    component.cantidad.set(0.9);
+    expect(component.umbralHabilitado()).toBe(false);
+  });
+
+  it('AC-9: renderiza inputmode numeric y etiqueta "c/u" (comportamiento unidad)', () => {
+    create();
+    const input = fixture.nativeElement.querySelector('input');
+    expect(input.getAttribute('inputmode')).toBe('numeric');
+    expect(fixture.nativeElement.textContent).toContain('c/u');
   });
 });

@@ -1,7 +1,7 @@
 import { Component, input, output, model, HostListener, viewChild, ElementRef, afterNextRender, signal, computed, effect } from '@angular/core';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto } from '../../models';
-import { UNIDAD_MEDIDA } from '../../models/producto';
+import { unidadMedidaInfo } from '../../models/producto';
 
 @Component({
   selector: 'app-quantity-input',
@@ -19,15 +19,19 @@ export class QuantityInputComponent {
 
   /** true cuando el producto admite decimales (gramaje). */
   readonly permiteDecimal = computed(
-    () => UNIDAD_MEDIDA[this.producto().unidad_medida].allowsDecimal,
+    () => unidadMedidaInfo(this.producto().unidad_medida).allowsDecimal,
   );
 
   /** sufijo de la etiqueta de precio ("c/u" | "por lb"). */
-  readonly sufijo = computed(() => UNIDAD_MEDIDA[this.producto().unidad_medida].suffix);
+  readonly sufijo = computed(() =>
+    unidadMedidaInfo(this.producto().unidad_medida).suffix,
+  );
 
   /** true cuando la cantidad supera el mínimo útil según la unidad de medida (step). */
   readonly umbralHabilitado = computed(
-    () => this.cantidad() >= UNIDAD_MEDIDA[this.producto().unidad_medida].step,
+    () =>
+      this.cantidad() >=
+      unidadMedidaInfo(this.producto().unidad_medida).step,
   );
 
   constructor() {
