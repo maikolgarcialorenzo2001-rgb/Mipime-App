@@ -10,11 +10,12 @@ import {
   FONT_SCALE_LEVEL_LABELS,
 } from '../../services/font-scale.service';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { APP_VERSION } from '../../version';
 
 @Component({
   selector: 'app-nav',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, PesosPipe],
   templateUrl: './app-nav.component.html',
   styleUrl: './app-nav.component.css',
 })

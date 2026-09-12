@@ -378,7 +378,7 @@
         <div
           class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-2.5 text-lg font-semibold text-gray-900 dark:text-gray-100"
         >
-          {{ jornadaService.totalEnCaja().toLocaleString() }}
+          {{ jornadaService.totalEnCaja() | pesos:'1.0-0' }}
         </div>
       </div>
 
@@ -391,7 +391,7 @@
           @for (denom of denominacionesVisibles(); track denom) {
             <div class="flex items-center gap-3">
               <span class="w-16 text-sm font-medium text-gray-700 dark:text-gray-300">
-                ${{ denom.toLocaleString() }}
+                {{ denom | pesos:'1.0-0' }}
               </span>
               <input
                 type="number"
@@ -402,7 +402,7 @@
                 class="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm dark:bg-gray-800 dark:text-gray-200"
               />
               <span class="w-20 text-right text-sm text-gray-500 dark:text-gray-400">
-                ${{ (denom * arqueoForm()[denom]).toLocaleString() }}
+                {{ (denom * arqueoForm()[denom]) | pesos:'1.0-0' }}
               </span>
             </div>
           }
@@ -430,21 +430,21 @@
       <div class="mb-4 space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
         <div class="flex justify-between text-sm font-semibold text-gray-900 dark:text-gray-100">
           <span>Total contado</span>
-          <span>${{ arqueoTotal().toLocaleString() }}</span>
+          <span>{{ arqueoTotal() | pesos:'1.0-0' }}</span>
         </div>
         <div class="flex justify-between text-sm">
           @if (diferencia() === 0) {
             <span class="text-green-600 dark:text-green-400 font-medium">Cuadrado ✓</span>
-            <span class="text-green-600 dark:text-green-400 font-medium">$0</span>
+            <span class="text-green-600 dark:text-green-400 font-medium">{{ 0 | pesos:'1.0-0' }}</span>
           } @else if (diferencia() < 0) {
             <span class="text-green-600 dark:text-green-400 font-medium">Sobrante</span>
             <span class="text-green-600 dark:text-green-400 font-medium"
-              >${{ (-diferencia()).toLocaleString() }}</span
+              >{{ (-diferencia()) | pesos:'1.0-0' }}</span
             >
           } @else {
             <span class="text-red-600 dark:text-red-400 font-medium">Faltante</span>
             <span class="text-red-600 dark:text-red-400 font-medium"
-              >${{ diferencia().toLocaleString() }}</span
+              >{{ diferencia() | pesos:'1.0-0' }}</span
             >
           }
         </div>

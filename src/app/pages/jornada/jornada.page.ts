@@ -7,6 +7,7 @@ import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { JornadaSummaryCardComponent } from '../../components/jornada-summary-card/jornada-summary-card.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Venta, DetalleVenta } from '../../models/venta';
 import type { Movimiento } from '../../models/movimiento';
 import type { StockMovimiento } from '../../models/stock-movimiento';
@@ -15,7 +16,7 @@ import type { CuentaCosa } from '../../models/cuenta-cosa';
 
 @Component({
   selector: 'app-jornada-page',
-  imports: [ErrorAlertComponent, EmptyStateComponent, JornadaSummaryCardComponent, DatePipe],
+  imports: [ErrorAlertComponent, EmptyStateComponent, JornadaSummaryCardComponent, DatePipe, PesosPipe],
   templateUrl: './jornada.page.html',
   styleUrl: './jornada.page.css',
 })

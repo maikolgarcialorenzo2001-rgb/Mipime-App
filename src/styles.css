@@ -60,6 +60,8 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* Better touch scrolling */
   -webkit-overflow-scrolling: touch;
+  /* R2: dígitos tabulares globales — montos sin saltos de ancho al cambiar de cifra */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Safe area for notch (iOS) */

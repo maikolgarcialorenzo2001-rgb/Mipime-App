@@ -6,6 +6,7 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto, StockMovimiento } from '../../models';
 
 describe('InventarioPage', () => {
@@ -112,7 +113,7 @@ describe('InventarioPage', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [InventarioPage],
+      imports: [InventarioPage, PesosPipe],
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: ProductoService, useValue: mockProductoService },
@@ -2025,6 +2026,34 @@ describe('InventarioPage', () => {
 
     it('devuelve null sin lotes', () => {
       expect(elegirLoteInicialEdicion([], 100, 10)).toBeNull();
+    });
+  });
+
+  describe('R1: precios formateados con pipe pesos', () => {
+    it('agrupa el precio de venta y muestra — cuando el costo es nulo', async () => {
+      const productosConMontos: Producto[] = [
+        { ...productos[0], precio_venta: 1500, precio_costo: 8 },
+        { ...productos[1], precio_venta: 15, precio_costo: null },
+      ];
+      mockProductoService.listar.mockReturnValue(of(productosConMontos));
+
+      fixture = TestBed.createComponent(InventarioPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const tbody = fixture.nativeElement.querySelector('tbody') as HTMLElement;
+      expect(tbody).toBeTruthy();
+      const texto = tbody.textContent ?? '';
+
+      // precio_venta 1500 con pesos:'1.2-2' → $1,500.00 (antes: $1500.00 por toFixed)
+      expect(texto).toContain('$1,500.00');
+      expect(texto).not.toContain('$1500.00');
+      // precio_venta 15 con pesos:'1.2-2' → $15.00
+      expect(texto).toContain('$15.00');
+      // precio_costo nulo → em dash (no "$null" ni "$0.00")
+      expect(texto).toContain('—');
     });
   });
 });

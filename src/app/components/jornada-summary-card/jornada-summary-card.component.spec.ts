@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { JornadaSummaryCardComponent } from './jornada-summary-card.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Jornada } from '../../models';
 
 function jornadaDe(overrides: Partial<Jornada> = {}): Jornada {
@@ -28,7 +29,7 @@ describe('JornadaSummaryCardComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [JornadaSummaryCardComponent],
+      imports: [JornadaSummaryCardComponent, PesosPipe],
     });
     fixture = TestBed.createComponent(JornadaSummaryCardComponent);
   });
@@ -47,7 +48,7 @@ describe('JornadaSummaryCardComponent', () => {
     fixture.componentRef.setInput('totalEnCaja', 17500);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('$17500');
+    expect(fixture.nativeElement.textContent).toContain('$17,500');
     expect(fixture.nativeElement.textContent).not.toContain('$18000');
   });
 
@@ -56,5 +57,17 @@ describe('JornadaSummaryCardComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('$0');
+  });
+
+  it('agrupa los montos con pipe pesos (R1): 150000 se muestra como $150,000', () => {
+    // R1: los montos del summary card usan el pipe pesos ('1.0-0') con agrupación.
+    const jornada = jornadaDe({ total_ventas: 150000, saldo_esperado: 150000 });
+    fixture.componentRef.setInput('jornada', jornada);
+    fixture.componentRef.setInput('totalEnCaja', 150000);
+    fixture.componentRef.setInput('totalGastos', 150000);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('$150,000');
+    expect(fixture.nativeElement.textContent).not.toContain('$150000');
   });
 });

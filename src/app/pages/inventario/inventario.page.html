@@ -69,10 +69,10 @@
                 {{ producto.nombre }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                ${{ producto.precio_costo?.toFixed(2) ?? '—' }}
+                {{ producto.precio_costo != null ? (producto.precio_costo | pesos:'1.2-2') : '—' }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                ${{ producto.precio_venta.toFixed(2) }}
+                {{ producto.precio_venta | pesos:'1.2-2' }}
               </td>
               <td class="px-4 py-3">
                 <app-stock-badge [stock]="producto.stock_almacen" />
@@ -184,7 +184,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -210,7 +210,7 @@
                           type="number"
                           [(ngModel)]="editarPrecioVenta"
                           name="editarPrecioVenta"
-                          [placeholder]="'$' + producto.precio_venta.toFixed(2)"
+                          [placeholder]="producto.precio_venta | pesos:'1.2-2'"
                           step="0.01"
                           min="0"
                           required
@@ -224,7 +224,7 @@
                           type="number"
                           [(ngModel)]="editarPrecioCosto"
                           name="editarPrecioCosto"
-                          [placeholder]="'$' + (loteActual?.precio_costo?.toFixed(2) ?? '0.00')"
+                          [placeholder]="(loteActual?.precio_costo ?? 0) | pesos:'1.2-2'"
                           step="0.01"
                           min="0"
                           required
@@ -295,7 +295,7 @@
                             <option value="" disabled>Seleccione un lote…</option>
                             @for (lote of lotesDeUbicacion(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -329,7 +329,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — ${{ lote.precio_costo.toFixed(2) }}
+                                Lote #{{ i + 1 }} — {{ lote.cantidad }}u — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -472,8 +472,8 @@
                                        {{ lote.fecha_ingreso | date:'short' }}
                                      </td>
                                      <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ lote.cantidad }}</td>
-                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">${{ lote.precio_costo.toFixed(2) }}</td>
-                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
+                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ lote.precio_costo | pesos:'1.2-2' }}</td>
+                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ (lote.cantidad * lote.precio_costo) | pesos:'1.2-2' }}</td>
                                      <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }}</td>
                                   </tr>
                               }

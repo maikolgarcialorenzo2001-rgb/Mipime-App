@@ -181,12 +181,12 @@
                 </div>
 
                 <span class="mt-1 text-[0.625rem] font-medium text-gray-700 dark:text-gray-300 tabular-nums leading-tight">
-                  ${{ cell.jornadas[0].total_ventas | number:'1.0-0' }}
+                  {{ cell.jornadas[0].total_ventas | pesos:'1.0-0' }}
                 </span>
 
                 @if (cell.jornadas[0].saldo_real !== null) {
                   <span class="text-[0.625rem] text-green-600 dark:text-green-400 tabular-nums leading-tight">
-                    ${{ cell.jornadas[0].saldo_real | number:'1.0-0' }}
+                    {{ cell.jornadas[0].saldo_real | pesos:'1.0-0' }}
                   </span>
                 }
               </button>

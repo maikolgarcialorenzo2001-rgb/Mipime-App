@@ -9,6 +9,7 @@ import { JornadaService } from '../../services/jornada.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
@@ -22,6 +23,7 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
     StockBadgeComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
+    PesosPipe,
   ],
   templateUrl: './inventario.page.html',
   styleUrl: './inventario.page.css',

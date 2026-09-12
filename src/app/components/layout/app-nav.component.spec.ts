@@ -11,6 +11,7 @@ import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
 import { readFileSync } from 'node:fs';
 import { APP_VERSION } from '../../version';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 
 const mockJornadaAbierta: Jornada = {
   id: 1,
@@ -109,7 +110,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [AppNavComponent],
+      imports: [AppNavComponent, PesosPipe],
       providers: [
         provideRouter(routes),
         { provide: AuthService, useValue: mockAuth },
