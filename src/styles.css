@@ -20,15 +20,34 @@ html.font-scale-xxlarge {
   font-size: 135%;
 }
 
-/* Smooth dark/light mode transition */
-*,
-*::before,
-*::after {
-  transition:
-    background-color 0.6s ease,
-    color 0.6s ease,
-    border-color 0.6s ease,
-    box-shadow 0.6s ease;
+/* Transiciones de tema (dark/light): ~0.25s por defecto (R4).
+   Con prefers-reduced-motion se recortan a ~0ms y se apaga la animación
+   del toast. El kill de .animate-fade-in usa !important para vencer su
+   definición normal posterior (misma especificidad, cascada). */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition:
+      background-color 250ms ease,
+      color 250ms ease,
+      border-color 250ms ease,
+      box-shadow 250ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .animate-fade-in {
+    animation: none !important;
+  }
 }
 
 /* Indicador de página activa en el nav: píldora corta centrada bajo el ítem.
