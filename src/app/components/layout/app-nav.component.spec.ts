@@ -12,6 +12,16 @@ import type { UsuarioPublico } from '../../models';
 import { readFileSync } from 'node:fs';
 import { APP_VERSION } from '../../version';
 import { PesosPipe } from '../../pipes/pesos.pipe';
+import { DATABASE, type Database } from '../../services/database';
+
+function createMockDb(): Database {
+  const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
+  return {
+    sql,
+    transaction: vi.fn((fn) => fn({ sql: (q: string, p?: unknown[]) => sql(q, p) })),
+    initialize: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 const mockJornadaAbierta: Jornada = {
   id: 1,
@@ -116,6 +126,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
         { provide: AuthService, useValue: mockAuth },
         { provide: JornadaService, useValue: mockJornadaSvc },
         { provide: ElectronFileService, useValue: mockElectronFileSvc },
+        { provide: DATABASE, useValue: createMockDb() },
       ],
     });
 
@@ -263,6 +274,12 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     const occurrences = text.split(`v${APP_VERSION}`).length - 1;
     expect(occurrences).toBe(1);
+  });
+
+  it('la marca del comercio cae a "Mipime POS" cuando no hay nombre configurado (R6)', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Mipime POS');
+    expect(text).not.toContain('Tienda-App');
   });
 
   it('el indicador de la página activa es una píldora corta centrada (active-accent), sin chip de texto', () => {

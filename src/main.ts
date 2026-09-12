@@ -1,17 +1,13 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
-import { APP_VERSION } from './app/version';
 
-bootstrapApplication(App, appConfig)
-  .then(() => {
-    // BACKLOG-1: el título de ventana/pestaña siempre en sync con package.json
-    // (la versión viene de APP_VERSION, generado en build por sync-version.mjs).
-    document.title = `Tienda-App ${APP_VERSION}`;
-  })
-  .catch((err) => {
-    // T6: si el bootstrap falla (p.ej. proveedor roto), nunca dejar la
-    // pantalla en blanco: mensaje mínimo en <app-root>.
+bootstrapApplication(App, appConfig).catch((err) => {
+  // T6: si el bootstrap falla (p.ej. proveedor roto), nunca dejar la
+  // pantalla en blanco: mensaje mínimo en <app-root>.
+  // R6: el título de pestaña lo mantiene BrandService (nombre_comercio de
+  // config con fallback 'Mipime POS'); el <title> estático de index.html lo
+  // regenera sync-version.mjs en build y no se toca.
     console.error(err);
     const root = document.querySelector('app-root');
     if (root) {

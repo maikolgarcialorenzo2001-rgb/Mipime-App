@@ -8,6 +8,7 @@ import { JornadaService } from '../../services/jornada.service';
 import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { UsuarioPublico, Jornada } from '../../models';
+import { SetupService } from '../../services/setup.service';
 
 function createMockDb(): Database {
   const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
@@ -124,6 +125,59 @@ describe('LoginPage', () => {
 
   it('renderiza el título Mipime POS', () => {
     expect(fixture.nativeElement.textContent).toContain('Mipime POS');
+  });
+
+  describe('marca del comercio (R6)', () => {
+    it('con nombre_comercio configurado, el título y document.title muestran el nombre', async () => {
+      // TestBed aislado (el compartido ya fue instanciado en el beforeEach).
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [LoginPage],
+        providers: [
+          provideRouter([
+            { path: '', component: LoginPage },
+            { path: 'pos', component: LoginPage }, // dummy route for navigate test
+          ]),
+          { provide: DATABASE, useValue: createMockDb() },
+          {
+            provide: AuthService,
+            useValue: {
+              login: vi.fn(),
+              usuario: signal<UsuarioPublico | null>(null),
+            },
+          },
+          {
+            provide: JornadaService,
+            useValue: {
+              obtenerAbierta: vi.fn().mockReturnValue(of(null)),
+              autoCerrarSiOtroUsuario: vi.fn(),
+              cerrar: vi.fn().mockReturnValue(of(undefined)),
+              obtenerReporte: vi.fn().mockReturnValue(of(null)),
+            },
+          },
+          {
+            provide: ElectronFileService,
+            useValue: {
+              isElectronPackaged: false,
+              saveIndividual: vi.fn().mockResolvedValue(undefined),
+              downloadBlob: vi.fn(),
+            },
+          },
+          {
+            provide: SetupService,
+            useValue: { getConfig: vi.fn().mockResolvedValue('Panadería La Espiga') },
+          },
+        ],
+      });
+
+      const fixture2 = TestBed.createComponent(LoginPage);
+      fixture2.detectChanges();
+      await fixture2.whenStable();
+      fixture2.detectChanges();
+
+      expect(fixture2.nativeElement.textContent).toContain('Panadería La Espiga');
+      expect(document.title).toContain('Panadería La Espiga');
+    });
   });
 
   it('username y password inician vacíos', () => {

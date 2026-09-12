@@ -4,6 +4,7 @@ import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
+import { BrandService } from '../../services/brand.service';
 import {
   FontScaleService,
   FONT_SCALE_LEVELS,
@@ -26,8 +27,14 @@ export class AppNavComponent {
   private readonly _electronFileService = inject(ElectronFileService);
   readonly themeService = inject(ThemeService);
   readonly fontScale = inject(FontScaleService);
+  readonly brand = inject(BrandService);
 
   protected readonly auth = this._auth;
+
+  constructor() {
+    // Idempotente: si el login ya cargó la marca, no relee la config.
+    void this.brand.cargar();
+  }
 
   /** Versión de la app (generada desde package.json en build). */
   readonly appVersion = APP_VERSION;
