@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal, viewChild, ElementRef, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -25,7 +25,6 @@ export interface DiaCalendario {
   imports: [
     PesosPipe,
     DatePipe,
-    DecimalPipe,
     FormsModule,
     ErrorAlertComponent,
     EmptyStateComponent,
