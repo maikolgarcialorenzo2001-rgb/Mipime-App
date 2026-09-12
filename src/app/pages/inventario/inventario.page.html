@@ -69,7 +69,7 @@
                 {{ producto.nombre }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                {{ producto.precio_costo != null ? (producto.precio_costo | pesos:'1.2-2') : '—' }}
+                {{ producto.precio_costo !== null ? (producto.precio_costo | pesos:'1.2-2') : '—' }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
                 {{ producto.precio_venta | pesos:'1.2-2' }}

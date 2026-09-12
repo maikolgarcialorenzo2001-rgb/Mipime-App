@@ -1,8 +1,4 @@
 import {
-  animate,
-  style,
-  transition,
-  trigger,
   AnimationMetadataType,
   type AnimationAnimateMetadata,
   type AnimationMetadata,
