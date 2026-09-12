@@ -35,12 +35,7 @@
     </div>
   }
 
-  <!-- Toast de éxito -->
-  @if (successMessage(); as msg) {
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none bg-green-500 dark:bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in">
-      {{ msg }}
-    </div>
-  }
+  <!-- Estados: el toast de éxito lo renderiza <app-toast /> (shell, R8) -->
 
   <!-- States: full loading state only on initial load (list empty); the table
        stays mounted during refresh so document height never collapses and the

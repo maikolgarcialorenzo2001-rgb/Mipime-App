@@ -1,4 +1,4 @@
-import { inject, LOCALE_ID, Pipe, PipeTransform } from '@angular/core';
+import { inject, Injectable, LOCALE_ID, Pipe, PipeTransform } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { MONEDA_LOCAL } from '../core/constants';
 
@@ -6,6 +6,9 @@ import { MONEDA_LOCAL } from '../core/constants';
   name: 'pesos',
   standalone: true,
 })
+// Injectable: además del uso en templates, el formato de dinero se reutiliza
+// desde TS (p. ej. mensajes de toast en inventario) vía inject(PesosPipe).
+@Injectable({ providedIn: 'root' })
 export class PesosPipe implements PipeTransform {
   private readonly _currencyPipe = new CurrencyPipe(inject(LOCALE_ID));
 

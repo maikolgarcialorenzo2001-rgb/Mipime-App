@@ -4,6 +4,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ToastService } from '../../services/toast.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
@@ -36,6 +37,7 @@ export interface DiaCalendario {
 export class HistorialPage {
   private readonly _jornadaService = inject(JornadaService);
   private readonly _electronFileService = inject(ElectronFileService);
+  private readonly _toastService = inject(ToastService);
 
   readonly jornadas = signal<Jornada[]>([]);
   readonly loading = signal(true);
@@ -48,10 +50,6 @@ export class HistorialPage {
 
   /** Error de la exportación mensual. */
   readonly errorExport = signal<string | null>(null);
-
-  /** Toast de confirmación. */
-  readonly toastMessage = signal<string | null>(null);
-  private _toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /** Controla la visibilidad del modal de vista previa. */
   readonly showPreview = signal(false);
@@ -250,7 +248,7 @@ export class HistorialPage {
       next: (reporte) => {
         if (!reporte) return;
         this._electronFileService.saveIndividual(reporte.content_base64, j);
-        this._mostrarToast('Guardado con éxito');
+        this._toastService.success('Guardado con éxito', 2500);
       },
     });
   }
@@ -288,7 +286,7 @@ export class HistorialPage {
         m.getMonth(),
       );
       this._descargarBase64(base64, m);
-      this._mostrarToast('Guardado con éxito');
+      this._toastService.success('Guardado con éxito', 2500);
     } catch (err: unknown) {
       this.errorExport.set(
         err instanceof Error ? err.message : 'Error al exportar',
@@ -319,7 +317,7 @@ export class HistorialPage {
     try {
       const base64 = await this._jornadaService.generarExportacionPorRango(desde, hasta);
       this._descargarBase64Rango(base64, desde, hasta);
-      this._mostrarToast('Guardado con éxito');
+      this._toastService.success('Guardado con éxito', 2500);
       this.showRangePicker.set(false);
     } catch (err: unknown) {
       this.errorExport.set(
@@ -336,15 +334,6 @@ export class HistorialPage {
 
   private _descargarBase64(base64: string, month: Date): void {
     this._electronFileService.saveMonthly(base64, month.getFullYear(), month.getMonth());
-  }
-
-  private _mostrarToast(mensaje: string): void {
-    this.toastMessage.set(mensaje);
-    if (this._toastTimeout !== null) clearTimeout(this._toastTimeout);
-    this._toastTimeout = setTimeout(() => {
-      this.toastMessage.set(null);
-      this._toastTimeout = null;
-    }, 2500);
   }
 
   private _cargarJornadas(): void {

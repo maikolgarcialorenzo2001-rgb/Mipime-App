@@ -6,8 +6,16 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ToastService } from '../../services/toast.service';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto, StockMovimiento } from '../../models';
+
+/** Último toast encolado (o null si no hay ninguno). R8: los toasts viven en el
+ *  ToastService compartido, no en señales de la página. */
+function ultimoMensajeToast(): string | null {
+  const toasts = TestBed.inject(ToastService).toasts();
+  return toasts.length > 0 ? toasts[toasts.length - 1].mensaje : null;
+}
 
 describe('InventarioPage', () => {
   let fixture: ComponentFixture<InventarioPage>;
@@ -1744,14 +1752,9 @@ describe('InventarioPage', () => {
     expect(component.productos()[0].stock_almacen).toBe(80);
     expect(component.productos()[0].stock_shop).toBe(7);
     // FR-03: toast post-save con stock nuevo por ubicación
-    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u · Tienda: 7 u');
-
-    const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Stock guardado'),
-    );
-    expect(toast).toBeTruthy();
-    expect(toast!.textContent).toContain('Almacén: 80 u');
-    expect(toast!.textContent).toContain('Tienda: 7 u');
+    expect(ultimoMensajeToast()).toBe('Stock guardado — Almacén: 80 u · Tienda: 7 u');
+    expect(ultimoMensajeToast()).toContain('Almacén: 80 u');
+    expect(ultimoMensajeToast()).toContain('Tienda: 7 u');
   });
 
   it('36b. F3: toast muestra el precio costo actualizado cuando el lote editado es el frente FIFO', async () => {
@@ -1785,8 +1788,8 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Precio costo: $150.00');
-    expect(component.successMessage()).not.toContain('sin cambios');
+    expect(ultimoMensajeToast()).toContain('Precio costo: $150.00');
+    expect(ultimoMensajeToast()).not.toContain('sin cambios');
   });
 
   it('36c. F3: toast aclara que el precio costo del producto NO cambió cuando el lote editado no es el frente FIFO', async () => {
@@ -1825,9 +1828,9 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Costo del lote: $8.00');
-    expect(component.successMessage()).toContain('Precio costo del producto sin cambios: $5.00');
-    expect(component.successMessage()).toContain('lote más viejo con stock');
+    expect(ultimoMensajeToast()).toContain('Costo del lote: $8.00');
+    expect(ultimoMensajeToast()).toContain('Precio costo del producto sin cambios: $5.00');
+    expect(ultimoMensajeToast()).toContain('lote más viejo con stock');
   });
 
   it('37. T-03: el toast se auto-oculta después de ~2.5s', async () => {
@@ -1855,16 +1858,12 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Stock guardado');
+    expect(ultimoMensajeToast()).toContain('Stock guardado');
 
     vi.advanceTimersByTime(2500);
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBeNull();
-    const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Stock guardado'),
-    );
-    expect(toastAfter).toBeFalsy();
+    expect(ultimoMensajeToast()).toBeNull();
     vi.useRealTimers();
   });
 
@@ -1893,7 +1892,7 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBeNull();
+    expect(TestBed.inject(ToastService).toasts()).toHaveLength(0);
     expect(component.error()).toBe('Error al guardar');
     const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
       (el) => el.textContent?.includes('Stock guardado'),
@@ -1942,7 +1941,7 @@ describe('InventarioPage', () => {
       1, null, 'Coca Cola', 15, 10, 80, 'Sin lotes', 'almacen',
     );
     expect(component.error()).toBeNull();
-    expect(component.successMessage()).toContain('Stock guardado');
+    expect(ultimoMensajeToast()).toContain('Stock guardado');
   });
 
   it('39b. F8: onSelectAction en editar con lotes vacíos prellena nombre/precios del producto y selectedLoteIndex null', async () => {

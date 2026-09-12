@@ -5,6 +5,7 @@ import { AppNavComponent } from './components/layout/app-nav.component';
 import { TtlExpiredComponent } from './components/ttl-expired/ttl-expired.component';
 import { DbErrorComponent } from './components/db-error/db-error.component';
 import { RestoreFeedbackComponent } from './components/restore-feedback/restore-feedback.component';
+import { AppToastComponent } from './components/app-toast/app-toast.component';
 import { DbStatusService } from './services/db-status.service';
 import { FontScaleService } from './services/font-scale.service';
 import { ActivePageService } from './services/active-page.service';
@@ -18,6 +19,7 @@ import { ActivePageService } from './services/active-page.service';
     TtlExpiredComponent,
     DbErrorComponent,
     RestoreFeedbackComponent,
+    AppToastComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',

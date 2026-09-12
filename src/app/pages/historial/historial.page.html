@@ -5,13 +5,7 @@
     <app-error-alert [message]="err" />
   }
 
-  <!-- Toast de confirmación -->
-  @if (toastMessage(); as msg) {
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 dark:bg-green-600 text-white px-5 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in flex items-center gap-3">
-      <span class="material-symbols-outlined text-base">check_circle</span>
-      <span>{{ msg }}</span>
-    </div>
-  }
+  <!-- Toast de confirmación: lo renderiza <app-toast /> (montado en el shell, R8) -->
 
   @if (loading()) {
     <app-loading-spinner />

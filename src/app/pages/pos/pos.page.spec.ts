@@ -7,6 +7,7 @@ import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
+import { ToastService } from '../../services/toast.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { AuthService } from '../../services/auth.service';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
@@ -134,15 +135,15 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
+    const toasts = TestBed.inject(ToastService).toasts();
+    expect(toasts.some((t) => t.mensaje.includes('Venta registrada con éxito'))).toBe(
+      true,
     );
-    expect(toastEl).toBeTruthy();
-    expect(toastEl!.textContent).toContain('Venta registrada con éxito');
   });
 
-  it('debería auto-ocultar el toast después de 3 segundos', () => {
+  it('debería auto-ocultar el toast después de 2 segundos', () => {
     vi.useFakeTimers();
+    const toastService = TestBed.inject(ToastService);
     const cart = TestBed.inject(CartService);
     cart.agregar(producto);
 
@@ -151,19 +152,14 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
-    );
-    expect(toastEl).toBeTruthy();
+    expect(
+      toastService.toasts().some((t) => t.mensaje.includes('Venta registrada con éxito')),
+    ).toBe(true);
 
     vi.advanceTimersByTime(2000);
     fixture.detectChanges();
 
-    const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
-    );
-    expect(toastAfter).toBeFalsy();
-    expect(component.successMessage()).toBeNull();
+    expect(toastService.toasts()).toHaveLength(0);
 
     vi.useRealTimers();
   });
@@ -179,10 +175,7 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
-    );
-    expect(toastEl).toBeFalsy();
+    expect(TestBed.inject(ToastService).toasts()).toHaveLength(0);
     expect(component.ventaError()).toBe('Error de prueba');
   });
 
@@ -212,7 +205,10 @@ describe('PosPage — toast de éxito', () => {
     fixture.detectChanges();
 
     expect(component.procesandoVenta()).toBe(false);
-    expect(component.successMessage()).toContain('Venta registrada con éxito');
+    const toasts = TestBed.inject(ToastService).toasts();
+    expect(toasts.some((t) => t.mensaje.includes('Venta registrada con éxito'))).toBe(
+      true,
+    );
   });
 
   it('R3: limpia procesandoVenta ante error para permitir reintentar', () => {
