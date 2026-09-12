@@ -1,7 +1,5 @@
 import { routes } from './app.routes';
 import { setupGuard } from './guards/setup.guard';
-import { authGuard } from './guards/auth.guard';
-import { adminGuard } from './guards/admin.guard';
 
 describe('app routes', () => {
   it('should have a /setup route with lazy loading', () => {

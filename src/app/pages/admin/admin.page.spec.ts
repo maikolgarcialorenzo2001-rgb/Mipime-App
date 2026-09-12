@@ -3,7 +3,6 @@ import { AdminPage } from './admin.page';
 import { UserService } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { signal } from '@angular/core';
-import type { UsuarioPublico } from '../../models';
 
 describe('AdminPage', () => {
   let mockUserService: {

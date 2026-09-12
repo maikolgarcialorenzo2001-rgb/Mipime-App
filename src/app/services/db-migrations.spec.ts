@@ -1,4 +1,3 @@
-import { environment } from '../environments/environment';
 import { runMigrations, type MigrationExecutor } from './db-migrations';
 
 /**
