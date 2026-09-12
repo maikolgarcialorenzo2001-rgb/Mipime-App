@@ -43,9 +43,23 @@ describe('AppToast (R8)', () => {
     service.success('ok');
     service.error('boom');
     fixture.detectChanges();
-    const items = fixture.nativeElement.querySelectorAll('[role="status"]');
+    const items = fixture.nativeElement.querySelectorAll('[role="status"], [role="alert"]');
     expect(items[0].classList.contains('bg-green-500')).toBe(true);
     expect(items[1].classList.contains('bg-red-500')).toBe(true);
+  });
+
+  it('asigna role=alert a los toasts de error y role=status a success/info (D5)', () => {
+    service.error('Boom');
+    service.success('OK');
+    service.info('Info');
+    fixture.detectChanges();
+    const alerts = fixture.nativeElement.querySelectorAll('[role="alert"]');
+    expect(alerts.length).toBe(1);
+    expect(alerts[0].textContent).toContain('Boom');
+    const statuses = fixture.nativeElement.querySelectorAll('[role="status"]');
+    expect(statuses.length).toBe(2);
+    expect(statuses[0].textContent).toContain('OK');
+    expect(statuses[1].textContent).toContain('Info');
   });
 
   it('el botón X descarta ese toast', () => {

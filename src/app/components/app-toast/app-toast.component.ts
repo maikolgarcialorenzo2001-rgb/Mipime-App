@@ -4,7 +4,8 @@ import { ToastService } from '../../services/toast.service';
 /**
  * Renderiza la pila de toasts del ToastService (R8), montado UNA vez en el
  * shell. El contenedor es aria-live="polite" para que los lectores de
- * pantalla anuncien cada toast sin robar foco; cada item es descartable.
+ * pantalla anuncien cada toast sin robar foco; role por tipo (D5):
+ * status (polite) para success/info, alert (assertive) para error.
  */
 @Component({
   selector: 'app-toast',
@@ -16,7 +17,7 @@ import { ToastService } from '../../services/toast.service';
     >
       @for (toast of toastService.toasts(); track toast.id) {
         <div
-          role="status"
+          [attr.role]="toast.tipo === 'error' ? 'alert' : 'status'"
           class="pointer-events-auto flex w-full items-center gap-3 rounded-lg px-5 py-3 text-sm font-semibold text-white shadow-lg animate-fade-in"
           [class.bg-green-500]="toast.tipo === 'success'"
           [class.bg-red-500]="toast.tipo === 'error'"
