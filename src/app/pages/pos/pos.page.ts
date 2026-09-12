@@ -16,13 +16,13 @@ import { CheckoutModalComponent } from '../../components/checkout-modal/checkout
 import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
 import { CobroPendienteModalComponent } from '../../components/cobro-pendiente-modal/cobro-pendiente-modal.component';
 import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
-import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [PesosPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [PesosPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, SkeletonComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })

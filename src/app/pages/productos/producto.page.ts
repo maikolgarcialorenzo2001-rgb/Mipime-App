@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
@@ -13,7 +14,7 @@ import type { LoteDetalle } from '../../models';
 
 @Component({
   selector: 'app-productos-page',
-  imports: [FormsModule, PesosPipe, DatePipe, StockBadgeComponent],
+  imports: [FormsModule, PesosPipe, DatePipe, StockBadgeComponent, SkeletonComponent],
   templateUrl: './producto.page.html',
   styleUrl: './producto.page.css',
 })

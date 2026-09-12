@@ -7,8 +7,8 @@ import { JornadaService } from '../../services/jornada.service';
 import { ToastService } from '../../services/toast.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
-import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 import { EstadoBadgeComponent } from '../../components/estado-badge/estado-badge.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import type { Jornada } from '../../models';
 import type { JornadaReportData } from '../../services/excel.service';
 
@@ -29,7 +29,7 @@ export interface DiaCalendario {
     FormsModule,
     ErrorAlertComponent,
     EmptyStateComponent,
-    LoadingSpinnerComponent,
+    SkeletonComponent,
     EstadoBadgeComponent,
   ],
   templateUrl: './historial.page.html',

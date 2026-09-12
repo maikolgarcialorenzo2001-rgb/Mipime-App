@@ -41,7 +41,7 @@
        stays mounted during refresh so document height never collapses and the
        window scroll position survives. -->
   @if (loading() && filteredProductos().length === 0) {
-    <app-loading-spinner />
+    <app-skeleton variant="table" [rows]="8" [cols]="5" />
   } @else if (!loading() && filteredProductos().length === 0) {
     <app-empty-state message="No hay productos" />
   } @else {

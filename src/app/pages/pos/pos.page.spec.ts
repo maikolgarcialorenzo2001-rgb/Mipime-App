@@ -517,4 +517,31 @@ describe('PosPage — toast de éxito', () => {
 
     expect(component.showPendienteModal()).toBe(false);
   });
+
+  // ─── R9: skeleton en la primera búsqueda; re-búsqueda mantiene el grid ─────
+
+  it('R9: primera búsqueda (sin resultados) muestra skeleton grid en vez de spinner', () => {
+    component.buscando.set(true);
+    component.resultados.set([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeFalsy();
+    expect(fixture.nativeElement.querySelectorAll('app-product-card')).toHaveLength(0);
+  });
+
+  it('R9: re-búsqueda con resultados montados mantiene el grid (sin destello de skeleton)', () => {
+    component.resultados.set([producto]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-product-card')).toHaveLength(1);
+
+    component.buscando.set(true);
+    component.resultados.set([producto, { ...producto, id: 2, nombre: 'Otro' }]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeFalsy();
+    const cards = fixture.nativeElement.querySelectorAll('app-product-card');
+    expect(cards.length).toBe(2);
+    expect(cards[1].textContent).toContain('Otro');
+  });
 });

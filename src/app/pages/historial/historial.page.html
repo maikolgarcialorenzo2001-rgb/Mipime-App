@@ -8,7 +8,7 @@
   <!-- Toast de confirmación: lo renderiza <app-toast /> (montado en el shell, R8) -->
 
   @if (loading()) {
-    <app-loading-spinner />
+    <app-skeleton variant="calendar" [rows]="6" />
   } @else {
     <!-- Navegación de mes — siempre visible -->
     <div class="mb-4 flex items-center justify-between">

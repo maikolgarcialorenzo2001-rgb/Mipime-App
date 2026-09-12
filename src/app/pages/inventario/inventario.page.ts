@@ -14,6 +14,7 @@ import { PesosPipe } from '../../pipes/pesos.pipe';
 
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 
 @Component({
   selector: 'app-inventario',
@@ -24,6 +25,7 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
     StockBadgeComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
+    SkeletonComponent,
     PesosPipe,
   ],
   templateUrl: './inventario.page.html',

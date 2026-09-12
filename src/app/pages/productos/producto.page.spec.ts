@@ -120,9 +120,9 @@ describe('ProductosPage', () => {
     expect(fixture.nativeElement.textContent).toContain('No hay productos cargados');
   });
 
-  it('muestra "Cargando…" en la carga inicial con lista vacía', () => {
-    // Initial-load semantics: the full loading state only renders when the
-    // list is empty. A refresh over an already-loaded list must keep the table.
+it('muestra skeleton en la carga inicial con lista vacía', () => {
+    // beforeEach already loaded Café + Té; simulate a first load by clearing
+    // the list. A refresh over an already-loaded list must keep the table.
     component.productos.set([]);
 
     let resolve!: (v: Producto[]) => void;
@@ -136,7 +136,7 @@ describe('ProductosPage', () => {
     fixture.detectChanges();
 
     expect(component.buscando()).toBe(true);
-    expect(fixture.nativeElement.textContent).toContain('Cargando');
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeTruthy();
 
     resolve([]);
     fixture.detectChanges();
@@ -190,7 +190,7 @@ describe('ProductosPage', () => {
     expect(component.buscando()).toBe(true);
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).not.toContain('No hay productos cargados');
-    expect(el.textContent).toContain('Cargando');
+    expect(el.querySelector('app-skeleton')).toBeTruthy();
 
     resolve([]);
     fixture.detectChanges();

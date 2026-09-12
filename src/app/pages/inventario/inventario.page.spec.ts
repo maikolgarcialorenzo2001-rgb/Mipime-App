@@ -150,7 +150,7 @@ describe('InventarioPage', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
 
-    const spinner = fixture.nativeElement.querySelector('app-loading-spinner');
+    const spinner = fixture.nativeElement.querySelector('app-skeleton');
     expect(spinner).toBeTruthy();
 
     resolveListar([]);
@@ -1423,7 +1423,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(component.loading()).toBe(true);
-    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeFalsy();
 
     const tbody = fixture.nativeElement.querySelector('tbody');
     expect(tbody).toBeTruthy();
@@ -1477,7 +1477,7 @@ describe('InventarioPage', () => {
     // While loading: no empty state, spinner instead.
     expect(component.loading()).toBe(true);
     expect(fixture.nativeElement.querySelector('app-empty-state')).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeTruthy();
 
     // After the refresh resolves: empty state appears.
     resolveRefresh([]);
