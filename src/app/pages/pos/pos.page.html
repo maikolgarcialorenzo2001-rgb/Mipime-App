@@ -165,6 +165,7 @@
     [total]="cart.total()"
     [errorMessage]="ventaError()"
     [saldoEnCaja]="_jornadaService.totalEnCaja()"
+    [procesando]="procesandoVenta()"
     (confirmar)="confirmarVenta($event)"
     (cancelar)="cerrarModal()"
   />

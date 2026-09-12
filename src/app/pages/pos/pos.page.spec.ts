@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { PosPage } from './pos.page';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
@@ -183,6 +183,49 @@ describe('PosPage — toast de éxito', () => {
       (el) => el.textContent?.includes('Venta registrada con éxito'),
     );
     expect(toastEl).toBeFalsy();
+    expect(component.ventaError()).toBe('Error de prueba');
+  });
+
+  // ─── R3: guard de doble submit (procesandoVenta) ───────────────
+
+  it('R3: no registra dos ventas si se confirma dos veces mientras la primera está pendiente', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    let resolver!: (v: unknown) => void;
+    mockVentaService.registrar.mockReturnValue(
+      new Observable<unknown>((subscriber) => {
+        resolver = (value: unknown) => {
+          subscriber.next(value);
+          subscriber.complete();
+        };
+      }),
+    );
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(mockVentaService.registrar).toHaveBeenCalledTimes(1);
+    expect(component.procesandoVenta()).toBe(true);
+
+    resolver({ id: 1, total: 100 });
+    fixture.detectChanges();
+
+    expect(component.procesandoVenta()).toBe(false);
+    expect(component.successMessage()).toContain('Venta registrada con éxito');
+  });
+
+  it('R3: limpia procesandoVenta ante error para permitir reintentar', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    mockVentaService.registrar.mockReturnValue(
+      throwError(() => new Error('Error de prueba')),
+    );
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(component.procesandoVenta()).toBe(false);
     expect(component.ventaError()).toBe('Error de prueba');
   });
 

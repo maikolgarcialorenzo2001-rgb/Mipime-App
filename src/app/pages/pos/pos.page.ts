@@ -50,6 +50,9 @@ export class PosPage {
 
   readonly successMessage = signal<string | null>(null);
 
+  /** R3: guard de doble submit — true mientras una venta está registrándose. */
+  readonly procesandoVenta = signal(false);
+
   /** Modal de pendientes (AD-6/AD-7): un único mount, modo cobrar o ver. */
   readonly showPendienteModal = signal(false);
   readonly modoPendientes = signal<'cobrar' | 'ver'>('cobrar');
@@ -219,11 +222,14 @@ export class PosPage {
   }
 
   confirmarVenta(payload: CheckoutPayload): void {
+    if (this.procesandoVenta()) return;
+
     const jId = this._jornadaService.jornadaAbierta()?.id;
     const usuarioId = this._auth.usuario()?.id;
     if (jId === undefined || !usuarioId) return;
 
     this.ventaError.set(null);
+    this.procesandoVenta.set(true);
     const items = this.cart.items();
 
     let obs: Observable<unknown>;
@@ -263,6 +269,7 @@ export class PosPage {
 
     obs.subscribe({
       next: () => {
+        this.procesandoVenta.set(false);
         this.showModal.set(false);
         this.cart.limpiar();
         this.successMessage.set('¡Venta registrada con éxito!');
@@ -273,6 +280,7 @@ export class PosPage {
         this._jornadaService.refreshJornadaAbierta();
       },
       error: (err: unknown) => {
+        this.procesandoVenta.set(false);
         this.ventaError.set(
           err instanceof Error ? err.message : 'Error al registrar la venta',
         );
