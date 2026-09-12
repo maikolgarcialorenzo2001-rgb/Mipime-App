@@ -169,6 +169,14 @@ describe('JornadaPage', () => {
       const empty = fixture.nativeElement.querySelector('app-empty-state');
       expect(empty).toBeTruthy();
     });
+
+    it('R10: empty state de jornada muestra icono event_available (la apertura vive en app-nav)', () => {
+      const empty = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+      expect(empty.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe(
+        'event_available',
+      );
+      expect(empty.querySelector('button')).toBeFalsy();
+    });
   });
 
   describe('error al cargar jornada', () => {

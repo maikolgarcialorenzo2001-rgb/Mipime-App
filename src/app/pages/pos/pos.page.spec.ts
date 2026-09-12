@@ -544,4 +544,17 @@ describe('PosPage — toast de éxito', () => {
     expect(cards.length).toBe(2);
     expect(cards[1].textContent).toContain('Otro');
   });
+
+  // ─── R10: empty-state con icono en búsqueda sin resultados ────────
+
+  it('R10: búsqueda sin resultados muestra empty-state con icono search', () => {
+    component.buscando.set(false);
+    component.resultados.set([]);
+    fixture.detectChanges();
+
+    const empty = fixture.nativeElement.querySelector('app-empty-state');
+    expect(empty).toBeTruthy();
+    expect(empty.textContent).toContain('Escribe para buscar productos');
+    expect(empty.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe('search');
+  });
 });

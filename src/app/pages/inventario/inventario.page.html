@@ -43,7 +43,12 @@
   @if (loading() && filteredProductos().length === 0) {
     <app-skeleton variant="table" [rows]="8" [cols]="5" />
   } @else if (!loading() && filteredProductos().length === 0) {
-    <app-empty-state message="No hay productos" />
+    <app-empty-state
+      icon="inventory_2"
+      message="No hay productos"
+      [accion]="esAdmin() ? 'Nuevo producto' : null"
+      (accionClick)="abrirNuevoProducto()"
+    />
   } @else {
     <div class="overflow-x-auto">
       <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50">

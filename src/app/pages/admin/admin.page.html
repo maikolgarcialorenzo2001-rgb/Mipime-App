@@ -87,7 +87,7 @@
   @if (loading()) {
     <app-loading-spinner />
   } @else if (usuarios().length === 0) {
-    <app-empty-state message="No hay usuarios registrados" />
+    <app-empty-state icon="group" message="No hay usuarios registrados" />
   } @else {
     <div class="overflow-x-auto">
       <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50">

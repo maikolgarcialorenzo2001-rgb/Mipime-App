@@ -187,6 +187,45 @@ describe('InventarioPage', () => {
     expect(emptyState).toBeTruthy();
   });
 
+  it('R10: empty state muestra icono inventory_2 y acción "Nuevo producto" solo para admin', async () => {
+    mockProductoService.listar.mockReturnValue(of([]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+    expect(emptyState).toBeTruthy();
+    expect(emptyState.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe(
+      'inventory_2',
+    );
+
+    // Admin: el botón de acción abre el modal de nuevo producto.
+    const actionBtn = Array.from(emptyState.querySelectorAll('button')).find(
+      (b) => (b as HTMLButtonElement).textContent?.includes('Nuevo producto'),
+    ) as HTMLButtonElement;
+    expect(actionBtn).toBeTruthy();
+    actionBtn.click();
+    fixture.detectChanges();
+    expect(component.showProductoModal()).toBe(true);
+  });
+
+  it('R10: sin permisos de admin el empty state no muestra botón de acción', async () => {
+    mockAuthService.usuario.mockReturnValue({ id: 2, nombre: 'User', rol: 'trabajador' });
+    mockProductoService.listar.mockReturnValue(of([]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+    expect(emptyState.querySelector('button')).toBeFalsy();
+  });
+
   it('4. shows error on service failure', async () => {
     mockProductoService.listar.mockReturnValue(
       throwError(() => new Error('Error de prueba')),

@@ -27,7 +27,7 @@
       @if (buscando() && resultados().length === 0) {
         <app-skeleton variant="grid" [rows]="10" />
       } @else if (resultados().length === 0) {
-        <app-empty-state message="Escribe para buscar productos" />
+        <app-empty-state icon="search" message="Escribe para buscar productos" />
       } @else {
         <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           @for (p of resultados(); track p.id; let i = $index) {
