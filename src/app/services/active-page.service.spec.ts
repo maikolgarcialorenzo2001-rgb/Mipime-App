@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter, Router, type Routes } from '@angular/router';
 import { ActivePageService, pageIdDeUrl } from './active-page.service';
 
 @Component({ selector: 'app-stub', template: '' })
 class StubComponent {}
 
-const RUTAS = [
+const RUTAS: Routes = [
   { path: '', redirectTo: '/pos', pathMatch: 'full' },
   { path: 'pos', component: StubComponent },
   { path: 'jornada', component: StubComponent },
