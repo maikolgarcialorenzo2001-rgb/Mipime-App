@@ -1,31 +1,31 @@
 import { TestBed } from '@angular/core/testing';
-import { App } from './app';
+import { App, clasesMain } from './app';
 import { AuthService } from './services/auth.service';
 import { DbStatusService } from './services/db-status.service';
 import { DATABASE, type Database } from './services/database';
+import { FontScaleService } from './services/font-scale.service';
 import { hashPassword, generateSalt } from './services/hash-password';
 import { firstValueFrom } from 'rxjs';
 import { provideRouter } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { APP_VERSION } from './version';
 
 function mockCrypto(): void {
-  const subtleDigest = vi.fn().mockImplementation(
-    async (_algorithm: string, data: ArrayBuffer) => {
-      const decoder = new TextDecoder();
-      const input = decoder.decode(data);
-      let hash = 0;
-      for (let i = 0; i < input.length; i++) {
-        const char = input.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      const buf = new ArrayBuffer(32);
-      const view = new DataView(buf);
-      view.setInt32(0, hash);
-      return buf;
-    },
-  );
+  const subtleDigest = vi.fn().mockImplementation(async (_algorithm: string, data: ArrayBuffer) => {
+    const decoder = new TextDecoder();
+    const input = decoder.decode(data);
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    const buf = new ArrayBuffer(32);
+    const view = new DataView(buf);
+    view.setInt32(0, hash);
+    return buf;
+  });
   const subtle = { digest: subtleDigest };
   Object.defineProperty(globalThis, 'crypto', {
     value: { subtle, getRandomValues: (arr: Uint8Array) => arr },
@@ -56,6 +56,7 @@ describe('App component nav', () => {
       imports: [App],
       providers: [
         provideRouter(routes),
+        provideNoopAnimations(),
         AuthService,
         { provide: DATABASE, useValue: mockDb },
       ],
@@ -65,22 +66,27 @@ describe('App component nav', () => {
   afterEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    document.documentElement.classList.remove(
+      ...[...document.documentElement.classList].filter((c) => c.startsWith('font-scale-')),
+    );
   });
 
   it('debería mostrar enlaces de navegación para admin logueado', async () => {
     // Login as admin
     const salt = generateSalt();
     const hash = await hashPassword('admin123', salt);
-    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
-      id: 1,
-      nombre: 'admin',
-      password_hash: hash,
-      salt,
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    }]);
+    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 1,
+        nombre: 'admin',
+        password_hash: hash,
+        salt,
+        rol: 'admin',
+        activo: 1,
+        created_at: '2026-06-04T00:00:00Z',
+        updated_at: '2026-06-04T00:00:00Z',
+      },
+    ]);
 
     const auth = TestBed.inject(AuthService);
     await firstValueFrom(auth.login('admin', 'admin123'));
@@ -89,7 +95,9 @@ describe('App component nav', () => {
     fixture.detectChanges();
 
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
-    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
+    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) =>
+      a.textContent?.trim(),
+    );
 
     expect(linkTexts.some((t) => t?.includes('POS'))).toBe(true);
     expect(linkTexts.some((t) => t?.includes('Productos'))).toBe(true);
@@ -102,16 +110,18 @@ describe('App component nav', () => {
   it('debería mostrar nombre de usuario y botón de logout cuando está logueado', async () => {
     const salt = generateSalt();
     const hash = await hashPassword('admin123', salt);
-    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
-      id: 1,
-      nombre: 'admin',
-      password_hash: hash,
-      salt,
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    }]);
+    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 1,
+        nombre: 'admin',
+        password_hash: hash,
+        salt,
+        rol: 'admin',
+        activo: 1,
+        created_at: '2026-06-04T00:00:00Z',
+        updated_at: '2026-06-04T00:00:00Z',
+      },
+    ]);
 
     const auth = TestBed.inject(AuthService);
     await firstValueFrom(auth.login('admin', 'admin123'));
@@ -127,16 +137,18 @@ describe('App component nav', () => {
   it('no debería mostrar enlaces de Admin para rol trabajador', async () => {
     const salt = generateSalt();
     const hash = await hashPassword('pass123', salt);
-    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
-      id: 2,
-      nombre: 'worker',
-      password_hash: hash,
-      salt,
-      rol: 'trabajador',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    }]);
+    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 2,
+        nombre: 'worker',
+        password_hash: hash,
+        salt,
+        rol: 'trabajador',
+        activo: 1,
+        created_at: '2026-06-04T00:00:00Z',
+        updated_at: '2026-06-04T00:00:00Z',
+      },
+    ]);
 
     const auth = TestBed.inject(AuthService);
     await firstValueFrom(auth.login('worker', 'pass123'));
@@ -145,10 +157,28 @@ describe('App component nav', () => {
     fixture.detectChanges();
 
     const navLinks = fixture.nativeElement.querySelectorAll('nav a');
-    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) => a.textContent?.trim());
+    const linkTexts = Array.from(navLinks as NodeListOf<HTMLAnchorElement>).map((a) =>
+      a.textContent?.trim(),
+    );
 
     expect(linkTexts.some((t) => t?.includes('Admin'))).toBe(false);
     expect(linkTexts.some((t) => t?.includes('POS'))).toBe(true);
+  });
+
+  it('el shell renderiza con pt-16 (nav) y px-2 por defecto (página no-POS)', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const main = fixture.nativeElement.querySelector('main') as HTMLElement;
+    expect(main.className).toContain('pt-16');
+    expect(main.className).toContain('px-2');
+  });
+
+  it('clasesMain: POS es full-bleed (sin px-2) y el resto conserva el padding lateral', () => {
+    expect(clasesMain('pos')).not.toContain('px-2');
+    expect(clasesMain('pos')).toContain('min-h-screen');
+    for (const pagina of ['jornada', 'inventario', 'historial', 'admin', 'productos', 'inicio']) {
+      expect(clasesMain(pagina)).toContain('px-2');
+    }
   });
 
   it('no debería mostrar nav completo cuando no hay sesión', () => {
@@ -237,9 +267,7 @@ describe('App component nav', () => {
     fixture.detectChanges();
 
     // Superficie distinta de db-error (R4): el toast coexiste con la app.
-    expect(
-      fixture.nativeElement.querySelector('app-restore-feedback'),
-    ).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-restore-feedback')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('router-outlet')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('app-db-error')).toBeFalsy();
   });
@@ -247,16 +275,18 @@ describe('App component nav', () => {
   it('debería llamar a logout cuando se hace clic en el botón', async () => {
     const salt = generateSalt();
     const hash = await hashPassword('admin123', salt);
-    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([{
-      id: 1,
-      nombre: 'admin',
-      password_hash: hash,
-      salt,
-      rol: 'admin',
-      activo: 1,
-      created_at: '2026-06-04T00:00:00Z',
-      updated_at: '2026-06-04T00:00:00Z',
-    }]);
+    (mockDb.sql as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 1,
+        nombre: 'admin',
+        password_hash: hash,
+        salt,
+        rol: 'admin',
+        activo: 1,
+        created_at: '2026-06-04T00:00:00Z',
+        updated_at: '2026-06-04T00:00:00Z',
+      },
+    ]);
 
     const auth = TestBed.inject(AuthService);
     await firstValueFrom(auth.login('admin', 'admin123'));
@@ -273,5 +303,24 @@ describe('App component nav', () => {
     expect(auth.isLoggedIn()).toBe(false);
     const nav = fixture.nativeElement.querySelector('nav');
     expect(nav).toBeFalsy();
+  });
+
+  it('debería restaurar el marcador de escala al boot desde localStorage (sin interacción)', () => {
+    localStorage.setItem('fontScale', 'xxlarge');
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(true);
+  });
+
+  it('debería aplicar el marcador al instante al cambiar el nivel vía FontScaleService', () => {
+    const fixture = TestBed.createComponent(App);
+    expect(fixture).toBeTruthy();
+
+    const fontScale = TestBed.inject(FontScaleService);
+    fontScale.setLevel('xlarge');
+
+    expect(document.documentElement.classList.contains('font-scale-xlarge')).toBe(true);
   });
 });

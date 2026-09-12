@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
+import { BrandService } from '../../services/brand.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import type { Jornada } from '../../models';
 
@@ -20,6 +21,12 @@ export class LoginPage {
   private readonly router = inject(Router);
   private readonly jornadaService = inject(JornadaService);
   private readonly _electronFileService = inject(ElectronFileService);
+  readonly brand = inject(BrandService);
+
+  constructor() {
+    // R6: la marca del negocio se carga acá (el login es la primera pantalla).
+    void this.brand.cargar();
+  }
 
   readonly username = signal('');
   readonly password = signal('');

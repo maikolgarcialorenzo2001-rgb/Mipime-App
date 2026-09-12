@@ -40,7 +40,7 @@
                           <span>{{ productosMap().get(d.producto_id) ?? ('#' + d.producto_id) }} ×{{ d.cantidad }}</span>@if (!last) {<span class="text-gray-400">, </span>}
                         }
                       </td>
-                      <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${{ v.total.toLocaleString() }}</td>
+                      <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ v.total | pesos:'1.0-0' }}</td>
                       <td class="px-3 py-2">
                         @switch (v.forma_pago) {
                           @case ('efectivo') {
@@ -96,9 +96,9 @@
                       <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ m.descripcion }}</td>
                       <td class="px-3 py-2 font-medium">
                         @if (m.tipo === 'gasto' || m.tipo === 'compra_divisa') {
-                          <span class="text-red-600 dark:text-red-400">-${{ m.monto.toLocaleString() }}</span>
+                          <span class="text-red-600 dark:text-red-400">-{{ m.monto | pesos:'1.0-0' }}</span>
                         } @else {
-                          <span class="text-green-600 dark:text-green-400">+${{ m.monto.toLocaleString() }}</span>
+                          <span class="text-green-600 dark:text-green-400">+{{ m.monto | pesos:'1.0-0' }}</span>
                         }
                       </td>
                     </tr>
@@ -130,7 +130,7 @@
                     <tr class="border-t dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ productosMap().get(m.producto_id) ?? ('#' + m.producto_id) }}</td>
                       <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ m.cantidad }}</td>
-                      <td class="px-3 py-2 text-red-600 dark:text-red-400 font-medium">${{ m.costo_total.toLocaleString() }}</td>
+                      <td class="px-3 py-2 text-red-600 dark:text-red-400 font-medium">{{ m.costo_total | pesos:'1.0-0' }}</td>
                       <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.motivo ?? '—' }}</td>
                       <td class="px-3 py-2 text-gray-500 dark:text-gray-400">{{ m.ubicacion ? (m.ubicacion === 'almacen' ? 'Almacén' : 'Tienda') : '—' }}</td>
                       <td class="px-3 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ m.created_at | date:'short' }}</td>
@@ -210,7 +210,7 @@
             }
           </div>
           <div class="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100">
-            Total a retirar: <strong class="text-lg">${{ totalCup().toLocaleString() }}</strong>
+            Total a retirar: <strong class="text-lg">{{ totalCup() | pesos:'1.0-0' }}</strong>
           </div>
         } @else {
           <div class="mb-3">
@@ -231,7 +231,7 @@
         </button>
       </div>
   } @else if (!error()) {
-    <app-empty-state message="No hay jornada abierta. Inicia el día para comenzar." />
+    <app-empty-state icon="event_available" message="No hay jornada abierta. Inicia el día para comenzar." />
   }
 </div>
 

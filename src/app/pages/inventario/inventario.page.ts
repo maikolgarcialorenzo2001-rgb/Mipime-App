@@ -6,13 +6,16 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService, type EdicionResultado } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ToastService } from '../../services/toast.service';
 import type { Producto } from '../../models';
 import type { StockMovimiento, LoteStock } from '../../models';
 import { StockBadgeComponent } from '../../components/stock-badge/stock-badge.component';
 import { unidadMedidaInfo, type UnidadMedida } from '../../models/producto';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 
 @Component({
   selector: 'app-inventario',
@@ -23,6 +26,8 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
     StockBadgeComponent,
     EmptyStateComponent,
     LoadingSpinnerComponent,
+    SkeletonComponent,
+    PesosPipe,
   ],
   templateUrl: './inventario.page.html',
   styleUrl: './inventario.page.css',
@@ -32,6 +37,8 @@ export class InventarioPage implements OnInit {
   private readonly stockService = inject(StockMovimientoService);
   private readonly authService = inject(AuthService);
   private readonly jornadaService = inject(JornadaService);
+  private readonly _toastService = inject(ToastService);
+  private readonly _pesos = inject(PesosPipe);
 
   readonly esAdmin = computed(() => this.authService.usuario()?.rol === 'admin');
 
@@ -40,8 +47,6 @@ export class InventarioPage implements OnInit {
   readonly loading = signal(true);
   readonly movimientosLoading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly successMessage = signal<string | null>(null);
-  private _toastTimeout: ReturnType<typeof setTimeout> | null = null;
   private _errorTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly searchQuery = signal('');
   readonly selectedAction = signal<{
@@ -128,18 +133,6 @@ export class InventarioPage implements OnInit {
     } finally {
       this.loading.set(false);
     }
-  }
-
-  /** Muestra un toast de éxito y lo oculta automáticamente (~2.5s). */
-  private _mostrarToast(mensaje: string): void {
-    this.successMessage.set(mensaje);
-    if (this._toastTimeout !== null) {
-      clearTimeout(this._toastTimeout);
-    }
-    this._toastTimeout = setTimeout(() => {
-      this.successMessage.set(null);
-      this._toastTimeout = null;
-    }, 2500);
   }
 
   async onSubmitMovimiento(): Promise<void> {
@@ -302,15 +295,21 @@ export class InventarioPage implements OnInit {
           // no parezca que "no se guardó".
           let costoMsg = '';
           if (edicionResult) {
-            const costoProducto = edicionResult.costoProducto?.toFixed(2) ?? '—';
+            // R8/monedas: el formato de dinero sale del PesosPipe (misma fuente
+            // que los templates) en vez de toFixed()/interpolación cruda.
+            const costoProducto =
+              edicionResult.costoProducto != null
+                ? this._pesos.transform(edicionResult.costoProducto, '1.2-2')
+                : '—';
             if (edicionResult.esFront) {
-              costoMsg = ` · Precio costo: $${costoProducto}`;
+              costoMsg = ` · Precio costo: ${costoProducto}`;
             } else {
-              costoMsg = ` · Costo del lote: $${edicionResult.costoEditado.toFixed(2)} — Precio costo del producto sin cambios: $${costoProducto} (lote más viejo con stock)`;
+              costoMsg = ` · Costo del lote: ${this._pesos.transform(edicionResult.costoEditado, '1.2-2')} — Precio costo del producto sin cambios: ${costoProducto} (lote más viejo con stock)`;
             }
           }
-          this._mostrarToast(
+          this._toastService.success(
             `Stock guardado — Almacén: ${actualizado.stock_almacen} ${sufijo} · Tienda: ${actualizado.stock_shop} ${sufijo}${costoMsg}`,
+            2500,
           );
         }
       }

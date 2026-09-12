@@ -26,6 +26,8 @@ export class CheckoutModalComponent {
   readonly total = input.required<number>();
   readonly errorMessage = input<string | null>(null);
   readonly saldoEnCaja = input<number>(0);
+  /** R3: true mientras la venta se está registrando (deshabilita acciones). */
+  readonly procesando = input(false);
   readonly confirmar = output<CheckoutPayload>();
   readonly cancelar = output();
 
@@ -130,18 +132,22 @@ export class CheckoutModalComponent {
   readonly descripcion = signal<string>('');
 
   onBackdropClick(event: MouseEvent): void {
+    if (this.procesando()) return;
     if (event.target === event.currentTarget) {
       this.cancelar.emit();
     }
   }
 
   onKeydown(event: KeyboardEvent): void {
+    if (this.procesando()) return;
     if (event.key === 'Escape') {
       this.cancelar.emit();
     }
   }
 
   onConfirmar(): void {
+    if (this.procesando()) return;
+
     const payload: CheckoutPayload = { formaPago: this.formaPago() };
 
     if (this.formaPago() === 'divisas') {

@@ -35,20 +35,20 @@
     </div>
   }
 
-  <!-- Toast de éxito -->
-  @if (successMessage(); as msg) {
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none bg-green-500 dark:bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-semibold animate-fade-in">
-      {{ msg }}
-    </div>
-  }
+  <!-- Estados: el toast de éxito lo renderiza <app-toast /> (shell, R8) -->
 
   <!-- States: full loading state only on initial load (list empty); the table
        stays mounted during refresh so document height never collapses and the
        window scroll position survives. -->
   @if (loading() && filteredProductos().length === 0) {
-    <app-loading-spinner />
+    <app-skeleton variant="table" [rows]="8" [cols]="5" />
   } @else if (!loading() && filteredProductos().length === 0) {
-    <app-empty-state message="No hay productos" />
+    <app-empty-state
+      icon="inventory_2"
+      message="No hay productos"
+      [accion]="esAdmin() ? 'Nuevo producto' : null"
+      (accionClick)="abrirNuevoProducto()"
+    />
   } @else {
     <div class="overflow-x-auto">
       <table class="w-full border-collapse bg-white dark:bg-gray-900 rounded-lg shadow-lg dark:shadow-gray-950/50">
@@ -69,10 +69,10 @@
                 {{ producto.nombre }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                ${{ producto.precio_costo?.toFixed(2) ?? '—' }}
+                {{ producto.precio_costo !== null ? (producto.precio_costo | pesos:'1.2-2') : '—' }}
               </td>
               <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                ${{ producto.precio_venta.toFixed(2) }}
+                {{ producto.precio_venta | pesos:'1.2-2' }}
               </td>
               <td class="px-4 py-3">
                 <app-stock-badge [stock]="producto.stock_almacen" [unidadMedida]="producto.unidad_medida" />
@@ -184,7 +184,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
+Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -210,7 +210,7 @@
                           type="number"
                           [(ngModel)]="editarPrecioVenta"
                           name="editarPrecioVenta"
-                          [placeholder]="'$' + producto.precio_venta.toFixed(2)"
+                          [placeholder]="producto.precio_venta | pesos:'1.2-2'"
                           step="0.01"
                           min="0"
                           required
@@ -224,7 +224,7 @@
                           type="number"
                           [(ngModel)]="editarPrecioCosto"
                           name="editarPrecioCosto"
-                          [placeholder]="'$' + (loteActual?.precio_costo?.toFixed(2) ?? '0.00')"
+                          [placeholder]="(loteActual?.precio_costo ?? 0) | pesos:'1.2-2'"
                           step="0.01"
                           min="0"
                           required
@@ -295,7 +295,7 @@
                             <option value="" disabled>Seleccione un lote…</option>
                             @for (lote of lotesDeUbicacion(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
+Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -329,7 +329,7 @@
                           >
                             @for (lote of productoLotes(); track lote.id; let i = $index) {
                               <option [value]="i + 1">
-                                Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — ${{ lote.precio_costo.toFixed(2) }}
+Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — {{ lote.precio_costo | pesos:'1.2-2' }}
                                 ({{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }})
                               </option>
                             }
@@ -472,8 +472,8 @@
                                        {{ lote.fecha_ingreso | date:'short' }}
                                      </td>
                                      <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ lote.cantidad }}</td>
-                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">${{ lote.precio_costo.toFixed(2) }}</td>
-                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">${{ (lote.cantidad * lote.precio_costo).toFixed(2) }}</td>
+                                     <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ lote.precio_costo | pesos:'1.2-2' }}</td>
+                                     <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">{{ (lote.cantidad * lote.precio_costo) | pesos:'1.2-2' }}</td>
                                      <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ lote.ubicacion === 'almacen' ? 'Almacén' : 'Tienda' }}</td>
                                   </tr>
                               }
@@ -572,7 +572,7 @@
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unidad de medida</label>
+            <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unidad de medida</span>
             <div class="flex gap-3">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input

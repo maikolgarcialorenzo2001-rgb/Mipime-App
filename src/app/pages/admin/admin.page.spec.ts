@@ -3,7 +3,6 @@ import { AdminPage } from './admin.page';
 import { UserService } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { signal } from '@angular/core';
-import type { UsuarioPublico } from '../../models';
 
 describe('AdminPage', () => {
   let mockUserService: {
@@ -89,5 +88,21 @@ describe('AdminPage', () => {
 
     expect(component.activeAdminCount()).toBe(2);
     expect(component.isLastAdmin()).toBe(false);
+  });
+
+  it('R10: empty state de usuarios muestra icono group', async () => {
+    mockUserService.getActiveAdminCount.mockResolvedValue(1);
+    mockUserService.list.mockResolvedValue([]);
+
+    const fixture = TestBed.createComponent(AdminPage);
+    fixture.detectChanges();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.usuarios().length).toBe(0);
+    const empty = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+    expect(empty).toBeTruthy();
+    expect(empty.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe('group');
   });
 });

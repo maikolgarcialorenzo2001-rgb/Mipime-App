@@ -10,6 +10,15 @@
       if (localStorage.getItem('theme') === 'dark') {
         document.documentElement.classList.add('dark');
       }
+      var fontScale = localStorage.getItem('fontScale');
+      if (
+        fontScale === 'small' ||
+        fontScale === 'large' ||
+        fontScale === 'xlarge' ||
+        fontScale === 'xxlarge'
+      ) {
+        document.documentElement.classList.add('font-scale-' + fontScale);
+      }
     </script>
   </head>
   <body>

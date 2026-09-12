@@ -8,6 +8,7 @@ import { VentaService } from '../../services/venta.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { AuthService } from '../../services/auth.service';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
+import { ToastService } from '../../services/toast.service';
 import { ErrorAlertComponent } from '../../components/error-alert/error-alert.component';
 import { ProductCardComponent } from '../../components/product-card/product-card.component';
 import { CartItemRowComponent } from '../../components/cart-item-row/cart-item-row.component';
@@ -15,13 +16,13 @@ import { CheckoutModalComponent } from '../../components/checkout-modal/checkout
 import type { CheckoutPayload } from '../../components/checkout-modal/checkout-modal.component';
 import { CobroPendienteModalComponent } from '../../components/cobro-pendiente-modal/cobro-pendiente-modal.component';
 import { QuantityInputComponent } from '../../components/quantity-input/quantity-input.component';
-import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
+import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import type { Producto } from '../../models';
 
 @Component({
   selector: 'app-pos-page',
-  imports: [PesosPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, LoadingSpinnerComponent, EmptyStateComponent],
+  imports: [PesosPipe, ErrorAlertComponent, ProductCardComponent, CartItemRowComponent, CheckoutModalComponent, CobroPendienteModalComponent, QuantityInputComponent, SkeletonComponent, EmptyStateComponent],
   templateUrl: './pos.page.html',
   styleUrl: './pos.page.css',
 })
@@ -32,6 +33,7 @@ export class PosPage {
   private readonly _ventaService = inject(VentaService);
   private readonly _cuentaCosasService = inject(CuentaCosasService);
   private readonly _cobroPendienteService = inject(CobroPendienteService);
+  private readonly _toastService = inject(ToastService);
   readonly _auth = inject(AuthService);
   private readonly _destroyRef = inject(DestroyRef);
 
@@ -48,7 +50,8 @@ export class PosPage {
   readonly ventaError = signal<string | null>(null);
   readonly searchError = signal<string | null>(null);
 
-  readonly successMessage = signal<string | null>(null);
+  /** R3: guard de doble submit — true mientras una venta está registrándose. */
+  readonly procesandoVenta = signal(false);
 
   /** Modal de pendientes (AD-6/AD-7): un único mount, modo cobrar o ver. */
   readonly showPendienteModal = signal(false);
@@ -214,16 +217,18 @@ export class PosPage {
     this.showPendienteModal.set(false);
     this._cargarPendientes();
     this._jornadaService.refreshJornadaAbierta();
-    this.successMessage.set('¡Cobro registrado con éxito!');
-    setTimeout(() => this.successMessage.set(null), 2000);
+    this._toastService.success('¡Cobro registrado con éxito!', 2000);
   }
 
   confirmarVenta(payload: CheckoutPayload): void {
+    if (this.procesandoVenta()) return;
+
     const jId = this._jornadaService.jornadaAbierta()?.id;
     const usuarioId = this._auth.usuario()?.id;
     if (jId === undefined || !usuarioId) return;
 
     this.ventaError.set(null);
+    this.procesandoVenta.set(true);
     const items = this.cart.items();
 
     let obs: Observable<unknown>;
@@ -263,16 +268,17 @@ export class PosPage {
 
     obs.subscribe({
       next: () => {
+        this.procesandoVenta.set(false);
         this.showModal.set(false);
         this.cart.limpiar();
-        this.successMessage.set('¡Venta registrada con éxito!');
-        setTimeout(() => this.successMessage.set(null), 2000);
+        this._toastService.success('¡Venta registrada con éxito!', 2000);
         // Refrescar productos para mostrar stock actualizado
         this._buscar(this.query());
         this.searchInput()?.nativeElement.focus();
         this._jornadaService.refreshJornadaAbierta();
       },
       error: (err: unknown) => {
+        this.procesandoVenta.set(false);
         this.ventaError.set(
           err instanceof Error ? err.message : 'Error al registrar la venta',
         );

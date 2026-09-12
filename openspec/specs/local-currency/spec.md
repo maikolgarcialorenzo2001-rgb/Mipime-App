@@ -29,3 +29,40 @@ El sistema DEBE proveer un pipe único `pesos` que envuelva el formateo de moned
 - GIVEN la UI renderizada
 - WHEN un usuario inspecciona cualquier etiqueta de dinero
 - THEN nunca contiene "CUP", "ARS" ni "pesos cubanos"
+
+### Requirement R1: Money formatting unification (MUST)
+
+(Del delta `premium-frontend-p0-p1` — capability local-currency MODIFIED, archivado 2026-09-12. Trazabilidad: engram `sdd/premium-frontend-p0-p1/archive-report`.)
+
+All money figures MUST render through the `pesos` pipe: `pesos:'1.2-2'` for amounts with decimals, `pesos:'1.0-0'` for round summaries. Raw `toLocaleString`/`toFixed(2)` MUST NOT remain in templates (jornada, inventario, app-nav, jornada-summary-card). Existing specs asserting old strings MUST be updated to pesos.pipe.spec.ts references.
+(Previously: 4 formats — pipe in pos/historial/productos, toLocaleString in jornada+app-nav, toFixed(2) in inventario, bare numbers in jornada-summary-card.)
+
+#### Scenario: Decimal amount in inventario
+
+- GIVEN inventario list with unit price 1500
+- WHEN the page renders
+- THEN figure shows `$1,500.00` and no `toFixed(2)` output remains
+
+#### Scenario: Round summary in jornada
+
+- GIVEN jornada total 150000
+- WHEN jornada-summary-card renders
+- THEN total shows `$150,000` (grouped, no decimals)
+
+### Requirement R2: tabular-nums on every money figure (MUST)
+
+(Del delta `premium-frontend-p0-p1`, archivado 2026-09-12.)
+
+Every money figure MUST apply `tabular-nums`: POS total, checkout/cobro totals, jornada-summary-card dd, app-nav total. Non-money text MUST NOT be affected.
+
+#### Scenario: POS total alignment
+
+- GIVEN cart total updates across transactions
+- WHEN digits change
+- THEN columns do not shift (tabular-nums on total)
+
+#### Scenario: All four surfaces
+
+- GIVEN money figures on POS, checkout, jornada-summary-card, nav
+- WHEN markup is inspected
+- THEN each carries tabular-nums and only money elements do

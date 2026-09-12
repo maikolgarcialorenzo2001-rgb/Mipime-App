@@ -367,4 +367,72 @@ describe('CheckoutModalComponent', () => {
       expect(confirmBtn.disabled).toBe(false);
     });
   });
+
+  describe('R3: procesando (loading / guard de doble submit)', () => {
+    function botonConfirmar(): HTMLButtonElement {
+      const buttons = fixture.nativeElement.querySelectorAll('button');
+      // Último botón del footer (su texto cambia a "Guardando…" mientras procesa).
+      return Array.from(buttons).at(-1) as HTMLButtonElement;
+    }
+
+    function botonCancelar(): HTMLButtonElement {
+      const buttons = fixture.nativeElement.querySelectorAll('button');
+      // Penúltimo botón del footer (Cancelar).
+      return Array.from(buttons).at(-2) as HTMLButtonElement;
+    }
+
+    it('deshabilita Confirmar aunque el formulario sea válido', () => {
+      fixture.componentRef.setInput('procesando', true);
+      fixture.detectChanges();
+
+      expect(botonConfirmar().disabled).toBe(true);
+    });
+
+    it('deshabilita Cancelar mientras procesa', () => {
+      fixture.componentRef.setInput('procesando', true);
+      fixture.detectChanges();
+
+      expect(botonCancelar().disabled).toBe(true);
+    });
+
+    it('no emite confirmar si onConfirmar se llama mientras procesa', () => {
+      const spy = vi.fn();
+      component.confirmar.subscribe(spy);
+
+      fixture.componentRef.setInput('procesando', true);
+      component['onConfirmar']();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('no emite cancelar con Escape mientras procesa', () => {
+      const spy = vi.fn();
+      component.cancelar.subscribe(spy);
+
+      fixture.componentRef.setInput('procesando', true);
+      component.onKeydown({ key: 'Escape' } as KeyboardEvent);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('no emite cancelar al hacer click en el backdrop mientras procesa', () => {
+      const spy = vi.fn();
+      component.cancelar.subscribe(spy);
+
+      fixture.componentRef.setInput('procesando', true);
+      component.onBackdropClick({
+        target: document.body,
+        currentTarget: document.body,
+      } as unknown as MouseEvent);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('muestra "Guardando…" en el botón de confirmar mientras procesa', () => {
+      fixture.componentRef.setInput('procesando', true);
+      fixture.detectChanges();
+
+      expect(botonConfirmar().textContent).toContain('Guardando…');
+    });
+  });
 });

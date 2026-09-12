@@ -3,11 +3,86 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 
-/* Smooth dark/light mode transition */
-*,
-*::before,
-*::after {
-  transition: background-color 0.6s ease, color 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+/* Font scale levels: porcentaje del root (16px base; sin clase = normal 100%) */
+html.font-scale-small {
+  font-size: 87.5%;
+}
+
+html.font-scale-large {
+  font-size: 112.5%;
+}
+
+html.font-scale-xlarge {
+  font-size: 125%;
+}
+
+html.font-scale-xxlarge {
+  font-size: 135%;
+}
+
+/* Transiciones de tema (dark/light): ~0.25s por defecto (R4).
+   Con prefers-reduced-motion se recortan a ~0ms y se apaga la animación
+   del toast. El kill de .animate-fade-in usa !important para vencer su
+   definición normal posterior (misma especificidad, cascada). */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition:
+      background-color 250ms ease,
+      color 250ms ease,
+      border-color 250ms ease,
+      box-shadow 250ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .animate-fade-in {
+    animation: none !important;
+  }
+}
+
+/* Indicador de página activa en el nav: píldora corta centrada bajo el ítem.
+   Vive aquí (global) porque el dark de ThemeService se aplica en <html> y la
+   encapsulación emulada del componente rompería el selector .dark descendiente. */
+.active-accent {
+  position: relative;
+}
+
+.active-accent::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  height: 3px;
+  width: 24px;
+  border-radius: 9999px;
+  background-color: #2563eb; /* blue-600, mismo tono del texto activo/hover */
+}
+
+.dark .active-accent::after {
+  background-color: #60a5fa; /* blue-400 */
+}
+
+/* Anillo de foco visible SOLO por teclado (R5). :where() = especificidad 0:
+   las utilities del componente (focus:outline-none, focus:ring-2, etc.) siguen
+   ganando sin necesidad de borrar el fallback. El mouse no dispara :focus-visible. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #2563eb; /* blue-600 */
+  outline-offset: 2px;
+}
+
+.dark :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline-color: #60a5fa; /* blue-400 */
 }
 
 body {
@@ -16,6 +91,8 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* Better touch scrolling */
   -webkit-overflow-scrolling: touch;
+  /* R2: dígitos tabulares globales — montos sin saltos de ancho al cambiar de cifra */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Safe area for notch (iOS) */
@@ -28,8 +105,10 @@ body {
 }
 
 /* Touch-friendly form inputs */
-input, select, textarea {
-  font-size: 16px !important; /* Prevent iOS zoom on focus */
+input,
+select,
+textarea {
+  font-size: max(1rem, 16px) !important; /* Prevent iOS zoom on focus (floor anti-zoom) */
 }
 
 /* Virtual keyboard: keep focused input visible */
@@ -40,7 +119,9 @@ input, select, textarea {
 }
 
 /* Disable double-tap zoom on buttons/links */
-button, a, [role="button"] {
+button,
+a,
+[role='button'] {
   touch-action: manipulation;
 }
 
@@ -48,6 +129,13 @@ button, a, [role="button"] {
 .scroll-touch {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+}
+
+/* Dark mode: los scrollbars nativos y form controls respetan el scheme oscuro.
+   color-scheme en la raíz .dark hace que todo contenedor con overflow-*
+   herede el scheme y sus scrollbars dejen de verse blancos en oscuro. */
+.dark {
+  color-scheme: dark;
 }
 
 /* Ensure native select/option elements respect dark mode */
@@ -58,8 +146,12 @@ button, a, [role="button"] {
 
 /* Toast fade-in animation */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 .animate-fade-in {
   animation: fade-in 0.25s ease-out;

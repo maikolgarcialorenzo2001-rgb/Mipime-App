@@ -175,3 +175,22 @@ POS page keyboard shortcuts for quantity increment/decrement MUST use step 0.1 f
 - GIVEN a unidad product selected in POS with cantidad = 3
 - WHEN the user presses the decrement keyboard shortcut
 - THEN cantidad becomes 2
+
+### Requirement R3: Confirm loading + double-submit guard (MUST)
+
+(Del delta `premium-frontend-p0-p1` — capability checkout MODIFIED, archivado 2026-09-12. Trazabilidad: engram `sdd/premium-frontend-p0-p1/archive-report`.)
+
+While `confirmarVenta` is in flight, the confirm button MUST show loading and be disabled; further clicks/Enter MUST NOT enqueue a second sale. Mirrors cobro-pendiente-modal loading pattern.
+(Previously: button stayed enabled through the flow.)
+
+#### Scenario: Single confirmation
+
+- GIVEN cart ready and registration pending
+- WHEN user clicks Confirm
+- THEN button shows loading+disabled AND exactly one sale registers
+
+#### Scenario: Rapid double-click
+
+- GIVEN registration in flight
+- WHEN user clicks twice quickly
+- THEN exactly one sale and one success toast

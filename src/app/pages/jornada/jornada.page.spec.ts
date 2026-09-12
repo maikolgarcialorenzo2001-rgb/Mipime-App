@@ -5,7 +5,8 @@ import { JornadaPage } from './jornada.page';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
 import { DATABASE, type Database } from '../../services/database';
-import type { Jornada, StockMovimiento } from '../../models';
+import { PesosPipe } from '../../pipes/pesos.pipe';
+import type { Jornada, StockMovimiento, Venta } from '../../models';
 import type { UsuarioPublico } from '../../models';
 import type { CuentaCosa } from '../../models/cuenta-cosa';
 
@@ -107,7 +108,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -145,7 +146,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       const mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -168,6 +169,14 @@ describe('JornadaPage', () => {
       const empty = fixture.nativeElement.querySelector('app-empty-state');
       expect(empty).toBeTruthy();
     });
+
+    it('R10: empty state de jornada muestra icono event_available (la apertura vive en app-nav)', () => {
+      const empty = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+      expect(empty.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe(
+        'event_available',
+      );
+      expect(empty.querySelector('button')).toBeFalsy();
+    });
   });
 
   describe('error al cargar jornada', () => {
@@ -176,7 +185,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       const mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -213,7 +222,7 @@ describe('JornadaPage', () => {
       const mockDb = createMockDb();
 
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -411,7 +420,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       const mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -444,7 +453,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       const mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -479,7 +488,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -581,7 +590,7 @@ describe('JornadaPage', () => {
     beforeEach(() => {
       mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -666,7 +675,7 @@ describe('UI guard — saldo insuficiente deshabilita botón', () => {
     beforeEach(() => {
       const mockDb = createMockDb();
       TestBed.configureTestingModule({
-        imports: [JornadaPage],
+        imports: [JornadaPage, PesosPipe],
         providers: [
           {
             provide: JornadaService,
@@ -755,6 +764,52 @@ describe('UI guard — saldo insuficiente deshabilita botón', () => {
     });
   });
 
+describe('R1: totales de venta formateados con pipe pesos', () => {
+  let fixture: ComponentFixture<JornadaPage>;
+  let component: JornadaPage;
+
+  beforeEach(() => {
+    const mockDb = createMockDb();
+    TestBed.configureTestingModule({
+      imports: [JornadaPage, PesosPipe],
+      providers: [
+        {
+          provide: JornadaService,
+          useValue: createMockJornadaService({
+            jornadaAbierta: mockJornadaAbierta,
+            jornadaCargando: false,
+            obtenerAbierta: () => of(mockJornadaAbierta),
+          }),
+        },
+        { provide: AuthService, useValue: createMockAuth(mockAdmin) },
+        { provide: DATABASE, useValue: mockDb },
+      ],
+    });
+
+    fixture = TestBed.createComponent(JornadaPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('muestra el total de la venta agrupado: 1500 → $1,500', () => {
+    const venta: Venta = {
+      id: 1,
+      jornada_id: 1,
+      fecha_hora: '2026-06-04T10:00:00Z',
+      total: 1500,
+      usuario_id: 1,
+      forma_pago: 'efectivo',
+      created_at: '2026-06-04T10:00:00Z',
+    };
+    component.ventasDelDia.set([venta]);
+    fixture.detectChanges();
+
+    const celdas = Array.from(fixture.nativeElement.querySelectorAll('td')) as HTMLElement[];
+    const celdaTotal = celdas.find((td) => (td.textContent ?? '').trim() === '$1,500');
+    expect(celdaTotal).toBeTruthy();
+  });
+});
+
 describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
   let fixture: ComponentFixture<JornadaPage>;
   let component: JornadaPage;
@@ -762,7 +817,7 @@ describe('fix-cierre-jornada-calculos — totalEnCaja y diferencia', () => {
   beforeEach(() => {
     const mockDb = createMockDb();
     TestBed.configureTestingModule({
-      imports: [JornadaPage],
+      imports: [JornadaPage, PesosPipe],
       providers: [
         {
           provide: JornadaService,

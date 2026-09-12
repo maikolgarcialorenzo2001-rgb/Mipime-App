@@ -9,7 +9,19 @@ import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import type { Jornada } from '../../models';
 import type { UsuarioPublico } from '../../models';
+import { readFileSync } from 'node:fs';
 import { APP_VERSION } from '../../version';
+import { PesosPipe } from '../../pipes/pesos.pipe';
+import { DATABASE, type Database } from '../../services/database';
+
+function createMockDb(): Database {
+  const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
+  return {
+    sql,
+    transaction: vi.fn((fn) => fn({ sql: (q: string, p?: unknown[]) => sql(q, p) })),
+    initialize: vi.fn().mockResolvedValue(undefined),
+  };
+}
 
 const mockJornadaAbierta: Jornada = {
   id: 1,
@@ -93,6 +105,12 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
   };
 
   beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.remove(
+      ...[...document.documentElement.classList].filter((c) => c.startsWith('font-scale-')),
+    );
+
     mockJornadaSvc = createMockJornadaService();
     mockAuth = createMockAuth(mockAdmin);
     mockElectronFileSvc = {
@@ -102,18 +120,27 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [AppNavComponent],
+      imports: [AppNavComponent, PesosPipe],
       providers: [
         provideRouter(routes),
         { provide: AuthService, useValue: mockAuth },
         { provide: JornadaService, useValue: mockJornadaSvc },
         { provide: ElectronFileService, useValue: mockElectronFileSvc },
+        { provide: DATABASE, useValue: createMockDb() },
       ],
     });
 
     fixture = TestBed.createComponent(AppNavComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.remove(
+      ...[...document.documentElement.classList].filter((c) => c.startsWith('font-scale-')),
+    );
   });
 
   it('debería tener montoInicial default de 500', () => {
@@ -143,21 +170,10 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(modalText).toContain('Total en caja');
   });
 
-  it('debería renderizar el botón de cambio de tema y alternar clase dark', () => {
-    const el = fixture.nativeElement as HTMLElement;
-    const themeBtn = el.querySelector('button[aria-label="Cambiar tema"]');
-    expect(themeBtn).toBeTruthy();
-
-    // Inicialmente en modo claro → ícono dark_mode
-    const icon = themeBtn!.querySelector('.material-symbols-outlined');
-    expect(icon?.textContent?.trim()).toBe('dark_mode');
-
-    // Click → modo oscuro
-    (themeBtn as HTMLElement).click();
-    fixture.detectChanges();
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
-    const iconDark = themeBtn!.querySelector('.material-symbols-outlined');
-    expect(iconDark?.textContent?.trim()).toBe('light_mode');
+  it('el botón suelto de tema ya no debería existir en la top bar; el control vive en el modal', () => {
+    const el2 = fixture.nativeElement as HTMLElement;
+    expect(el2.querySelector('nav button[aria-label="Cambiar tema"]')).toBeNull();
+    expect(el2.querySelector('nav button[aria-label="Ajustes"]')).toBeTruthy();
   });
 
   it('5.2 RED: confirmarCierre debería pasar arqueoTotal como saldoReal con entries a cerrar()', () => {
@@ -177,14 +193,16 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
   });
 
   it('should call ElectronFileService.downloadBlob after confirmarCierre (Blob only, service ya guardó)', () => {
-    mockJornadaSvc.obtenerReporte.mockReturnValue(of({
-      id: 1,
-      jornada_id: 1,
-      content_type: 'excel',
-      content_base64: 'dGVzdEJhc2U2NA==',
-      filename: 'jornada_2026-06-05_1.xlsx',
-      created_at: '',
-    }));
+    mockJornadaSvc.obtenerReporte.mockReturnValue(
+      of({
+        id: 1,
+        jornada_id: 1,
+        content_type: 'excel',
+        content_base64: 'dGVzdEJhc2U2NA==',
+        filename: 'jornada_2026-06-05_1.xlsx',
+        created_at: '',
+      }),
+    );
     mockElectronFileSvc.isElectronPackaged = true;
 
     component.abrirModalCierre();
@@ -211,7 +229,9 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     expect(component.denominacionesVisibles().length).toBe(10);
 
     // Click checkbox to show optional denominations
-    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    const checkbox = fixture.nativeElement.querySelector(
+      '#show-optional-denoms-nav',
+    ) as HTMLInputElement;
     expect(checkbox).toBeTruthy();
     checkbox.click();
     fixture.detectChanges();
@@ -233,7 +253,9 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
 
     expect(component.denominacionesVisibles().length).toBe(12);
 
-    const checkbox = fixture.nativeElement.querySelector('#show-optional-denoms-nav') as HTMLInputElement;
+    const checkbox = fixture.nativeElement.querySelector(
+      '#show-optional-denoms-nav',
+    ) as HTMLInputElement;
     expect(checkbox).toBeTruthy();
     checkbox.click(); // toggles off
     fixture.detectChanges();
@@ -252,5 +274,194 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     const occurrences = text.split(`v${APP_VERSION}`).length - 1;
     expect(occurrences).toBe(1);
+  });
+
+  it('la marca del comercio cae a "Mipime POS" cuando no hay nombre configurado (R6)', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Mipime POS');
+    expect(text).not.toContain('Tienda-App');
+  });
+
+  it('el indicador de la página activa es una píldora corta centrada (active-accent), sin chip de texto', () => {
+    const tpl = readFileSync('src/app/components/layout/app-nav.component.html', 'utf-8');
+
+    // Sin chip de texto de la página activa en la top bar
+    expect(tpl).not.toContain('activePage');
+    expect(tpl).not.toContain('font-mono');
+
+    // El acento ya no es un borde full-width: no debe quedar border-b-2 en los ítems
+    expect(tpl.match(/border-b-2/g) ?? []).toHaveLength(0);
+
+    // Los 12 ítems (6 desktop + 6 bottom) usan el marcador active-accent
+    const acentos = tpl.match(/\[class\.active-accent\]="[a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(acentos.length).toBe(12);
+
+    // El texto activo queda del tono del hover (azul), el gris solo si NO está activo
+    const textoAzul = tpl.match(/\[class\.text-blue-600\]="[a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoAzul.length).toBe(12);
+    const textoGrisNoActivo = tpl.match(/\[class\.text-gray-600\]="![a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoGrisNoActivo.length).toBe(12);
+    const textoGrisDark = tpl.match(/\[class\.dark:text-gray-400\]="![a-zA-Z]+(?:Bottom)?\.isActive"/g) ?? [];
+    expect(textoGrisDark.length).toBe(12);
+
+    // Contrato CSS (global): píldora corta, centrada, con variante dark.
+    // Vive en styles.css porque la encapsulación emulada del componente rompe
+    // el selector .dark descendiente (el dark vive en <html>).
+    const css = readFileSync('src/styles.css', 'utf-8');
+    expect(css).toContain('.active-accent::after');
+    expect(css).toMatch(/left:\s*50%/);
+    expect(css).toMatch(/transform:\s*translateX\(-50%\)/);
+    expect(css).toMatch(/width:\s*\d+px/);
+    expect(css).toMatch(/\.dark \.active-accent::after/);
+  });
+
+  describe('Modal de ajustes', () => {
+    function abrirModalAjustes(): HTMLElement {
+      const gear = (fixture.nativeElement as HTMLElement).querySelector(
+        'nav button[aria-label="Ajustes"]',
+      ) as HTMLElement;
+      expect(gear).toBeTruthy();
+      gear.click();
+      fixture.detectChanges();
+      return gear;
+    }
+
+    function botonNivel(label: string): HTMLElement {
+      const grupo = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="group"][aria-label="Tamaño de fuente"]',
+      );
+      const boton = Array.from(grupo?.querySelectorAll('button') ?? []).find(
+        (b) => b.textContent?.trim() === label,
+      );
+      expect(boton).toBeTruthy();
+      return boton as HTMLElement;
+    }
+
+    it('debería abrir el modal con selector de 5 niveles y toggle de tema al pulsar Ajustes', () => {
+      abrirModalAjustes();
+
+      const dialog = (fixture.nativeElement as HTMLElement).querySelector('[role="dialog"]');
+      expect(dialog?.textContent).toContain('Ajustes');
+
+      const grupo = dialog?.querySelector('[role="group"][aria-label="Tamaño de fuente"]');
+      expect(grupo?.querySelectorAll('button').length).toBe(5);
+
+      expect(dialog?.querySelector('button[aria-label="Cambiar tema"]')).toBeTruthy();
+    });
+
+    it('debería cerrar el modal con el botón de cierre', () => {
+      abrirModalAjustes();
+
+      const closeBtn = (fixture.nativeElement as HTMLElement).querySelector(
+        'button[aria-label="Cerrar ajustes"]',
+      ) as HTMLElement;
+      expect(closeBtn).toBeTruthy();
+      closeBtn.click();
+      fixture.detectChanges();
+
+      expect(component.showSettingsModal()).toBe(false);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[role="dialog"]')).toBeNull();
+    });
+
+    it('debería cerrar el modal al hacer clic en el backdrop pero no al hacer clic dentro', () => {
+      abrirModalAjustes();
+
+      const panel = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="dialog"] > div',
+      ) as HTMLElement;
+      panel.click();
+      fixture.detectChanges();
+      expect(component.showSettingsModal()).toBe(true);
+
+      const backdrop = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="dialog"]',
+      ) as HTMLElement;
+      backdrop.click();
+      fixture.detectChanges();
+      expect(component.showSettingsModal()).toBe(false);
+    });
+
+    it('debería cerrar el modal al presionar Escape', () => {
+      abrirModalAjustes();
+
+      const backdrop = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="dialog"]',
+      ) as HTMLElement;
+      backdrop.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.showSettingsModal()).toBe(false);
+    });
+
+    it('cada nivel de fuente debería aplicar su marcador y persistir al hacer clic', () => {
+      abrirModalAjustes();
+      const niveles: [string, string | null, string][] = [
+        ['Pequeña', 'font-scale-small', 'small'],
+        ['Grande', 'font-scale-large', 'large'],
+        ['Muy grande', 'font-scale-xlarge', 'xlarge'],
+        ['Extra grande', 'font-scale-xxlarge', 'xxlarge'],
+        ['Normal', null, 'normal'],
+      ];
+
+      for (const [label, cls, stored] of niveles) {
+        botonNivel(label).click();
+        fixture.detectChanges();
+
+        if (cls) {
+          expect(document.documentElement.classList.contains(cls)).toBe(true);
+        } else {
+          const tieneMarcador = [...document.documentElement.classList].some((c) =>
+            c.startsWith('font-scale-'),
+          );
+          expect(tieneMarcador).toBe(false);
+        }
+        expect(localStorage.getItem('fontScale')).toBe(stored);
+      }
+    });
+
+    it('el toggle de tema dentro del modal debería controlar .dark y localStorage', () => {
+      abrirModalAjustes();
+      const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="dialog"] button[aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      expect(toggle).toBeTruthy();
+
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(localStorage.getItem('theme')).toBe('dark');
+      expect(toggle.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe(
+        'light_mode',
+      );
+
+      toggle.click();
+      fixture.detectChanges();
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(localStorage.getItem('theme')).toBe('light');
+    });
+
+    it('tema y escala deberían ser independientes', () => {
+      abrirModalAjustes();
+
+      botonNivel('Extra grande').click();
+      fixture.detectChanges();
+      expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(true);
+
+      const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="dialog"] button[aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      toggle.click();
+      fixture.detectChanges();
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(true);
+
+      botonNivel('Normal').click();
+      fixture.detectChanges();
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(false);
+      expect(localStorage.getItem('fontScale')).toBe('normal');
+    });
   });
 });

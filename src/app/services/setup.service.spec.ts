@@ -15,18 +15,36 @@ Object.defineProperty(globalThis, 'crypto', {
   writable: true,
 });
 
-// Mock seedProductosSiVacio at top level
-vi.mock('./db-migrations', () => ({
-  seedProductosSiVacio: vi.fn().mockResolvedValue(undefined),
-}));
-
 function createMockDb(): Database {
-  const sql = vi.fn().mockResolvedValue([]) as unknown as Database['sql'];
+  // El seed real (seedProductosSiVacio) corre contra este mock: su primera
+  // query es "SELECT COUNT(*) AS count FROM productos"; si devuelve [] el
+  // seed hace `const [{ count }] = []` y explota, así que esa query responde
+  // { count: 0 }. Las demás queries devuelven [] (inofensivo).
+  const sql = vi.fn().mockImplementation(async (query: string) => {
+    if (query.includes('SELECT COUNT(*) AS count FROM productos')) {
+      return [{ count: 0 }];
+    }
+    return [];
+  }) as unknown as Database['sql'];
   return {
     sql,
     transaction: vi.fn((fn) => fn({ sql: (q: string, p?: unknown[]) => sql(q, p) })),
     initialize: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+/**
+ * ¿El seed real emitió INSERTs de catálogo contra el mock?
+ * @angular/build:unit-test prohíbe vi.mock con imports relativos (falla de
+ * carga de suite) y el namespace ESM real es inmutable (vi.spyOn lanza
+ * "Cannot redefine property"), así que NO se mockea db-migrations: el seed
+ * real corre contra el mock (sql → [] en todas las queries, inofensivo) y se
+ * detecta por su query distintiva, que SetupService nunca emite.
+ */
+function seedIntentoInserts(db: Database): boolean {
+  return vi
+    .mocked(db.sql)
+    .mock.calls.some(([query]) => query.includes('INSERT INTO productos'));
 }
 
 describe('SetupService', () => {
@@ -115,8 +133,8 @@ describe('SetupService', () => {
       };
 
       vi.mocked(mockDb.sql)
-        .mockResolvedValueOnce([{ count: 0 }])
-        .mockResolvedValueOnce([mockUser]);
+        .mockResolvedValueOnce([{ count: 0 }]) // countUsers
+        .mockResolvedValueOnce([mockUser]); // INSERT usuarios RETURNING *
 
       const service = TestBed.inject(SetupService);
       const result = await service.createInitialAdmin('admin', 'password123', 'Mi Negocio', true);
@@ -142,8 +160,7 @@ describe('SetupService', () => {
         'INSERT OR REPLACE INTO config (clave, valor) VALUES (?, ?)',
         ['seedProducts', '1'],
       );
-      const { seedProductosSiVacio } = await import('./db-migrations');
-      expect(seedProductosSiVacio).toHaveBeenCalled();
+      expect(seedIntentoInserts(mockDb)).toBe(true);
     });
 
     it('should persist seedProducts as 0 when seedProducts is false', async () => {
@@ -168,8 +185,7 @@ describe('SetupService', () => {
         'INSERT OR REPLACE INTO config (clave, valor) VALUES (?, ?)',
         ['seedProducts', '0'],
       );
-      const { seedProductosSiVacio } = await import('./db-migrations');
-      expect(seedProductosSiVacio).not.toHaveBeenCalled();
+      expect(seedIntentoInserts(mockDb)).toBe(false);
     });
 
     it('should throw when users already exist', async () => {
@@ -180,8 +196,7 @@ describe('SetupService', () => {
         service.createInitialAdmin('admin', 'password123', 'Mi Negocio', true),
       ).rejects.toThrow('Setup already completed - users exist');
 
-      const { seedProductosSiVacio } = await import('./db-migrations');
-      expect(seedProductosSiVacio).not.toHaveBeenCalled();
+      expect(seedIntentoInserts(mockDb)).toBe(false);
     });
   });
 });

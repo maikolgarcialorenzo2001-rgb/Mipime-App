@@ -1,12 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { PosPage } from './pos.page';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import { ProductoService } from '../../services/producto.service';
 import { CartService } from '../../services/cart.service';
 import { JornadaService } from '../../services/jornada.service';
 import { VentaService } from '../../services/venta.service';
+import { ToastService } from '../../services/toast.service';
 import { CuentaCosasService } from '../../services/cuenta-cosa.service';
 import { AuthService } from '../../services/auth.service';
 import { CobroPendienteService, type PendienteItem } from '../../services/cobro-pendiente.service';
@@ -136,15 +137,15 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
+    const toasts = TestBed.inject(ToastService).toasts();
+    expect(toasts.some((t) => t.mensaje.includes('Venta registrada con éxito'))).toBe(
+      true,
     );
-    expect(toastEl).toBeTruthy();
-    expect(toastEl!.textContent).toContain('Venta registrada con éxito');
   });
 
-  it('debería auto-ocultar el toast después de 3 segundos', () => {
+  it('debería auto-ocultar el toast después de 2 segundos', () => {
     vi.useFakeTimers();
+    const toastService = TestBed.inject(ToastService);
     const cart = TestBed.inject(CartService);
     cart.agregar(producto);
 
@@ -153,19 +154,14 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
-    );
-    expect(toastEl).toBeTruthy();
+    expect(
+      toastService.toasts().some((t) => t.mensaje.includes('Venta registrada con éxito')),
+    ).toBe(true);
 
     vi.advanceTimersByTime(2000);
     fixture.detectChanges();
 
-    const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
-    );
-    expect(toastAfter).toBeFalsy();
-    expect(component.successMessage()).toBeNull();
+    expect(toastService.toasts()).toHaveLength(0);
 
     vi.useRealTimers();
   });
@@ -181,10 +177,53 @@ describe('PosPage — toast de éxito', () => {
     component.confirmarVenta({ formaPago: 'efectivo' });
     fixture.detectChanges();
 
-    const toastEl = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Venta registrada con éxito'),
+    expect(TestBed.inject(ToastService).toasts()).toHaveLength(0);
+    expect(component.ventaError()).toBe('Error de prueba');
+  });
+
+  // ─── R3: guard de doble submit (procesandoVenta) ───────────────
+
+  it('R3: no registra dos ventas si se confirma dos veces mientras la primera está pendiente', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    let resolver!: (v: unknown) => void;
+    mockVentaService.registrar.mockReturnValue(
+      new Observable<unknown>((subscriber) => {
+        resolver = (value: unknown) => {
+          subscriber.next(value);
+          subscriber.complete();
+        };
+      }),
     );
-    expect(toastEl).toBeFalsy();
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(mockVentaService.registrar).toHaveBeenCalledTimes(1);
+    expect(component.procesandoVenta()).toBe(true);
+
+    resolver({ id: 1, total: 100 });
+    fixture.detectChanges();
+
+    expect(component.procesandoVenta()).toBe(false);
+    const toasts = TestBed.inject(ToastService).toasts();
+    expect(toasts.some((t) => t.mensaje.includes('Venta registrada con éxito'))).toBe(
+      true,
+    );
+  });
+
+  it('R3: limpia procesandoVenta ante error para permitir reintentar', () => {
+    const cart = TestBed.inject(CartService);
+    cart.agregar(producto);
+
+    mockVentaService.registrar.mockReturnValue(
+      throwError(() => new Error('Error de prueba')),
+    );
+
+    component.confirmarVenta({ formaPago: 'efectivo' });
+
+    expect(component.procesandoVenta()).toBe(false);
     expect(component.ventaError()).toBe('Error de prueba');
   });
 
@@ -481,7 +520,7 @@ describe('PosPage — toast de éxito', () => {
     expect(component.showPendienteModal()).toBe(false);
   });
 
-  // ─── ADD-1: ±step por unidad de medida via keyboard y botones ──────
+// ─── ADD-1: ±step por unidad de medida via keyboard y botones ──────
 
   function makeProductoGM(unidad_medida: 'unidad' | 'gramaje', id = 10): Producto {
     return {
@@ -551,5 +590,45 @@ describe('PosPage — toast de éxito', () => {
 
     const item = cart.items().find(i => i.producto.id === prod.id);
     expect(item!.cantidad).toBe(4);
+  });
+
+  // ─── R9: skeleton en la primera búsqueda; re-búsqueda mantiene el grid ─────
+
+  it('R9: primera búsqueda (sin resultados) muestra skeleton grid en vez de spinner', () => {
+    component.buscando.set(true);
+    component.resultados.set([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeFalsy();
+    expect(fixture.nativeElement.querySelectorAll('app-product-card')).toHaveLength(0);
+  });
+
+  it('R9: re-búsqueda con resultados montados mantiene el grid (sin destello de skeleton)', () => {
+    component.resultados.set([producto]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-product-card')).toHaveLength(1);
+
+    component.buscando.set(true);
+    component.resultados.set([producto, { ...producto, id: 2, nombre: 'Otro' }]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeFalsy();
+    const cards = fixture.nativeElement.querySelectorAll('app-product-card');
+    expect(cards.length).toBe(2);
+    expect(cards[1].textContent).toContain('Otro');
+  });
+
+  // ─── R10: empty-state con icono en búsqueda sin resultados ────────
+
+  it('R10: búsqueda sin resultados muestra empty-state con icono search', () => {
+    component.buscando.set(false);
+    component.resultados.set([]);
+    fixture.detectChanges();
+
+    const empty = fixture.nativeElement.querySelector('app-empty-state');
+    expect(empty).toBeTruthy();
+    expect(empty.textContent).toContain('Escribe para buscar productos');
+    expect(empty.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe('search');
   });
 });

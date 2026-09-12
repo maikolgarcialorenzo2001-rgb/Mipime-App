@@ -4,12 +4,19 @@ import { AuthService } from '../../services/auth.service';
 import { ElectronFileService } from '../../services/electron-file.service';
 import { JornadaService } from '../../services/jornada.service';
 import { ThemeService } from '../../services/theme.service';
+import { BrandService } from '../../services/brand.service';
+import {
+  FontScaleService,
+  FONT_SCALE_LEVELS,
+  FONT_SCALE_LEVEL_LABELS,
+} from '../../services/font-scale.service';
 import type { ArqueoCajaEntry } from '../../models/arqueo-caja';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import { APP_VERSION } from '../../version';
 
 @Component({
   selector: 'app-nav',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, PesosPipe],
   templateUrl: './app-nav.component.html',
   styleUrl: './app-nav.component.css',
 })
@@ -19,8 +26,15 @@ export class AppNavComponent {
   readonly jornadaService = inject(JornadaService);
   private readonly _electronFileService = inject(ElectronFileService);
   readonly themeService = inject(ThemeService);
+  readonly fontScale = inject(FontScaleService);
+  readonly brand = inject(BrandService);
 
   protected readonly auth = this._auth;
+
+  constructor() {
+    // Idempotente: si el login ya cargó la marca, no relee la config.
+    void this.brand.cargar();
+  }
 
   /** Versión de la app (generada desde package.json en build). */
   readonly appVersion = APP_VERSION;
@@ -41,6 +55,7 @@ export class AppNavComponent {
   /** Autofocus refs */
   readonly openModalBackdrop = viewChild<ElementRef<HTMLElement>>('openModalBackdrop');
   readonly closeModalBackdrop = viewChild<ElementRef<HTMLElement>>('closeModalBackdrop');
+  readonly settingsModalBackdrop = viewChild<ElementRef<HTMLElement>>('settingsModalBackdrop');
 
   private readonly _focusOpenEffect = effect(() => {
     if (this.showOpenModal()) {
@@ -54,17 +69,39 @@ export class AppNavComponent {
     }
   });
 
+  private readonly _focusSettingsEffect = effect(() => {
+    if (this.showSettingsModal()) {
+      setTimeout(() => this.settingsModalBackdrop()?.nativeElement.focus());
+    }
+  });
+
+  /** Modal de ajustes (escala de fuente + tema) */
+  readonly showSettingsModal = signal(false);
+  readonly fontScaleLevels = FONT_SCALE_LEVELS;
+  readonly fontScaleLabels = FONT_SCALE_LEVEL_LABELS;
+
   /** Denomination form */
   readonly DENOMINACIONES = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 3, 1] as const;
   readonly arqueoForm = signal<Record<number, number>>({
-    5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
+    5000: 0,
+    2000: 0,
+    1000: 0,
+    500: 0,
+    200: 0,
+    100: 0,
+    50: 0,
+    20: 0,
+    10: 0,
+    5: 0,
+    3: 0,
+    1: 0,
   });
   readonly showOptionalDenoms = signal(false);
 
   readonly denominacionesVisibles = computed(() =>
     this.showOptionalDenoms()
       ? [...this.DENOMINACIONES]
-      : this.DENOMINACIONES.filter(d => d !== 1 && d !== 3),
+      : this.DENOMINACIONES.filter((d) => d !== 1 && d !== 3),
   );
 
   readonly arqueoTotal = computed(() => {
@@ -82,11 +119,7 @@ export class AppNavComponent {
 
   get puedeCerrar(): boolean {
     const j = this.jornadaService.jornadaAbierta();
-    return (
-      !this.jornadaService.jornadaCargando() &&
-      j !== null &&
-      j.estado === 'abierta'
-    );
+    return !this.jornadaService.jornadaCargando() && j !== null && j.estado === 'abierta';
   }
 
   // ── Apertura ──────────────────────────────────────────
@@ -119,9 +152,7 @@ export class AppNavComponent {
         this.abriendo.set(false);
       },
       error: (err: unknown) => {
-        this.abrirError.set(
-          err instanceof Error ? err.message : 'Error al abrir la jornada',
-        );
+        this.abrirError.set(err instanceof Error ? err.message : 'Error al abrir la jornada');
         this.abriendo.set(false);
       },
     });
@@ -132,14 +163,25 @@ export class AppNavComponent {
   abrirModalCierre(): void {
     this.cerrarError.set(null);
     this.arqueoForm.set({
-      5000: 0, 2000: 0, 1000: 0, 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 3: 0, 1: 0,
+      5000: 0,
+      2000: 0,
+      1000: 0,
+      500: 0,
+      200: 0,
+      100: 0,
+      50: 0,
+      20: 0,
+      10: 0,
+      5: 0,
+      3: 0,
+      1: 0,
     });
     this.showOptionalDenoms.set(false);
     this.showCloseModal.set(true);
   }
 
   actualizarCantidad(denominacion: number, cantidad: number): void {
-    this.arqueoForm.update(f => ({ ...f, [denominacion]: cantidad }));
+    this.arqueoForm.update((f) => ({ ...f, [denominacion]: cantidad }));
   }
 
   cerrarModalCierre(): void {
@@ -179,9 +221,7 @@ export class AppNavComponent {
         this._descargarExcel(j.id, j);
       },
       error: (err: unknown) => {
-        this.cerrarError.set(
-          err instanceof Error ? err.message : 'Error al cerrar la jornada',
-        );
+        this.cerrarError.set(err instanceof Error ? err.message : 'Error al cerrar la jornada');
         this.cerrando.set(false);
       },
     });
@@ -198,10 +238,17 @@ export class AppNavComponent {
 
   filtrarTecla(event: KeyboardEvent): void {
     const teclasPermitidas = [
-      'Backspace', 'Delete', 'Tab',
-      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-      'Home', 'End',
-      'Enter', 'Escape',
+      'Backspace',
+      'Delete',
+      'Tab',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'Home',
+      'End',
+      'Enter',
+      'Escape',
     ];
     if (teclasPermitidas.includes(event.key)) return;
     if (!/^\d$/.test(event.key)) {
@@ -215,6 +262,28 @@ export class AppNavComponent {
     if (event.key === 'Escape') {
       if (this.showOpenModal()) this.cerrarModalApertura();
       if (this.showCloseModal()) this.cerrarModalCierre();
+    }
+  }
+
+  // ── Modal de ajustes ────────────────────────────────
+
+  abrirModalAjustes(): void {
+    this.showSettingsModal.set(true);
+  }
+
+  cerrarModalAjustes(): void {
+    this.showSettingsModal.set(false);
+  }
+
+  onSettingsBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.cerrarModalAjustes();
+    }
+  }
+
+  onSettingsKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.cerrarModalAjustes();
     }
   }
 

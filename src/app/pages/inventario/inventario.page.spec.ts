@@ -6,7 +6,16 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
+import { ToastService } from '../../services/toast.service';
+import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto, StockMovimiento } from '../../models';
+
+/** Último toast encolado (o null si no hay ninguno). R8: los toasts viven en el
+ *  ToastService compartido, no en señales de la página. */
+function ultimoMensajeToast(): string | null {
+  const toasts = TestBed.inject(ToastService).toasts();
+  return toasts.length > 0 ? toasts[toasts.length - 1].mensaje : null;
+}
 
 describe('InventarioPage', () => {
   let fixture: ComponentFixture<InventarioPage>;
@@ -115,7 +124,7 @@ describe('InventarioPage', () => {
     };
 
     TestBed.configureTestingModule({
-      imports: [InventarioPage],
+      imports: [InventarioPage, PesosPipe],
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: ProductoService, useValue: mockProductoService },
@@ -144,7 +153,7 @@ describe('InventarioPage', () => {
     component = fixture.componentInstance;
     fixture.detectChanges();
 
-    const spinner = fixture.nativeElement.querySelector('app-loading-spinner');
+    const spinner = fixture.nativeElement.querySelector('app-skeleton');
     expect(spinner).toBeTruthy();
 
     resolveListar([]);
@@ -179,6 +188,45 @@ describe('InventarioPage', () => {
 
     const emptyState = fixture.nativeElement.querySelector('app-empty-state');
     expect(emptyState).toBeTruthy();
+  });
+
+  it('R10: empty state muestra icono inventory_2 y acción "Nuevo producto" solo para admin', async () => {
+    mockProductoService.listar.mockReturnValue(of([]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+    expect(emptyState).toBeTruthy();
+    expect(emptyState.querySelector('.material-symbols-outlined')?.textContent?.trim()).toBe(
+      'inventory_2',
+    );
+
+    // Admin: el botón de acción abre el modal de nuevo producto.
+    const actionBtn = Array.from(emptyState.querySelectorAll('button')).find(
+      (b) => (b as HTMLButtonElement).textContent?.includes('Nuevo producto'),
+    ) as HTMLButtonElement;
+    expect(actionBtn).toBeTruthy();
+    actionBtn.click();
+    fixture.detectChanges();
+    expect(component.showProductoModal()).toBe(true);
+  });
+
+  it('R10: sin permisos de admin el empty state no muestra botón de acción', async () => {
+    mockAuthService.usuario.mockReturnValue({ id: 2, nombre: 'User', rol: 'trabajador' });
+    mockProductoService.listar.mockReturnValue(of([]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('app-empty-state') as HTMLElement;
+    expect(emptyState.querySelector('button')).toBeFalsy();
   });
 
   it('4. shows error on service failure', async () => {
@@ -1485,7 +1533,7 @@ describe('InventarioPage', () => {
     fixture.detectChanges();
 
     expect(component.loading()).toBe(true);
-    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeFalsy();
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeFalsy();
 
     const tbody = fixture.nativeElement.querySelector('tbody');
     expect(tbody).toBeTruthy();
@@ -1539,7 +1587,7 @@ describe('InventarioPage', () => {
     // While loading: no empty state, spinner instead.
     expect(component.loading()).toBe(true);
     expect(fixture.nativeElement.querySelector('app-empty-state')).toBeFalsy();
-    expect(fixture.nativeElement.querySelector('app-loading-spinner')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('app-skeleton')).toBeTruthy();
 
     // After the refresh resolves: empty state appears.
     resolveRefresh([]);
@@ -1813,15 +1861,10 @@ describe('InventarioPage', () => {
     expect(mockProductoService.listar).toHaveBeenCalledTimes(2);
     expect(component.productos()[0].stock_almacen).toBe(80);
     expect(component.productos()[0].stock_shop).toBe(7);
-    // FR-03: toast post-save con stock nuevo por ubicación (sufijo 'u.' para unidad)
-    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
-
-    const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Stock guardado'),
-    );
-    expect(toast).toBeTruthy();
-    expect(toast!.textContent).toContain('Almacén: 80 u.');
-    expect(toast!.textContent).toContain('Tienda: 7 u.');
+// FR-03: toast post-save con stock nuevo por ubicación (sufijo 'u.' para unidad)
+    expect(ultimoMensajeToast()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
+    expect(ultimoMensajeToast()).toContain('Almacén: 80 u.');
+    expect(ultimoMensajeToast()).toContain('Tienda: 7 u.');
   });
 
   it('36c. S-UT: toast de edición usa el sufijo "lb" para productos con unidad_medida=gramaje', async () => {
@@ -1851,7 +1894,7 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 lb · Tienda: 7 lb');
+    expect(ultimoMensajeToast()).toBe('Stock guardado — Almacén: 80 lb · Tienda: 7 lb');
   });
 
   it('36d. AC-12: toast de edición con unidad_medida corrupta muestra "u." sin lanzar', async () => {
@@ -1884,7 +1927,7 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
+    expect(ultimoMensajeToast()).toBe('Stock guardado — Almacén: 80 u. · Tienda: 7 u.');
   });
 
   it('36b. F3: toast muestra el precio costo actualizado cuando el lote editado es el frente FIFO', async () => {
@@ -1918,8 +1961,8 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Precio costo: $150.00');
-    expect(component.successMessage()).not.toContain('sin cambios');
+    expect(ultimoMensajeToast()).toContain('Precio costo: $150.00');
+    expect(ultimoMensajeToast()).not.toContain('sin cambios');
   });
 
   it('36c. F3: toast aclara que el precio costo del producto NO cambió cuando el lote editado no es el frente FIFO', async () => {
@@ -1958,9 +2001,9 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Costo del lote: $8.00');
-    expect(component.successMessage()).toContain('Precio costo del producto sin cambios: $5.00');
-    expect(component.successMessage()).toContain('lote más viejo con stock');
+    expect(ultimoMensajeToast()).toContain('Costo del lote: $8.00');
+    expect(ultimoMensajeToast()).toContain('Precio costo del producto sin cambios: $5.00');
+    expect(ultimoMensajeToast()).toContain('lote más viejo con stock');
   });
 
   it('37. T-03: el toast se auto-oculta después de ~2.5s', async () => {
@@ -1988,16 +2031,12 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toContain('Stock guardado');
+    expect(ultimoMensajeToast()).toContain('Stock guardado');
 
     vi.advanceTimersByTime(2500);
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBeNull();
-    const toastAfter = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
-      (el) => el.textContent?.includes('Stock guardado'),
-    );
-    expect(toastAfter).toBeFalsy();
+    expect(ultimoMensajeToast()).toBeNull();
     vi.useRealTimers();
   });
 
@@ -2026,7 +2065,7 @@ describe('InventarioPage', () => {
     await component.onSubmitMovimiento();
     fixture.detectChanges();
 
-    expect(component.successMessage()).toBeNull();
+    expect(TestBed.inject(ToastService).toasts()).toHaveLength(0);
     expect(component.error()).toBe('Error al guardar');
     const toast = (Array.from(fixture.nativeElement.querySelectorAll('*')) as HTMLElement[]).find(
       (el) => el.textContent?.includes('Stock guardado'),
@@ -2075,7 +2114,7 @@ describe('InventarioPage', () => {
       1, null, 'Coca Cola', 15, 10, 80, 'Sin lotes', 'almacen',
     );
     expect(component.error()).toBeNull();
-    expect(component.successMessage()).toContain('Stock guardado');
+    expect(ultimoMensajeToast()).toContain('Stock guardado');
   });
 
   it('39b. F8: onSelectAction en editar con lotes vacíos prellena nombre/precios del producto y selectedLoteIndex null', async () => {
@@ -2187,6 +2226,34 @@ describe('InventarioPage', () => {
 
     it('devuelve null sin lotes', () => {
       expect(elegirLoteInicialEdicion([], 100, 10)).toBeNull();
+    });
+  });
+
+  describe('R1: precios formateados con pipe pesos', () => {
+    it('agrupa el precio de venta y muestra — cuando el costo es nulo', async () => {
+      const productosConMontos: Producto[] = [
+        { ...productos[0], precio_venta: 1500, precio_costo: 8 },
+        { ...productos[1], precio_venta: 15, precio_costo: null },
+      ];
+      mockProductoService.listar.mockReturnValue(of(productosConMontos));
+
+      fixture = TestBed.createComponent(InventarioPage);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const tbody = fixture.nativeElement.querySelector('tbody') as HTMLElement;
+      expect(tbody).toBeTruthy();
+      const texto = tbody.textContent ?? '';
+
+      // precio_venta 1500 con pesos:'1.2-2' → $1,500.00 (antes: $1500.00 por toFixed)
+      expect(texto).toContain('$1,500.00');
+      expect(texto).not.toContain('$1500.00');
+      // precio_venta 15 con pesos:'1.2-2' → $15.00
+      expect(texto).toContain('$15.00');
+      // precio_costo nulo → em dash (no "$null" ni "$0.00")
+      expect(texto).toContain('—');
     });
   });
 });

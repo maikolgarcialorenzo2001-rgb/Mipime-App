@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth.service';
 import { DATABASE, type Database } from './database';
 import { hashPassword } from './hash-password';
-import type { Usuario, UsuarioPublico } from '../models';
+import type { Usuario } from '../models';
 
 function mockCrypto(): void {
   const subtleDigest = vi.fn().mockImplementation(
