@@ -121,3 +121,22 @@ Los textos del sub-form divisas y del vuelto, en checkout-modal y cobro-pendient
 - GIVEN `payload.descripcion = "Retiro familiar"` and `payload.autorizadoPor = "María"`
 - WHEN `confirmarVenta` runs
 - THEN `registrarLote` receives those `descripcion` and `autorizadoPor` values for the batch
+
+### Requirement R3: Confirm loading + double-submit guard (MUST)
+
+(Del delta `premium-frontend-p0-p1` — capability checkout MODIFIED, archivado 2026-09-12. Trazabilidad: engram `sdd/premium-frontend-p0-p1/archive-report`.)
+
+While `confirmarVenta` is in flight, the confirm button MUST show loading and be disabled; further clicks/Enter MUST NOT enqueue a second sale. Mirrors cobro-pendiente-modal loading pattern.
+(Previously: button stayed enabled through the flow.)
+
+#### Scenario: Single confirmation
+
+- GIVEN cart ready and registration pending
+- WHEN user clicks Confirm
+- THEN button shows loading+disabled AND exactly one sale registers
+
+#### Scenario: Rapid double-click
+
+- GIVEN registration in flight
+- WHEN user clicks twice quickly
+- THEN exactly one sale and one success toast
