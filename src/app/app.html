@@ -5,7 +5,9 @@
   } @else if (ttlExpired()) {
     <app-ttl-expired />
   }   @else {
-    <router-outlet />
+    <div [@routeAnimations]>
+      <router-outlet />
+    </div>
   }
   @if (dbStatus.restoreInfo()) {
     <app-restore-feedback />

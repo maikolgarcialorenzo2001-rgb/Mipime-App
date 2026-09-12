@@ -7,6 +7,7 @@ import { FontScaleService } from './services/font-scale.service';
 import { hashPassword, generateSalt } from './services/hash-password';
 import { firstValueFrom } from 'rxjs';
 import { provideRouter } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { routes } from './app.routes';
 import { APP_VERSION } from './version';
 
@@ -53,7 +54,12 @@ describe('App component nav', () => {
 
     TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter(routes), AuthService, { provide: DATABASE, useValue: mockDb }],
+      providers: [
+        provideRouter(routes),
+        provideNoopAnimations(),
+        AuthService,
+        { provide: DATABASE, useValue: mockDb },
+      ],
     });
   });
 

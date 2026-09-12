@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { routeAnimations } from './animations/route.transitions';
 import { AppNavComponent } from './components/layout/app-nav.component';
 import { TtlExpiredComponent } from './components/ttl-expired/ttl-expired.component';
 import { DbErrorComponent } from './components/db-error/db-error.component';
@@ -10,6 +11,7 @@ import { ActivePageService } from './services/active-page.service';
 
 @Component({
   selector: 'app-root',
+  animations: [routeAnimations],
   imports: [
     RouterOutlet,
     AppNavComponent,
