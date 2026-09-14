@@ -16,9 +16,25 @@ const sqlCalls: { query: string; params: unknown[]; via?: 'tx' | 'client' }[] = 
 /** Override para controlar qué versión devuelve el mock de schema_version. */
 let mockSchemaVersion: number | null = null;
 
+/**
+ * Estado simulado del driver SQLocal (fidelidad Judge B): durante la
+ * ejecución de client.transaction() el worker retiene transactionMutex, así
+ * que cualquier client.sql() caería en espera circular (deadlock). El mock
+ * registra `wouldDeadlock` en vez de tirar, para que las demás assertions
+ * sigan corriendo. `driverTxnOpen` lo mantiene el propio mock (set/clear por
+ * llamada) y ambos se resetean en cada beforeEach.
+ */
+const mockState = { driverTxnOpen: false, wouldDeadlock: false };
+
 class MockSQLocalClient {
   sql = vi.fn().mockImplementation((query: string, ...params: unknown[]) => {
     sqlCalls.push({ query, params, via: 'client' });
+    // Fidelidad del deadlock: con la txn del driver abierta, client.sql() al
+    // worker SQLocal 0.18 no puede avanzar (transactionMutex retenido entre
+    // begin/commit). Marker en vez de throw para no romper el resto.
+    if (mockState.driverTxnOpen) {
+      mockState.wouldDeadlock = true;
+    }
     // Check schema_version: return version 1 so v1 is skipped, then v2 runs
     if (query.includes('COALESCE(MAX(version), 0)')) {
       return [{ version: mockSchemaVersion ?? 1 }];
@@ -36,6 +52,7 @@ class MockSQLocalClient {
   transaction = vi.fn().mockImplementation(
     async (fn: (tx: { sql: (q: string, ...p: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
       sqlCalls.push({ query: 'BEGIN (client.transaction)', params: [] });
+      mockState.driverTxnOpen = true;
       try {
         // Handle fiel de SQLocal 0.18: las sentencias del callback viajan por
         // el handle tx (porta transactionKey), NO por client.sql(). Etiquetar
@@ -52,6 +69,10 @@ class MockSQLocalClient {
       } catch (err) {
         sqlCalls.push({ query: 'ROLLBACK (client.transaction)', params: [] });
         throw err;
+      } finally {
+        // La txn del driver terminó (éxito O error): liberar la ventana de
+        // deadlock simulado para el próximo client.sql().
+        mockState.driverTxnOpen = false;
       }
     },
   );
@@ -260,6 +281,8 @@ describe('SqliteService migration v5', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -349,6 +372,8 @@ describe('SqliteService migration v6', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -474,6 +499,8 @@ describe('SqliteService migration v7', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -561,6 +588,8 @@ describe('SqliteService migration v11', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -720,6 +749,8 @@ describe('SqliteService migration v13', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -811,6 +842,8 @@ describe('SqliteService migration v14', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -964,6 +997,8 @@ describe('SqliteService persist web (T11/R9)', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -1021,6 +1056,8 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     vi.clearAllMocks();
 
     globalThis.Worker = vi.fn().mockImplementation(function () {
@@ -1127,6 +1164,10 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     ).toBe(true);
     // Ningún DML de la cadena anidada sale por client.sql() (sin transactionKey)
     expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
+    // Invariante general (Judge B): con la txn del driver abierta NINGUNA
+    // sentencia (SELECT/INSERT/UPDATE...) debe salir por client.sql() — un
+    // leak así deadlockearía el worker (transactionMutex retenido).
+    expect(mockState.wouldDeadlock).toBe(false);
   });
 
   it('8.5 RED TRIANGULATE: tras COMMIT del BEGIN raw, una transaction() nueva abre txn propia', async () => {
@@ -1195,5 +1236,39 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
       txStatements.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
     ).toBe(true);
     expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
+  });
+
+  it('8.8 RED: tras transaction() exitosa, un BEGIN raw posterior con JOIN viaja por client.sql() (sin handle stale)', async () => {
+    // Txn del driver exitosa: su finally interno debe limpiar _activeTxn.
+    await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_almacen = 1 WHERE id = 1');
+    });
+
+    // BEGIN raw posterior: _txnDepth sube SIN handle del driver. Si el
+    // finally no hubiera limpiado _activeTxn, el JOIN de abajo viajaría por
+    // el handle stale (via 'tx') y se ejecutaría FUERA de la txn raw —
+    // rompiendo la atomicidad silenciosamente.
+    await service.sql('BEGIN TRANSACTION');
+    const result = await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_shop = 5 WHERE id = 1');
+      return 'ok';
+    });
+    await service.sql('COMMIT');
+
+    expect(result).toBe('ok');
+    // Sin handle activo, el JOIN cae a this.sql() → client.sql() (via 'client'),
+    // igual que 8.3: el mutex no se retiene por sentencia raw.
+    expect(
+      sqlCalls.some(
+        (c) =>
+          c.via === 'client' && c.query.includes('UPDATE productos SET stock_shop = 5'),
+      ),
+    ).toBe(true);
+    // Y el DML del JOIN NO sale por el handle stale (via 'tx').
+    expect(
+      sqlCalls.some(
+        (c) => c.via === 'tx' && c.query.includes('UPDATE productos SET stock_shop = 5'),
+      ),
+    ).toBe(false);
   });
 });
