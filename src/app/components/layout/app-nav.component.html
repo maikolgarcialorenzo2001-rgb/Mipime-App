@@ -539,21 +539,23 @@
       </div>
 
       <div
-        class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3"
+        role="switch"
+        [attr.aria-checked]="themeService.isDark()"
+        tabindex="0"
+        aria-label="Cambiar tema"
+        class="flex cursor-pointer select-none items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-4 py-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+        (click)="themeService.toggle()"
+        (keydown.enter)="themeService.toggle()"
+        (keydown.space)="themeService.toggle()"
       >
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Tema oscuro</span>
-        <button
-          type="button"
-          (click)="themeService.toggle()"
-          class="cursor-pointer rounded-lg p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors leading-none"
-          aria-label="Cambiar tema"
-        >
+        <span class="pointer-events-none rounded-lg p-1.5 leading-none text-gray-600 dark:text-gray-400">
           @if (themeService.isDark()) {
             <span class="material-symbols-outlined text-base leading-none">light_mode</span>
           } @else {
             <span class="material-symbols-outlined text-base leading-none">dark_mode</span>
           }
-        </button>
+        </span>
       </div>
     </div>
   </div>

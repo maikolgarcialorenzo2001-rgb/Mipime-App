@@ -346,7 +346,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
       const grupo = dialog?.querySelector('[role="group"][aria-label="Tamaño de fuente"]');
       expect(grupo?.querySelectorAll('button').length).toBe(5);
 
-      expect(dialog?.querySelector('button[aria-label="Cambiar tema"]')).toBeTruthy();
+      expect(dialog?.querySelector('[role="switch"][aria-label="Cambiar tema"]')).toBeTruthy();
     });
 
     it('debería cerrar el modal con el botón de cierre', () => {
@@ -422,7 +422,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
     it('el toggle de tema dentro del modal debería controlar .dark y localStorage', () => {
       abrirModalAjustes();
       const toggle = (fixture.nativeElement as HTMLElement).querySelector(
-        '[role="dialog"] button[aria-label="Cambiar tema"]',
+        '[role="dialog"] [role="switch"][aria-label="Cambiar tema"]',
       ) as HTMLElement;
       expect(toggle).toBeTruthy();
 
@@ -450,7 +450,7 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
       expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(true);
 
       const toggle = (fixture.nativeElement as HTMLElement).querySelector(
-        '[role="dialog"] button[aria-label="Cambiar tema"]',
+        '[role="dialog"] [role="switch"][aria-label="Cambiar tema"]',
       ) as HTMLElement;
       toggle.click();
       fixture.detectChanges();
@@ -462,6 +462,65 @@ describe('AppNavComponent - cierre modal auto-calc', () => {
       expect(document.documentElement.classList.contains('dark')).toBe(true);
       expect(document.documentElement.classList.contains('font-scale-xxlarge')).toBe(false);
       expect(localStorage.getItem('fontScale')).toBe('normal');
+    });
+
+    it('2.1 RED: el switch de tema expone role switch y aria-checked según el tema', () => {
+      abrirModalAjustes();
+
+      const switchEl = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="switch"][aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      expect(switchEl).toBeTruthy();
+      expect(switchEl.getAttribute('role')).toBe('switch');
+      expect(switchEl.getAttribute('aria-checked')).toBe(String(component.themeService.isDark()));
+    });
+
+    it('2.1 RED: click en la fila del switch (sobre el label) togglea el tema', () => {
+      abrirModalAjustes();
+
+      const switchEl = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="switch"][aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+
+      // Click sobre el texto "Tema oscuro" (no sobre un botón interno)
+      const label = switchEl.querySelector('span') as HTMLElement;
+      expect(label.textContent).toContain('Tema oscuro');
+      label.click();
+      fixture.detectChanges();
+
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(localStorage.getItem('theme')).toBe('dark');
+    });
+
+    it('2.1 RED: keydown Enter en el switch togglea el tema', () => {
+      abrirModalAjustes();
+
+      const switchEl = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="switch"][aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+
+      switchEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(localStorage.getItem('theme')).toBe('dark');
+    });
+
+    it('2.1 RED: keydown Space en el switch togglea el tema', () => {
+      abrirModalAjustes();
+
+      const switchEl = (fixture.nativeElement as HTMLElement).querySelector(
+        '[role="switch"][aria-label="Cambiar tema"]',
+      ) as HTMLElement;
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+
+      switchEl.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(localStorage.getItem('theme')).toBe('dark');
     });
   });
 });
