@@ -64,3 +64,28 @@ describe('ProductCardComponent — stock siempre visible con StockBadge', () => 
     expect(texto).toContain('0');
   });
 });
+
+describe('ProductCardComponent — 1.1 RED: hover dark perceptible (regresión)', () => {
+  let fixture: ComponentFixture<ProductCardComponent>;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [ProductCardComponent, StockBadgeComponent, PesosPipe],
+    });
+
+    fixture = TestBed.createComponent(ProductCardComponent);
+    fixture.componentRef.setInput('producto', { ...baseProducto, stock_shop: 25 });
+    fixture.detectChanges();
+  });
+
+  it('el host declara sombra dark:hover gray-800/60 y borde dark:hover:border-gray-500', () => {
+    const host = (fixture.nativeElement as HTMLElement).querySelector('button');
+    expect(host).toBeTruthy();
+
+    // La sombra base dark:hover:shadow-gray-900/50 es imperceptible sobre dark:bg-gray-900
+    // (mismo color de fondo); se exige un tono perceptible: gray-800/60.
+    expect(host?.classList.contains('dark:hover:shadow-gray-800/60')).toBe(true);
+    // Borde de hover más claro que el base dark:border-gray-700, feedback visual claro.
+    expect(host?.classList.contains('dark:hover:border-gray-500')).toBe(true);
+  });
+});
