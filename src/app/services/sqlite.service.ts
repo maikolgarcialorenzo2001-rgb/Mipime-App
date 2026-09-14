@@ -25,16 +25,12 @@ export class SqliteService implements Database {
    * sin transactionKey, que deadlockea el worker de SQLocal 0.18 (retiene
    * transactionMutex entre begin/commit).
    *
-   * INVARIANTE: si _txnDepth > 0 y _activeTxn === null, la transacción activa
-   * es un BEGIN raw (venta/jornada/etc.) y el JOIN deliberadamente hace
-   * fallback a this.sql() — el mutex del driver no se retiene por sentencia
-   * raw, así que ese canal no deadlockea.
-   *
-   * NOTA: transaction() asume callers serializados (sin transaction()
-   * top-level solapadas). En la ventana de microtask donde _txnDepth > 0 pero
-   * _activeTxn todavía es null (o viceversa, al limpiar el handle antes de
-   * decrementar el depth), calls concurrentes compartirían este campo — mismo
-   * supuesto de serialización que el diseño D1 original con _txnDepth.
+   * La regla "si _txnDepth > 0 y _activeTxn === null → la transacción activa
+   * es un BEGIN raw" SOLO es invariante bajo callers serializados (sin
+   * transaction() top-level solapadas): un JOIN concurrente en las ventanas
+   * A (entre _txnDepth++ y _activeTxn = tx) o B (entre el null-out del
+   * handle y _txnDepth--) caería a client.sql() sin transactionKey con el
+   * worker reteniendo transactionMutex (deadlock) o fuera de la txn.
    */
   private _activeTxn: TransactionHandle | null = null;
 
@@ -80,6 +76,9 @@ export class SqliteService implements Database {
    * RE-ENTRANTE (D1): si ya hay una transacción activa (_txnDepth > 0, por un
    * BEGIN raw o por una transaction() externa), fn corre desnuda contra la
    * conexión y el commit/rollback queda en manos del dueño externo.
+   *
+   * CONTRATO: toda sentencia de fn DEBE pasar por el executor tx.sql provisto
+   * (nunca sql() directo del servicio) o el worker SQLocal 0.18 deadlockea.
    */
   async transaction<Result>(
     fn: (tx: SqlExecutor) => Promise<Result>,

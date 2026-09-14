@@ -103,6 +103,8 @@ describe('SqliteService migration v2', () => {
 
   beforeEach(() => {
     sqlCalls.length = 0;
+    mockState.driverTxnOpen = false;
+    mockState.wouldDeadlock = false;
     mockClientInstance = null;
     vi.clearAllMocks();
 
@@ -1182,7 +1184,7 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
   });
 
-  it('8.6 RED: tras transaction() exitosa, la siguiente abre txn nueva del driver (handle limpiado)', async () => {
+  it('8.6 RED: transacciones top-level consecutivas rutean el JOIN anidado por un handle de driver (reen-armado)', async () => {
     await service.transaction(async (tx) => {
       await tx.sql('UPDATE productos SET stock_almacen = 1 WHERE id = 1');
     });
@@ -1209,7 +1211,7 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
   });
 
-  it('8.7 RED: tras transaction() con error, la siguiente abre txn nueva (handle limpiado en finally)', async () => {
+  it('8.7 RED: transacciones top-level consecutivas tras un error del driver rutean el JOIN anidado por un handle de driver (reen-armado)', async () => {
     await expect(
       service.transaction(async (tx) => {
         await tx.sql('UPDATE productos SET stock_almacen = 0 WHERE id = 1');
@@ -1219,8 +1221,8 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     // El fallo produjo ROLLBACK del driver
     expect(sqlCalls.some((c) => c.query.includes('ROLLBACK'))).toBe(true);
 
-    // Aun tras el error, el handle se limpió: la siguiente transacción abre
-    // txn nueva del driver y su JOIN viaja por el handle tx fresco.
+    // Tras el error, la segunda transacción top-level reabre una txn NUEVA del
+    // driver (2 llamadas) y su JOIN viaja por el handle fresco (reen-armado).
     const result = await service.transaction(async (outer) => {
       await outer.sql('UPDATE productos SET stock_almacen = 3 WHERE id = 1');
       return service.transaction(async (inner) => {
@@ -1268,6 +1270,45 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     expect(
       sqlCalls.some(
         (c) => c.via === 'tx' && c.query.includes('UPDATE productos SET stock_shop = 5'),
+      ),
+    ).toBe(false);
+  });
+
+  it('8.9 RED: tras transaction() con error, un BEGIN raw posterior con JOIN viaja por client.sql() (sin handle stale de la rama de error)', async () => {
+    // Txn del driver con ERROR: el finally interno también debe limpiar
+    // _activeTxn en la rama de error (el mock hace ROLLBACK).
+    await expect(
+      service.transaction(async (tx) => {
+        await tx.sql('UPDATE productos SET stock_almacen = 0 WHERE id = 1');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    expect(sqlCalls.some((c) => c.query.includes('ROLLBACK'))).toBe(true);
+
+    // BEGIN raw posterior: _txnDepth sube SIN handle del driver. Si el
+    // cleanup de la rama de error no existiera, _activeTxn apuntaría al
+    // handle ya cerrado y el JOIN de abajo viajaría por él (via 'tx'),
+    // ejecutándose FUERA de la txn raw — misma fuga que 8.8, por error.
+    await service.sql('BEGIN TRANSACTION');
+    const result = await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_shop = 7 WHERE id = 1');
+      return 'ok';
+    });
+    await service.sql('COMMIT');
+
+    expect(result).toBe('ok');
+    // Sin handle activo, el JOIN cae a this.sql() → client.sql() (via 'client'),
+    // igual que 8.3/8.8: el mutex no se retiene por sentencia raw.
+    expect(
+      sqlCalls.some(
+        (c) =>
+          c.via === 'client' && c.query.includes('UPDATE productos SET stock_shop = 7'),
+      ),
+    ).toBe(true);
+    // Y el DML del JOIN NO sale por el handle stale de la txn fallida (via 'tx').
+    expect(
+      sqlCalls.some(
+        (c) => c.via === 'tx' && c.query.includes('UPDATE productos SET stock_shop = 7'),
       ),
     ).toBe(false);
   });
