@@ -258,6 +258,94 @@ describe('QuantityInputComponent — umbral por unidad de medida y confirmación
   });
 });
 
+describe('QuantityInputComponent — maxDecimales vs soloNumeros (señales separadas)', () => {
+  let fixture: ComponentFixture<QuantityInputComponent>;
+  let component: QuantityInputComponent;
+
+  function create(unidad: 'unidad' | 'gramaje' = 'gramaje'): void {
+    TestBed.configureTestingModule({
+      imports: [QuantityInputComponent, PesosPipe],
+    });
+    fixture = TestBed.createComponent(QuantityInputComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('producto', makeProducto(unidad));
+    fixture.detectChanges();
+  }
+
+  it('1. Tercer decimal activa maxDecimales y muestra "Solo se permiten hasta 2 decimales"', () => {
+    create();
+    // Precondición: gramaje con valor "1.25" (ya tiene 2 decimales)
+    component.onInput('1.25');
+    // Act: intentar escribir un tercer dígito decimal
+    const event = new KeyboardEvent('keydown', { key: '5', cancelable: true });
+    component.onInputKeydown(event);
+    // Assert: input bloqueado, maxDecimales activo, soloNumeros apagado
+    expect(event.defaultPrevented).toBe(true);
+    expect(component.maxDecimales()).toBe(true);
+    expect(component.soloNumeros()).toBe(false);
+    // Assert: el template renderiza el mensaje de decimales
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Solo se permiten hasta 2 decimales');
+    expect(fixture.nativeElement.textContent).not.toContain('Solo se permiten números');
+  });
+
+  it('2. Input no numérico activa soloNumeros y NO maxDecimales', () => {
+    create();
+    component.onInput('0.6');
+    // Act: intentar pegar un texto no numérico
+    component.onInput('abc');
+    // Assert: soloNumeros activo, maxDecimales apagado
+    expect(component.soloNumeros()).toBe(true);
+    expect(component.maxDecimales()).toBe(false);
+    // Assert: el template renderiza "Solo se permiten números"
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Solo se permiten números');
+    expect(fixture.nativeElement.textContent).not.toContain('Solo se permiten hasta 2 decimales');
+  });
+
+  it('3. Mensajes maxDecimales y soloNumeros son mutuamente excluyentes', () => {
+    create();
+    // Escenario: activar maxDecimales (3er decimal)
+    component.onInput('1.25');
+    const eventDec = new KeyboardEvent('keydown', { key: '9', cancelable: true });
+    component.onInputKeydown(eventDec);
+    expect(component.maxDecimales()).toBe(true);
+    expect(component.soloNumeros()).toBe(false);
+    fixture.detectChanges();
+    const textoConDec = fixture.nativeElement.textContent;
+    expect(textoConDec).toContain('Solo se permiten hasta 2 decimales');
+    expect(textoConDec).not.toContain('Solo se permiten números');
+
+    // Simular que maxDecimales se auto-limpia (forzar limpieza manual)
+    component.maxDecimales.set(false);
+    fixture.detectChanges();
+
+    // Ahora activar soloNumeros (input no numérico)
+    component.onInput('xyz');
+    expect(component.soloNumeros()).toBe(true);
+    expect(component.maxDecimales()).toBe(false);
+    fixture.detectChanges();
+    const textoConNum = fixture.nativeElement.textContent;
+    expect(textoConNum).toContain('Solo se permiten números');
+    expect(textoConNum).not.toContain('Solo se permiten hasta 2 decimales');
+  });
+
+  it('4. unidad: tecla no numérica activa soloNumeros y nunca maxDecimales', () => {
+    create('unidad');
+    // Act: tecla no numérica en el path de unidad (rama final de onInputKeydown)
+    const event = new KeyboardEvent('keydown', { key: 'a', cancelable: true });
+    component.onInputKeydown(event);
+    // Assert: bloqueado, soloNumeros activo, maxDecimales inactivo
+    expect(event.defaultPrevented).toBe(true);
+    expect(component.soloNumeros()).toBe(true);
+    expect(component.maxDecimales()).toBe(false);
+    // Assert: solo se renderiza "Solo se permiten números"
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Solo se permiten números');
+    expect(fixture.nativeElement.textContent).not.toContain('Solo se permiten hasta 2 decimales');
+  });
+});
+
 describe('QuantityInputComponent — producto con unidad_medida corrupta (AC-9)', () => {
   let fixture: ComponentFixture<QuantityInputComponent>;
   let component: QuantityInputComponent;

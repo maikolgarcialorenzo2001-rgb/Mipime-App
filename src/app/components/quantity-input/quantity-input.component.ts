@@ -15,6 +15,7 @@ export class QuantityInputComponent {
   readonly cancelar = output<void>();
   readonly qtyInput = viewChild<ElementRef<HTMLInputElement>>('qtyInput');
   readonly soloNumeros = signal(false);
+  readonly maxDecimales = signal(false);
   readonly rawText = signal('');
 
   /** true cuando el producto admite decimales (gramaje). */
@@ -66,9 +67,20 @@ export class QuantityInputComponent {
       this.cantidad.set(n);
     } else {
       // Non-numeric paste: show feedback, preserve last valid cantidad
-      this.soloNumeros.set(true);
-      setTimeout(() => this.soloNumeros.set(false), 1800);
+      this.flashSoloNumeros();
     }
+  }
+
+  /** Muestra "Solo se permiten números" por ~1.8s (input no numérico). */
+  private flashSoloNumeros(): void {
+    this.soloNumeros.set(true);
+    setTimeout(() => this.soloNumeros.set(false), 1800);
+  }
+
+  /** Muestra "Solo se permiten hasta 2 decimales" por ~1.8s (3er decimal). */
+  private flashMaxDecimales(): void {
+    this.maxDecimales.set(true);
+    setTimeout(() => this.maxDecimales.set(false), 1800);
   }
 
   /** Clamp to 2 decimal places for paste (matches _redondear in cart). */
@@ -121,8 +133,7 @@ export class QuantityInputComponent {
         const decimalIndex = current.indexOf('.');
         if (decimalIndex !== -1 && current.length - decimalIndex - 1 >= 2) {
           event.preventDefault();
-          this.soloNumeros.set(true);
-          setTimeout(() => this.soloNumeros.set(false), 1800);
+          this.flashMaxDecimales();
         }
         return;
       }
@@ -134,16 +145,14 @@ export class QuantityInputComponent {
         return;
       }
       event.preventDefault();
-      this.soloNumeros.set(true);
-      setTimeout(() => this.soloNumeros.set(false), 1800);
+      this.flashSoloNumeros();
       return;
     }
 
     // Unidad: solo dígitos, filtra el punto decimal
     if (!/^\d$/.test(event.key)) {
       event.preventDefault();
-      this.soloNumeros.set(true);
-      setTimeout(() => this.soloNumeros.set(false), 1800);
+      this.flashSoloNumeros();
     }
   }
 
