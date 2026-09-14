@@ -5,6 +5,7 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 import { DATABASE, type Database } from '../../services/database';
 import { Observable, of, throwError } from 'rxjs';
 import type { Producto } from '../../models';
@@ -311,6 +312,21 @@ it('muestra skeleton en la carga inicial con lista vacía', () => {
       undefined,
       'shop',
     );
+  });
+
+  it('3.3 RED: toast success tras merma exitosa', async () => {
+    component.abrirMerma(1);
+    component.mermaCantidad.set(3);
+    component.mermaMotivo.set('Rotura en depósito');
+    fixture.detectChanges();
+
+    await component.onSubmitMerma();
+    fixture.detectChanges();
+
+    const toasts = TestBed.inject(ToastService).toasts();
+    const ultimo = toasts[toasts.length - 1];
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Merma registrada');
   });
 
   it('shows error on insufficient stock for merma', async () => {

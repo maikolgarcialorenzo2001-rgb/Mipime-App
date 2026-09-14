@@ -8,6 +8,7 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { JornadaService } from '../../services/jornada.service';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 import type { Producto } from '../../models';
 import type { GlobalInvestment } from '../../models';
 import type { LoteDetalle } from '../../models';
@@ -23,6 +24,7 @@ export class ProductosPage implements OnInit {
   private readonly _stockService = inject(StockMovimientoService);
   private readonly _jornadaService = inject(JornadaService);
   private readonly _authService = inject(AuthService);
+  private readonly _toastService = inject(ToastService);
 
   readonly esAdmin = computed(() => this._authService.usuario()?.rol === 'admin');
 
@@ -212,6 +214,7 @@ export class ProductosPage implements OnInit {
       );
       this.cancelarMerma();
       this._cargar();
+      this._toastService.success('Merma registrada');
     } catch (e) {
       this.mermaError.set(
         e instanceof Error ? e.message : 'Error al registrar merma',

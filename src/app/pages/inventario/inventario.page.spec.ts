@@ -6,7 +6,7 @@ import { ProductoService } from '../../services/producto.service';
 import { StockMovimientoService } from '../../services/stock-movimiento.service';
 import { AuthService } from '../../services/auth.service';
 import { JornadaService } from '../../services/jornada.service';
-import { ToastService } from '../../services/toast.service';
+import { ToastService, type Toast } from '../../services/toast.service';
 import { PesosPipe } from '../../pipes/pesos.pipe';
 import type { Producto, StockMovimiento } from '../../models';
 
@@ -15,6 +15,12 @@ import type { Producto, StockMovimiento } from '../../models';
 function ultimoMensajeToast(): string | null {
   const toasts = TestBed.inject(ToastService).toasts();
   return toasts.length > 0 ? toasts[toasts.length - 1].mensaje : null;
+}
+
+/** Último toast encolado como objeto (con tipo), o null si no hay ninguno. */
+function ultimoToast(): Toast | null {
+  const toasts = TestBed.inject(ToastService).toasts();
+  return toasts.length > 0 ? toasts[toasts.length - 1] : null;
 }
 
 describe('InventarioPage', () => {
@@ -2255,5 +2261,197 @@ describe('InventarioPage', () => {
       // precio_costo nulo → em dash (no "$null" ni "$0.00")
       expect(texto).toContain('—');
     });
+  });
+
+  // ── Fix 3 (0121): success toasts en operaciones de inventario ──
+
+  it('3.1 RED: toast success tras entrada exitosa', async () => {
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 105, stock_shop: 10 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'entrada');
+    fixture.detectChanges();
+    component.movimientoCantidad.set(5);
+    component.movimientoCosto.set(500);
+    component.movimientoMotivo.set('Repo');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Almacén: 105 u.');
+    expect(ultimo?.mensaje).toContain('Tienda: 10 u.');
+  });
+
+  it('3.1 RED: toast success tras salida exitosa', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 97, stock_shop: 10 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+    await component.onSalidaUbicacionChange('almacen');
+    component.selectedLoteIndex.set(1);
+    component.movimientoCantidad.set(3);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Almacén: 97 u.');
+    expect(ultimo?.mensaje).toContain('Tienda: 10 u.');
+  });
+
+  it('3.1 RED: toast success tras ajuste exitoso', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 100, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 150, stock_shop: 10 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'ajuste');
+    fixture.detectChanges();
+    component.movimientoCantidad.set(150);
+    component.movimientoMotivo.set('Inventario físico');
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Almacén: 150 u.');
+    expect(ultimo?.mensaje).toContain('Tienda: 10 u.');
+  });
+
+  it('3.1 RED: toast success tras traslado exitoso', async () => {
+    mockProductoService.listar
+      .mockReturnValueOnce(of(productos.slice(0, 1)))
+      .mockReturnValueOnce(of([{ ...productos[0], stock_almacen: 98, stock_shop: 12 }]));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'traslado');
+    fixture.detectChanges();
+    component.movimientoCantidad.set(2);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Almacén: 98 u.');
+    expect(ultimo?.mensaje).toContain('Tienda: 12 u.');
+  });
+
+  it('3.1 RED: toast success tras guardar producto', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.crear.mockReturnValue(
+      of({ ...productos[0], id: 99, nombre: 'Test Producto' }),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    component.abrirNuevoProducto();
+    fixture.detectChanges();
+    component.formNombre.set('Test Producto');
+    component.formCosto.set(200);
+    component.formPrecioVenta.set(500);
+    component.formUnidades.set(10);
+    fixture.detectChanges();
+
+    await component.guardarProducto();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('Test Producto');
+    expect(ultimo?.mensaje).toContain('creado');
+  });
+
+  it('3.1 RED: toast success tras ejecutar eliminar', async () => {
+    mockProductoService.listar.mockReturnValue(of(productos));
+    mockProductoService.eliminar.mockReturnValue(of(undefined));
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.confirmarEliminar(1);
+    fixture.detectChanges();
+
+    await component.ejecutarEliminar();
+    fixture.detectChanges();
+
+    const ultimo = ultimoToast();
+    expect(ultimo?.tipo).toBe('success');
+    expect(ultimo?.mensaje).toContain('eliminado');
+  });
+
+  it('3.1 RED: falla no encola toast success', async () => {
+    mockStockService.obtenerLotesPorProducto.mockResolvedValue([
+      { id: 42, producto_id: 1, cantidad: 10, precio_costo: 8, fecha_ingreso: '2026-01-01T00:00:00Z', ubicacion: 'almacen', created_at: '2026-01-01T00:00:00Z' },
+    ]);
+    mockProductoService.listar.mockReturnValue(of(productos.slice(0, 1)));
+    mockStockService.registrarSalida.mockRejectedValue(
+      new Error('Stock insuficiente'),
+    );
+
+    fixture = TestBed.createComponent(InventarioPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await component.onSelectAction(1, 'salida');
+    fixture.detectChanges();
+    await component.onSalidaUbicacionChange('almacen');
+    component.selectedLoteIndex.set(1);
+    component.movimientoCantidad.set(999);
+    fixture.detectChanges();
+
+    await component.onSubmitMovimiento();
+    fixture.detectChanges();
+
+    expect(component.error()).toBe('Stock insuficiente');
+    expect(ultimoToast()).toBeNull();
   });
 });

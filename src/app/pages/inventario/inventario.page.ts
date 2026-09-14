@@ -282,6 +282,9 @@ export class InventarioPage implements OnInit {
       this.editarPrecioVenta.set(null);
       this.editarPrecioCosto.set(null);
       await this.loadProductos();
+      // Fix 3 (0121): toda operación exitosa encola toast success. El editar
+      // mantiene su mensaje histórico (con detalle de costo FIFO); los demás
+      // movimientos usan el mismo formato de stock por ubicación.
       if (action.tipo === 'editar' && this.error() === null) {
         const actualizado = this.productos().find(
           (p) => p.id === action.productoId,
@@ -309,6 +312,22 @@ export class InventarioPage implements OnInit {
           }
           this._toastService.success(
             `Stock guardado — Almacén: ${actualizado.stock_almacen} ${sufijo} · Tienda: ${actualizado.stock_shop} ${sufijo}${costoMsg}`,
+            2500,
+          );
+        }
+      }
+      if (action.tipo !== 'editar' && this.error() === null) {
+        const actualizado = this.productos().find((p) => p.id === action.productoId);
+        if (actualizado) {
+          const sufijo = unidadMedidaInfo(actualizado.unidad_medida).suffix;
+          const etiquetas: Record<'entrada' | 'salida' | 'ajuste' | 'traslado', string> = {
+            entrada: 'Entrada registrada',
+            salida: 'Salida registrada',
+            ajuste: 'Ajuste registrado',
+            traslado: 'Traslado registrado',
+          };
+          this._toastService.success(
+            `${etiquetas[action.tipo]} — Almacén: ${actualizado.stock_almacen} ${sufijo} · Tienda: ${actualizado.stock_shop} ${sufijo}`,
             2500,
           );
         }
@@ -554,9 +573,10 @@ export class InventarioPage implements OnInit {
     this.formError.set(null);
 
     try {
+      const nombre = this.formNombre().trim();
       await firstValueFrom(
         this.productoService.crear({
-          nombre: this.formNombre().trim(),
+          nombre,
           precio_costo: this.formCosto()!,
           precio_venta: this.formPrecioVenta()!,
           stock_almacen: this.formUnidades()!,
@@ -565,6 +585,7 @@ export class InventarioPage implements OnInit {
       );
       this.cerrarModal();
       await this.loadProductos();
+      this._toastService.success(`Producto "${nombre}" creado`, 2500);
     } catch (e) {
       this.formError.set(
         e instanceof Error ? e.message : 'Error al guardar producto',
@@ -614,10 +635,15 @@ export class InventarioPage implements OnInit {
     }
 
     this.procesando.set(true);
+    const productoEliminado = this.productos().find((p) => p.id === id);
     try {
       await firstValueFrom(this.productoService.eliminar(id));
       this.confirmandoEliminar.set(null);
       await this.loadProductos();
+      this._toastService.success(
+        productoEliminado ? `Producto "${productoEliminado.nombre}" eliminado` : 'Producto eliminado',
+        2500,
+      );
     } catch (e) {
       this.error.set(
         e instanceof Error ? e.message : 'Error al eliminar producto',
