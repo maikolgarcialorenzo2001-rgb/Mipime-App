@@ -3,15 +3,22 @@ import { SqliteService } from './sqlite.service';
 import { PLATFORM_ID } from '@angular/core';
 import { environment } from '../environments/environment';
 
-// Track all SQL calls made through the mock client
-const sqlCalls: { query: string; params: unknown[] }[] = [];
+/**
+ * Registro de todas las sentencias SQL contra el mock.
+ * `via` indica el canal de ejecución (R6): 'tx' = handle de
+ * client.transaction() (porta transactionKey en SQLocal 0.18), 'client' =
+ * client.sql() directo. Los markers BEGIN/COMMIT/ROLLBACK del mock no llevan
+ * `via`. Un mock fiel con trazabilidad permite que el test de regresión
+ * (JOIN anidado) atrape el routing incorrecto por client.sql().
+ */
+const sqlCalls: { query: string; params: unknown[]; via?: 'tx' | 'client' }[] = [];
 
 /** Override para controlar qué versión devuelve el mock de schema_version. */
 let mockSchemaVersion: number | null = null;
 
 class MockSQLocalClient {
   sql = vi.fn().mockImplementation((query: string, ...params: unknown[]) => {
-    sqlCalls.push({ query, params });
+    sqlCalls.push({ query, params, via: 'client' });
     // Check schema_version: return version 1 so v1 is skipped, then v2 runs
     if (query.includes('COALESCE(MAX(version), 0)')) {
       return [{ version: mockSchemaVersion ?? 1 }];
@@ -30,7 +37,16 @@ class MockSQLocalClient {
     async (fn: (tx: { sql: (q: string, ...p: unknown[]) => Promise<unknown[]> }) => Promise<unknown>) => {
       sqlCalls.push({ query: 'BEGIN (client.transaction)', params: [] });
       try {
-        const result = await fn({ sql: (q: string, ...p: unknown[]) => this.sql(q, ...p) });
+        // Handle fiel de SQLocal 0.18: las sentencias del callback viajan por
+        // el handle tx (porta transactionKey), NO por client.sql(). Etiquetar
+        // 'tx' por separado es lo que permite que el test de regresión (JOIN
+        // anidado) atrape un routing incorrecto por client.sql().
+        const result = await fn({
+          sql: (q: string, ...p: unknown[]) => {
+            sqlCalls.push({ query: q, params: p, via: 'tx' });
+            return Promise.resolve([]);
+          },
+        });
         sqlCalls.push({ query: 'COMMIT (client.transaction)', params: [] });
         return result;
       } catch (err) {
@@ -1078,8 +1094,14 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
     expect(result).toBe('ok');
     // JOIN: client.transaction NO se llama (evita "transaction within a transaction")
     expect(mockClientInstance!.transaction).not.toHaveBeenCalled();
+    // R3 (fallback): sin handle tx activo, el JOIN viaja por this.sql() →
+    // client.sql() (via 'client'). El mutex del driver no se retiene por
+    // sentencia, así que este canal no deadlockea bajo BEGIN raw.
     expect(
-      sqlCalls.some((c) => c.query.includes('UPDATE productos SET stock_shop = 5')),
+      sqlCalls.some(
+        (c) =>
+          c.via === 'client' && c.query.includes('UPDATE productos SET stock_shop = 5'),
+      ),
     ).toBe(true);
   });
 
@@ -1094,12 +1116,17 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
 
     expect(result).toBe('inner');
     expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
+    // R1 (regresión deadlock): TODAS las sentencias de la cadena viajan por el
+    // handle tx (porta transactionKey) — el inner incluido. Ninguna por client.
+    const txStatements = sqlCalls.filter((c) => c.via === 'tx');
     expect(
-      sqlCalls.some((c) => c.query.includes('UPDATE productos SET stock_almacen = 3')),
+      txStatements.some((c) => c.query.includes('UPDATE productos SET stock_almacen = 3')),
     ).toBe(true);
     expect(
-      sqlCalls.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
+      txStatements.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
     ).toBe(true);
+    // Ningún DML de la cadena anidada sale por client.sql() (sin transactionKey)
+    expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
   });
 
   it('8.5 RED TRIANGULATE: tras COMMIT del BEGIN raw, una transaction() nueva abre txn propia', async () => {
@@ -1112,5 +1139,61 @@ describe('SqliteService transaction (T-07 / FR-05 / D1)', () => {
 
     // depth volvió a 0 → client.transaction se usa de nuevo (no JOIN)
     expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('8.6 RED: tras transaction() exitosa, la siguiente abre txn nueva del driver (handle limpiado)', async () => {
+    await service.transaction(async (tx) => {
+      await tx.sql('UPDATE productos SET stock_almacen = 1 WHERE id = 1');
+    });
+
+    // Segunda transacción consecutiva (no anidada): el driver abre una txn
+    // NUEVA (2 llamadas) y el JOIN interno viaja por el handle tx fresco.
+    const result = await service.transaction(async (outer) => {
+      await outer.sql('UPDATE productos SET stock_almacen = 3 WHERE id = 1');
+      return service.transaction(async (inner) => {
+        await inner.sql('UPDATE lotes_stock SET cantidad = 2 WHERE id = 1');
+        return 'inner';
+      });
+    });
+
+    expect(result).toBe('inner');
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(2);
+    const txStatements = sqlCalls.filter((c) => c.via === 'tx');
+    expect(
+      txStatements.some((c) => c.query.includes('UPDATE productos SET stock_almacen = 3')),
+    ).toBe(true);
+    expect(
+      txStatements.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
+    ).toBe(true);
+    expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
+  });
+
+  it('8.7 RED: tras transaction() con error, la siguiente abre txn nueva (handle limpiado en finally)', async () => {
+    await expect(
+      service.transaction(async (tx) => {
+        await tx.sql('UPDATE productos SET stock_almacen = 0 WHERE id = 1');
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    // El fallo produjo ROLLBACK del driver
+    expect(sqlCalls.some((c) => c.query.includes('ROLLBACK'))).toBe(true);
+
+    // Aun tras el error, el handle se limpió: la siguiente transacción abre
+    // txn nueva del driver y su JOIN viaja por el handle tx fresco.
+    const result = await service.transaction(async (outer) => {
+      await outer.sql('UPDATE productos SET stock_almacen = 3 WHERE id = 1');
+      return service.transaction(async (inner) => {
+        await inner.sql('UPDATE lotes_stock SET cantidad = 2 WHERE id = 1');
+        return 'inner';
+      });
+    });
+
+    expect(result).toBe('inner');
+    expect(mockClientInstance!.transaction).toHaveBeenCalledTimes(2);
+    const txStatements = sqlCalls.filter((c) => c.via === 'tx');
+    expect(
+      txStatements.some((c) => c.query.includes('UPDATE lotes_stock SET cantidad = 2')),
+    ).toBe(true);
+    expect(sqlCalls.some((c) => c.via === 'client' && c.query.includes('UPDATE'))).toBe(false);
   });
 });

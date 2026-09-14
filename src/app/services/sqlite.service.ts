@@ -1,6 +1,6 @@
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import type { SQLocal } from 'sqlocal';
+import type { SQLocal, TransactionHandle } from 'sqlocal';
 import type { Database, SqlExecutor } from './database';
 import { environment } from '../environments/environment';
 import { createSqlocalClient } from './sqlocal-client';
@@ -17,6 +17,15 @@ export class SqliteService implements Database {
    * En ese caso transaction() anidada hace JOIN en vez de abrir otra txn.
    */
   private _txnDepth = 0;
+
+  /**
+   * Handle tx activo de SQLocal (porta transactionKey). Se setea al entrar al
+   * callback de client.transaction() y se limpia en un finally interno (éxito
+   * Y error). La rama JOIN (_txnDepth > 0) lo usa para no caer en client.sql()
+   * sin transactionKey, que deadlockea el worker de SQLocal 0.18 (retiene
+   * transactionMutex entre begin/commit).
+   */
+  private _activeTxn: TransactionHandle | null = null;
 
   constructor() {
     this._isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -68,20 +77,41 @@ export class SqliteService implements Database {
 
     if (this._txnDepth > 0) {
       // JOIN: misma conexión → las sentencias participan de la txn abierta.
+      const active = this._activeTxn;
+      if (active) {
+        // JOIN bajo client.transaction(): el anidado viaja por el handle tx
+        // activo (porta transactionKey). client.sql() sin transactionKey
+        // durante client.transaction() bloquea en espera circular — el worker
+        // SQLocal 0.18 retiene transactionMutex entre begin/commit.
+        return fn({
+          sql: async <T>(q: string, p?: unknown[]) =>
+            ((await active.sql(q, ...(p ?? []))) as unknown) as T[],
+        });
+      }
+      // JOIN bajo BEGIN raw (sin handle del driver): fallback por this.sql(),
+      // comportamiento original. El mutex no se retiene por sentencia, así
+      // que este canal no deadlockea.
       return fn({ sql: (q, p) => this.sql(q, p) });
     }
 
     this._txnDepth++;
     try {
-      return await client.transaction(async (tx) =>
-        fn({
-          // Mismo patrón de cast que initialize()/runMigrations: SQLocal
-          // tipa el resultado como Record<string, any>[] y el executor es
-          // genérico. El schema es nuestro, así que el cast es seguro.
-          sql: async <T>(q: string, p?: unknown[]) =>
-            ((await tx.sql(q, ...(p ?? []))) as unknown) as T[],
-        }),
-      );
+      return await client.transaction(async (tx) => {
+        this._activeTxn = tx;
+        try {
+          return await fn({
+            // Mismo patrón de cast que initialize()/runMigrations: SQLocal
+            // tipa el resultado como Record<string, any>[] y el executor es
+            // genérico. El schema es nuestro, así que el cast es seguro.
+            sql: async <T>(q: string, p?: unknown[]) =>
+              ((await tx.sql(q, ...(p ?? []))) as unknown) as T[],
+          });
+        } finally {
+          // R4: limpiar el handle tanto en éxito como en error para que la
+          // próxima transaction() no anidada abra una txn nueva del driver.
+          this._activeTxn = null;
+        }
+      });
     } finally {
       this._txnDepth--;
     }
