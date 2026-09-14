@@ -562,11 +562,13 @@ Lote #{{ i + 1 }} — {{ lote.cantidad }}{{ sufijoDe(producto) }} — {{ lote.pr
             <label for="form-unidades" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ formUnidadMedida() === 'gramaje' ? 'Libras' : 'Unidades' }}</label>
             <input
               id="form-unidades"
-              type="number"
-              [(ngModel)]="formUnidades"
+              type="text"
+              [attr.inputmode]="unidadMedidaInfo(formUnidadMedida()).allowsDecimal ? 'decimal' : 'numeric'"
+              [value]="formUnidadesRaw()"
+              (input)="onFormUnidadesInput($event)"
+              (keydown)="onFormUnidadesKeydown($event)"
               name="formUnidades"
               [placeholder]="formUnidadMedida() === 'gramaje' ? 'Libras' : 'Unidades'"
-              min="0"
               required
               class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400"
             />

@@ -2454,4 +2454,273 @@ describe('InventarioPage', () => {
     expect(component.error()).toBe('Stock insuficiente');
     expect(ultimoToast()).toBeNull();
   });
+
+  describe('decimales en campo unidades (fix-formulario-crear-producto)', () => {
+    it('1.1 RED: formUnidadesRaw es "" tras abrirNuevoProducto y cerrarModal', async () => {
+      await setupLoaded();
+
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+      expect(component.formUnidadesRaw()).toBe('');
+
+      component.formUnidadesRaw.set('2.5');
+      component.cerrarModal();
+      fixture.detectChanges();
+      expect(component.formUnidadesRaw()).toBe('');
+
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+      expect(component.formUnidadesRaw()).toBe('');
+    });
+
+    it('2.1 RED: onFormUnidadesInput("1,5") con gramaje → formUnidades 1.5 y raw "1.5"', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('1,5');
+
+      expect(component.formUnidades()).toBe(1.5);
+      expect(component.formUnidadesRaw()).toBe('1.5');
+    });
+
+    it('2.2 RED: onFormUnidadesInput("1.5") con unidad → formUnidades 1 y raw "1" (solo dígitos)', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('unidad');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('1.5');
+
+      expect(component.formUnidades()).toBe(1);
+      expect(component.formUnidadesRaw()).toBe('1');
+    });
+
+    it('2.2b TRIANGULATE: onFormUnidadesInput("12.75") con unidad → 12 (descarta decimales de 2 dígitos)', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('unidad');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('12.75');
+
+      expect(component.formUnidades()).toBe(12);
+      expect(component.formUnidadesRaw()).toBe('12');
+    });
+
+    it('2.3 RED: onFormUnidadesInput("1.555") con gramaje → clamp a 1.55', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('1.555');
+
+      expect(component.formUnidadesRaw()).toBe('1.55');
+      expect(component.formUnidades()).toBe(1.55);
+    });
+
+    it('2.3b RED: onFormUnidadesInput("abc") → raw "" y formUnidades null', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('abc');
+
+      expect(component.formUnidadesRaw()).toBe('');
+      expect(component.formUnidades()).toBeNull();
+    });
+
+    it('2.4 RED: onFormUnidadesInput("") y (".") mantienen formUnidades null', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      component.onFormUnidadesInput('');
+      expect(component.formUnidades()).toBeNull();
+
+      component.onFormUnidadesInput('.');
+      expect(component.formUnidades()).toBeNull();
+    });
+
+    it('2.6 RED: onFormUnidadesKeydown bloquea "-", "e" y "E"', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      const casos = ['-', 'e', 'E'];
+      for (const key of casos) {
+        const event = new KeyboardEvent('keydown', { key, cancelable: true });
+        component.onFormUnidadesKeydown(event);
+        expect(event.defaultPrevented).toBe(true);
+      }
+    });
+
+    it('2.6b RED: onFormUnidadesKeydown permite "." solo si allowsDecimal', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formUnidadMedida.set('unidad');
+      const eventUnidad = new KeyboardEvent('keydown', { key: '.', cancelable: true });
+      component.onFormUnidadesKeydown(eventUnidad);
+      expect(eventUnidad.defaultPrevented).toBe(true);
+
+      component.formUnidadMedida.set('gramaje');
+      const eventGramaje = new KeyboardEvent('keydown', { key: '.', cancelable: true });
+      component.onFormUnidadesKeydown(eventGramaje);
+      expect(eventGramaje.defaultPrevented).toBe(false);
+    });
+
+    it('3.1 RED: #form-unidades es type="text" con inputmode "numeric" (unidad) y "decimal" (gramaje)', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector(
+        '#form-unidades',
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.getAttribute('type')).toBe('text');
+
+      // Unidad (default tras abrirNuevoProducto) → numeric
+      component.formUnidadMedida.set('unidad');
+      fixture.detectChanges();
+      expect(input.getAttribute('inputmode')).toBe('numeric');
+
+      // Gramaje → decimal
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+      expect(input.getAttribute('inputmode')).toBe('decimal');
+    });
+
+    it('3.1b TRIANGULATE: evento input real en #form-unidades dispara la normalización (gramaje, "1,5" → 1.5)', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      const input = fixture.nativeElement.querySelector(
+        '#form-unidades',
+      ) as HTMLInputElement;
+      input.value = '1,5';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      expect(component.formUnidadesRaw()).toBe('1.5');
+      expect(component.formUnidades()).toBe(1.5);
+    });
+
+    it('4.1 RED: unidad con formUnidades 1.5 → formError "Las unidades deben ser números enteros" y crear NO llamado', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formNombre.set('Test');
+      component.formCosto.set(200);
+      component.formPrecioVenta.set(500);
+      component.formUnidades.set(1.5);
+      component.formUnidadMedida.set('unidad');
+      fixture.detectChanges();
+
+      await component.guardarProducto();
+      fixture.detectChanges();
+
+      expect(component.formError()).toBe('Las unidades deben ser números enteros');
+      expect(mockProductoService.crear).not.toHaveBeenCalled();
+    });
+
+    it('4.2 RED: formUnidades -1 → formError "Las unidades no pueden ser negativas" y crear NO llamado', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formNombre.set('Test');
+      component.formCosto.set(200);
+      component.formPrecioVenta.set(500);
+      component.formUnidades.set(-1);
+      fixture.detectChanges();
+
+      await component.guardarProducto();
+      fixture.detectChanges();
+
+      expect(component.formError()).toBe('Las unidades no pueden ser negativas');
+      expect(mockProductoService.crear).not.toHaveBeenCalled();
+    });
+
+    it('4.3 RED: gramaje con formUnidades 1.5 → crear con stock_almacen 1.5', async () => {
+      mockProductoService.crear.mockReturnValue(
+        of(productos[0] as Producto),
+      );
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formNombre.set('Harina');
+      component.formCosto.set(200);
+      component.formPrecioVenta.set(500);
+      component.formUnidades.set(1.5);
+      component.formUnidadMedida.set('gramaje');
+      fixture.detectChanges();
+
+      await component.guardarProducto();
+      fixture.detectChanges();
+
+      expect(mockProductoService.crear).toHaveBeenCalledWith({
+        nombre: 'Harina',
+        precio_costo: 200,
+        precio_venta: 500,
+        stock_almacen: 1.5,
+        unidad_medida: 'gramaje',
+      });
+    });
+
+    it('4.4 RED: unidad con formUnidades 0 → crear con stock_almacen 0 (Number.isInteger(0))', async () => {
+      mockProductoService.crear.mockReturnValue(
+        of(productos[0] as Producto),
+      );
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formNombre.set('Gratis');
+      component.formCosto.set(0);
+      component.formPrecioVenta.set(0);
+      component.formUnidades.set(0);
+      component.formUnidadMedida.set('unidad');
+      fixture.detectChanges();
+
+      await component.guardarProducto();
+      fixture.detectChanges();
+
+      expect(mockProductoService.crear).toHaveBeenCalledWith({
+        nombre: 'Gratis',
+        precio_costo: 0,
+        precio_venta: 0,
+        stock_almacen: 0,
+        unidad_medida: 'unidad',
+      });
+    });
+
+    it('5.1 REGRESIÓN: vacío sigue mostrando "Las unidades son obligatorias" y no llama crear', async () => {
+      await setupLoaded();
+      component.abrirNuevoProducto();
+      fixture.detectChanges();
+
+      component.formNombre.set('Test');
+      component.formCosto.set(200);
+      component.formPrecioVenta.set(500);
+      // formUnidades queda null (campo vacío)
+      fixture.detectChanges();
+
+      await component.guardarProducto();
+      fixture.detectChanges();
+
+      expect(component.formError()).toBe('Las unidades son obligatorias');
+      expect(mockProductoService.crear).not.toHaveBeenCalled();
+    });
+  });
 });

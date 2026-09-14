@@ -464,7 +464,13 @@ export class InventarioPage implements OnInit {
   readonly formCosto = signal<number | null>(null);
   readonly formPrecioVenta = signal<number | null>(null);
   readonly formUnidades = signal<number | null>(null);
+  /** Texto crudo del campo unidades (type="text" + [value]): se sanitiza en
+   *  tiempo real y alimenta a formUnidades solo cuando es parseable. */
+  readonly formUnidadesRaw = signal('');
   readonly formUnidadMedida = signal<UnidadMedida>('unidad');
+
+  /** Expone unidadMedidaInfo al template (inputmode dinámico según allowsDecimal). */
+  readonly unidadMedidaInfo = unidadMedidaInfo;
   readonly formError = signal<string | null>(null);
   readonly confirmandoEliminar = signal<number | null>(null);
   readonly procesando = signal(false);
@@ -516,6 +522,7 @@ export class InventarioPage implements OnInit {
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
     this.formUnidades.set(null);
+    this.formUnidadesRaw.set('');
     this.formUnidadMedida.set('unidad');
     this.formError.set(null);
     this.procesando.set(false);
@@ -528,6 +535,7 @@ export class InventarioPage implements OnInit {
     this.formCosto.set(null);
     this.formPrecioVenta.set(null);
     this.formUnidades.set(null);
+    this.formUnidadesRaw.set('');
     this.formUnidadMedida.set('unidad');
     this.formError.set(null);
     this.procesando.set(false);
@@ -536,6 +544,71 @@ export class InventarioPage implements OnInit {
   onOverlayKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       this.cerrarModal();
+    }
+  }
+
+  /**
+   * Normaliza el texto crudo del campo unidades según la unidad de medida:
+   * coma→punto, unidad → solo la parte entera (dígitos), gramaje → clamp a 2
+   * decimales. Devuelve el texto ya sanitizado ('' si no queda nada parseable).
+   */
+  private static normalizarCantidadInput(
+    raw: string,
+    allowsDecimal: boolean,
+  ): string {
+    const conPunto = raw.replace(',', '.');
+    if (!allowsDecimal) {
+      // Unidad: descarta el separador decimal y lo que sigue, solo dígitos.
+      const parteEntera = conPunto.split('.')[0];
+      return parteEntera.replace(/\D/g, '');
+    }
+    // Gramaje: quita caracteres no numéricos y clampa a 2 decimales.
+    const limpio = conPunto.replace(/[^\d.]/g, '');
+    const dotIndex = limpio.indexOf('.');
+    if (dotIndex === -1) return limpio;
+    const parteEntera = limpio.substring(0, dotIndex);
+    const decimales = limpio.substring(dotIndex + 1).substring(0, 2);
+    return `${parteEntera}.${decimales}`;
+  }
+
+  /** (input) del campo unidades: sanitiza el texto y setea formUnidades solo
+   *  cuando el resultado es parseable ('' | '.' no tocan el valor previo). */
+  onFormUnidadesInput(valueOrEvent: string | Event): void {
+    const raw =
+      typeof valueOrEvent === 'string'
+        ? valueOrEvent
+        : (valueOrEvent.target as HTMLInputElement).value;
+    const allowsDecimal = unidadMedidaInfo(this.formUnidadMedida()).allowsDecimal;
+    const sanitizado = InventarioPage.normalizarCantidadInput(raw, allowsDecimal);
+    this.formUnidadesRaw.set(sanitizado);
+    if (sanitizado === '' || sanitizado === '.') return;
+    this.formUnidades.set(Number(sanitizado));
+  }
+
+  /** (keydown) del campo unidades: bloquea teclas inválidas por adelantado
+   *  (el input handler es la red de seguridad para paste/IME). */
+  onFormUnidadesKeydown(event: KeyboardEvent): void {
+    const teclasPermitidas = [
+      'Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight',
+      'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', 'Escape',
+    ];
+    if (teclasPermitidas.includes(event.key)) return;
+
+    const allowsDecimal = unidadMedidaInfo(this.formUnidadMedida()).allowsDecimal;
+
+    if (allowsDecimal) {
+      if (/^\d$/.test(event.key)) return;
+      if (event.key === '.') {
+        if (this.formUnidadesRaw().includes('.')) event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      return;
+    }
+
+    // Unidad: solo dígitos (el '.' cae acá y se bloquea).
+    if (!/^\d$/.test(event.key)) {
+      event.preventDefault();
     }
   }
 
@@ -556,6 +629,20 @@ export class InventarioPage implements OnInit {
     }
     if (this.formUnidades() === null) {
       this.formError.set('Las unidades son obligatorias');
+      return;
+    }
+    // Defensa en profundidad: unidades con decimales (inputmode ya bloquea el
+    // tipeo, pero un valor programático o un paste edge podría colarse).
+    if (
+      !unidadMedidaInfo(this.formUnidadMedida()).allowsDecimal &&
+      !Number.isInteger(this.formUnidades()!)
+    ) {
+      this.formError.set('Las unidades deben ser números enteros');
+      return;
+    }
+    // Sin cantidades negativas (min="0" desapareció con type="text").
+    if (this.formUnidades()! < 0) {
+      this.formError.set('Las unidades no pueden ser negativas');
       return;
     }
     // F4: feedback temprano de precios/costos negativos (NaN-safe) antes de
