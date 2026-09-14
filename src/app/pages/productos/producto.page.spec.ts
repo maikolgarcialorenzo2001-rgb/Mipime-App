@@ -700,4 +700,28 @@ it('muestra skeleton en la carga inicial con lista vacía', () => {
       expect(container).toBeTruthy();
     });
   });
+
+  // ── Stock display regression (fix 6) ─────────────────────────
+
+  describe('stock display', () => {
+    it('6.1 RED: cada celda de stock renderiza un único app-stock-badge sin cantidad duplicada', () => {
+      const el = fixture.nativeElement as HTMLElement;
+      const badges = el.querySelectorAll('app-stock-badge');
+
+      // Non-empty guard: mockProductos (2) × ubicaciones (almacén + tienda) = 4 badges
+      expect(badges.length).toBe(mockProductos.length * 2);
+
+      for (const badge of Array.from(badges)) {
+        const cell = badge.closest('td');
+        expect(cell).toBeTruthy();
+
+        // Exactly one badge per stock cell
+        expect(cell!.querySelectorAll('app-stock-badge').length).toBe(1);
+
+        // The stock number appears ONLY inside the badge (badge text === cell text);
+        // a duplicated raw-number span would make the cell text longer.
+        expect(cell!.textContent?.trim()).toBe(badge.textContent?.trim());
+      }
+    });
+  });
 });
