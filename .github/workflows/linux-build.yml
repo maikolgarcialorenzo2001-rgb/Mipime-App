@@ -53,7 +53,7 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ github.ref_name }}
+          name: linux-${{ github.run_id }}
           path: |
             release/*.deb
             release/*.AppImage
