@@ -38,8 +38,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build Linux artifacts
-        run: bun run electron:build:linux
+      # Split the electron:build:linux script and pass --publish never:
+      # electron-builder auto-publishes when it detects a CI env, tries to hit
+      # GitHub Releases, and fails without GH_TOKEN. We only want artifacts.
+      - name: Build renderer
+        run: bun run build
+
+      - name: Build electron main
+        run: bun run electron:ts
+
+      - name: Package Linux artifacts (no publish)
+        run: npx electron-builder --linux --publish never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
