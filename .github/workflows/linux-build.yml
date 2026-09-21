@@ -1,0 +1,52 @@
+name: Build Linux (deb + AppImage)
+
+# Builds Linux artifacts ONLY for the linux branch. Nothing on main.
+#
+# Why push-trigger (and not workflow_dispatch): GitHub only shows the
+# "Run workflow" button for workflows stored on the DEFAULT branch (main).
+# We keep Linux delivery independent of main, so every push to this branch
+# builds fresh artifacts automatically. If this branch is ever merged into
+# main, workflow_dispatch becomes usable there too — harmless to keep.
+#
+# electron-builder CANNOT cross-compile Linux targets from Windows
+# (docs/install-chromebook-linux.md's claim is wrong). So we build on a
+# fresh ubuntu-latest runner. Download the .deb from the run's "Artifacts"
+# and install over the old one on the client Chromebook
+# (see docs/install-chromebook-linux.md).
+on:
+  push:
+    branches:
+      - feature/linux-downloads-data
+  workflow_dispatch:
+
+concurrency:
+  group: linux-build
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Linux artifacts
+        run: bun run electron:build:linux
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ github.ref_name }}
+          path: |
+            release/*.deb
+            release/*.AppImage
+            release/*.yml
+          if-no-files-found: error
